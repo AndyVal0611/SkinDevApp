@@ -1,0 +1,94 @@
+﻿<Page x:Class="SkinDevApp.Views.UserDashboardForm"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="UserDashboardForm" Background="#FBF9F6">
+
+    <Grid Margin="25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Clinic Navigation Bar -->
+        <Border Grid.Row="0" Background="#1A2328" CornerRadius="16" Padding="20,15" Margin="0,0,0,20">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text=" |  Specialist Database Console" Foreground="#E0B0A2" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+                <Button Content="Sign Out" Width="95" Height="36" Background="Transparent" Foreground="#E0B0A2" 
+                        BorderBrush="#E0B0A2" BorderThickness="1" HorizontalAlignment="Right" Click="LogoutBtn_Click"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Dynamic Summary Metric Cards -->
+        <Grid Grid.Row="1" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="15"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="15"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Card 1: Total Evaluations (Dynamic Database Count) -->
+            <Border Grid.Column="0" Background="White" CornerRadius="12" Padding="20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="Total Evaluations" FontSize="12" Foreground="#8A827A" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TotalEvaluationsTxt" Text="0" FontSize="28" FontWeight="Bold" Foreground="#1A2328" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Card 2: Unique Clients Logged (Dynamic Database Count) -->
+            <Border Grid.Column="2" Background="White" CornerRadius="12" Padding="20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="Unique Clients Logged" FontSize="12" Foreground="#8A827A" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="UniquePatientsTxt" Text="0" FontSize="28" FontWeight="Bold" Foreground="#1A2328" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Card 3: System / ONNX Status -->
+            <Border Grid.Column="4" Background="White" CornerRadius="12" Padding="20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="ONNX Engine Status" FontSize="12" Foreground="#8A827A" FontWeight="SemiBold"/>
+                    <TextBlock Text="Active (PrecisionSkin)" FontSize="22" FontWeight="Bold" Foreground="#588157" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Main Restricted Database Records Log Card -->
+        <Border Grid.Row="2" Background="White" CornerRadius="16" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.03" Direction="270"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,15">
+                    <TextBlock Text="Restricted Client Database Logs (Owner View)" FontSize="16" FontWeight="Bold" Foreground="#1A2328" VerticalAlignment="Center"/>
+                    <Button Content="🗑️ Clear Database Logs" Width="170" Height="32" Background="#E76F51" Foreground="White" 
+                            FontWeight="Bold" FontSize="11" HorizontalAlignment="Right" Click="ClearLogsBtn_Click"/>
+                </Grid>
+
+                <!-- SQLite Patient Records DataGrid -->
+                <DataGrid x:Name="RecordsDataGrid" Grid.Row="1" AutoGenerateColumns="True" 
+                          CanUserAddRows="False" IsReadOnly="True" GridLinesVisibility="Horizontal" 
+                          Background="Transparent" BorderThickness="1" BorderBrush="#E2EADF" 
+                          RowHeight="40" FontSize="13" Foreground="#1A2328"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>
