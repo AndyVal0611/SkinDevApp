@@ -1,0 +1,33 @@
+{
+  "project": "PrecisionSkin",
+  "pipeline_version": "5.2.1",
+  "run_name": "with_aux",
+  "deployment_target": "Windows 11 Mini PC",
+  "cpu": "Intel Core i5 6th Gen",
+  "ram": "8 GB DDR4",
+  "gpu": "None \u2014 CPU inference",
+  "camera": "Logitech Brio",
+  "inference_runtime": "ONNX Runtime (CPU)",
+  "inference_model": "precisionskin.onnx",
+  "gradcam_model": "precisionskin_best.keras",
+  "gradcam_strategy": "on_capture",
+  "normalization": "(pixel / 127.5) - 1.0",
+  "channel_order": "RGB",
+  "input_size": [
+    224,
+    224,
+    3
+  ],
+  "output_classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "onnx_input_name": "input_layer_1",
+  "onnx_output_name": "dense_2",
+  "best_seed": 0,
+  "use_auxiliary_nonfacial": true,
+  "raspberry_pi": "REMOVED",
+  "tflite": "NOT REQUIRED \u2014 ONNX primary"
+}

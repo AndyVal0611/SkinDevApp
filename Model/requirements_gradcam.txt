@@ -1,0 +1,25 @@
+# PrecisionSkin - Grad-CAM++ explanation service
+# Target: Windows 11 Pro, Intel i5 6th gen, 8 GB RAM, CPU only, Python 3.11 or 3.12
+#
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements_gradcam.txt
+#
+# NOTE: Python 3.13 is not recommended on the deployment machine - prebuilt
+# TensorFlow wheels for Windows lag behind. Use 3.11 or 3.12.
+
+# --- core (required) ---------------------------------------------------------
+tensorflow==2.20.0          # CPU wheel; pulls in keras 3.x
+numpy>=1.26,<3.0
+opencv-python-headless==4.10.0.84
+
+# --- HTTP server (recommended) ----------------------------------------------
+# If these are absent the service automatically falls back to Python's
+# built-in http.server, which works but is slower under load.
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.10.4
+
+# --- used only by the notebook / validation, not by the service --------------
+# onnxruntime==1.20.1       # for the Keras-vs-ONNX agreement check
+# requests==2.32.3          # for the service smoke test

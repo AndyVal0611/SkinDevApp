@@ -1,0 +1,27 @@
+{
+  "model_name": "PrecisionSkin",
+  "version": "5.2.1",
+  "run_name": "with_aux",
+  "classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "class_mapping": {
+    "Acne": 0,
+    "Hyperpigmentation": 1,
+    "Eczema": 2,
+    "Normal": 3
+  },
+  "input_shape": [
+    224,
+    224,
+    3
+  ],
+  "normalization": "(pixel / 127.5) - 1.0",
+  "channel_order": "RGB",
+  "best_seed": 0,
+  "onnx_sha256": "9b66f5aec8c2bb1461097893d8f4b005cb480f13b26cf5fb05ad801eedd6fb0d",
+  "deployment_target": "Windows 11 Mini PC + ONNX Runtime (CPU)"
+}
