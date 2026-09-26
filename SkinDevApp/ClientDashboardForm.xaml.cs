@@ -1,273 +1,497 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using AForge.Video;
+using AForge.Video.DirectShow;
+using Microsoft.Win32;
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
+using SkinDevApp.AI;
+using SkinDevApp.Explainability;
+using SkinDevApp.Imaging;
+using System;
 using System.Drawing;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
-namespace SkinDevApp.Explainability
+namespace SkinDevApp.Views
 {
-    // ======================================================================
-    // WIRE MODELS  (match gradcam_service.py exactly)
-    // ======================================================================
-
-    public sealed class GradCamRequest
+    public partial class ClientDashboardForm : Page
     {
-        [JsonPropertyName("image_base64")]
-        public string ImageBase64 { get; set; } = string.Empty;
+        private FilterInfoCollection videoDevices;
+        private VideoCaptureDevice videoSource;
 
-        /// <summary>null = explain the predicted class.</summary>
-        [JsonPropertyName("class_index")]
-        public int? ClassIndex { get; set; }
+        private BitmapSource currentCapturedImage;
+        private string primaryDiagnosis = "Acne";
+        private string confidencePercent = "0.0%";
 
-        [JsonPropertyName("method")]
-        public string Method { get; set; } = "gradcam++";
+        // --- continuous live Grad-CAM++ (runs while the camera is streaming) ---
+        private LiveGradCamController _live;
+        private readonly object _frameStoreLock = new object();
+        private Bitmap _latestRawFrame;
+        private readonly bool _showLiveHeatmap = true;
 
-        [JsonPropertyName("layer")]
-        public string Layer { get; set; }
-    }
+        /// <summary>Grad-CAM++ refresh period during live preview. 2000ms is
+        /// the tested default for a CPU-only deployment machine.</summary>
+        private const int LiveGradCamRefreshMs = 2000;
 
-    public sealed class GradCamResponse
-    {
-        [JsonPropertyName("ok")] public bool Ok { get; set; }
-        [JsonPropertyName("error")] public string Error { get; set; }
-
-        [JsonPropertyName("predicted_index")] public int PredictedIndex { get; set; }
-        [JsonPropertyName("predicted_class")] public string PredictedClass { get; set; }
-        [JsonPropertyName("confidence")] public float Confidence { get; set; }
-
-        [JsonPropertyName("probabilities")]
-        public Dictionary<string, float> Probabilities { get; set; }
-
-        [JsonPropertyName("method")] public string Method { get; set; }
-        [JsonPropertyName("target_layer")] public string TargetLayer { get; set; }
-        [JsonPropertyName("latency_ms")] public double LatencyMs { get; set; }
-
-        [JsonPropertyName("overlay_base64")] public string OverlayBase64 { get; set; }
-        [JsonPropertyName("heatmap_base64")] public string HeatmapBase64 { get; set; }
-
-        [JsonPropertyName("notes")] public List<string> Notes { get; set; }
-    }
-
-    public sealed class GradCamHealth
-    {
-        [JsonPropertyName("ok")] public bool Ok { get; set; }
-        [JsonPropertyName("status")] public string Status { get; set; }
-        [JsonPropertyName("model_loaded")] public bool ModelLoaded { get; set; }
-        [JsonPropertyName("target_layer")] public string TargetLayer { get; set; }
-        [JsonPropertyName("classes")] public List<string> Classes { get; set; }
-    }
-
-    /// <summary>
-    /// Decoded, ready-to-display result.
-    /// Overlay and Heatmap are owned by the caller - dispose them (or wrap
-    /// the whole result in a `using` block, since GradCamResult itself
-    /// implements IDisposable and disposes both for you).
-    /// </summary>
-    public sealed class GradCamResult : IDisposable
-    {
-        public bool Ok { get; set; }
-        public string Error { get; set; }
-
-        public int PredictedIndex { get; set; }
-        public string PredictedClass { get; set; } = "";
-        public float Confidence { get; set; }
-        public string Method { get; set; } = "";
-        public string TargetLayer { get; set; } = "";
-
-        /// <summary>Server-side compute time.</summary>
-        public double ServiceLatencyMs { get; set; }
-
-        /// <summary>Wall-clock time including HTTP, base64 and PNG decode.</summary>
-        public double RoundTripMs { get; set; }
-
-        public Bitmap Overlay { get; set; }
-        public Bitmap Heatmap { get; set; }
-
-        public IReadOnlyList<string> Notes { get; set; } = Array.Empty<string>();
-
-        public static GradCamResult Failed(string error) =>
-            new GradCamResult { Ok = false, Error = error };
-
-        public void Dispose()
+        public ClientDashboardForm()
         {
-            Overlay?.Dispose();
-            Heatmap?.Dispose();
+            InitializeComponent();
+            ResetKioskState();
         }
-    }
 
-    // ======================================================================
-    // SERVICE CLIENT
-    // ======================================================================
-
-    /// <summary>
-    /// Talks to the local Python Grad-CAM++ service on 127.0.0.1:8765.
-    ///
-    /// ONE static HttpClient for the whole application lifetime. Creating a
-    /// HttpClient per request exhausts sockets under TIME_WAIT and will start
-    /// throwing SocketException after a few hundred analyses.
-    ///
-    /// NOTE: uses HttpClientHandler, not SocketsHttpHandler - the latter is
-    /// .NET-Core-only and does not exist on .NET Framework 4.7.2.
-    /// </summary>
-    public static class GradCamService
-    {
-        public const string BaseUrl = "http://127.0.0.1:8765";
-
-        private static readonly HttpClient Http = CreateClient();
-
-        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            PropertyNameCaseInsensitive = true
-        };
+            if (ContentGrid == null) return;
 
-        private static HttpClient CreateClient()
-        {
-            var handler = new HttpClientHandler
+            ContentGrid.ColumnDefinitions.Clear();
+            ContentGrid.RowDefinitions.Clear();
+
+            if (e.NewSize.Width > 850)
             {
-                // Loopback only - never send this through a corporate proxy.
-                UseProxy = false
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                Grid.SetRow(ImageCard, 0);
+                Grid.SetColumn(ImageCard, 0);
+
+                Grid.SetRow(ControlsCard, 0);
+                Grid.SetColumn(ControlsCard, 1);
+            }
+            else
+            {
+                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(320) });
+                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                Grid.SetRow(ImageCard, 0);
+                Grid.SetColumn(ImageCard, 0);
+
+                Grid.SetRow(ControlsCard, 1);
+                Grid.SetColumn(ControlsCard, 0);
+            }
+        }
+
+        private void ResetKioskState()
+        {
+            StopCamera();
+            DetectionDotsCanvas.Children.Clear();
+            currentCapturedImage = null;
+
+            SnapBtn.IsEnabled = false;
+            AnalyzeBtn.IsEnabled = false;
+            PrintBtn.IsEnabled = false;
+
+            AcneBar.Value = 0; AcneScoreTxt.Text = "0.0%";
+            HyperBar.Value = 0; HyperScoreTxt.Text = "0.0%";
+            EczemaBar.Value = 0; EczemaScoreTxt.Text = "0.0%";
+            NormalBar.Value = 0; NormalScoreTxt.Text = "0.0%";
+
+            VerdictTxt.Text = "Status: Ready. Click Live Cam to start new scan.";
+        }
+
+        private void StartCamBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+
+                if (videoDevices.Count == 0)
+                {
+                    MessageBox.Show("No camera hardware detected on this machine. Please connect a USB webcam.", "LUMYVUE Camera");
+                    return;
+                }
+
+                ResetKioskState();
+
+                videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
+                videoSource.NewFrame += VideoSource_NewFrame;
+                videoSource.Start();
+
+                PlaceholderPanel.Visibility = Visibility.Collapsed;
+                UploadedImageViewer.Visibility = Visibility.Visible;
+
+                SnapBtn.IsEnabled = true;
+                VerdictTxt.Text = "Status: Live Camera Active. Click Snap Frame.";
+
+                // Start continuous, throttled Grad-CAM++ in the background.
+                // The preview stays at full frame rate; the heatmap behind it
+                // refreshes roughly every 2 seconds - see LiveGradCamController.
+                _live = new LiveGradCamController(GetLatestFrameMatForLiveLoop)
+                {
+                    RefreshIntervalMs = LiveGradCamRefreshMs,
+                    WorkingWidth = 640
+                };
+                _live.AnalysisUpdated += OnLiveAnalysisUpdated;
+                _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
+                _live.Start();
+
+                LiveStatusTxt.Text = "Connecting to Grad-CAM++ service...";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Camera Hardware Error: " + ex.Message, "LUMYVUE Camera");
+            }
+        }
+
+        private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            try
+            {
+                using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
+                {
+                    // Give the background analysis loop a copy to work from.
+                    StoreLatestFrame(bitmap);
+
+                    BitmapSource displaySource;
+                    Mat heat = _live?.GetLatestHeatmapClone();
+
+                    if (_showLiveHeatmap && heat != null && !heat.Empty())
+                    {
+                        // Composite the most recent heatmap onto THIS frame, so
+                        // the preview stays at full frame rate even though the
+                        // gradient computation behind it only refreshes every
+                        // ~2 seconds. Fades if the service stalls, rather than
+                        // silently showing a stale result forever.
+                        using (heat)
+                        using (Mat frameMat = BitmapConverter.ToMat(bitmap))
+                        {
+                            double alpha = HeatmapRenderer.AgeAdjustedAlpha(_live.HeatmapAge);
+
+                            using (Mat blended = HeatmapRenderer.Blend(frameMat, heat, alpha))
+                            {
+                                displaySource = ImageInterop.MatToBitmapSource(blended);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        heat?.Dispose();
+                        displaySource = ConvertBitmapToBitmapSource(bitmap);
+                    }
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        UploadedImageViewer.Source = displaySource;
+                        currentCapturedImage = displaySource;
+                    });
+                }
+            }
+            catch
+            {
+                // Frame stream capture catch
+            }
+        }
+
+        /// <summary>Keeps a copy of the latest raw camera frame for the
+        /// background analysis loop, independent of what's on screen.</summary>
+        private void StoreLatestFrame(Bitmap frame)
+        {
+            lock (_frameStoreLock)
+            {
+                _latestRawFrame?.Dispose();
+                _latestRawFrame = (Bitmap)frame.Clone();
+            }
+        }
+
+        /// <summary>Frame provider passed to LiveGradCamController. Returns a
+        /// fresh Mat from the latest stored frame, or null if none yet.</summary>
+        private Mat GetLatestFrameMatForLiveLoop()
+        {
+            lock (_frameStoreLock)
+            {
+                if (_latestRawFrame == null) return null;
+                return BitmapConverter.ToMat(_latestRawFrame);
+            }
+        }
+
+        /// <summary>Raised on the background thread roughly every 2 seconds
+        /// with a fresh classification. Updates the live prediction display.</summary>
+        private void OnLiveAnalysisUpdated(LiveInfo info)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (info.Onnx == null) return;
+
+                    double acneScore = info.Onnx.Probabilities[0] * 100.0;
+                    double hyperScore = info.Onnx.Probabilities[1] * 100.0;
+                    double eczemaScore = info.Onnx.Probabilities[2] * 100.0;
+                    double normalScore = info.Onnx.Probabilities[3] * 100.0;
+
+                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
+                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
+                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
+                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
+
+                    primaryDiagnosis = info.Onnx.PredictedClass;
+                    confidencePercent = info.Onnx.ConfidenceText;
+
+                    if (info.Disagreement)
+                    {
+                        LiveStatusTxt.Text =
+                            $"⚠ ONNX/Keras mismatch: {info.Onnx.PredictedClass} vs {info.ServiceClass}";
+                    }
+                    else
+                    {
+                        LiveStatusTxt.Text = $"● Live Grad-CAM++ - {info.GradCamMs:0} ms";
+                    }
+
+                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
+                });
+            }
+            catch (System.Threading.Tasks.TaskCanceledException) { /* page closing */ }
+        }
+
+        /// <summary>Raised when the Grad-CAM service goes offline or recovers.</summary>
+        private void OnLiveServiceStatusChanged(bool online, string error)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    LiveStatusTxt.Text = online
+                        ? "● Live Grad-CAM++ connected"
+                        : $"○ Grad-CAM++ offline - {error}";
+                });
+            }
+            catch (System.Threading.Tasks.TaskCanceledException) { }
+        }
+
+        private BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+                stream.Position = 0;
+                BitmapImage result = new BitmapImage();
+                result.BeginInit();
+                result.CacheOption = BitmapCacheOption.OnLoad;
+                result.StreamSource = stream;
+                result.EndInit();
+                result.Freeze();
+                return result;
+            }
+        }
+
+        private void SnapBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentCapturedImage == null) return;
+
+            StopCamera();
+            SnapBtn.IsEnabled = false;
+            AnalyzeBtn.IsEnabled = true;
+
+            VerdictTxt.Text = "Status: Frame Captured. Click Run Aesthetic Analysis.";
+        }
+
+        private void UploadBtn_Click(object sender, RoutedEventArgs e)
+        {
+            ResetKioskState();
+
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "Image Files (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png"
             };
 
-            return new HttpClient(handler)
+            if (openFileDialog.ShowDialog() == true)
             {
-                BaseAddress = new Uri(BaseUrl),
-                // Grad-CAM++ on a CPU-only machine is typically 300ms-2s.
-                // 20s covers a cold first request right after service start.
-                Timeout = TimeSpan.FromSeconds(20)
-            };
-        }
+                BitmapImage uploadedBmp = new BitmapImage(new Uri(openFileDialog.FileName));
+                UploadedImageViewer.Source = uploadedBmp;
+                currentCapturedImage = uploadedBmp;
 
-        /// <summary>
-        /// True when the service is up and the Keras model is in RAM.
-        /// Call this once when the dashboard loads and show a status hint.
-        /// </summary>
-        public static async Task<bool> IsReadyAsync(CancellationToken ct = default)
-        {
-            try
-            {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(3));
+                PlaceholderPanel.Visibility = Visibility.Collapsed;
+                UploadedImageViewer.Visibility = Visibility.Visible;
 
-                var health = await Http
-                    .GetFromJsonAsync<GradCamHealth>("/health", JsonOptions, cts.Token)
-                    .ConfigureAwait(false);
-
-                return health != null && health.Ok && health.ModelLoaded;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[GradCAM] health check failed: {ex.Message}");
-                return false;
+                AnalyzeBtn.IsEnabled = true;
+                VerdictTxt.Text = "Status: Image Loaded. Click Run Aesthetic Analysis.";
             }
         }
 
-        /// <summary>
-        /// Send captured image bytes, receive the Grad-CAM++ overlay.
-        ///
-        /// IMPORTANT: pass PNG bytes of the SAME frame that went to ONNX.
-        /// Re-encoding as JPEG changes pixels and can shift the prediction.
-        /// </summary>
-        /// <param name="imageBytes">PNG (preferred) or JPEG encoded frame.</param>
-        /// <param name="classIndex">null = explain the predicted class.</param>
-        public static async Task<GradCamResult> ExplainAsync(
-            byte[] imageBytes,
-            int? classIndex = null,
-            string method = "gradcam++",
-            CancellationToken ct = default)
-        {
-            if (imageBytes == null || imageBytes.Length == 0)
-                return GradCamResult.Failed("No image data to explain.");
+        // ---------------------------------------------------------------------
+        // REAL ANALYSIS - replaces the previous Random()-based fake predictor.
+        //
+        //   1. Convert whatever is currently displayed (webcam snap or an
+        //      uploaded file) into an OpenCV BGR Mat.
+        //   2. Run the real ONNX classifier on it (AiEngine.Predict).
+        //   3. Send the SAME bytes to the local Grad-CAM++ Python service and
+        //      replace the displayed image with the real heatmap overlay.
+        //
+        // If the Grad-CAM service isn't running, the classification result
+        // still shows - only the heatmap is skipped, with a message saying so.
+        // ---------------------------------------------------------------------
 
-            var sw = Stopwatch.StartNew();
+        private async void AnalyzeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            await RunAnalysisAndRender();
+        }
+
+        private async Task RunAnalysisAndRender()
+        {
+            if (currentCapturedImage == null)
+            {
+                MessageBox.Show("Please capture a frame or upload an image first.", "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!AiEngine.IsAvailable)
+            {
+                AiEngine.EnsureLoaded();
+            }
+
+            if (!AiEngine.IsAvailable)
+            {
+                MessageBox.Show(
+                    "The AI model is not loaded.\n\n" +
+                    (AiEngine.LoadErrorMessage ?? "Unknown error.") +
+                    "\n\nSee the instructions at the top of AiEngine.cs.",
+                    "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            AnalyzeBtn.IsEnabled = false;
+            VerdictTxt.Text = "Status: Running skin analysis...";
 
             try
             {
-                var request = new GradCamRequest
+                using (Mat frame = ImageInterop.BitmapSourceToMat(currentCapturedImage))
                 {
-                    ImageBase64 = Convert.ToBase64String(imageBytes),
-                    ClassIndex = classIndex,
-                    Method = method
-                };
+                    // ---- 1. real ONNX classification -------------------------
+                    PredictionResult prediction = await Task.Run(() => AiEngine.Predict(frame));
 
-                using var httpResponse = await Http
-                    .PostAsJsonAsync("/gradcam", request, ct)
-                    .ConfigureAwait(false);
+                    double acneScore = prediction.Probabilities[0] * 100.0;
+                    double hyperScore = prediction.Probabilities[1] * 100.0;
+                    double eczemaScore = prediction.Probabilities[2] * 100.0;
+                    double normalScore = prediction.Probabilities[3] * 100.0;
 
-                var payload = await httpResponse.Content
-                    .ReadFromJsonAsync<GradCamResponse>(JsonOptions, ct)
-                    .ConfigureAwait(false);
+                    primaryDiagnosis = prediction.PredictedClass;
+                    confidencePercent = prediction.ConfidenceText;
 
-                if (payload == null)
-                    return GradCamResult.Failed("Empty response from Grad-CAM service.");
+                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
+                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
+                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
+                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
 
-                if (!payload.Ok)
-                    return GradCamResult.Failed(payload.Error ?? "Unknown service error.");
+                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  |  Rendering Grad-CAM++...";
 
-                var overlay = DecodePng(payload.OverlayBase64);
-                var heatmap = DecodePng(payload.HeatmapBase64);
+                    // ---- 2. real Grad-CAM++ on the SAME bytes -----------------
+                    byte[] pngBytes = frame.ImEncode(".png");
 
-                sw.Stop();
+                    using (GradCamResult gradcam = await GradCamService.ExplainAsync(
+                        pngBytes, classIndex: null, method: "gradcam++"))
+                    {
+                        if (gradcam.Ok && gradcam.Overlay != null)
+                        {
+                            // Replace the displayed image with the real heatmap
+                            // overlay. PrintBtn_Click renders whatever is
+                            // currently shown here, so the printed report
+                            // automatically includes it - no changes needed there.
+                            UploadedImageViewer.Source = ImageInterop.ToBitmapSource(gradcam.Overlay);
 
-                return new GradCamResult
-                {
-                    Ok = true,
-                    PredictedIndex = payload.PredictedIndex,
-                    PredictedClass = payload.PredictedClass ?? "",
-                    Confidence = payload.Confidence,
-                    Method = payload.Method ?? "",
-                    TargetLayer = payload.TargetLayer ?? "",
-                    ServiceLatencyMs = payload.LatencyMs,
-                    RoundTripMs = sw.Elapsed.TotalMilliseconds,
-                    Overlay = overlay,
-                    Heatmap = heatmap,
-                    Notes = payload.Notes ?? new List<string>()
-                };
-            }
-            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-            {
-                return GradCamResult.Failed(
-                    "Grad-CAM service timed out. Is gradcam_service.py still running?");
-            }
-            catch (HttpRequestException ex)
-            {
-                return GradCamResult.Failed(
-                    $"Cannot reach the Grad-CAM service at {BaseUrl}. " +
-                    $"Start gradcam_service.py first. ({ex.Message})");
+                            if (gradcam.PredictedIndex != prediction.PredictedIndex)
+                            {
+                                VerdictTxt.Text =
+                                    $"WARNING: ONNX says {prediction.PredictedClass}, but the Grad-CAM " +
+                                    $"service says {gradcam.PredictedClass}. This indicates a preprocessing " +
+                                    "mismatch - do not trust this result until it's fixed.";
+                            }
+                            else
+                            {
+                                VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)";
+                            }
+                        }
+                        else
+                        {
+                            // Classification is still valid and shown - only the
+                            // heatmap is unavailable (service probably not running).
+                            VerdictTxt.Text =
+                                $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  " +
+                                $"[Grad-CAM unavailable: {gradcam.Error}]";
+                        }
+                    }
+
+                    PrintBtn.IsEnabled = true;
+                }
             }
             catch (Exception ex)
             {
-                return GradCamResult.Failed($"{ex.GetType().Name}: {ex.Message}");
+                MessageBox.Show("Analysis Error: " + ex.Message, "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
+                VerdictTxt.Text = "Status: Analysis failed. Please try again.";
+            }
+            finally
+            {
+                AnalyzeBtn.IsEnabled = true;
             }
         }
 
-        /// <summary>
-        /// Base64 PNG -> Bitmap. The intermediate Bitmap keeps a lock on its
-        /// MemoryStream, so a detached copy is returned instead.
-        /// </summary>
-        private static Bitmap DecodePng(string base64)
+        private void PrintBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(base64)) return null;
-
             try
             {
-                byte[] bytes = Convert.FromBase64String(base64);
+                if (currentCapturedImage == null)
+                {
+                    currentCapturedImage = UploadedImageViewer.Source as BitmapSource;
+                }
 
-                using var ms = new MemoryStream(bytes, writable: false);
-                using var decoded = new Bitmap(ms);
+                // Kunin ang buong larawan kasama ang overlay gamit ang RenderTargetBitmap
+                RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
+                    (int)ImageCard.ActualWidth,
+                    (int)ImageCard.ActualHeight,
+                    96d, 96d, System.Windows.Media.PixelFormats.Pbgra32);
+                renderBitmap.Render(ImageCard);
 
-                return new Bitmap(decoded);   // independent of the stream
+                // Ipasa ang exact scores papunta sa PrintReportWindow
+                PrintReportWindow printWin = new PrintReportWindow(
+                    renderBitmap,
+                    DatabaseHelper.CurrentClientName,
+                    primaryDiagnosis,
+                    confidencePercent,
+                    DatabaseHelper.CurrentClientAge,
+                    DatabaseHelper.CurrentClientContact,
+                    AcneBar.Value, HyperBar.Value, EczemaBar.Value, NormalBar.Value
+                );
+
+                printWin.Owner = Application.Current.MainWindow;
+                printWin.ShowDialog();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[GradCAM] PNG decode failed: {ex.Message}");
-                return null;
+                MessageBox.Show("Report Window Error: " + ex.Message, "LUMYVUE Print", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void LogoutBtn_Click(object sender, RoutedEventArgs e)
+        {
+            StopCamera();
+            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
+            mainWin.MainFrame.Navigate(new LoginForm());
+        }
+
+        private void StopCamera()
+        {
+            if (videoSource != null && videoSource.IsRunning)
+            {
+                videoSource.SignalToStop();
+                videoSource.NewFrame -= VideoSource_NewFrame;
+                videoSource = null;
+            }
+
+            if (_live != null)
+            {
+                _live.AnalysisUpdated -= OnLiveAnalysisUpdated;
+                _live.ServiceStatusChanged -= OnLiveServiceStatusChanged;
+                _live.Dispose();
+                _live = null;
+            }
+
+            lock (_frameStoreLock)
+            {
+                _latestRawFrame?.Dispose();
+                _latestRawFrame = null;
+            }
+
+            LiveStatusTxt.Text = "";
         }
     }
 }

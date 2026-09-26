@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenCvSharp;
 
 namespace SkinDevApp.Explainability
 {
@@ -30,6 +31,13 @@ namespace SkinDevApp.Explainability
 
         [JsonPropertyName("layer")]
         public string Layer { get; set; }
+
+        /// <summary>Live mode sets this false and blends the heatmap client-side.</summary>
+        [JsonPropertyName("return_overlay")]
+        public bool ReturnOverlay { get; set; } = true;
+
+        [JsonPropertyName("return_heatmap")]
+        public bool ReturnHeatmap { get; set; } = true;
     }
 
     public sealed class GradCamResponse
@@ -99,6 +107,31 @@ namespace SkinDevApp.Explainability
             Overlay?.Dispose();
             Heatmap?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Live-mode result: raw heatmap only, no server-rendered overlay - the
+    /// caller composites it with SkinDevApp.Imaging.HeatmapRenderer.Blend().
+    /// The Mat is owned by the caller.
+    /// </summary>
+    public sealed class GradCamRawResult : IDisposable
+    {
+        public bool Ok { get; set; }
+        public string Error { get; set; }
+
+        public int PredictedIndex { get; set; } = -1;
+        public string PredictedClass { get; set; } = "";
+        public float Confidence { get; set; }
+        public string Method { get; set; } = "";
+        public double ServiceLatencyMs { get; set; }
+
+        /// <summary>8-bit single-channel attribution map. May be null.</summary>
+        public Mat Heatmap { get; set; }
+
+        public static GradCamRawResult Failed(string error) =>
+            new GradCamRawResult { Ok = false, Error = error };
+
+        public void Dispose() => Heatmap?.Dispose();
     }
 
     // ======================================================================
@@ -243,6 +276,85 @@ namespace SkinDevApp.Explainability
             catch (Exception ex)
             {
                 return GradCamResult.Failed($"{ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// LIVE MODE: request the raw heatmap only, skipping the server-side
+        /// overlay render (a colormap pass + a full-size PNG encode). This is
+        /// the single biggest saving available at a 2s refresh rate.
+        ///
+        /// The caller composites with SkinDevApp.Imaging.HeatmapRenderer.Blend().
+        /// </summary>
+        public static async Task<GradCamRawResult> ExplainRawAsync(
+            byte[] imageBytes,
+            int? classIndex = null,
+            CancellationToken ct = default)
+        {
+            if (imageBytes == null || imageBytes.Length == 0)
+                return GradCamRawResult.Failed("No image data.");
+
+            try
+            {
+                var request = new GradCamRequest
+                {
+                    ImageBase64 = Convert.ToBase64String(imageBytes),
+                    ClassIndex = classIndex,
+                    Method = "gradcam++",
+                    ReturnOverlay = false,   // <- the live-mode saving
+                    ReturnHeatmap = true
+                };
+
+                using var httpResponse = await Http
+                    .PostAsJsonAsync("/gradcam", request, ct)
+                    .ConfigureAwait(false);
+
+                var payload = await httpResponse.Content
+                    .ReadFromJsonAsync<GradCamResponse>(JsonOptions, ct)
+                    .ConfigureAwait(false);
+
+                if (payload == null)
+                    return GradCamRawResult.Failed("Empty response.");
+
+                if (!payload.Ok)
+                    return GradCamRawResult.Failed(payload.Error ?? "Service error.");
+
+                Mat heat = null;
+
+                if (!string.IsNullOrWhiteSpace(payload.HeatmapBase64))
+                {
+                    byte[] png = Convert.FromBase64String(payload.HeatmapBase64);
+                    heat = Cv2.ImDecode(png, ImreadModes.Grayscale);
+
+                    if (heat.Empty())
+                    {
+                        heat.Dispose();
+                        return GradCamRawResult.Failed("Heatmap PNG failed to decode.");
+                    }
+                }
+
+                return new GradCamRawResult
+                {
+                    Ok = true,
+                    PredictedIndex = payload.PredictedIndex,
+                    PredictedClass = payload.PredictedClass ?? "",
+                    Confidence = payload.Confidence,
+                    Method = payload.Method ?? "",
+                    ServiceLatencyMs = payload.LatencyMs,
+                    Heatmap = heat
+                };
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return GradCamRawResult.Failed("Grad-CAM service timed out.");
+            }
+            catch (HttpRequestException ex)
+            {
+                return GradCamRawResult.Failed($"Service unreachable: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return GradCamRawResult.Failed($"{ex.GetType().Name}: {ex.Message}");
             }
         }
 

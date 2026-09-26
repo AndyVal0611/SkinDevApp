@@ -38,6 +38,14 @@
                     <!-- Canvas layer for Drawing AI Detection Dots -->
                     <Canvas x:Name="DetectionDotsCanvas" IsHitTestVisible="False"/>
 
+                    <!-- Live Grad-CAM++ status - shown only while the camera is streaming -->
+                    <TextBlock x:Name="LiveStatusTxt"
+                               Text=""
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="White" Background="#99000000"
+                               Padding="8,4" VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                               Margin="10" IsHitTestVisible="False"/>
+
                     <!-- Initial Placeholder -->
                     <StackPanel x:Name="PlaceholderPanel" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="✨" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>

@@ -41,6 +41,27 @@ namespace SkinDevApp
         }
 
         /// <summary>
+        /// OpenCV Mat (e.g. a live-blended BGR frame) -> a frozen WPF
+        /// BitmapSource suitable for assigning off the UI thread and then
+        /// setting on an Image control via Dispatcher.Invoke.
+        /// </summary>
+        public static BitmapSource MatToBitmapSource(Mat mat)
+        {
+            byte[] png = mat.ImEncode(".png");
+
+            using (var ms = new MemoryStream(png))
+            {
+                var result = new BitmapImage();
+                result.BeginInit();
+                result.CacheOption = BitmapCacheOption.OnLoad;
+                result.StreamSource = ms;
+                result.EndInit();
+                result.Freeze();
+                return result;
+            }
+        }
+
+        /// <summary>
         /// System.Drawing.Bitmap (e.g. the Grad-CAM overlay returned by the
         /// Python service) -> a frozen, cross-thread-safe WPF BitmapSource
         /// suitable for assigning to an Image control's Source property.
