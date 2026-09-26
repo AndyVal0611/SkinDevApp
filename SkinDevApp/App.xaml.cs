@@ -24,6 +24,7 @@ namespace SkinDevApp
             // this fails quietly here - AiEngine.IsAvailable/LoadErrorMessage
             // report it later instead of crashing the app at startup.
             Task.Run(() => AiEngine.EnsureLoaded());
+
         }
     }
 }
