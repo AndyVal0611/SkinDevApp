@@ -162,6 +162,7 @@
     <Compile Include="PatientRecordPage.xaml.cs">
       <DependentUpon>PatientRecordPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="PrecisionSkinReferences.cs" />
     <Compile Include="PredictionResult.cs" />
     <Compile Include="GradCamService.cs" />
     <Compile Include="HeatmapRenderer.cs" />
