@@ -1,14 +1,18 @@
 ﻿using AForge.Video;
 using AForge.Video.DirectShow;
 using Microsoft.Win32;
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
+using SkinDevApp.AI;
+using SkinDevApp.Explainability;
+using SkinDevApp.Imaging;
 using System;
 using System.Drawing;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace SkinDevApp.Views
 {
@@ -19,7 +23,17 @@ namespace SkinDevApp.Views
 
         private BitmapSource currentCapturedImage;
         private string primaryDiagnosis = "Acne";
-        private string confidencePercent = "83.5%";
+        private string confidencePercent = "0.0%";
+
+        // --- continuous live Grad-CAM++ (runs while the camera is streaming) ---
+        private LiveGradCamController _live;
+        private readonly object _frameStoreLock = new object();
+        private Bitmap _latestRawFrame;
+        private readonly bool _showLiveHeatmap = true;
+
+        /// <summary>Grad-CAM++ refresh period during live preview. 2000ms is
+        /// the tested default for a CPU-only deployment machine.</summary>
+        private const int LiveGradCamRefreshMs = 2000;
 
         public ClientDashboardForm()
         {
@@ -99,6 +113,20 @@ namespace SkinDevApp.Views
 
                 SnapBtn.IsEnabled = true;
                 VerdictTxt.Text = "Status: Live Camera Active. Click Snap Frame.";
+
+                // Start continuous, throttled Grad-CAM++ in the background.
+                // The preview stays at full frame rate; the heatmap behind it
+                // refreshes roughly every 2 seconds - see LiveGradCamController.
+                _live = new LiveGradCamController(GetLatestFrameMatForLiveLoop)
+                {
+                    RefreshIntervalMs = LiveGradCamRefreshMs,
+                    WorkingWidth = 640
+                };
+                _live.AnalysisUpdated += OnLiveAnalysisUpdated;
+                _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
+                _live.Start();
+
+                LiveStatusTxt.Text = "Connecting to Grad-CAM++ service...";
             }
             catch (Exception ex)
             {
@@ -112,11 +140,40 @@ namespace SkinDevApp.Views
             {
                 using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
                 {
+                    // Give the background analysis loop a copy to work from.
+                    StoreLatestFrame(bitmap);
+
+                    BitmapSource displaySource;
+                    Mat heat = _live?.GetLatestHeatmapClone();
+
+                    if (_showLiveHeatmap && heat != null && !heat.Empty())
+                    {
+                        // Composite the most recent heatmap onto THIS frame, so
+                        // the preview stays at full frame rate even though the
+                        // gradient computation behind it only refreshes every
+                        // ~2 seconds. Fades if the service stalls, rather than
+                        // silently showing a stale result forever.
+                        using (heat)
+                        using (Mat frameMat = BitmapConverter.ToMat(bitmap))
+                        {
+                            double alpha = HeatmapRenderer.AgeAdjustedAlpha(_live.HeatmapAge);
+
+                            using (Mat blended = HeatmapRenderer.Blend(frameMat, heat, alpha))
+                            {
+                                displaySource = ImageInterop.MatToBitmapSource(blended);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        heat?.Dispose();
+                        displaySource = ConvertBitmapToBitmapSource(bitmap);
+                    }
+
                     Dispatcher.Invoke(() =>
                     {
-                        var bitmapSource = ConvertBitmapToBitmapSource(bitmap);
-                        UploadedImageViewer.Source = bitmapSource;
-                        currentCapturedImage = bitmapSource;
+                        UploadedImageViewer.Source = displaySource;
+                        currentCapturedImage = displaySource;
                     });
                 }
             }
@@ -124,6 +181,82 @@ namespace SkinDevApp.Views
             {
                 // Frame stream capture catch
             }
+        }
+
+        /// <summary>Keeps a copy of the latest raw camera frame for the
+        /// background analysis loop, independent of what's on screen.</summary>
+        private void StoreLatestFrame(Bitmap frame)
+        {
+            lock (_frameStoreLock)
+            {
+                _latestRawFrame?.Dispose();
+                _latestRawFrame = (Bitmap)frame.Clone();
+            }
+        }
+
+        /// <summary>Frame provider passed to LiveGradCamController. Returns a
+        /// fresh Mat from the latest stored frame, or null if none yet.</summary>
+        private Mat GetLatestFrameMatForLiveLoop()
+        {
+            lock (_frameStoreLock)
+            {
+                if (_latestRawFrame == null) return null;
+                return BitmapConverter.ToMat(_latestRawFrame);
+            }
+        }
+
+        /// <summary>Raised on the background thread roughly every 2 seconds
+        /// with a fresh classification. Updates the live prediction display.</summary>
+        private void OnLiveAnalysisUpdated(LiveInfo info)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (info.Onnx == null) return;
+
+                    double acneScore = info.Onnx.Probabilities[0] * 100.0;
+                    double hyperScore = info.Onnx.Probabilities[1] * 100.0;
+                    double eczemaScore = info.Onnx.Probabilities[2] * 100.0;
+                    double normalScore = info.Onnx.Probabilities[3] * 100.0;
+
+                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
+                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
+                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
+                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
+
+                    primaryDiagnosis = info.Onnx.PredictedClass;
+                    confidencePercent = info.Onnx.ConfidenceText;
+
+                    if (info.Disagreement)
+                    {
+                        LiveStatusTxt.Text =
+                            $"⚠ ONNX/Keras mismatch: {info.Onnx.PredictedClass} vs {info.ServiceClass}";
+                    }
+                    else
+                    {
+                        LiveStatusTxt.Text = $"● Live Grad-CAM++ - {info.GradCamMs:0} ms";
+                    }
+
+                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
+                });
+            }
+            catch (System.Threading.Tasks.TaskCanceledException) { /* page closing */ }
+        }
+
+        /// <summary>Raised when the Grad-CAM service goes offline or recovers.</summary>
+        private void OnLiveServiceStatusChanged(bool online, string error)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    LiveStatusTxt.Text = online
+                        ? "● Live Grad-CAM++ connected"
+                        : $"○ Grad-CAM++ offline - {error}";
+                });
+            }
+            catch (System.Threading.Tasks.TaskCanceledException) { }
         }
 
         private BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
@@ -176,12 +309,25 @@ namespace SkinDevApp.Views
             }
         }
 
-        private void AnalyzeBtn_Click(object sender, RoutedEventArgs e)
+        // ---------------------------------------------------------------------
+        // REAL ANALYSIS - replaces the previous Random()-based fake predictor.
+        //
+        //   1. Convert whatever is currently displayed (webcam snap or an
+        //      uploaded file) into an OpenCV BGR Mat.
+        //   2. Run the real ONNX classifier on it (AiEngine.Predict).
+        //   3. Send the SAME bytes to the local Grad-CAM++ Python service and
+        //      replace the displayed image with the real heatmap overlay.
+        //
+        // If the Grad-CAM service isn't running, the classification result
+        // still shows - only the heatmap is skipped, with a message saying so.
+        // ---------------------------------------------------------------------
+
+        private async void AnalyzeBtn_Click(object sender, RoutedEventArgs e)
         {
-            RunAnalysisAndRender();
+            await RunAnalysisAndRender();
         }
 
-        private void RunAnalysisAndRender()
+        private async Task RunAnalysisAndRender()
         {
             if (currentCapturedImage == null)
             {
@@ -189,92 +335,93 @@ namespace SkinDevApp.Views
                 return;
             }
 
+            if (!AiEngine.IsAvailable)
+            {
+                AiEngine.EnsureLoaded();
+            }
+
+            if (!AiEngine.IsAvailable)
+            {
+                MessageBox.Show(
+                    "The AI model is not loaded.\n\n" +
+                    (AiEngine.LoadErrorMessage ?? "Unknown error.") +
+                    "\n\nSee the instructions at the top of AiEngine.cs.",
+                    "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             AnalyzeBtn.IsEnabled = false;
+            VerdictTxt.Text = "Status: Running skin analysis...";
 
-            Random rand = new Random();
-
-            // Binigyan natin ng pantay-pantay na range ang bawat isa para pwedeng mag-iba-iba kung alin ang pinakamataas
-            double acneScore = Math.Round(40.0 + (rand.NextDouble() * 45.0), 1);     // 40% hanggang 85%
-            double hyperScore = Math.Round(30.0 + (rand.NextDouble() * 45.0), 1);    // 30% hanggang 75%
-            double eczemaScore = Math.Round(20.0 + (rand.NextDouble() * 40.0), 1);   // 20% hanggang 60%
-
-            double normalScore = Math.Round(100.0 - (acneScore * 0.4 + hyperScore * 0.3 + eczemaScore * 0.3), 1);
-            if (normalScore < 5.0) normalScore = 8.5;
-
-            // Alamin kung alin ang pinakamataas para maging totoong primary diagnosis
-            if (hyperScore > acneScore && hyperScore >= eczemaScore)
+            try
             {
-                primaryDiagnosis = "Hyperpigmentation";
-                confidencePercent = $"{hyperScore:F1}%";
-            }
-            else if (eczemaScore > acneScore && eczemaScore > hyperScore)
-            {
-                primaryDiagnosis = "Eczema";
-                confidencePercent = $"{eczemaScore:F1}%";
-            }
-            else
-            {
-                primaryDiagnosis = "Acne";
-                confidencePercent = $"{acneScore:F1}%";
-            }
-
-            AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
-            HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
-            EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
-            NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
-
-            VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)";
-
-            // I-render ang detection dots batay sa kung anong diagnosis ang nanalo
-            DrawAIDetectionOverlay(primaryDiagnosis, rand);
-            PrintBtn.IsEnabled = true;
-        }
-
-        private void DrawAIDetectionOverlay(string diagnosis, Random rand)
-        {
-            DetectionDotsCanvas.Children.Clear();
-
-            double canvasWidth = DetectionDotsCanvas.ActualWidth > 0 ? DetectionDotsCanvas.ActualWidth : 380;
-            double canvasHeight = DetectionDotsCanvas.ActualHeight > 0 ? DetectionDotsCanvas.ActualHeight : 350;
-
-            double centerX = canvasWidth / 2.0;
-            double centerY = canvasHeight / 2.0;
-
-            // Distance/Zoom factor: Dahil malapit ang mukha sa kiosk, pinalaki natin ang spread scale (1.35x to 1.6x)
-            // para hindi magkumpulan sa gitna ng ilong/bibig kundi kumalat sa buong pisngi at noo.
-            double distanceScale = 1.45 + (rand.NextDouble() * 0.2);
-
-            int dotCount = 7; // Dagdagan natin ng konti para mas mukhang detalyado
-            for (int i = 0; i < dotCount; i++)
-            {
-                // Mas pinalawak na random range tapos min-multiply sa distanceScale para sumunod sa lapit ng mukha
-                double randomX = ((rand.NextDouble() * 120.0) - 60.0) * distanceScale;
-                double randomY = ((rand.NextDouble() * 130.0) - 65.0) * distanceScale;
-
-                // Kulay batay sa diagnosis
-                System.Windows.Media.Color dotColor = System.Windows.Media.Color.FromRgb(230, 160, 145);
-                if (diagnosis == "Hyperpigmentation")
+                using (Mat frame = ImageInterop.BitmapSourceToMat(currentCapturedImage))
                 {
-                    dotColor = System.Windows.Media.Color.FromRgb(210, 180, 140);
+                    // ---- 1. real ONNX classification -------------------------
+                    PredictionResult prediction = await Task.Run(() => AiEngine.Predict(frame));
+
+                    double acneScore = prediction.Probabilities[0] * 100.0;
+                    double hyperScore = prediction.Probabilities[1] * 100.0;
+                    double eczemaScore = prediction.Probabilities[2] * 100.0;
+                    double normalScore = prediction.Probabilities[3] * 100.0;
+
+                    primaryDiagnosis = prediction.PredictedClass;
+                    confidencePercent = prediction.ConfidenceText;
+
+                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
+                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
+                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
+                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
+
+                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  |  Rendering Grad-CAM++...";
+
+                    // ---- 2. real Grad-CAM++ on the SAME bytes -----------------
+                    byte[] pngBytes = frame.ImEncode(".png");
+
+                    using (GradCamResult gradcam = await GradCamService.ExplainAsync(
+                        pngBytes, classIndex: null, method: "gradcam++"))
+                    {
+                        if (gradcam.Ok && gradcam.Overlay != null)
+                        {
+                            // Replace the displayed image with the real heatmap
+                            // overlay. PrintBtn_Click renders whatever is
+                            // currently shown here, so the printed report
+                            // automatically includes it - no changes needed there.
+                            UploadedImageViewer.Source = ImageInterop.ToBitmapSource(gradcam.Overlay);
+
+                            if (gradcam.PredictedIndex != prediction.PredictedIndex)
+                            {
+                                VerdictTxt.Text =
+                                    $"WARNING: ONNX says {prediction.PredictedClass}, but the Grad-CAM " +
+                                    $"service says {gradcam.PredictedClass}. This indicates a preprocessing " +
+                                    "mismatch - do not trust this result until it's fixed.";
+                            }
+                            else
+                            {
+                                VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)";
+                            }
+                        }
+                        else
+                        {
+                            // Classification is still valid and shown - only the
+                            // heatmap is unavailable (service probably not running).
+                            VerdictTxt.Text =
+                                $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  " +
+                                $"[Grad-CAM unavailable: {gradcam.Error}]";
+                        }
+                    }
+
+                    PrintBtn.IsEnabled = true;
                 }
-                else if (diagnosis == "Eczema")
-                {
-                    dotColor = System.Windows.Media.Color.FromRgb(240, 140, 130);
-                }
-
-                Ellipse dot = new Ellipse
-                {
-                    Width = 11,
-                    Height = 11,
-                    Fill = new System.Windows.Media.SolidColorBrush(dotColor),
-                    Stroke = System.Windows.Media.Brushes.White,
-                    StrokeThickness = 2
-                };
-
-                // Siguraduhing nasa loob ng canvas bounds at nakakalat sa pisngi/noo
-                Canvas.SetLeft(dot, centerX + randomX);
-                Canvas.SetTop(dot, centerY + randomY);
-                DetectionDotsCanvas.Children.Add(dot);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Analysis Error: " + ex.Message, "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
+                VerdictTxt.Text = "Status: Analysis failed. Please try again.";
+            }
+            finally
+            {
+                AnalyzeBtn.IsEnabled = true;
             }
         }
 
@@ -287,11 +434,11 @@ namespace SkinDevApp.Views
                     currentCapturedImage = UploadedImageViewer.Source as BitmapSource;
                 }
 
-                // Kunin ang buong larawan kasama ang dots gamit ang RenderTargetBitmap
+                // Kunin ang buong larawan kasama ang overlay gamit ang RenderTargetBitmap
                 RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
                     (int)ImageCard.ActualWidth,
                     (int)ImageCard.ActualHeight,
-                    96d, 96d, PixelFormats.Pbgra32);
+                    96d, 96d, System.Windows.Media.PixelFormats.Pbgra32);
                 renderBitmap.Render(ImageCard);
 
                 // Ipasa ang exact scores papunta sa PrintReportWindow
@@ -329,6 +476,22 @@ namespace SkinDevApp.Views
                 videoSource.NewFrame -= VideoSource_NewFrame;
                 videoSource = null;
             }
+
+            if (_live != null)
+            {
+                _live.AnalysisUpdated -= OnLiveAnalysisUpdated;
+                _live.ServiceStatusChanged -= OnLiveServiceStatusChanged;
+                _live.Dispose();
+                _live = null;
+            }
+
+            lock (_frameStoreLock)
+            {
+                _latestRawFrame?.Dispose();
+                _latestRawFrame = null;
+            }
+
+            LiveStatusTxt.Text = "";
         }
     }
 }
