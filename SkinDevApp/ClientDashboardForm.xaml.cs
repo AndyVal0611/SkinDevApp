@@ -234,6 +234,30 @@ namespace SkinDevApp.Views
             }
         }
 
+        // ============================================================================
+        // ClientDashboardForm_LiveUpdates.cs
+        //
+        // This is NOT a standalone file — it shows the two methods you need to
+        // REPLACE inside your existing ClientDashboardForm_xaml.cs.
+        //
+        // HOW TO USE:
+        //   1. Open ClientDashboardForm_xaml.cs in Visual Studio.
+        //   2. Find the method  OnLiveAnalysisUpdated(LiveInfo info)
+        //      and replace its entire body with the one below.
+        //   3. The method  OnLiveServiceStatusChanged  is UNCHANGED — leave it alone.
+        //   4. No other changes are needed in the dashboard file.
+        //
+        // WHY THIS CHANGES:
+        //   The progress bars (AcneBar, HyperBar, etc.) now show the EMA-smoothed
+        //   probabilities from info.Stable instead of the raw per-tick values.
+        //   This makes the bars move smoothly rather than jumping every second.
+        //
+        //   VerdictTxt now shows a "Confirming…" or "Analyzing… low confidence"
+        //   message during uncertain periods instead of a flickering diagnosis.
+        // ============================================================================
+
+        // ─── REPLACE THIS METHOD IN ClientDashboardForm_xaml.cs ───────────────────
+
         private void OnLiveAnalysisUpdated(LiveInfo info)
         {
             try
@@ -242,34 +266,73 @@ namespace SkinDevApp.Views
                 {
                     if (info.Onnx == null) return;
 
-                    double acneScore = info.Onnx.Probabilities[0] * 100.0;
-                    double hyperScore = info.Onnx.Probabilities[1] * 100.0;
-                    double eczemaScore = info.Onnx.Probabilities[2] * 100.0;
-                    double normalScore = info.Onnx.Probabilities[3] * 100.0;
+                    // ── Progress bars: use smoothed probabilities ─────────────────
+                    // info.Stable.SmoothedProbabilities is EMA-smoothed, so the bars
+                    // animate gradually rather than jumping every tick.
+                    float[] smoothed = info.Stable?.SmoothedProbabilities ?? info.Onnx.Probabilities;
+
+                    double acneScore = smoothed.Length > 0 ? smoothed[0] * 100.0 : 0;
+                    double hyperScore = smoothed.Length > 1 ? smoothed[1] * 100.0 : 0;
+                    double eczemaScore = smoothed.Length > 2 ? smoothed[2] * 100.0 : 0;
+                    double normalScore = smoothed.Length > 3 ? smoothed[3] * 100.0 : 0;
 
                     AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
                     HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
                     EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
                     NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
 
-                    primaryDiagnosis = info.Onnx.PredictedClass;
-                    confidencePercent = info.Onnx.ConfidenceText;
-
-                    if (info.Disagreement)
+                    // ── Verdict text: use the stabilized display class ────────────
+                    if (info.Stable != null)
                     {
-                        LiveStatusTxt.Text =
-                            $"⚠ ONNX/Keras mismatch: {info.Onnx.PredictedClass} vs {info.ServiceClass}";
+                        if (info.Stable.IsUncertain)
+                        {
+                            // Model is guessing — don't show a diagnosis.
+                            VerdictTxt.Text = "Status: Analyzing\u2026 Maintain position and lighting.";
+                        }
+                        else if (!info.Stable.IsStable)
+                        {
+                            // Confidence is sufficient but the class hasn't held long enough yet.
+                            VerdictTxt.Text = $"Status: {info.Stable.StatusText}";
+                        }
+                        else
+                        {
+                            // Stable confirmed result.
+                            primaryDiagnosis = info.Stable.DisplayClass;
+                            confidencePercent = $"{info.Stable.DisplayConfidence * 100f:F1}%";
+                            VerdictTxt.Text =
+                                $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
+                        }
                     }
                     else
                     {
-                        LiveStatusTxt.Text = $"● Live Grad-CAM++ - {info.GradCamMs:0} ms";
+                        // Fallback: stabilizer not available, use raw (shouldn't happen).
+                        primaryDiagnosis = info.Onnx.PredictedClass;
+                        confidencePercent = info.Onnx.ConfidenceText;
+                        VerdictTxt.Text =
+                            $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
                     }
 
-                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
+                    // ── Service status line ───────────────────────────────────────
+                    if (info.Disagreement)
+                    {
+                        LiveStatusTxt.Text =
+                            $"\u26a0 ONNX/Keras mismatch: {info.Onnx.PredictedClass} vs {info.ServiceClass}";
+                    }
+                    else
+                    {
+                        LiveStatusTxt.Text = $"\u25cf Live Grad-CAM++ \u2014 {info.GradCamMs:0} ms";
+                    }
                 });
             }
             catch (System.Threading.Tasks.TaskCanceledException) { }
         }
+
+        // ─── NO OTHER CHANGES NEEDED IN ClientDashboardForm_xaml.cs ───────────────
+        //
+        // The _live controller is already constructed and started correctly in
+        // StartCamBtn_Click.  The stabilizer lives inside LiveGradCamController and
+        // is automatically reset when Stop() is called, so each camera session starts
+        // with a clean EMA state.
 
         private void OnLiveServiceStatusChanged(bool online, string error)
         {

@@ -173,6 +173,7 @@
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Predictionstabilizer.cs" />
     <Compile Include="PrepearationPage.xaml.cs">
       <DependentUpon>PrepearationPage.xaml</DependentUpon>
     </Compile>

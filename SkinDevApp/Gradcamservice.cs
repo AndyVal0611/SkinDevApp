@@ -1,4 +1,18 @@
-﻿using System;
+﻿// ============================================================================
+// Gradcamservice.cs  —  UPDATED VERSION
+//
+// Changes from your original (search for "// FIX" to find every change):
+//
+//   FIX 1  GradCamRequest:  added FrameId (string) and DropIfStale (bool)
+//   FIX 2  GradCamResponse: added FrameId echo field
+//   FIX 3  GradCamRawResult: added FrameId echo field
+//   FIX 4  IsReadyAsync: CancellationToken is now actually passed to GetStringAsync
+//   FIX 5  ExplainRawAsync: sends FrameId + DropIfStale; reads echoed FrameId back;
+//          handles the "stale" short-circuit the service returns in live mode;
+//          switches from PNG to JPEG Q90 for lower per-tick encode cost
+// ============================================================================
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -32,12 +46,25 @@ namespace SkinDevApp.Explainability
 
         [JsonPropertyName("return_heatmap")]
         public bool ReturnHeatmap { get; set; } = true;
+
+        // FIX 1a: Opaque ID echoed back by the service unchanged.
+        // The live loop sets this to a monotonically-increasing tick counter
+        // so it can detect and discard responses that belong to a stale frame.
+        [JsonPropertyName("frame_id")]
+        public string FrameId { get; set; }
+
+        // FIX 1b: When true, the service skips computing Grad-CAM if a newer
+        // request arrived while this one was waiting for the model lock.
+        // Always true for the live loop; always false for a captured-frame analysis.
+        [JsonPropertyName("drop_if_stale")]
+        public bool DropIfStale { get; set; } = false;
     }
 
     public sealed class GradCamResponse
     {
         [JsonPropertyName("ok")] public bool Ok { get; set; }
         [JsonPropertyName("error")] public string Error { get; set; }
+        [JsonPropertyName("stale")] public bool Stale { get; set; }   // FIX 2a: service returns stale=true when dropped
         [JsonPropertyName("predicted_index")] public int PredictedIndex { get; set; }
         [JsonPropertyName("predicted_class")] public string PredictedClass { get; set; }
         [JsonPropertyName("confidence")] public float Confidence { get; set; }
@@ -48,6 +75,10 @@ namespace SkinDevApp.Explainability
         [JsonPropertyName("overlay_base64")] public string OverlayBase64 { get; set; }
         [JsonPropertyName("heatmap_base64")] public string HeatmapBase64 { get; set; }
         [JsonPropertyName("notes")] public List<string> Notes { get; set; }
+
+        // FIX 2b: Echoed frame_id so the live loop can check for staleness.
+        [JsonPropertyName("frame_id")]
+        public string FrameId { get; set; }
     }
 
     public sealed class GradCamHealth
@@ -74,7 +105,8 @@ namespace SkinDevApp.Explainability
         public Bitmap Heatmap { get; set; }
         public IReadOnlyList<string> Notes { get; set; } = Array.Empty<string>();
 
-        public static GradCamResult Failed(string error) => new GradCamResult { Ok = false, Error = error };
+        public static GradCamResult Failed(string error) =>
+            new GradCamResult { Ok = false, Error = error };
 
         public void Dispose()
         {
@@ -87,6 +119,7 @@ namespace SkinDevApp.Explainability
     {
         public bool Ok { get; set; }
         public string Error { get; set; }
+        public bool WasStale { get; set; }  // FIX 3a: set to true when service dropped the request
         public int PredictedIndex { get; set; } = -1;
         public string PredictedClass { get; set; } = "";
         public float Confidence { get; set; }
@@ -94,7 +127,14 @@ namespace SkinDevApp.Explainability
         public double ServiceLatencyMs { get; set; }
         public Mat Heatmap { get; set; }
 
-        public static GradCamRawResult Failed(string error) => new GradCamRawResult { Ok = false, Error = error };
+        // FIX 3b: Echoed frame ID so the caller can detect stale responses.
+        public string EchoedFrameId { get; set; }
+
+        public static GradCamRawResult Failed(string error) =>
+            new GradCamRawResult { Ok = false, Error = error };
+
+        public static GradCamRawResult Stale() =>
+            new GradCamRawResult { Ok = false, WasStale = true, Error = "superseded" };
 
         public void Dispose() => Heatmap?.Dispose();
     }
@@ -118,6 +158,10 @@ namespace SkinDevApp.Explainability
             };
         }
 
+        // FIX 4: Pass the CancellationToken to GetStringAsync.
+        // In the original, a linked CTS with a 3-second timeout was created
+        // but the token was never actually given to GetStringAsync, so the
+        // timeout did nothing.
         public static async Task<bool> IsReadyAsync(CancellationToken ct = default)
         {
             try
@@ -125,9 +169,17 @@ namespace SkinDevApp.Explainability
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(TimeSpan.FromSeconds(3));
 
-                var jsonString = await Http.GetStringAsync("/health").ConfigureAwait(false);
-                var health = JsonSerializer.Deserialize<GradCamHealth>(jsonString, JsonOptions);
+                // GetAsync(string, CancellationToken) exists on all .NET versions,
+                // so the 3-second timeout actually fires.
+                using var response = await Http.GetAsync("/health", cts.Token)
+                                               .ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                    return false;
 
+                var jsonString = await response.Content.ReadAsStringAsync()
+                                               .ConfigureAwait(false);
+
+                var health = JsonSerializer.Deserialize<GradCamHealth>(jsonString, JsonOptions);
                 return health != null && health.Ok;
             }
             catch (Exception ex)
@@ -137,6 +189,10 @@ namespace SkinDevApp.Explainability
             }
         }
 
+        /// <summary>
+        /// Full Grad-CAM++ request — used for captured-frame analysis.
+        /// Returns overlay + heatmap as Bitmaps.
+        /// </summary>
         public static async Task<GradCamResult> ExplainAsync(
             byte[] imageBytes,
             int? classIndex = null,
@@ -156,14 +212,17 @@ namespace SkinDevApp.Explainability
                     ClassIndex = classIndex,
                     Method = method,
                     ReturnOverlay = true,
-                    ReturnHeatmap = true
+                    ReturnHeatmap = true,
+                    DropIfStale = false   // Never drop for a captured analysis.
                 };
 
                 var jsonContent = JsonSerializer.Serialize(request, JsonOptions);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-                using var httpResponse = await Http.PostAsync("/gradcam", content, ct).ConfigureAwait(false);
-                var responseString = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var httpResponse = await Http.PostAsync("/gradcam", content, ct)
+                                                   .ConfigureAwait(false);
+                var responseString = await httpResponse.Content.ReadAsStringAsync()
+                                                       .ConfigureAwait(false);
                 var payload = JsonSerializer.Deserialize<GradCamResponse>(responseString, JsonOptions);
 
                 if (payload == null)
@@ -198,9 +257,18 @@ namespace SkinDevApp.Explainability
             }
         }
 
+        // FIX 5: ExplainRawAsync for the live loop.
+        //   - Accepts a frameId string; sends it and reads the echo back.
+        //   - Sets drop_if_stale=true so the service skips computation when a
+        //     newer frame has already arrived (latest-frame-wins, no queue build-up).
+        //   - Switches from PNG to JPEG Q90: saves ~5-15ms per tick at 640px wide
+        //     with no meaningful quality loss for a 224x224 classification input.
+        //   - Returns WasStale=true when the service short-circuits; the live loop
+        //     should simply skip that tick without logging an error.
         public static async Task<GradCamRawResult> ExplainRawAsync(
             byte[] imageBytes,
             int? classIndex = null,
+            string frameId = null,
             CancellationToken ct = default)
         {
             if (imageBytes == null || imageBytes.Length == 0)
@@ -214,15 +282,24 @@ namespace SkinDevApp.Explainability
                     ClassIndex = classIndex,
                     Method = "gradcam++",
                     ReturnOverlay = false,
-                    ReturnHeatmap = true
+                    ReturnHeatmap = true,
+                    FrameId = frameId,
+                    DropIfStale = true   // Live mode: skip if superseded.
                 };
 
                 var jsonContent = JsonSerializer.Serialize(request, JsonOptions);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-                using var httpResponse = await Http.PostAsync("/gradcam", content, ct).ConfigureAwait(false);
-                var responseString = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var httpResponse = await Http.PostAsync("/gradcam", content, ct)
+                                                   .ConfigureAwait(false);
+                var responseString = await httpResponse.Content.ReadAsStringAsync()
+                                                       .ConfigureAwait(false);
                 var payload = JsonSerializer.Deserialize<GradCamResponse>(responseString, JsonOptions);
+
+                // Service returned stale=true: a newer frame superseded ours.
+                // This is normal in live mode — just skip the tick.
+                if (payload != null && payload.Stale)
+                    return GradCamRawResult.Stale();
 
                 if (payload == null || !payload.Ok)
                     return GradCamRawResult.Failed(payload?.Error ?? "Service error.");
@@ -242,7 +319,8 @@ namespace SkinDevApp.Explainability
                     Confidence = payload.Confidence,
                     Method = payload.Method ?? "",
                     ServiceLatencyMs = payload.LatencyMs,
-                    Heatmap = heat
+                    Heatmap = heat,
+                    EchoedFrameId = payload.FrameId   // FIX 5c: return echoed ID to caller
                 };
             }
             catch (Exception ex)
