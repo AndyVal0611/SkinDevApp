@@ -5,5 +5,6 @@
   </Configurations>
   <Project Path="SkinDevApp/SkinDevApp.csproj" Id="c45b5adb-1bf4-45c7-8b8f-87f0729ab4ab">
     <Platform Solution="*|x64" Project="x64" />
+    <Platform Solution="Debug|Any CPU" Project="x64" />
   </Project>
 </Solution>

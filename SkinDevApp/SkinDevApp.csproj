@@ -55,6 +55,14 @@
     <Reference Include="AForge.Video.DirectShow, Version=2.2.5.0, Culture=neutral, PublicKeyToken=61ea4348d43881b7, processorArchitecture=MSIL">
       <HintPath>..\packages\AForge.Video.DirectShow.2.2.5\lib\AForge.Video.DirectShow.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=10.0.0.8, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.10.0.12\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.ML.OnnxRuntime, Version=1.30.0.0, Culture=neutral, PublicKeyToken=f27f157f0a5b7bb6, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.ML.OnnxRuntime.Managed.1.30.0\lib\netstandard2.0\Microsoft.ML.OnnxRuntime.dll</HintPath>
+    </Reference>
     <Reference Include="OpenCvSharp, Version=4.0.0.0, Culture=neutral, PublicKeyToken=6adad1e807fea099, processorArchitecture=MSIL">
       <HintPath>..\packages\OpenCvSharp4.4.13.0.20260627\lib\netstandard2.0\OpenCvSharp.dll</HintPath>
     </Reference>
@@ -139,10 +147,22 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="ConsentPage.xaml.cs">
+      <DependentUpon>ConsentPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="DatabaseHelper.cs" />
     <Compile Include="AiEngine.cs" />
     <Compile Include="ImageInterop.cs" />
+    <Compile Include="ImageReviewPage.xaml.cs">
+      <DependentUpon>ImageReviewPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ModelInfoPage.xaml.cs">
+      <DependentUpon>ModelInfoPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OnnxInference.cs" />
+    <Compile Include="PatientRecordPage.xaml.cs">
+      <DependentUpon>PatientRecordPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="PredictionResult.cs" />
     <Compile Include="GradCamService.cs" />
     <Compile Include="HeatmapRenderer.cs" />
@@ -153,13 +173,36 @@
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="PrepearationPage.xaml.cs">
+      <DependentUpon>PrepearationPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="PrintReportWindow.xaml.cs">
       <DependentUpon>PrintReportWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="RegistrationPage.xaml.cs">
+      <DependentUpon>RegistrationPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ResearchDashboardPage.xaml.cs">
+      <DependentUpon>ResearchDashboardPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ResearcherVerificationWindow.xaml.cs">
+      <DependentUpon>ResearcherVerificationWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="SettingsPage.xaml.cs">
+      <DependentUpon>SettingsPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="UserDashboardForm.xaml.cs">
       <DependentUpon>UserDashboardForm.xaml</DependentUpon>
     </Compile>
     <Page Include="ClientDashboardForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ConsentPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ImageReviewPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -178,7 +221,35 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ModelInfoPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="PatientRecordPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="PrepearationPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="PrintReportWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="RegistrationPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ResearchDashboardPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ResearcherVerificationWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SettingsPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

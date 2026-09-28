@@ -1,0 +1,21 @@
+{
+  "classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "class_mapping": {
+    "Acne": 0,
+    "Hyperpigmentation": 1,
+    "Eczema": 2,
+    "Normal": 3
+  },
+  "input_size": [
+    224,
+    224,
+    3
+  ],
+  "normalization": "(pixel / 127.5) - 1.0",
+  "channel_order": "RGB"
+}
