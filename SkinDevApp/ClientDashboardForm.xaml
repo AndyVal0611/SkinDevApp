@@ -31,9 +31,10 @@
                 </Border.Effect>
                 <Grid x:Name="CameraViewportGrid" ClipToBounds="True">
                     <Image x:Name="UploadedImageViewer" 
-                           Stretch="UniformToFill" 
+                           Stretch="Uniform" 
                            HorizontalAlignment="Center" 
-                           VerticalAlignment="Center"/>
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
 
                     <!-- Canvas layer for Drawing AI Detection Dots -->
                     <Canvas x:Name="DetectionDotsCanvas" IsHitTestVisible="False"/>

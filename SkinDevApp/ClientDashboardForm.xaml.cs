@@ -31,9 +31,15 @@ namespace SkinDevApp.Views
         private Bitmap _latestRawFrame;
         private readonly bool _showLiveHeatmap = true;
 
-        /// <summary>Grad-CAM++ refresh period during live preview. 2000ms is
-        /// the tested default for a CPU-only deployment machine.</summary>
-        private const int LiveGradCamRefreshMs = 2000;
+        // --- frame handling ---
+        private Bitmap _snappedRaw;
+        private volatile bool _cameraLive;
+
+        private readonly bool _cropLiveFrameToSquare = true;
+        private const int AnalysisWidth = 640;
+
+        /// <summary>Grad-CAM++ refresh period during live preview. Reduced to 1000ms for responsiveness.</summary>
+        private const int LiveGradCamRefreshMs = 1000;
 
         public ClientDashboardForm()
         {
@@ -77,6 +83,8 @@ namespace SkinDevApp.Views
             StopCamera();
             DetectionDotsCanvas.Children.Clear();
             currentCapturedImage = null;
+            _snappedRaw?.Dispose();
+            _snappedRaw = null;
 
             SnapBtn.IsEnabled = false;
             AnalyzeBtn.IsEnabled = false;
@@ -104,6 +112,7 @@ namespace SkinDevApp.Views
 
                 ResetKioskState();
 
+                _cameraLive = true;
                 videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
                 videoSource.NewFrame += VideoSource_NewFrame;
                 videoSource.Start();
@@ -114,13 +123,13 @@ namespace SkinDevApp.Views
                 SnapBtn.IsEnabled = true;
                 VerdictTxt.Text = "Status: Live Camera Active. Click Snap Frame.";
 
-                // Start continuous, throttled Grad-CAM++ in the background.
-                // The preview stays at full frame rate; the heatmap behind it
-                // refreshes roughly every 2 seconds - see LiveGradCamController.
+                // Start continuous, throttled Grad-CAM++ with relaxed gating thresholds
                 _live = new LiveGradCamController(GetLatestFrameMatForLiveLoop)
                 {
                     RefreshIntervalMs = LiveGradCamRefreshMs,
-                    WorkingWidth = 640
+                    WorkingWidth = 640,
+                    MotionThreshold = 25.0,    // Relaxed threshold to prevent flickering during head movements
+                    MaxHeatmapAgeSeconds = 8.0  // Extended timeout to allow smooth response transitions
                 };
                 _live.AnalysisUpdated += OnLiveAnalysisUpdated;
                 _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
@@ -136,44 +145,47 @@ namespace SkinDevApp.Views
 
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
+            if (!_cameraLive) return;
+
             try
             {
-                using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
+                using (Bitmap rawFrame = (Bitmap)eventArgs.Frame.Clone())
+                using (Bitmap bitmap = PrepareFrame(rawFrame))
                 {
-                    // Give the background analysis loop a copy to work from.
                     StoreLatestFrame(bitmap);
 
-                    BitmapSource displaySource;
-                    Mat heat = _live?.GetLatestHeatmapClone();
+                    LiveGradCamController live = _live;
+                    BitmapSource displaySource = null;
+                    Mat heat = live?.GetLatestHeatmapClone();
 
-                    if (_showLiveHeatmap && heat != null && !heat.Empty())
+                    if (_showLiveHeatmap && live != null && heat != null && !heat.Empty())
                     {
-                        // Composite the most recent heatmap onto THIS frame, so
-                        // the preview stays at full frame rate even though the
-                        // gradient computation behind it only refreshes every
-                        // ~2 seconds. Fades if the service stalls, rather than
-                        // silently showing a stale result forever.
                         using (heat)
-                        using (Mat frameMat = BitmapConverter.ToMat(bitmap))
+                        using (Mat frameMat = EnsureBgr(BitmapConverter.ToMat(bitmap)))
                         {
-                            double alpha = HeatmapRenderer.AgeAdjustedAlpha(_live.HeatmapAge);
+                            double alpha = live.GetOverlayAlpha(frameMat);
 
-                            using (Mat blended = HeatmapRenderer.Blend(frameMat, heat, alpha))
+                            if (alpha > 0.01)
                             {
-                                displaySource = ImageInterop.MatToBitmapSource(blended);
+                                using (Mat blended = HeatmapRenderer.Blend(frameMat, heat, alpha))
+                                {
+                                    displaySource = ImageInterop.MatToBitmapSource(blended);
+                                }
                             }
                         }
                     }
                     else
                     {
                         heat?.Dispose();
-                        displaySource = ConvertBitmapToBitmapSource(bitmap);
                     }
+
+                    if (displaySource == null)
+                        displaySource = ConvertBitmapToBitmapSource(bitmap);
 
                     Dispatcher.Invoke(() =>
                     {
+                        if (!_cameraLive) return;
                         UploadedImageViewer.Source = displaySource;
-                        currentCapturedImage = displaySource;
                     });
                 }
             }
@@ -183,8 +195,27 @@ namespace SkinDevApp.Views
             }
         }
 
-        /// <summary>Keeps a copy of the latest raw camera frame for the
-        /// background analysis loop, independent of what's on screen.</summary>
+        private Bitmap PrepareFrame(Bitmap src)
+        {
+            if (!_cropLiveFrameToSquare || src.Width == src.Height)
+                return (Bitmap)src.Clone();
+
+            int s = Math.Min(src.Width, src.Height);
+            var r = new System.Drawing.Rectangle((src.Width - s) / 2, (src.Height - s) / 2, s, s);
+            return src.Clone(r, src.PixelFormat);
+        }
+
+        private static Mat EnsureBgr(Mat m)
+        {
+            if (m.Channels() == 3) return m;
+
+            Mat bgr = new Mat();
+            Cv2.CvtColor(m, bgr, m.Channels() == 4
+                ? ColorConversionCodes.BGRA2BGR : ColorConversionCodes.GRAY2BGR);
+            m.Dispose();
+            return bgr;
+        }
+
         private void StoreLatestFrame(Bitmap frame)
         {
             lock (_frameStoreLock)
@@ -194,19 +225,15 @@ namespace SkinDevApp.Views
             }
         }
 
-        /// <summary>Frame provider passed to LiveGradCamController. Returns a
-        /// fresh Mat from the latest stored frame, or null if none yet.</summary>
         private Mat GetLatestFrameMatForLiveLoop()
         {
             lock (_frameStoreLock)
             {
                 if (_latestRawFrame == null) return null;
-                return BitmapConverter.ToMat(_latestRawFrame);
+                return EnsureBgr(BitmapConverter.ToMat(_latestRawFrame));
             }
         }
 
-        /// <summary>Raised on the background thread roughly every 2 seconds
-        /// with a fresh classification. Updates the live prediction display.</summary>
         private void OnLiveAnalysisUpdated(LiveInfo info)
         {
             try
@@ -241,10 +268,9 @@ namespace SkinDevApp.Views
                     VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
                 });
             }
-            catch (System.Threading.Tasks.TaskCanceledException) { /* page closing */ }
+            catch (System.Threading.Tasks.TaskCanceledException) { }
         }
 
-        /// <summary>Raised when the Grad-CAM service goes offline or recovers.</summary>
         private void OnLiveServiceStatusChanged(bool online, string error)
         {
             try
@@ -277,9 +303,25 @@ namespace SkinDevApp.Views
 
         private void SnapBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (currentCapturedImage == null) return;
+            Bitmap snapped = null;
+
+            lock (_frameStoreLock)
+            {
+                if (_latestRawFrame != null)
+                    snapped = (Bitmap)_latestRawFrame.Clone();
+            }
+
+            if (snapped == null) return;
 
             StopCamera();
+
+            _snappedRaw?.Dispose();
+            _snappedRaw = snapped;
+
+            BitmapSource frozen = ConvertBitmapToBitmapSource(snapped);
+            UploadedImageViewer.Source = frozen;
+            currentCapturedImage = frozen;
+
             SnapBtn.IsEnabled = false;
             AnalyzeBtn.IsEnabled = true;
 
@@ -308,19 +350,6 @@ namespace SkinDevApp.Views
                 VerdictTxt.Text = "Status: Image Loaded. Click Run Aesthetic Analysis.";
             }
         }
-
-        // ---------------------------------------------------------------------
-        // REAL ANALYSIS - replaces the previous Random()-based fake predictor.
-        //
-        //   1. Convert whatever is currently displayed (webcam snap or an
-        //      uploaded file) into an OpenCV BGR Mat.
-        //   2. Run the real ONNX classifier on it (AiEngine.Predict).
-        //   3. Send the SAME bytes to the local Grad-CAM++ Python service and
-        //      replace the displayed image with the real heatmap overlay.
-        //
-        // If the Grad-CAM service isn't running, the classification result
-        // still shows - only the heatmap is skipped, with a message saying so.
-        // ---------------------------------------------------------------------
 
         private async void AnalyzeBtn_Click(object sender, RoutedEventArgs e)
         {
@@ -355,9 +384,8 @@ namespace SkinDevApp.Views
 
             try
             {
-                using (Mat frame = ImageInterop.BitmapSourceToMat(currentCapturedImage))
+                using (Mat frame = GetAnalysisMat())
                 {
-                    // ---- 1. real ONNX classification -------------------------
                     PredictionResult prediction = await Task.Run(() => AiEngine.Predict(frame));
 
                     double acneScore = prediction.Probabilities[0] * 100.0;
@@ -375,7 +403,6 @@ namespace SkinDevApp.Views
 
                     VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  |  Rendering Grad-CAM++...";
 
-                    // ---- 2. real Grad-CAM++ on the SAME bytes -----------------
                     byte[] pngBytes = frame.ImEncode(".png");
 
                     using (GradCamResult gradcam = await GradCamService.ExplainAsync(
@@ -383,10 +410,6 @@ namespace SkinDevApp.Views
                     {
                         if (gradcam.Ok && gradcam.Overlay != null)
                         {
-                            // Replace the displayed image with the real heatmap
-                            // overlay. PrintBtn_Click renders whatever is
-                            // currently shown here, so the printed report
-                            // automatically includes it - no changes needed there.
                             UploadedImageViewer.Source = ImageInterop.ToBitmapSource(gradcam.Overlay);
 
                             if (gradcam.PredictedIndex != prediction.PredictedIndex)
@@ -403,8 +426,6 @@ namespace SkinDevApp.Views
                         }
                         else
                         {
-                            // Classification is still valid and shown - only the
-                            // heatmap is unavailable (service probably not running).
                             VerdictTxt.Text =
                                 $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  " +
                                 $"[Grad-CAM unavailable: {gradcam.Error}]";
@@ -425,6 +446,18 @@ namespace SkinDevApp.Views
             }
         }
 
+        private Mat GetAnalysisMat()
+        {
+            Mat full = _snappedRaw != null
+                ? EnsureBgr(BitmapConverter.ToMat(_snappedRaw))
+                : ImageInterop.BitmapSourceToMat(currentCapturedImage);
+
+            using (full)
+            {
+                return LiveGradCamController.ResizeToWidth(full, AnalysisWidth);
+            }
+        }
+
         private void PrintBtn_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -434,14 +467,12 @@ namespace SkinDevApp.Views
                     currentCapturedImage = UploadedImageViewer.Source as BitmapSource;
                 }
 
-                // Kunin ang buong larawan kasama ang overlay gamit ang RenderTargetBitmap
                 RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
                     (int)ImageCard.ActualWidth,
                     (int)ImageCard.ActualHeight,
                     96d, 96d, System.Windows.Media.PixelFormats.Pbgra32);
                 renderBitmap.Render(ImageCard);
 
-                // Ipasa ang exact scores papunta sa PrintReportWindow
                 PrintReportWindow printWin = new PrintReportWindow(
                     renderBitmap,
                     DatabaseHelper.CurrentClientName,
@@ -470,6 +501,8 @@ namespace SkinDevApp.Views
 
         private void StopCamera()
         {
+            _cameraLive = false;
+
             if (videoSource != null && videoSource.IsRunning)
             {
                 videoSource.SignalToStop();
