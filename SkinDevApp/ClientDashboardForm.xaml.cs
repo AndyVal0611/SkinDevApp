@@ -1285,6 +1285,19 @@ namespace SkinDevApp.Views
                     AcneBar.Value, HyperBar.Value, EczemaBar.Value, NormalBar.Value
                 );
 
+                // Page 2 of the report: every captured view with the original and the four class maps.
+                try
+                {
+                    string shotsFolder = (_session != null && _session.Outcomes.Count > 0) ? _session.Folder
+                                       : (_lastResult != null ? _lastResult.Folder : null);
+                    if (!string.IsNullOrEmpty(shotsFolder))
+                        printWin.SetShots(GalleryModel.Load(shotsFolder));
+                }
+                catch (Exception shotsEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[PRINT] shots page skipped: " + shotsEx.Message);
+                }
+
                 printWin.Owner = Application.Current.MainWindow;
                 printWin.ShowDialog();
             }

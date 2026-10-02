@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // Gradcamservice.cs  —  UPDATED VERSION  (v2.0 service support)
 //
 //   NEW (v2.0)  ExplainAllClassesAsync(...) -> GradCamAllResult: one request
@@ -88,7 +88,7 @@ namespace SkinDevApp.Explainability
         [JsonPropertyName("max_pairwise_pearson")] public double MaxPairwisePearson { get; set; }
         [JsonPropertyName("mean_top10pct_iou")] public double MeanTop10Iou { get; set; }
         [JsonPropertyName("pairwise_pearson")] public Dictionary<string, double> PairwisePearson { get; set; }
-        [JsonPropertyName("shared_component_r2")] public double? SharedComponentR2 { get; set; }
+        [JsonPropertyName("shared_component_r2")] public Dictionary<string, double> SharedComponentR2 { get; set; }
         [JsonPropertyName("basis")] public string Basis { get; set; }
     }
 

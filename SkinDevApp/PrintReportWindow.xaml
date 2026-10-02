@@ -11,6 +11,7 @@
         </Grid.RowDefinitions>
 
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PagesPanel">
             <Border x:Name="PrintCanvas" Width="595" Height="842" Background="White" Padding="35,40,35,35" CornerRadius="4">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="10" Color="#000000" Opacity="0.1" Direction="270"/>
@@ -157,6 +158,7 @@
                     </StackPanel>
                 </Grid>
             </Border>
+            </StackPanel>
         </ScrollViewer>
 
         <Button x:Name="TriggerPrintBtn" Grid.Row="1" Content="🖨️ CONFIRM &amp; PRINT PDF REPORT" Height="45" Width="260" 
