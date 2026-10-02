@@ -32,6 +32,11 @@ namespace SkinDevApp.Explainability
         public double CentroidY { get; set; }
         public bool Diffuse { get; set; }
 
+        /// <summary>v2.1: raw (un-normalised) CAM, row-major, RawCamHeight x RawCamWidth. May be null.</summary>
+        public float[] RawCam { get; set; }
+        public int RawCamHeight { get; set; }
+        public int RawCamWidth { get; set; }
+
         /// <summary>8-bit, 0..255, per-class normalised.</summary>
         public Mat Heat8U { get; set; }
 
@@ -73,6 +78,9 @@ namespace SkinDevApp.Explainability
         public Mat SourceThumb { get; set; }
 
         public ClassMapInfo[] Maps { get; set; } = new ClassMapInfo[0];
+
+        /// <summary>v2.1 inter-class agreement of the raw maps (null with an older service).</summary>
+        public SkinDevApp.Explainability.ClassMapSimilarityDto Similarity { get; set; }
 
         public ClassMapInfo this[int classIndex]
         {

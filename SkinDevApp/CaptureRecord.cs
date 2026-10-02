@@ -204,6 +204,9 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("zone_share")] public Dictionary<string, double> ZoneShare { get; set; }
         [JsonPropertyName("heatmap_file")] public string HeatmapFile { get; set; }
         [JsonPropertyName("overlay_file")] public string OverlayFile { get; set; }
+        // v2.1 (additive): raw un-normalised CAM as a NumPy .npy (float32, H x W).
+        [JsonPropertyName("raw_cam_file")] public string RawCamFile { get; set; }
+        [JsonPropertyName("raw_cam_shape")] public int[] RawCamShape { get; set; }
     }
 
     public sealed class RegionSection
@@ -234,6 +237,8 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("quality")] public QualitySection Quality { get; set; }
         [JsonPropertyName("region")] public RegionSection Region { get; set; }
         [JsonPropertyName("class_maps")] public List<MapSection> ClassMaps { get; set; } = new List<MapSection>();
+        // v2.1 (additive): how much the four class maps agree (raw CAMs). Null with an older service.
+        [JsonPropertyName("class_map_similarity")] public ClassMapSimilarityDto ClassMapSimilarity { get; set; }
         [JsonPropertyName("gradcam")] public Dictionary<string, string> GradCam { get; set; } = new Dictionary<string, string>();
         [JsonPropertyName("files")] public Dictionary<string, string> Files { get; set; } = new Dictionary<string, string>();
         [JsonPropertyName("notes")] public List<string> Notes { get; set; } = new List<string>();

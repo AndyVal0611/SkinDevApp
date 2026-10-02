@@ -305,7 +305,7 @@ namespace SkinDevApp.Views
                 }
             }
 
-            // Otherwise prefer Logitech
+            // Otherwise prefer another Logitech camera
             for (int i = 0; i < videoDevices.Count; i++)
             {
                 string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
@@ -314,7 +314,15 @@ namespace SkinDevApp.Views
                     return i;
             }
 
-            // Fallback
+            // Otherwise use first normal webcam
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (!NotARealWebcam.Any(k => name.Contains(k)))
+                    return i;
+            }
+
             return 0;
         }
 
@@ -1148,7 +1156,7 @@ namespace SkinDevApp.Views
                               "  consistency " + rec.Stability.Consistency.ToString("P0") +
                               "  motion " + rec.Stability.MotionMean.ToString("F1") + "/" + rec.Stability.MotionMax.ToString("F1"));
 
-            if (rec.PickCameraIndex != null)
+            if (rec.Quality != null)
                 sb.AppendLine("quality    : sharp " + rec.Quality.Sharpness.ToString("F0") +
                               "  bright " + rec.Quality.Brightness.ToString("F0") +
                               "  face " + (rec.Quality.FaceFound ? "yes" : "no"));

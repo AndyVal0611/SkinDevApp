@@ -1,5 +1,10 @@
 """
-PrecisionSkin - Live Grad-CAM++ Explanation Service
+PrecisionSkin - Live Grad-CAM++ Explanation Service  (v2.0)
+  v1.1: frame_id echo, stale-drop, input fingerprint, concentration diagnostics
+  v2.0: ALL-CLASS endpoint - one forward pass yields a Grad-CAM++ map for each of
+        the four classes (+ raw_peak / relative_strength / concentration per class),
+        optional compiled (tf.function) path, backward-compatible /gradcam.
+        Heatmap math for a single class is UNCHANGED.
 ===================================================
 
 Loads precisionskin_best.keras ONCE at startup and keeps it in RAM.
@@ -9,6 +14,7 @@ Endpoints
 ---------
 GET  /health    -> service + model status
 POST /gradcam   -> {"image_base64": "..."} -> prediction + Grad-CAM++ overlay
+                   add "all_classes": true for the four class-specific maps
 
 Preprocessing is IDENTICAL to the ONNX classifier:
     decode -> BGR -> RGB -> resize 224x224 (bilinear) -> float32 -> (p / 127.5) - 1.0
@@ -72,6 +78,21 @@ PERCENTILE_HIGH = 99.0
 BLUR_SIGMA = 3.0          # gaussian smoothing on the upsampled heatmap; 0 = off
 
 MAX_IMAGE_BYTES = 12 * 1024 * 1024   # reject absurd payloads
+
+# 2.1 = 2.0 + raw CAM arrays (include_raw_cam) + class_map_similarity. Purely additive:
+# every 2.0 request/response field is unchanged.
+SERVICE_VERSION = "2.1"
+
+# All-class maps are returned at most this many pixels on the longer side
+# (the client resizes to the frame). Keeps four PNGs small and fast.
+ALL_CLASS_MAX_SIDE = 320
+
+# A map whose top-10% pixels hold less than this share of its total mass is
+# reported as "diffuse" (attribution is spread out, not focal).
+DIFFUSE_TOP10_MASS = 0.28
+
+# Set PRECISIONSKIN_COMPILE=0 to force eager execution (debug).
+USE_COMPILED = os.environ.get("PRECISIONSKIN_COMPILE", "1") != "0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -231,6 +252,8 @@ class GradCAMPlusPlus:
         self.feature_model = feature_model
         self.feature_path = path
         self.layer_name = layer_name
+        self._all_fn = None            # (re)built lazily for the new feature model
+        self._all_fn_mode = "eager"
 
         log.info(
             "Grad-CAM target layer: %s | %s | %s | path=%s",
@@ -368,6 +391,94 @@ class GradCAMPlusPlus:
             raise RuntimeError("CAM contains NaN/Inf - refusing to return it.")
 
         return cam, pred_index, probabilities, method_used, notes
+
+    # ------------------------------------------------------------ compute_all
+    def _all_impl(self, x_t):
+        """
+        ONE forward pass, then one gradient per class on a persistent tape.
+        For Conv_1 the class-score gradient only has to travel back through the
+        short tail of the backbone and the pooling/dense head, so four classes
+        cost little more than one.
+        Returns (conv (1,H,W,K), grads (N,1,H,W,K), probs (1,N)).
+        """
+        tf = self.tf
+        n = len(CLASS_NAMES)
+
+        with tf.GradientTape(persistent=True) as tape:
+            conv, logits, probs = self._forward(x_t, tape=tape)
+            scores = [logits[:, i] for i in range(n)]
+
+        grads = []
+        for sc in scores:
+            g = tape.gradient(sc, conv)
+            if g is None:
+                g = tf.zeros_like(conv)
+            grads.append(g)
+
+        del tape
+        return conv, tf.stack(grads, axis=0), probs
+
+    def _get_all_fn(self):
+        if self._all_fn is None:
+            if USE_COMPILED:
+                self._all_fn = self.tf.function(self._all_impl, reduce_retracing=True)
+                self._all_fn_mode = "compiled"
+            else:
+                self._all_fn = self._all_impl
+                self._all_fn_mode = "eager"
+        return self._all_fn
+
+    def compute_all(
+        self,
+        x: np.ndarray,
+        method: str = "gradcam++",
+    ) -> Tuple[List[np.ndarray], int, np.ndarray, str, List[str]]:
+        """
+        Returns (cams, predicted_index, probabilities, method_used, notes)
+        where cams[i] is the raw (un-normalised) ReLU'd CAM for class i.
+        Raw values are kept so the caller can compare classes honestly.
+        """
+        tf = self.tf
+        notes: List[str] = []
+        x_t = tf.convert_to_tensor(x, dtype=tf.float32)
+
+        try:
+            conv, grads, probs = self._get_all_fn()(x_t)
+        except Exception as exc:                                 # noqa: BLE001
+            if self._all_fn_mode == "compiled":
+                log.warning("Compiled all-class path failed (%s: %s). "
+                            "Falling back to eager.", type(exc).__name__, exc)
+                self._all_fn = self._all_impl
+                self._all_fn_mode = "eager"
+                conv, grads, probs = self._all_fn(x_t)
+            else:
+                raise
+
+        conv_np = tf.cast(conv, tf.float32).numpy()[0]           # (H, W, K)
+        grads_np = tf.cast(grads, tf.float32).numpy()[:, 0]      # (N, H, W, K)
+        probabilities = probs.numpy()[0]
+        pred_index = int(np.argmax(probabilities))
+
+        use_pp = method.lower().replace("_", "").replace("-", "") in (
+            "gradcam++", "gradcampp", "gradcamplusplus",
+        )
+        method_used = "Grad-CAM++" if use_pp else "Grad-CAM"
+
+        cams: List[np.ndarray] = []
+        for i in range(len(CLASS_NAMES)):
+            cam = None
+            if use_pp:
+                cam = self._gradcam_plus_plus(conv_np, grads_np[i], notes)
+                if cam is None:
+                    notes.append(f"{CLASS_NAMES[i]}: Grad-CAM++ degenerate; used standard Grad-CAM.")
+                    method_used = "Grad-CAM++ (some classes: Grad-CAM fallback)"
+            if cam is None:
+                cam = self._standard_gradcam(conv_np, grads_np[i])
+            if not np.isfinite(cam).all():
+                raise RuntimeError(f"CAM for {CLASS_NAMES[i]} contains NaN/Inf.")
+            cams.append(cam)
+
+        return cams, pred_index, probabilities, method_used, notes
 
     # --------------------------------------------------------- cam variants
     @staticmethod
@@ -529,6 +640,115 @@ def png_base64(img: np.ndarray) -> str:
     return base64.b64encode(buf.tobytes()).decode("ascii")
 
 
+
+# ==============================================================================
+# DIAGNOSTICS  (added v1.1 - read-only; they never alter the heatmap)
+# ==============================================================================
+
+# Fixed sample positions (row, col, channel) used to compare the C# tensor with
+# this service's tensor value-for-value. Do not change without changing C#.
+FINGERPRINT_POINTS = [(0, 0, 0), (0, 223, 1), (112, 112, 2), (223, 0, 0),
+                      (223, 223, 1), (56, 168, 2), (168, 56, 0), (112, 60, 1)]
+
+
+def input_fingerprint(x: np.ndarray) -> dict:
+    """
+    Fingerprint of the (1,224,224,3) float32 tensor actually fed to the model.
+    A C# client computes the same numbers from ITS tensor; any difference means
+    the two pipelines are not preprocessing identically.
+    """
+    t = x[0]
+    return {
+        "shape": [int(v) for v in x.shape],
+        "min": float(t.min()),
+        "max": float(t.max()),
+        "mean": float(t.mean()),
+        "mean_rgb": [float(t[..., c].mean()) for c in range(3)],
+        "samples": [float(t[r, c, k]) for r, c, k in FINGERPRINT_POINTS],
+    }
+
+
+def heat_concentration(heat: np.ndarray) -> dict:
+    """
+    How focused the attention is. Percentile normalisation always stretches the
+    map to the full colour range, so a diffuse CAM and a focused CAM look
+    equally "hot". These numbers tell the UI (and you) which one it really is.
+    """
+    total = float(heat.sum()) + 1e-9
+    flat = np.sort(heat.ravel())[::-1]
+    top10 = float(flat[: max(1, flat.size // 10)].sum() / total)
+    ys, xs = np.mgrid[0:heat.shape[0], 0:heat.shape[1]]
+    return {
+        "top10pct_mass": round(top10, 4),          # 0.10 = uniform, 1.0 = one spot
+        "centroid_x": round(float((xs * heat).sum() / total / heat.shape[1]), 4),
+        "centroid_y": round(float((ys * heat).sum() / total / heat.shape[0]), 4),
+    }
+
+# Mean pairwise Pearson (over the RAW class CAMs) at/above which the four class
+# maps are reported as "largely shared". Reporting only - it never changes a map.
+SIMILARITY_HIGH = 0.90
+SIMILARITY_MODERATE = 0.70
+
+
+def _pearson(a, b) -> float:
+    """Pearson r of two arrays; 0.0 when either is constant (never NaN)."""
+    a = np.asarray(a, dtype=np.float64).ravel()
+    b = np.asarray(b, dtype=np.float64).ravel()
+    a = a - a.mean()
+    b = b - b.mean()
+    d = float(np.sqrt((a * a).sum() * (b * b).sum()))
+    return float((a * b).sum() / d) if d > 1e-12 else 0.0
+
+
+def class_map_similarity(cams: List[np.ndarray], heats: List[np.ndarray]) -> dict:
+    """
+    How alike the four class maps are, measured on the RAW (un-normalised,
+    pre-colour) CAMs, plus top-10% overlap of the rendered heatmaps.
+
+    This is a measurement for the researcher / UI. It does not alter any map.
+    For a GlobalAveragePooling head every class CAM is a re-weighting of the
+    same activation maps, so high similarity is expected and is reported
+    honestly instead of being hidden by per-class normalisation.
+    """
+    n = len(cams)
+    pairs: Dict[str, float] = {}
+    vals: List[float] = []
+    ious: List[float] = []
+
+    tops = [h >= np.percentile(h, 90.0) for h in heats]
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            r = _pearson(cams[i], cams[j])
+            pairs[f"{CLASS_NAMES[i]}|{CLASS_NAMES[j]}"] = round(r, 4)
+            vals.append(r)
+            union = int((tops[i] | tops[j]).sum())
+            ious.append(float((tops[i] & tops[j]).sum()) / union if union else 0.0)
+
+    mean_cam = np.mean([np.asarray(c, dtype=np.float64) for c in cams], axis=0)
+    shared = {
+        CLASS_NAMES[i]: round(max(0.0, _pearson(cams[i], mean_cam)) ** 2, 4)
+        for i in range(n)
+    }
+
+    mean_r = float(np.mean(vals)) if vals else 0.0
+    level = "high" if mean_r >= SIMILARITY_HIGH else (
+        "moderate" if mean_r >= SIMILARITY_MODERATE else "low")
+
+    return {
+        "level": level,
+        "maps_largely_shared": bool(level == "high"),
+        "mean_pairwise_pearson": round(mean_r, 4),
+        "min_pairwise_pearson": round(float(min(vals)) if vals else 0.0, 4),
+        "max_pairwise_pearson": round(float(max(vals)) if vals else 0.0, 4),
+        "mean_top10pct_iou": round(float(np.mean(ious)) if ious else 0.0, 4),
+        "pairwise_pearson": pairs,
+        "shared_component_r2": shared,
+        "basis": "raw ReLU'd Grad-CAM++ maps at feature-map resolution (before percentile "
+                 "normalisation, blur and colour)",
+    }
+
+
 # ==============================================================================
 # ENGINE  (model held in RAM for the process lifetime)
 # ==============================================================================
@@ -570,8 +790,19 @@ class GradCamEngine:
         self.cams[layer_name] = GradCAMPlusPlus(self.model, layer_name)
         self.default_layer = layer_name
 
+        out_dim = int(self.model.output_shape[-1])
+        if out_dim != len(CLASS_NAMES):
+            raise RuntimeError(
+                f"Model outputs {out_dim} classes but CLASS_NAMES has "
+                f"{len(CLASS_NAMES)}. Refusing to start."
+            )
+
         self.lock = threading.Lock()
         self.request_count = 0
+        self.dropped_stale = 0
+        self._seq_lock = threading.Lock()
+        self._seq_counter = 0        # arrival order of requests
+        self._latest_seq = 0         # newest arrival seen so far
         self.started_at = time.time()
 
         self._warmup()
@@ -582,6 +813,16 @@ class GradCamEngine:
         t0 = time.perf_counter()
         self.cams[self.default_layer].compute(dummy)
         log.info("Warm-up Grad-CAM++ pass: %.0f ms", (time.perf_counter() - t0) * 1000)
+
+        # All-class path: first call traces the graph (compiled mode). Do it now.
+        t1 = time.perf_counter()
+        eng = self.cams[self.default_layer]
+        eng.compute_all(dummy)
+        eng.compute_all(dummy)
+        t2 = time.perf_counter()
+        eng.compute_all(dummy)
+        log.info("Warm-up all-class pass: trace+2 runs %.0f ms | steady %.0f ms | mode=%s",
+                 (t2 - t1) * 1000, (time.perf_counter() - t2) * 1000, eng._all_fn_mode)
 
     def get_cam(self, layer_name: str) -> GradCAMPlusPlus:
         if layer_name not in self.cams:
@@ -601,8 +842,17 @@ class GradCamEngine:
         layer_name: Optional[str] = None,
         return_overlay: bool = True,
         return_heatmap: bool = True,
+        frame_id: Optional[str] = None,
+        drop_if_stale: bool = False,
     ) -> dict:
         """
+        frame_id       : opaque string echoed back unchanged. The client MUST
+                         compare it with the id of the frame it is displaying
+                         and discard the result on mismatch.
+        drop_if_stale  : LIVE mode. If a newer request arrived while this one
+                         was waiting for the model, skip it (latest-frame-wins,
+                         no queue build-up). Never set for a capture request.
+
         return_overlay=False is the LIVE-MODE path: the client gets only the
         raw heatmap and composites it onto its own video frames locally. This
         skips one colormap pass and one full-size PNG encode per request,
@@ -610,6 +860,11 @@ class GradCamEngine:
         """
 
         t_start = time.perf_counter()
+
+        with self._seq_lock:
+            self._seq_counter += 1
+            my_seq = self._seq_counter
+            self._latest_seq = my_seq
 
         img_bgr = decode_image(image_bytes)
         orig_h, orig_w = img_bgr.shape[:2]
@@ -622,10 +877,24 @@ class GradCamEngine:
 
         # Keras/TF graph execution is not re-entrant per model; serialise.
         with self.lock:
+            if drop_if_stale and self._latest_seq != my_seq:
+                self.dropped_stale += 1
+                return {
+                    "ok": False,
+                    "stale": True,
+                    "frame_id": frame_id,
+                    "error": "superseded by a newer frame",
+                }
             cam_engine = self.get_cam(layer)
-            cam, pred_index, probabilities, method_used, notes = cam_engine.compute(
-                x, class_index=class_index, method=method
+            # v2.0: the compiled all-class path serves single-class requests too
+            # (same maths, ~10-30x faster than eager). Pick the requested class.
+            cams_all, pred_index, probabilities, method_used, notes = cam_engine.compute_all(
+                x, method=method
             )
+            _t = pred_index if class_index is None else int(class_index)
+            if not 0 <= _t < len(CLASS_NAMES):
+                raise ValueError(f"class_index {_t} out of range")
+            cam = cams_all[_t]
             self.request_count += 1
 
         t_cam = time.perf_counter()
@@ -655,7 +924,12 @@ class GradCamEngine:
             "explained_class": CLASS_NAMES[int(target_index)],
             "method": method_used,
             "target_layer": layer,
+            "frame_id": frame_id,
             "image_size": [int(orig_w), int(orig_h)],
+            "heatmap_size": [int(heat.shape[1]), int(heat.shape[0])],
+            "cam_grid": [int(cam.shape[0]), int(cam.shape[1])],
+            "input_fingerprint": input_fingerprint(x),
+            "heat_concentration": heat_concentration(heat),
             "heatmap_min": float(heat.min()),
             "heatmap_max": float(heat.max()),
             "latency_ms": round((t_end - t_start) * 1000, 1),
@@ -671,6 +945,127 @@ class GradCamEngine:
         if notes:
             response["notes"] = notes
 
+        return response
+
+
+    # ------------------------------------------------------------ explain_all
+    def explain_all(
+        self,
+        image_bytes: bytes,
+        method: str = "gradcam++",
+        max_side: int = ALL_CLASS_MAX_SIDE,
+        frame_id: Optional[str] = None,
+        drop_if_stale: bool = False,
+        include_raw_cam: bool = False,
+    ) -> dict:
+        """
+        Four class-specific Grad-CAM++ maps from ONE pass.
+
+        v2.1: include_raw_cam=True also returns each class's RAW CAM (float32,
+        little-endian, row-major, shape raw_cam_shape) so the research team can
+        inspect attribution quantitatively; class_map_similarity (always
+        returned) reports how alike the four raw maps are.
+
+        HONESTY NOTES (also returned in the response):
+          * Each heatmap is normalised PER CLASS (1st->0, 99th->1 percentile),
+            so a map's SHAPE is comparable but its brightness is not.
+          * raw_peak is the un-normalised CAM maximum for that class and
+            relative_strength = raw_peak / max(raw_peak over the 4 classes).
+            It says how strongly this class's evidence is expressed compared
+            with the others for THIS image. It is NOT a probability.
+          * None of this is lesion segmentation or a diagnosis.
+        """
+        t_start = time.perf_counter()
+
+        with self._seq_lock:
+            self._seq_counter += 1
+            my_seq = self._seq_counter
+            self._latest_seq = my_seq
+
+        img_bgr = decode_image(image_bytes)
+        orig_h, orig_w = img_bgr.shape[:2]
+        x = preprocess(img_bgr)
+        t_pre = time.perf_counter()
+
+        with self.lock:
+            if drop_if_stale and self._latest_seq != my_seq:
+                self.dropped_stale += 1
+                return {"ok": False, "stale": True, "frame_id": frame_id,
+                        "error": "superseded by a newer frame"}
+            cam_engine = self.get_cam(self.default_layer)
+            cams, pred_index, probs, method_used, notes = cam_engine.compute_all(x, method=method)
+            self.request_count += 1
+
+        t_cam = time.perf_counter()
+
+        scale = min(1.0, float(max_side) / float(max(orig_w, orig_h)))
+        out_w = max(8, int(round(orig_w * scale)))
+        out_h = max(8, int(round(orig_h * scale)))
+        sigma = BLUR_SIGMA * (out_w / float(orig_w))
+
+        raw_peaks = [float(c.max()) for c in cams]
+        global_peak = max(raw_peaks) if raw_peaks else 0.0
+
+        classes = []
+        heats: List[np.ndarray] = []
+        for i, name in enumerate(CLASS_NAMES):
+            heat = postprocess_heatmap(cams[i], out_w, out_h, blur_sigma=sigma)
+            heats.append(heat)
+            conc = heat_concentration(heat)
+            rel = (raw_peaks[i] / global_peak) if global_peak > 1e-12 else 0.0
+            entry = {
+                "index": i,
+                "class": name,
+                "probability": float(probs[i]),
+                "is_predicted": bool(i == pred_index),
+                "raw_peak": raw_peaks[i],
+                "relative_strength": round(float(rel), 4),
+                "top10pct_mass": conc["top10pct_mass"],
+                "centroid_x": conc["centroid_x"],
+                "centroid_y": conc["centroid_y"],
+                "diffuse": bool(conc["top10pct_mass"] < DIFFUSE_TOP10_MASS or raw_peaks[i] <= 1e-12),
+                "heatmap_base64": png_base64(np.uint8(255 * heat)),
+            }
+            if include_raw_cam:
+                raw = np.ascontiguousarray(np.squeeze(cams[i]), dtype="<f4")
+                entry["raw_cam_shape"] = [int(raw.shape[0]), int(raw.shape[1])]
+                entry["raw_cam_base64"] = base64.b64encode(raw.tobytes()).decode("ascii")
+            classes.append(entry)
+
+        similarity = class_map_similarity(cams, heats)
+
+        t_end = time.perf_counter()
+
+        response = {
+            "ok": True,
+            "all_classes": True,
+            "service_version": SERVICE_VERSION,
+            "predicted_index": int(pred_index),
+            "predicted_class": CLASS_NAMES[int(pred_index)],
+            "confidence": float(probs[int(pred_index)]),
+            "probabilities": {n: float(probs[i]) for i, n in enumerate(CLASS_NAMES)},
+            "classes": classes,
+            "class_map_similarity": similarity,
+            "method": method_used,
+            "target_layer": self.default_layer,
+            "exec_mode": cam_engine._all_fn_mode,
+            "frame_id": frame_id,
+            "image_size": [int(orig_w), int(orig_h)],
+            "heatmap_size": [int(out_w), int(out_h)],
+            "input_fingerprint": input_fingerprint(x),
+            "latency_ms": round((t_end - t_start) * 1000, 1),
+            "timings_ms": {
+                "preprocess": round((t_pre - t_start) * 1000, 1),
+                "gradcam": round((t_cam - t_pre) * 1000, 1),
+                "render_encode": round((t_end - t_cam) * 1000, 1),
+            },
+            "normalization_note": (
+                "Each class heatmap is normalised separately; compare shape, not brightness. "
+                "relative_strength compares raw CAM peaks across classes and is not a probability."
+            ),
+        }
+        if notes:
+            response["notes"] = notes
         return response
 
 
@@ -723,9 +1118,25 @@ def handle_gradcam(payload: dict) -> dict:
     return_overlay = bool(payload.get("return_overlay", True))
     return_heatmap = bool(payload.get("return_heatmap", True))
 
+    frame_id = payload.get("frame_id", None)
+    frame_id = None if frame_id is None else str(frame_id)
+    drop_if_stale = bool(payload.get("drop_if_stale", False))
+
     try:
+        if bool(payload.get("all_classes", False)):
+            return ENGINE.explain_all(
+                image_bytes=image_bytes,
+                method=method,
+                max_side=int(payload.get("heatmap_max_side") or ALL_CLASS_MAX_SIDE),
+                frame_id=frame_id,
+                drop_if_stale=drop_if_stale,
+                include_raw_cam=bool(payload.get("include_raw_cam", False)),
+            )
+
         return ENGINE.explain(
-            image_bytes,
+            frame_id=frame_id,
+            drop_if_stale=drop_if_stale,
+            image_bytes=image_bytes,
             class_index=class_index,
             method=method,
             layer_name=layer,
@@ -747,6 +1158,11 @@ def handle_health() -> dict:
         "model_loaded": True,
         "model_path": ENGINE.model_path,
         "classes": CLASS_NAMES,
+        "class_mapping": {n: i for i, n in enumerate(CLASS_NAMES)},
+        "service_version": SERVICE_VERSION,
+        "features": ["gradcam", "all_classes", "frame_id", "drop_if_stale"],
+        "exec_mode": ENGINE.cams[ENGINE.default_layer]._all_fn_mode,
+        "dropped_stale": ENGINE.dropped_stale,
         "input_size": [IMG_SIZE, IMG_SIZE, 3],
         "normalization": "(pixel / 127.5) - 1.0",
         "channel_order": "RGB",
@@ -783,8 +1199,13 @@ def run_fastapi(host: str, port: int) -> bool:
         layer: Optional[str] = None
         return_overlay: Optional[bool] = True
         return_heatmap: Optional[bool] = True
+        frame_id: Optional[str] = None
+        drop_if_stale: Optional[bool] = False
+        all_classes: Optional[bool] = False
+        heatmap_max_side: Optional[int] = None
+        include_raw_cam: Optional[bool] = False
 
-    app = FastAPI(title="PrecisionSkin Grad-CAM++ Service", version="1.0")
+    app = FastAPI(title="PrecisionSkin Grad-CAM++ Service", version=SERVICE_VERSION)
 
     @app.get("/health")
     def health():
@@ -793,7 +1214,7 @@ def run_fastapi(host: str, port: int) -> bool:
     @app.post("/gradcam")
     def gradcam(req: GradCamRequest):
         result = handle_gradcam(req.model_dump())
-        return JSONResponse(result, status_code=200 if result.get("ok") else 400)
+        return JSONResponse(result, status_code=200 if (result.get("ok") or result.get("stale")) else 400)
 
     log.info("Serving with FastAPI/uvicorn on http://%s:%d", host, port)
     uvicorn.run(app, host=host, port=port, log_level="warning", workers=1)
@@ -847,7 +1268,7 @@ def run_stdlib(host: str, port: int) -> None:
                 return
 
             result = handle_gradcam(payload)
-            self._send(result, 200 if result.get("ok") else 400)
+            self._send(result, 200 if (result.get("ok") or result.get("stale")) else 400)
 
     server = ThreadingHTTPServer((host, port), Handler)
     log.info("Serving with stdlib http.server on http://%s:%d", host, port)

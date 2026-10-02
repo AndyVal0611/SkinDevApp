@@ -63,6 +63,26 @@ namespace SkinDevApp.Scanning
             File.WriteAllBytes(path, bytes);
         }
 
+        /// <summary>Write a float32 H x W array as a NumPy v1.0 .npy file (np.load-able).</summary>
+        private static void WriteNpyFloat32(string path, float[] data, int h, int w)
+        {
+            string header = "{'descr': '<f4', 'fortran_order': False, 'shape': (" + h + ", " + w + "), }";
+            int total = 10 + header.Length + 1;             // magic(6)+ver(2)+len(2)+header+\n
+            int pad = (64 - total % 64) % 64;
+            header = header + new string(' ', pad) + "\n";
+            byte[] hb = System.Text.Encoding.ASCII.GetBytes(header);
+            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
+            {
+                fs.Write(new byte[] { 0x93, (byte)'N', (byte)'U', (byte)'M', (byte)'P', (byte)'Y', 1, 0 }, 0, 8);
+                fs.WriteByte((byte)(hb.Length & 0xFF));
+                fs.WriteByte((byte)((hb.Length >> 8) & 0xFF));
+                fs.Write(hb, 0, hb.Length);
+                byte[] raw = new byte[data.Length * 4];
+                Buffer.BlockCopy(data, 0, raw, 0, raw.Length);
+                fs.Write(raw, 0, raw.Length);
+            }
+        }
+
         /// <summary>
         /// Save a capture. Heavy (disk + PNG encoding): call from Task.Run.
         /// <paramref name="maps"/> may be null if the Grad-CAM service was unavailable;
@@ -225,6 +245,10 @@ namespace SkinDevApp.Scanning
                 record.GradCam["normalisation"] =
                     "per-class percentile map; compare shape, not brightness. relative_strength compares classes and is not a probability.";
 
+                record.ClassMapSimilarity = maps.Similarity;
+                record.GradCam["attribution_note"] =
+                    "Grad-CAM++ is image-level model attribution, not a lesion map. When class_map_similarity.level is high the four class maps largely share one pattern.";
+
                 foreach (ClassMapInfo m in maps.Maps)
                 {
                     string hm = "heatmap_" + m.Name + ".png";
@@ -238,6 +262,15 @@ namespace SkinDevApp.Scanning
                             WritePng(Path.Combine(folder, ov), overlay);
                     }
 
+                    string rawFile = null;
+                    int[] rawShape = null;
+                    if (m.RawCam != null && m.RawCamHeight > 0 && m.RawCamWidth > 0)
+                    {
+                        rawFile = "camraw_" + m.Name + ".npy";
+                        WriteNpyFloat32(Path.Combine(folder, rawFile), m.RawCam, m.RawCamHeight, m.RawCamWidth);
+                        rawShape = new[] { m.RawCamHeight, m.RawCamWidth };
+                    }
+
                     record.ClassMaps.Add(new MapSection
                     {
                         Class = m.Name,
@@ -249,7 +282,9 @@ namespace SkinDevApp.Scanning
                         TopZoneShare = m.Region != null ? Math.Round(m.Region.TopShare, 3) : 0.0,
                         ZoneShare = m.Region != null ? m.Region.ZoneShare : null,
                         HeatmapFile = hm,
-                        OverlayFile = ov
+                        OverlayFile = ov,
+                        RawCamFile = rawFile,
+                        RawCamShape = rawShape
                     });
                 }
 

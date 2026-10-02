@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // Gradcamservice.cs  —  UPDATED VERSION  (v2.0 service support)
 //
 //   NEW (v2.0)  ExplainAllClassesAsync(...) -> GradCamAllResult: one request
@@ -72,6 +72,24 @@ namespace SkinDevApp.Explainability
         // v2.0: longest side of each returned class heatmap (client resizes).
         [JsonPropertyName("heatmap_max_side")]
         public int? HeatmapMaxSide { get; set; }
+
+        // v2.1: also return each class's RAW CAM (float32, feature-map resolution).
+        [JsonPropertyName("include_raw_cam")]
+        public bool IncludeRawCam { get; set; } = false;
+    }
+
+    /// <summary>v2.1: how much the four class maps agree with each other (raw CAMs).</summary>
+    public sealed class ClassMapSimilarityDto
+    {
+        [JsonPropertyName("level")] public string Level { get; set; }
+        [JsonPropertyName("maps_largely_shared")] public bool MapsLargelyShared { get; set; }
+        [JsonPropertyName("mean_pairwise_pearson")] public double MeanPairwisePearson { get; set; }
+        [JsonPropertyName("min_pairwise_pearson")] public double MinPairwisePearson { get; set; }
+        [JsonPropertyName("max_pairwise_pearson")] public double MaxPairwisePearson { get; set; }
+        [JsonPropertyName("mean_top10pct_iou")] public double MeanTop10Iou { get; set; }
+        [JsonPropertyName("pairwise_pearson")] public Dictionary<string, double> PairwisePearson { get; set; }
+        [JsonPropertyName("shared_component_r2")] public double? SharedComponentR2 { get; set; }
+        [JsonPropertyName("basis")] public string Basis { get; set; }
     }
 
     public sealed class GradCamClassDto
@@ -87,6 +105,8 @@ namespace SkinDevApp.Explainability
         [JsonPropertyName("centroid_y")] public double CentroidY { get; set; }
         [JsonPropertyName("diffuse")] public bool Diffuse { get; set; }
         [JsonPropertyName("heatmap_base64")] public string HeatmapBase64 { get; set; }
+        [JsonPropertyName("raw_cam_shape")] public int[] RawCamShape { get; set; }
+        [JsonPropertyName("raw_cam_base64")] public string RawCamBase64 { get; set; }
     }
 
     public sealed class GradCamResponse
@@ -113,6 +133,7 @@ namespace SkinDevApp.Explainability
         [JsonPropertyName("classes")] public List<GradCamClassDto> Classes { get; set; }
         [JsonPropertyName("service_version")] public string ServiceVersion { get; set; }
         [JsonPropertyName("exec_mode")] public string ExecMode { get; set; }
+        [JsonPropertyName("class_map_similarity")] public ClassMapSimilarityDto ClassMapSimilarity { get; set; }
     }
 
     public sealed class GradCamHealth
@@ -200,6 +221,9 @@ namespace SkinDevApp.Explainability
 
         public ClassMapInfo[] Maps { get; set; } = new ClassMapInfo[0];
 
+        /// <summary>v2.1 inter-class agreement of the raw maps (null with an older service).</summary>
+        public ClassMapSimilarityDto Similarity { get; set; }
+
         public static GradCamAllResult Failed(string error) =>
             new GradCamAllResult { Ok = false, Error = error };
 
@@ -228,7 +252,8 @@ namespace SkinDevApp.Explainability
                 SourceSize = sourceSize,
                 FaceBoxSource = faceBoxSource,
                 SourceThumb = sourceThumb,
-                Maps = Maps
+                Maps = Maps,
+                Similarity = Similarity
             };
 
             // Approximate facial-region attribution per class (reference frame only).
@@ -464,7 +489,8 @@ namespace SkinDevApp.Explainability
             string frameId,
             bool dropIfStale,
             int heatmapMaxSide = 320,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            bool includeRawCam = false)
         {
             if (imageBytes == null || imageBytes.Length == 0)
                 return GradCamAllResult.Failed("No image data.");
@@ -482,7 +508,8 @@ namespace SkinDevApp.Explainability
                     FrameId = frameId,
                     DropIfStale = dropIfStale,
                     AllClasses = true,
-                    HeatmapMaxSide = heatmapMaxSide
+                    HeatmapMaxSide = heatmapMaxSide,
+                    IncludeRawCam = includeRawCam
                 };
 
                 var jsonContent = JsonSerializer.Serialize(request, JsonOptions);
@@ -513,7 +540,8 @@ namespace SkinDevApp.Explainability
                     Method = payload.Method ?? "",
                     ExecMode = payload.ExecMode ?? "",
                     ServiceVersion = payload.ServiceVersion ?? "",
-                    ServiceLatencyMs = payload.LatencyMs
+                    ServiceLatencyMs = payload.LatencyMs,
+                    Similarity = payload.ClassMapSimilarity
                 };
 
                 var maps = new ClassMapInfo[SkinDevApp.Imaging.ClassPalette.ClassCount];
@@ -531,6 +559,19 @@ namespace SkinDevApp.Explainability
 
                         result.Probabilities[c.Index] = c.Probability;
 
+                        float[] rawCam = null;
+                        int rawH = 0, rawW = 0;
+                        if (!string.IsNullOrWhiteSpace(c.RawCamBase64) && c.RawCamShape != null && c.RawCamShape.Length == 2)
+                        {
+                            byte[] rb = Convert.FromBase64String(c.RawCamBase64);
+                            rawH = c.RawCamShape[0]; rawW = c.RawCamShape[1];
+                            if (rawH > 0 && rawW > 0 && rb.Length == rawH * rawW * 4)
+                            {
+                                rawCam = new float[rawH * rawW];
+                                Buffer.BlockCopy(rb, 0, rawCam, 0, rb.Length);   // float32 little-endian (x86/x64)
+                            }
+                        }
+
                         maps[c.Index] = new ClassMapInfo
                         {
                             Index = c.Index,
@@ -542,7 +583,10 @@ namespace SkinDevApp.Explainability
                             CentroidX = c.CentroidX,
                             CentroidY = c.CentroidY,
                             Diffuse = c.Diffuse,
-                            Heat8U = heat
+                            Heat8U = heat,
+                            RawCam = rawCam,
+                            RawCamHeight = rawH,
+                            RawCamWidth = rawW
                         };
                     }
                 }

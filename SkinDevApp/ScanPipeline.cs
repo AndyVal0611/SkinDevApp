@@ -41,7 +41,7 @@ namespace SkinDevApp.Scanning
                 string gradcamError = null;
 
                 using (GradCamAllResult r = await GradCamService
-                    .ExplainAllClassesAsync(png, frameId, false, ServiceHeatmapMaxSide, ct)
+                    .ExplainAllClassesAsync(png, frameId, false, ServiceHeatmapMaxSide, ct, includeRawCam: true)
                     .ConfigureAwait(false))
                 {
                     if (r.Ok && r.FrameId == frameId)
