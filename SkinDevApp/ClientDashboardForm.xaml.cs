@@ -27,7 +27,7 @@ using SkinDevApp.Scanning;
 using System;
 using System.Drawing;
 using System.IO;
-using System.Net.Configuration;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,6 +42,10 @@ namespace SkinDevApp.Views
     {
         private FilterInfoCollection videoDevices;
         private VideoCaptureDevice videoSource;
+        private int _camIndex;                              // device currently in use
+        private int _camTried;                              // devices tried in this start attempt
+        private int _framesSeen;                            // frames received from the current device
+        private System.Windows.Threading.DispatcherTimer _camWatchdog;
 
         private BitmapSource currentCapturedImage;      // uploaded image only
         private string primaryDiagnosis = "";
@@ -241,9 +245,8 @@ namespace SkinDevApp.Views
                 _cameraLive = true;
                 _resultsFrozen = false;
 
-                videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
-                videoSource.NewFrame += VideoSource_NewFrame;
-                videoSource.Start();
+                _camTried = 0;
+                OpenCamera(PickCameraIndex());
 
                 PlaceholderPanel.Visibility = Visibility.Collapsed;
                 UploadedImageViewer.Visibility = Visibility.Visible;
@@ -279,16 +282,115 @@ namespace SkinDevApp.Views
             }
         }
 
+
+        // ── camera selection ────────────────────────────────────────────────────
+
+        private static readonly string[] NotARealWebcam =
+            { "virtual", "obs", "ir camera", "infrared", " ir ", "snap camera", "droidcam", "ndi", "manycam", "xsplit", "depth" };
+
+        /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
+        private int PickCameraIndex()
+        {
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string n = (videoDevices[i].Name ?? "").ToLowerInvariant();
+                if (!NotARealWebcam.Any(k => n.Contains(k))) return i;
+            }
+            return 0;
+        }
+
+        private void OpenCamera(int index)
+        {
+            CloseCameraDevice();
+
+            _camIndex = index;
+            _framesSeen = 0;
+            string name = videoDevices[index].Name;
+            LiveStatusTxt.Text = "Opening camera: " + name + " ...";
+
+            videoSource = new VideoCaptureDevice(videoDevices[index].MonikerString);
+
+            // Use a common, widely supported mode (about 640x480 or closest) to avoid
+            // drivers that open silently but never deliver frames at their default mode.
+            try
+            {
+                var caps = videoSource.VideoCapabilities;
+                if (caps != null && caps.Length > 0)
+                {
+                    var best = caps.OrderBy(c => Math.Abs(c.FrameSize.Width - 640) + Math.Abs(c.FrameSize.Height - 480)).First();
+                    videoSource.VideoResolution = best;
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[CAM] caps: " + ex.Message); }
+
+            videoSource.NewFrame += VideoSource_NewFrame;
+            videoSource.VideoSourceError += VideoSource_Error;
+            videoSource.Start();
+
+            // If this device gives no frames within 4 s, try the next one.
+            _camWatchdog?.Stop();
+            _camWatchdog = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            _camWatchdog.Tick += CamWatchdog_Tick;
+            _camWatchdog.Start();
+        }
+
+        private void CloseCameraDevice()
+        {
+            var src = videoSource;
+            videoSource = null;
+            if (src == null) return;
+            try
+            {
+                src.NewFrame -= VideoSource_NewFrame;
+                src.VideoSourceError -= VideoSource_Error;
+                if (src.IsRunning) { src.SignalToStop(); }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[CAM] close: " + ex.Message); }
+        }
+
+        private void CamWatchdog_Tick(object sender, EventArgs e)
+        {
+            if (!_cameraLive) { _camWatchdog?.Stop(); return; }
+
+            if (Volatile.Read(ref _framesSeen) > 0)
+            {
+                _camWatchdog.Stop();
+                LiveStatusTxt.Text = "Camera: " + videoDevices[_camIndex].Name;
+                return;
+            }
+
+            _camTried++;
+            if (_camTried >= videoDevices.Count)
+            {
+                _camWatchdog.Stop();
+                var names = string.Join("\n", Enumerable.Range(0, videoDevices.Count)
+                    .Select(i => "  " + (i + 1) + ". " + videoDevices[i].Name));
+                MessageBox.Show(
+                    "No camera delivered any video.\n\nDevices found:\n" + names +
+                    "\n\nClose other apps that use the camera (Teams, Zoom, Windows Camera, browser tabs) and check " +
+                    "Settings > Privacy & security > Camera > 'Let desktop apps access your camera'.",
+                    "LUMYVUE Camera", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            OpenCamera((_camIndex + 1) % videoDevices.Count);
+        }
+
+        private void VideoSource_Error(object sender, VideoSourceErrorEventArgs eventArgs)
+        {
+            System.Diagnostics.Debug.WriteLine("[CAM] error: " + eventArgs.Description);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_cameraLive) LiveStatusTxt.Text = "Camera error: " + eventArgs.Description;
+            }));
+        }
+
         private void StopCamera()
         {
             _cameraLive = false;
 
-            if (videoSource != null && videoSource.IsRunning)
-            {
-                videoSource.SignalToStop();
-                videoSource.NewFrame -= VideoSource_NewFrame;
-                videoSource = null;
-            }
+            _camWatchdog?.Stop();
+            CloseCameraDevice();
 
             if (_live != null)
             {
@@ -317,6 +419,7 @@ namespace SkinDevApp.Views
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             if (!_cameraLive) return;
+            Interlocked.Increment(ref _framesSeen);
 
             try
             {
