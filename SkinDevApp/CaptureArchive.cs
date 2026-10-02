@@ -96,7 +96,10 @@ namespace SkinDevApp.Scanning
         {
             string day = req.CapturedUtc.ToLocalTime().ToString("yyyy-MM-dd");
             string stamp = req.CapturedUtc.ToLocalTime().ToString("HHmmss") + "_" + req.CaptureId.Substring(0, 8);
-            string folder = Path.Combine(RootDirectory, day, stamp);
+            // Multi-view: <session folder>\Front|Left|Right ; single capture: <date>\<time_id> as before.
+            string folder = !string.IsNullOrEmpty(req.SessionFolder) && req.View != ScanView.Any
+                ? Path.Combine(req.SessionFolder, ScanViews.Name(req.View))
+                : Path.Combine(RootDirectory, day, stamp);
             Directory.CreateDirectory(folder);
 
             var files = new Dictionary<string, string>();
@@ -219,6 +222,26 @@ namespace SkinDevApp.Scanning
                 };
             }
 
+            if (!string.IsNullOrEmpty(req.SessionId) && req.View != ScanView.Any)
+            {
+                var ss = new SessionSection
+                {
+                    SessionId = req.SessionId,
+                    PatientId = req.PatientId,
+                    View = ScanViews.Name(req.View),
+                    PoseGateVerified = req.PoseVerified,
+                    QualityWeight = ViewFusion.QualityWeight(req.Quality, req.PoseVerified)
+                };
+                if (req.Pose != null && req.Pose.FaceFound)
+                {
+                    ss.YawRatio = Math.Round(req.Pose.YawRatio, 3);
+                    ss.RollDegrees = Math.Round(req.Pose.RollDegrees, 1);
+                    ss.FaceScore = Math.Round(req.Pose.Score, 3);
+                    ss.ObservedView = ScanViews.Name(req.Pose.Observed);
+                }
+                record.Session = ss;
+            }
+
             if (req.Quality != null)
             {
                 FrameQuality q = req.Quality;
@@ -246,6 +269,8 @@ namespace SkinDevApp.Scanning
                     "per-class percentile map; compare shape, not brightness. relative_strength compares classes and is not a probability.";
 
                 record.ClassMapSimilarity = maps.Similarity;
+                record.GradCam["overlay_opacity"] =
+                    "saved single-class overlays use the same opacity scale for every class (relative_strength is not applied)";
                 record.GradCam["attribution_note"] =
                     "Grad-CAM++ is image-level model attribution, not a lesion map. When class_map_similarity.level is high the four class maps largely share one pattern.";
 
@@ -332,8 +357,18 @@ namespace SkinDevApp.Scanning
             {
                 foreach (string day in Directory.GetDirectories(root))
                     foreach (string cap in Directory.GetDirectories(day))
+                    {
                         if (File.Exists(Path.Combine(cap, "record.json")))
-                            result.Add(cap);
+                        {
+                            result.Add(cap);                                    // single capture
+                        }
+                        else if (File.Exists(Path.Combine(cap, "session.json")))
+                        {
+                            foreach (string view in Directory.GetDirectories(cap))   // Front / Left / Right
+                                if (File.Exists(Path.Combine(view, "record.json")))
+                                    result.Add(view);
+                        }
+                    }
             }
             catch (Exception ex)
             {

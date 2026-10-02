@@ -45,6 +45,18 @@ namespace SkinDevApp.Scanning
         public FrameQuality Quality { get; set; }
         public StabilityMetrics Stability { get; set; }
 
+        // ---- multi-view scan (all optional; defaults = old single-capture behaviour) ----
+        /// <summary>Scan/session id shared by the Front, Left and Right captures of one scan. Null = single capture.</summary>
+        public string SessionId { get; set; }
+        /// <summary>Absolute path of the session folder; the view folder is created inside it.</summary>
+        public string SessionFolder { get; set; }
+        public string PatientId { get; set; }
+        public ScanView View { get; set; } = ScanView.Any;
+        /// <summary>Head-pose measurement at the moment of capture (null when not measured).</summary>
+        public PoseReading Pose { get; set; }
+        /// <summary>The pose gate really verified the view (false = instruction-only / manual snap).</summary>
+        public bool PoseVerified { get; set; }
+
         public void Dispose()
         {
             Original?.Dispose(); Original = null;
@@ -209,6 +221,24 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("raw_cam_shape")] public int[] RawCamShape { get; set; }
     }
 
+    /// <summary>Which scan/session and which angle this capture belongs to (null for single captures).</summary>
+    public sealed class SessionSection
+    {
+        [JsonPropertyName("session_id")] public string SessionId { get; set; }
+        [JsonPropertyName("patient_id")] public string PatientId { get; set; }
+        [JsonPropertyName("view")] public string View { get; set; }
+        [JsonPropertyName("view_naming")] public string ViewNaming { get; set; } =
+            "Left = left side of the patient's face shown to the camera; Right = right side shown.";
+        [JsonPropertyName("pose_gate_verified")] public bool PoseGateVerified { get; set; }
+        [JsonPropertyName("pose_method")] public string PoseMethod { get; set; } =
+            "YuNet 5-point landmarks; yaw_ratio = (nose_x - eye_mid_x) / inter_eye_distance; positive = nose toward image right";
+        [JsonPropertyName("yaw_ratio")] public double? YawRatio { get; set; }
+        [JsonPropertyName("roll_degrees")] public double? RollDegrees { get; set; }
+        [JsonPropertyName("face_score")] public double? FaceScore { get; set; }
+        [JsonPropertyName("observed_view")] public string ObservedView { get; set; }
+        [JsonPropertyName("quality_weight")] public double QualityWeight { get; set; }
+    }
+
     public sealed class RegionSection
     {
         [JsonPropertyName("summary")] public string Summary { get; set; }
@@ -235,6 +265,7 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("consistency")] public ConsistencySection Consistency { get; set; }
         [JsonPropertyName("stability")] public StabilitySection Stability { get; set; }
         [JsonPropertyName("quality")] public QualitySection Quality { get; set; }
+        [JsonPropertyName("session")] public SessionSection Session { get; set; }
         [JsonPropertyName("region")] public RegionSection Region { get; set; }
         [JsonPropertyName("class_maps")] public List<MapSection> ClassMaps { get; set; } = new List<MapSection>();
         // v2.1 (additive): how much the four class maps agree (raw CAMs). Null with an older service.

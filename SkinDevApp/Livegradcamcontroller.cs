@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // Livegradcamcontroller.cs  —  v2 (decoupled loops + auto-capture)
 //
 // WHY THIS WAS REWRITTEN
@@ -82,6 +82,11 @@ namespace SkinDevApp.Explainability
         private readonly FrameQualityAnalyzer _quality = new FrameQualityAnalyzer();
         private readonly PredictionStabilizer _stabilizer;
         private readonly ScanStateMachine _machine = new ScanStateMachine();
+        private readonly ViewPoseEstimator _pose = new ViewPoseEstimator();
+        private volatile int _requiredView = (int)ScanView.Any;
+        private volatile MultiViewSession _session;
+        private volatile PoseReading _lastPose;
+        private volatile string _poseMessage = "";
 
         // --- shared state (guarded by _stateLock) -------------------------------
         private readonly object _stateLock = new object();
@@ -133,6 +138,35 @@ namespace SkinDevApp.Explainability
         public int CaptureFlashMs { get; set; } = 600;
 
         public bool Enabled { get; set; } = true;
+
+        // ── Multi-view scan ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The view the patient must show before auto-capture may fire.
+        /// ScanView.Any (default) = the old single-capture behaviour, no pose gate.
+        /// </summary>
+        public ScanView RequiredView
+        {
+            get { return (ScanView)_requiredView; }
+            set { _requiredView = (int)value; _pose.Reset(); }
+        }
+
+        /// <summary>When set (with RequiredView != Any) captures are filed under this session.</summary>
+        public MultiViewSession Session
+        {
+            get { return _session; }
+            set { _session = value; }
+        }
+
+        /// <summary>Latest head-pose measurement (null when no view is required).</summary>
+        public PoseReading LastPose { get { return _lastPose; } }
+
+        /// <summary>Latest pose instruction, for researcher metrics.</summary>
+        public string PoseMessage { get { return _poseMessage; } }
+
+        /// <summary>False when the YuNet model file is missing: pose is then instruction-only.</summary>
+        public bool PoseCheckAvailable { get { return _pose.Available; } }
+        public string PoseLoadError { get { return _pose.LoadError; } }
 
         public bool AutoCaptureEnabled
         {
@@ -251,6 +285,7 @@ namespace SkinDevApp.Explainability
             if (_disposed) return;
             Stop();
             _quality.Dispose();
+            _pose.Dispose();
             _disposed = true;
         }
 
@@ -271,6 +306,7 @@ namespace SkinDevApp.Explainability
 
             _stabilizer.Reset();
             _quality.Reset();
+            _pose.Reset();
             _prevThumb?.Dispose();
             _prevThumb = null;
 
@@ -396,6 +432,24 @@ namespace SkinDevApp.Explainability
                         // ---- quality / guide (positioning aid only) ---------------
                         FrameQuality q = _quality.Analyze(working);
 
+                        // ---- multi-view: head-pose gate for the requested view ------
+                        ScanView required = RequiredView;
+                        PoseReading pose = null;
+                        PoseVerdict verdict = null;
+                        if (required != ScanView.Any)
+                        {
+                            pose = _pose.Estimate(working);
+                            verdict = _pose.Evaluate(required, pose, working.Width, working.Height);
+                            _lastPose = pose;
+                            ApplyPoseToQuality(q, required, pose, verdict);
+                            _poseMessage = verdict.Message;
+                        }
+                        else
+                        {
+                            _lastPose = null;
+                            _poseMessage = "";
+                        }
+
                         // ---- motion between consecutive ticks ---------------------
                         Mat thumb = MotionMeter.MakeThumb(working);
                         double motion = _prevThumb == null ? 0.0 : MotionMeter.Between(_prevThumb, thumb);
@@ -438,7 +492,9 @@ namespace SkinDevApp.Explainability
                                 Motion = motion,
                                 Stable = stable,
                                 RawPredictedIndex = onnx.PredictedIndex,
-                                RequireFace = requireFace
+                                RequireFace = requireFace,
+                                PoseOk = verdict == null || verdict.Ok,
+                                PoseMessage = verdict != null ? verdict.Message : ""
                             });
 
                         // ---- publish ---------------------------------------------
@@ -458,8 +514,14 @@ namespace SkinDevApp.Explainability
                                 Onnx = onnx,
                                 Stable = stable,
                                 Quality = q,
-                                Stability = decision.Metrics
+                                Stability = decision.Metrics,
+                                Pose = pose,
+                                PoseVerified = verdict != null && verdict.Verified && verdict.Ok
                             };
+
+                            MultiViewSession session = _session;
+                            if (session != null && required != ScanView.Any)
+                                session.Stamp(req, required);
 
                             rawOwnedByCapture = true;
                             _finalTask = Task.Run(() => RunCaptureAsync(req, ct));
@@ -685,6 +747,51 @@ namespace SkinDevApp.Explainability
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Folds the pose measurement into the quality/guide object the rest of the loop already uses.
+        /// Front: the Haar positioning gate stays; a wrong pose only changes the message.
+        /// Left/Right: the frontal Haar cascade cannot see a turned face, so the YuNet result supplies
+        /// "face found / ready". FaceBox is cleared so the zone attribution never names a facial
+        /// region from a box that was not measured on a frontal face.
+        /// </summary>
+        private void ApplyPoseToQuality(FrameQuality q, ScanView required, PoseReading pose, PoseVerdict verdict)
+        {
+            if (!_pose.Available)
+            {
+                if (required != ScanView.Front)
+                {
+                    q.FaceFound = false;
+                    q.FaceBox = null;
+                    q.Guidance = GuidanceState.Unavailable;
+                    q.GuidanceText = "Pose model missing: press Snap Now when the view is right";
+                }
+                return;
+            }
+
+            if (required == ScanView.Front)
+            {
+                if (!verdict.Ok && q.Ready)
+                {
+                    q.Guidance = GuidanceState.CenterFace;
+                    q.GuidanceText = verdict.Message;
+                }
+                return;
+            }
+
+            q.FaceFound = pose != null && pose.FaceFound;
+            q.FaceBox = null;
+            if (verdict.Ok)
+            {
+                q.Guidance = GuidanceState.Ready;
+                q.GuidanceText = verdict.Message;
+            }
+            else
+            {
+                q.Guidance = q.FaceFound ? GuidanceState.CenterFace : GuidanceState.NoFace;
+                q.GuidanceText = verdict.Message;
+            }
+        }
 
         private static async Task DelayRemainder(DateTime tickStart, int periodMs, CancellationToken ct)
         {

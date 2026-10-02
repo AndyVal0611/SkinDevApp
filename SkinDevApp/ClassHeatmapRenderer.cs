@@ -117,7 +117,7 @@ namespace SkinDevApp.Imaging
         /// Composite the given class indices (draw order = list order) into one
         /// layer. Returns null if nothing can be drawn.
         /// </summary>
-        public static ClassOverlayLayer BuildLayer(ClassHeatmapSet set, IList<int> classIndices)
+        public static ClassOverlayLayer BuildLayer(ClassHeatmapSet set, IList<int> classIndices, bool useRelativeStrength = true)
         {
             if (set == null || classIndices == null || classIndices.Count == 0)
                 return null;
@@ -144,7 +144,10 @@ namespace SkinDevApp.Imaging
                         continue;   // all maps from one response share a size
                     }
 
-                    double scale = ClassPalette.AlphaMax * ClassPalette.StrengthFactor(map.RelativeStrength);
+                    // useRelativeStrength=false: every class is drawn at the same opacity scale. The relative
+                    // strength is a raw-peak ratio between classes, not evidence, so comparison images do not use it.
+                    double scale = ClassPalette.AlphaMax *
+                        (useRelativeStrength ? ClassPalette.StrengthFactor(map.RelativeStrength) : 1.0);
 
                     using (Mat heatF = new Mat())
                     using (Mat a = new Mat())
@@ -203,8 +206,11 @@ namespace SkinDevApp.Imaging
         /// <summary>Overlay of ONE class, for the per-class files in the capture archive.</summary>
         public static Mat RenderSingleClass(Mat frameBgr, ClassHeatmapSet set, int classIndex)
         {
-            return RenderOverlay(frameBgr, set,
-                (OverlayView)((int)OverlayView.Acne + classIndex), classIndex, 1.0);
+            using (ClassOverlayLayer layer = BuildLayer(set, new List<int> { classIndex }, useRelativeStrength: false))
+            {
+                if (layer == null) return frameBgr.Clone();
+                return layer.Blend(frameBgr, 1.0);
+            }
         }
     }
 }

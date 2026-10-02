@@ -205,6 +205,11 @@
 		</Compile>
 		<Compile Include="ScanPipeline.cs" />
 		<Compile Include="ScanStateMachine.cs" />
+		<Compile Include="ScanView.cs" />
+		<Compile Include="ViewPoseEstimator.cs" />
+		<Compile Include="MultiViewSession.cs" />
+		<Compile Include="GalleryModel.cs" />
+		<Compile Include="ComparisonGalleryWindow.cs" />
 		<Compile Include="SettingsPage.xaml.cs">
 			<DependentUpon>SettingsPage.xaml</DependentUpon>
 		</Compile>
@@ -311,6 +316,9 @@
 	</ItemGroup>
 	<ItemGroup>
 		<Content Include="haarcascade_frontalface_default.xml">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="face_detection_yunet_2023mar.onnx">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 		<Content Include="model_version.json">

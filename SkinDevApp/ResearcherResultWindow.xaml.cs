@@ -78,8 +78,7 @@ namespace SkinDevApp.Views
                 string zone = m.Diffuse ? "diffuse (no single region)" : (m.TopZone ?? "-");
                 var cap = new TextBlock
                 {
-                    Text = m.Class + "  |  score " + m.ProbabilityPercent.ToString("0.0") + "%  |  relative strength "
-                         + m.RelativeStrength.ToString("0.00") + "  |  " + zone,
+                    Text = m.Class + "  |  score " + m.ProbabilityPercent.ToString("0.0") + "%  |  " + zone,
                     FontSize = 11,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 4, 0, 0)
@@ -238,6 +237,20 @@ namespace SkinDevApp.Views
         private void OpenFolderBtn_Click(object sender, RoutedEventArgs e)
         {
             try { Process.Start("explorer.exe", _folder); } catch { }
+        }
+
+        private void GalleryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var g = new ComparisonGalleryWindow(_folder);
+                g.Owner = this;
+                g.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the gallery: " + ex.Message, "LUMYVUE Review");
+            }
         }
 
         private void CloseBtn_Click(object sender, RoutedEventArgs e) { Close(); }

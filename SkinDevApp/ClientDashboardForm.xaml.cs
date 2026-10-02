@@ -64,6 +64,8 @@ namespace SkinDevApp.Views
         private bool _serviceOnline;
 
         private ScanResult _lastResult;     // owned by the dashboard
+        private MultiViewSession _session;  // current Front/Left/Right scan (null = single capture)
+        private ComparisonGalleryWindow _gallery;
         private OverlayView _view = OverlayView.Predicted;
         private bool _initialized;
 
@@ -201,6 +203,8 @@ namespace SkinDevApp.Views
             PrintBtn.IsEnabled = false;
             NewScanBtn.IsEnabled = false;
             OpenDetailsBtn.IsEnabled = false;
+            GalleryBtn.IsEnabled = false;
+            ViewStepTxt.Text = "";
 
             SetBars(null);
 
@@ -272,6 +276,7 @@ namespace SkinDevApp.Views
                 _live.CaptureTriggered += OnCaptureTriggered;
                 _live.ScanCompleted += OnScanCompleted;
                 _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
+                BeginMultiViewIfEnabled();
                 _live.Start();
 
                 LiveStatusTxt.Text = "Connecting to Grad-CAM++ service...";
@@ -415,6 +420,12 @@ namespace SkinDevApp.Views
         private void StopCamera()
         {
             _cameraLive = false;
+
+            if (_session != null)
+            {
+                try { _session.Abort(); } catch { }      // keep whatever views were captured
+                _session = null;
+            }
 
             _camWatchdog?.Stop();
             CloseCameraDevice();
@@ -605,7 +616,10 @@ namespace SkinDevApp.Views
             ScanDecision d = s.Decision;
 
             // ---- state banner -------------------------------------------------------
-            SetBanner(d.Message, d.State);
+            string bannerText = d.Message;
+            if (_live != null && _live.RequiredView != ScanView.Any && !string.IsNullOrEmpty(bannerText))
+                bannerText = ScanViews.StepText(_live.RequiredView) + " — " + bannerText;
+            SetBanner(bannerText, d.State);
 
             // ---- guide oval + instruction + hold progress -----------------------------
             UpdateGuide(s.Quality, d);
@@ -657,7 +671,8 @@ namespace SkinDevApp.Views
 
             if (d.State == ScanState.HoldStill) text = "Hold still…";
             else if (d.State == ScanState.StableCapturing) text = "Capturing…";
-            else if (d.State == ScanState.Cooldown) text = d.Message;
+            else if (d.State == ScanState.Cooldown)
+                text = (_live.RequiredView != ScanView.Any ? ScanViews.Instruction(_live.RequiredView) + " — " : "") + d.Message;
 
             GuideTxt.Text = text;
             GuideBanner.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
@@ -813,9 +828,202 @@ namespace SkinDevApp.Views
 
             PrintBtn.IsEnabled = true;
             OpenDetailsBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
+            GalleryBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
 
             if (ResearcherChk.IsChecked == true)
                 ResearcherMetricsTxt.Text = BuildResultMetrics(r);
+
+            if (_live != null && _session != null && _live.RequiredView != ScanView.Any)
+                AdvanceMultiView(r);                                   // Front -> Left -> Right -> overall result
+            else if (ResearcherChk.IsChecked == true && !string.IsNullOrEmpty(r.Folder))
+                ShowGallery(r.Folder);                                 // single capture: show the comparison right away
+        }
+
+        // ============================================================================
+        // Multi-view scan: Front -> Left -> Right
+        // ============================================================================
+
+        private void BeginMultiViewIfEnabled()
+        {
+            _session = null;
+            if (_live == null) return;
+
+            if (MultiViewChk.IsChecked != true)
+            {
+                _live.Session = null;
+                _live.RequiredView = ScanView.Any;
+                ViewStepTxt.Text = "";
+                return;
+            }
+
+            try
+            {
+                _session = new MultiViewSession(DatabaseHelper.CurrentClientName);
+            }
+            catch (Exception ex)
+            {
+                _session = null;
+                _live.Session = null;
+                _live.RequiredView = ScanView.Any;
+                MessageBox.Show("Could not create the scan folder, falling back to a single capture.\n\n" + ex.Message,
+                    "LUMYVUE Scan", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _live.Session = _session;
+            _live.RequiredView = _session.Current;
+            UpdateViewStep();
+
+            if (!_live.PoseCheckAvailable)
+                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Snap Now when the view is right.)";
+        }
+
+        private void UpdateViewStep()
+        {
+            if (_session == null || _live == null) { ViewStepTxt.Text = ""; return; }
+
+            var sb = new StringBuilder();
+            foreach (ScanView v in ScanViews.Sequence)
+            {
+                bool done = _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
+                bool now = !_session.IsComplete && _session.Current == v;
+                sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Title(v));
+                if (v != ScanViews.Sequence[ScanViews.Sequence.Length - 1]) sb.Append("   ");
+            }
+            if (!_session.IsComplete)
+                sb.Append("\n").Append(ScanViews.Instruction(_session.Current));
+            ViewStepTxt.Text = sb.ToString();
+        }
+
+        /// <summary>A view finished (ONNX + Grad-CAM++ + saved): file it, then guide the patient to the next one.</summary>
+        private void AdvanceMultiView(ScanResult r)
+        {
+            MultiViewSession session = _session;
+            if (session == null || _live == null) return;
+
+            ScanView doneView = _live.RequiredView;
+            ScanView next;
+            try { next = session.AddResult(r); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not record this view: " + ex.Message, "LUMYVUE Scan");
+                return;
+            }
+
+            UpdateViewStep();
+
+            if (next == ScanView.Any)
+            {
+                FinishMultiView(session);
+                return;
+            }
+
+            NewScanBtn.IsEnabled = true;          // lets the operator restart the whole scan
+            VerdictTxt.Text += "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
+
+            // Show this view's result for a moment, then move on to the next angle.
+            Task.Delay(2500).ContinueWith(_ =>
+            {
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_session != session || _live == null || session.IsComplete) return;
+                        StartNextView(session);
+                    }));
+                }
+                catch { }
+            });
+        }
+
+        private void StartNextView(MultiViewSession session)
+        {
+            _lastResult?.Dispose();
+            _lastResult = null;
+            _resultsFrozen = false;
+
+            PrintBtn.IsEnabled = false;
+            OpenDetailsBtn.IsEnabled = false;
+            GalleryBtn.IsEnabled = false;
+            RegionTxt.Text = "";
+            SetBars(null);
+            LegendPanel.Visibility = Visibility.Collapsed;
+
+            _live.RequiredView = session.Current;
+            _live.NewScan();                       // cool-down, fresh stabiliser and pose history
+
+            GuideCanvas.Visibility = Visibility.Visible;
+            SnapBtn.IsEnabled = true;
+            NewScanBtn.IsEnabled = true;
+            VerdictTxt.Text = ScanViews.StepText(session.Current) + ": " + ScanViews.Instruction(session.Current);
+            UpdateViewStep();
+        }
+
+        private void FinishMultiView(MultiViewSession session)
+        {
+            FusedResult f = session.Fusion;
+
+            NewScanBtn.IsEnabled = true;
+            SnapBtn.IsEnabled = false;
+            PrintBtn.IsEnabled = true;
+            GalleryBtn.IsEnabled = true;
+
+            if (f == null || f.ViewsUsed == 0)
+            {
+                VerdictTxt.Text = "Scan finished, but no view could be analysed. Press New Scan to try again.";
+                return;
+            }
+
+            primaryDiagnosis = f.TopClass;
+            confidencePercent = f.TopClassPercent.ToString("F1") + "%";
+            SetBars(f.Pooled);
+
+            var v = new StringBuilder();
+            v.Append("Overall result (").Append(f.ViewsUsed).Append(" views): ").Append(f.TopClass)
+             .Append(" (").Append(confidencePercent).Append(" pooled model score)");
+            if (f.Disagreement)
+                v.Append("\n⚠ The views differ from each other. Each angle is kept and can be reviewed separately.");
+            foreach (SideSpecificNote n in f.SideSpecific)
+                v.Append("\n• ").Append(n.Class).Append(" scored ").Append(n.ViewScorePercent.ToString("0"))
+                 .Append("% in the ").Append(n.View).Append(" view.");
+            VerdictTxt.Text = v.ToString();
+            RegionTxt.Text = "Front, Left and Right captures are saved together. Heatmaps show model attribution, not lesion outlines.";
+
+            SetBanner("Scan complete — " + f.ViewsUsed + " views", ScanState.Results);
+            UpdateViewStep();
+
+            if (ResearcherChk.IsChecked == true) ShowGallery(session.Folder);
+        }
+
+        private void MultiViewChk_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+            if (_live == null) return;                // takes effect when the camera starts
+            NewScanBtn_Click(null, null);             // restart cleanly in the chosen mode
+        }
+
+        private void ShowGallery(string folder)
+        {
+            if (string.IsNullOrEmpty(folder)) return;
+            try
+            {
+                _gallery = new ComparisonGalleryWindow(folder);
+                _gallery.Owner = Application.Current.MainWindow;
+                _gallery.Show();                       // not modal: the kiosk keeps running
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the comparison gallery: " + ex.Message, "LUMYVUE Review",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void GalleryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session != null && !string.IsNullOrEmpty(_session.Folder) && _session.Outcomes.Count > 0)
+                ShowGallery(_session.Folder);
+            else if (_lastResult != null)
+                ShowGallery(_lastResult.Folder);
         }
 
         /// <summary>Draw the captured frame with the selected class map(s).</summary>
@@ -888,13 +1096,21 @@ namespace SkinDevApp.Views
             SetBars(null);
             LegendPanel.Visibility = Visibility.Collapsed;
 
+            GalleryBtn.IsEnabled = false;
+
             if (_live != null)
             {
                 _resultsFrozen = false;
+
+                if (_session != null) { try { _session.Abort(); } catch { } }   // keep any captured views, start a new scan
+                BeginMultiViewIfEnabled();
+
                 _live.NewScan();
                 GuideCanvas.Visibility = Visibility.Visible;
                 SnapBtn.IsEnabled = true;
-                VerdictTxt.Text = "Status: Live camera active. Position your face in the oval.";
+                VerdictTxt.Text = _session != null
+                    ? ScanViews.StepText(_session.Current) + ": " + ScanViews.Instruction(_session.Current)
+                    : "Status: Live camera active. Position your face in the oval.";
             }
             else
             {
@@ -1100,6 +1316,13 @@ namespace SkinDevApp.Views
             FrameQuality q = s.Quality;
 
             sb.AppendLine("state      : " + d.State);
+            if (_live != null && _live.RequiredView != ScanView.Any)
+            {
+                PoseReading pr = _live.LastPose;
+                sb.AppendLine("view       : " + ScanViews.Title(_live.RequiredView) + "  pose gate " + Ok(g.Pose) +
+                              (pr != null && pr.FaceFound ? "  yaw " + pr.YawRatio.ToString("F2") + " (measured " + ScanViews.Name(pr.Observed) + ")" : "  no face for pose") +
+                              "  \"" + _live.PoseMessage + "\"");
+            }
             sb.AppendLine("gates      : face " + Ok(g.Face) + " | quality " + Ok(g.Quality) + " | stable " + Ok(g.Stable) +
                           " | conf " + Ok(g.Confident) + " | margin " + Ok(g.Margin) +
                           " | consistent " + Ok(g.Consistent) + " | still " + Ok(g.Still));

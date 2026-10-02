@@ -63,11 +63,21 @@ namespace SkinDevApp.Scanning
 
         /// <summary>False when the cascade is missing or the operator turned the face requirement off.</summary>
         public bool RequireFace { get; set; } = true;
+
+        /// <summary>
+        /// Multi-view scans: the head pose matches the requested view (Front / Left / Right).
+        /// Always true in single-capture mode.
+        /// </summary>
+        public bool PoseOk { get; set; } = true;
+
+        /// <summary>What to tell the patient when PoseOk is false.</summary>
+        public string PoseMessage { get; set; } = "";
     }
 
     public sealed class ScanGates
     {
         public bool Face { get; set; }
+        public bool Pose { get; set; } = true;
         public bool Quality { get; set; }
         public bool Stable { get; set; }
         public bool Confident { get; set; }
@@ -76,13 +86,14 @@ namespace SkinDevApp.Scanning
         public bool Still { get; set; }
 
         public bool AllOk =>
-            Face && Quality && Stable && Confident && Margin && Consistent && Still;
+            Face && Pose && Quality && Stable && Confident && Margin && Consistent && Still;
 
         public string FirstFailure
         {
             get
             {
                 if (!Face) return "face not positioned";
+                if (!Pose) return "head pose";
                 if (!Quality) return "image quality";
                 if (!Stable) return "prediction not stable yet";
                 if (!Confident) return "confidence below threshold";
@@ -303,6 +314,7 @@ namespace SkinDevApp.Scanning
                 var g = new ScanGates
                 {
                     Face = faceOk,
+                    Pose = inp.PoseOk,
                     Quality = inp.QualityOk,
                     Stable = st != null && st.IsStable && !st.IsUncertain && !string.IsNullOrEmpty(st.DisplayClass),
                     Still = inp.Motion <= MotionStillThreshold
@@ -323,6 +335,13 @@ namespace SkinDevApp.Scanning
                     _state = ScanState.Live;
                     _holdStart = DateTime.MinValue;
                     d.Message = "Position your face in the oval";
+                }
+                else if (!inp.PoseOk)
+                {
+                    // Multi-view: wrong head pose for the requested view. Never capture, restart the hold.
+                    _state = ScanState.Scanning;
+                    _holdStart = DateTime.MinValue;
+                    d.Message = string.IsNullOrEmpty(inp.PoseMessage) ? "Adjust your head position" : inp.PoseMessage;
                 }
                 else if (st == null || st.IsUncertain)
                 {

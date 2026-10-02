@@ -14,7 +14,7 @@
             <TextBlock x:Name="HeaderTxt" FontSize="18" FontWeight="Bold" Foreground="#1A2328"/>
             <TextBlock x:Name="StatusTxt" FontSize="12" Foreground="#6B7280" Margin="0,2,0,0"/>
             <TextBlock Foreground="#8A5A00" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"
-                       Text="AI output is not ground truth and is never added to training data automatically. Colours show class identity; strength is relative within this capture."/>
+                       Text="AI output is not ground truth and is never added to training data automatically. Colours show class identity. Each map is normalised per class, so compare its shape, not its brightness. Grad-CAM++ is model attribution, not lesion segmentation."/>
         </StackPanel>
 
         <Grid Grid.Row="1">
@@ -68,6 +68,7 @@
             <Button x:Name="PrevBtn" Content="&lt; Previous pending" Width="140" Height="32" Click="PrevBtn_Click"/>
             <Button x:Name="NextBtn" Content="Next pending &gt;" Width="140" Height="32" Margin="8,0,0,0" Click="NextBtn_Click"/>
             <Button Content="Open folder" Width="110" Height="32" Margin="8,0,0,0" Click="OpenFolderBtn_Click"/>
+            <Button Content="Comparison gallery" Width="150" Height="32" Margin="8,0,0,0" Click="GalleryBtn_Click"/>
             <Button Content="Close" Width="90" Height="32" DockPanel.Dock="Right" Click="CloseBtn_Click"/>
         </DockPanel>
     </Grid>

@@ -137,6 +137,13 @@
                                   FontSize="12" Foreground="#1A2328" Margin="0,0,0,10"
                                   Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
+                        <CheckBox x:Name="MultiViewChk" Content="3-view scan: Front, Left side, Right side" IsChecked="True"
+                                  FontSize="12" Foreground="#1A2328" Margin="0,0,0,6"
+                                  Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
+
+                        <TextBlock x:Name="ViewStepTxt" Text="" FontSize="12" FontWeight="SemiBold" Foreground="#2563EB"
+                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+
                         <Button x:Name="NewScanBtn" Content="&#x1F501; New Scan" Height="42" FontSize="13"
                                 Background="#1A2328" Foreground="White" FontWeight="Bold" IsEnabled="False"
                                 Margin="0,0,0,10" Click="NewScanBtn_Click"/>
@@ -210,6 +217,8 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                     <Button x:Name="OpenDetailsBtn" Content="Capture details / review" Height="32" Padding="12,0" Margin="0,0,8,0"
                                             IsEnabled="False" Click="OpenDetailsBtn_Click"/>
+                                    <Button x:Name="GalleryBtn" Content="Comparison gallery" Height="32" Padding="12,0" Margin="0,0,8,0"
+                                            IsEnabled="False" Click="GalleryBtn_Click"/>
                                     <Button x:Name="PendingBtn" Content="Pending reviews" Height="32" Padding="12,0" Click="PendingBtn_Click"/>
                                 </StackPanel>
                             </StackPanel>
