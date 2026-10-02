@@ -251,6 +251,8 @@ namespace SkinDevApp.Scanning
     {
         [JsonPropertyName("schema_version")] public string SchemaVersion { get; set; } = "1.0";
         [JsonPropertyName("capture_id")] public string CaptureId { get; set; }
+        // v2.2 (additive): id of the exact frozen frame used for ONNX, Grad-CAM++ and the saved images.
+        [JsonPropertyName("frame_id")] public long FrameId { get; set; }
         [JsonPropertyName("timestamp_utc")] public string TimestampUtc { get; set; }
         [JsonPropertyName("trigger")] public string Trigger { get; set; }
         [JsonPropertyName("review_status")] public string ReviewStatus { get; set; } = "PendingReview";

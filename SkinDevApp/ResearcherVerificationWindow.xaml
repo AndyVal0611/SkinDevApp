@@ -1,12 +1,55 @@
 ﻿<Window x:Class="SkinDevApp.ResearcherVerificationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:SkinDevApp"
-        mc:Ignorable="d"
-        Title="ResearcherVerificationWindow" Height="450" Width="800">
-    <Grid>
-        
+        Title="Researcher Verification" Height="820" Width="1250" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterOwner" Background="#FBF9F6">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="8,0,8,10">
+            <TextBlock x:Name="TitleTxt" Text="Researcher Verification" Style="{StaticResource H1}"/>
+            <TextBlock x:Name="SubtitleTxt" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- AI prediction (read-only) -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="AiColumn"/>
+            </ScrollViewer>
+
+            <!-- Human assessments -->
+            <TabControl Grid.Column="1" Margin="8" Background="White" BorderThickness="0">
+                <TabItem Header="  Researcher Assessment  " FontSize="13">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="ResearcherForm" Margin="16"/>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="  Licensed Dermatologist Validation  " FontSize="13">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="DermForm" Margin="16"/>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="  History  " FontSize="13">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="HistoryPanel" Margin="16"/>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <DockPanel Grid.Row="2" Margin="8,10,8,0">
+            <Button Content="Close" Style="{StaticResource SecondaryButton}" Width="120" DockPanel.Dock="Right" Click="CloseBtn_Click"/>
+            <TextBlock Style="{StaticResource Muted}" VerticalAlignment="Center" FontSize="11.5"
+                       Text="AI output, researcher assessment and dermatologist validation are three separate records. Saving a human assessment never overwrites the AI prediction; a new save adds a new record."/>
+        </DockPanel>
     </Grid>
 </Window>

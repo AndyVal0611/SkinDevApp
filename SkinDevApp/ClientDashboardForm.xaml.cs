@@ -21,10 +21,12 @@ using Microsoft.Win32;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 using SkinDevApp.AI;
+using SkinDevApp.Data;
 using SkinDevApp.Explainability;
 using SkinDevApp.Imaging;
 using SkinDevApp.Scanning;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -69,6 +71,13 @@ namespace SkinDevApp.Views
         private OverlayView _view = OverlayView.Predicted;
         private bool _initialized;
 
+        // --- study workflow ---------------------------------------------------------
+        private readonly string _participantId;          // PatientID the scan is filed under (never the name)
+        private Task _importChain = Task.CompletedTask;   // database imports run one after another, off the UI thread
+        private string _resultSessionId;                  // ScanSessionID of the last saved scan (results / report)
+        private string _resultSessionLabel;
+        private readonly Dictionary<string, TextBlock> _status = new Dictionary<string, TextBlock>();
+
         private readonly bool _cropLiveFrameToSquare = true;
         private const int AnalysisWidth = 640;
         private const int FastLoopMs = 200;
@@ -99,7 +108,311 @@ namespace SkinDevApp.Views
 
             Unloaded += (s, e) => ResetKioskState();
 
+            _participantId = AppSession.CurrentParticipantId;
+            ApplyRoleAndSettings();
+            BuildStatusPanel();
+
             ResetKioskState();
+            CheckGate();
+            UpdateScanInfo();
+        }
+
+        // ============================================================================
+        // Study workflow: role, consent gate, settings, status panel, database import
+        // ============================================================================
+
+        private void ApplyRoleAndSettings()
+        {
+            bool r = AppSession.IsResearcher;
+            ScanSettings cfg = ScanSettings.Current;
+
+            ResearcherChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            if (!r) ResearcherChk.IsChecked = false;
+            HeatmapChoicePanel.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            UploadBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            AnalyzeBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            MultiViewChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;   // operators always run the 3-view scan
+            AutoCaptureChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+
+            AutoCaptureChk.IsChecked = cfg.AutoCapture;
+            CamOnChk.IsChecked = cfg.LiveGradCam;
+            OpacitySlider.Value = Math.Max(0.1, Math.Min(1.0, cfg.OverlayOpacity));
+            OpacityTxt.Text = OpacitySlider.Value.ToString("0.00");
+        }
+
+        /// <summary>Scanning needs a registered participant with the required consent.</summary>
+        private bool CheckGate()
+        {
+            string problem = null;
+            if (string.IsNullOrEmpty(_participantId))
+                problem = AppSession.IsResearcher
+                    ? "No participant selected. Live scanning is filed under a PatientID: register or select a participant first. (Researchers may still analyse an uploaded image; it is saved as an unlinked scan.)"
+                    : "No participant selected. Register or select a participant from the Dashboard first.";
+            else if (!Workflow.HasScanConsent(_participantId))
+                problem = "Required consent has not been recorded for " + _participantId + ". Image capture is blocked until consent is given.";
+
+            GateBox.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
+            GateTxt.Text = problem ?? "";
+            GateBtn.Content = string.IsNullOrEmpty(_participantId) ? "Go to Dashboard" : "Go to Consent";
+            StartCamBtn.IsEnabled = problem == null;
+            if (problem != null) VerdictTxt.Text = "Status: scanning is blocked — see the message above.";
+            return problem == null;
+        }
+
+        private void GateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_participantId)) Nav.Home();
+            else Nav.Go(new ConsentPage(_participantId));
+        }
+
+        private void HomeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            Nav.Home();
+        }
+
+        /// <summary>Top bar: PatientID, ScanSessionID, Front/Left/Right progress, required pose.</summary>
+        private void UpdateScanInfo()
+        {
+            var sb = new StringBuilder();
+            sb.Append("PatientID: ").Append(string.IsNullOrEmpty(_participantId) ? "none selected" : _participantId);
+
+            if (_session != null)
+            {
+                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel ?? _session.SessionId.Substring(0, 8) + "…");
+                sb.Append("   ·   ");
+                foreach (ScanView v in ScanViews.Sequence)
+                {
+                    bool done = _session.HasView(v);
+                    bool now = !_session.IsComplete && _session.Current == v;
+                    sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Name(v)).Append("  ");
+                }
+                if (!_session.IsComplete)
+                    sb.Append("  ·   Required pose: ").Append(ScanViews.Instruction(_session.Current));
+            }
+            else if (!string.IsNullOrEmpty(_resultSessionLabel))
+            {
+                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel);
+            }
+            ScanInfoTxt.Text = sb.ToString();
+        }
+
+        private static readonly string[] StatusKeys =
+            { "Face position", "Pose / orientation", "Sharpness", "Brightness / exposure", "Motion", "Stability", "Camera" };
+
+        private void BuildStatusPanel()
+        {
+            StatusGrid.Children.Clear();
+            _status.Clear();
+            foreach (string k in StatusKeys)
+            {
+                var sp = new StackPanel { Margin = new Thickness(0, 2, 8, 4) };
+                sp.Children.Add(new TextBlock { Text = k, FontSize = 10.5, Foreground = Ui.Muted });
+                var val = new TextBlock { Text = "—", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
+                sp.Children.Add(val);
+                _status[k] = val;
+                StatusGrid.Children.Add(sp);
+            }
+        }
+
+        private void SetStatusLine(string key, bool ok, string text)
+        {
+            TextBlock t;
+            if (!_status.TryGetValue(key, out t)) return;
+            t.Text = (ok ? "✓ " : "• ") + text;
+            t.Foreground = ok ? Ui.Good : Ui.Warn;
+        }
+
+        private void UpdateStatusPanel(LiveSnapshot s)
+        {
+            StatusPanel.Visibility = Visibility.Visible;
+            ScanDecision d = s.Decision;
+            ScanGates g = d.Gates;
+            FrameQuality q = s.Quality;
+
+            switch (d.State)
+            {
+                case ScanState.Stabilizing: StabilityTxt.Text = "STABILIZING"; break;
+                case ScanState.HoldStill: StabilityTxt.Text = "HOLD STILL"; break;
+                case ScanState.StableCapturing: StabilityTxt.Text = "STABLE — CAPTURING"; break;
+                case ScanState.FinalAnalysis: StabilityTxt.Text = "CAPTURING"; break;
+                case ScanState.Cooldown: StabilityTxt.Text = "NEXT VIEW"; break;
+                default: StabilityTxt.Text = "ANALYZING"; break;
+            }
+
+            if (q == null || !q.FaceFound) SetStatusLine("Face position", false, "Position your face");
+            else SetStatusLine("Face position", q.Ready || g.Face, q.Ready ? "Centred" : q.GuidanceText);
+
+            if (_live != null && _live.RequiredView != ScanView.Any)
+            {
+                if (!_live.PoseCheckAvailable) SetStatusLine("Pose / orientation", false, "Not verified (pose model missing)");
+                else SetStatusLine("Pose / orientation", g.Pose, g.Pose ? ScanViews.Title(_live.RequiredView) + " confirmed" : (_live.PoseMessage ?? "Turn as instructed"));
+            }
+            else SetStatusLine("Pose / orientation", true, "Any (single capture)");
+
+            SetStatusLine("Sharpness", q != null && q.SharpEnough, q == null ? "—" : (q.SharpEnough ? "Sharp" : "Blurry — hold still / refocus"));
+            SetStatusLine("Brightness / exposure", q != null && q.ExposureOk, q == null ? "—" : (q.ExposureOk ? "OK" : "Check lighting"));
+            SetStatusLine("Motion", g.Still, g.Still ? "Still" : "Moving");
+            SetStatusLine("Stability", g.Stable && g.Consistent,
+                d.Metrics.FramesHeldStable + "/" + d.Metrics.StableFramesRequired + " frames, " + d.Metrics.ConsistencyRatio.ToString("P0") + " consistent");
+            SetStatusLine("Camera", Volatile.Read(ref _framesSeen) > 0, Volatile.Read(ref _framesSeen) > 0 ? "Live" : "Waiting for video");
+        }
+
+        // ---- database ------------------------------------------------------------
+
+        /// <summary>Run imports one after another on a worker thread; report failures without blocking scanning.</summary>
+        private async Task<string> SaveToDatabase(Func<string> work)
+        {
+            Task<string> t = _importChain.ContinueWith(_ => work(), TaskScheduler.Default);
+            _importChain = t.ContinueWith(_ => { }, TaskScheduler.Default);
+            try
+            {
+                return await t;
+            }
+            catch (Exception ex)
+            {
+                VerdictTxt.Text += "\n⚠ Could not save to the database: " + ex.Message +
+                                   ". The images and record files are saved on disk and can be imported later from Participant Records.";
+                return null;
+            }
+        }
+
+        private async Task<string> SaveSession(MultiViewSession session, bool finalize)
+        {
+            if (session == null || session.Outcomes.Count == 0) return null;
+            string folder = session.Folder;
+            string pid = _participantId;
+            string id = await SaveToDatabase(() => SessionImporter.ImportSession(folder, pid, finalize));
+            if (id != null) RememberSaved(id);
+            return id;
+        }
+
+        private async Task<string> SaveSingle(string captureFolder)
+        {
+            if (string.IsNullOrEmpty(captureFolder)) return null;
+            string pid = _participantId;
+            string id = await SaveToDatabase(() => SessionImporter.ImportSingleCapture(captureFolder, pid, true));
+            if (id != null) RememberSaved(id);
+            return id;
+        }
+
+        private void RememberSaved(string scanSessionId)
+        {
+            _resultSessionId = scanSessionId;
+            try
+            {
+                ScanSessionRow row = StudyRepository.GetSession(scanSessionId);
+                _resultSessionLabel = row != null ? row.DisplayId : null;
+            }
+            catch { _resultSessionLabel = null; }
+            UpdateScanInfo();
+        }
+
+        // ---- image review (per view, retake, accept) ----------------------------------
+
+        private void ShowReviewPanel(MultiViewSession session)
+        {
+            ReviewList.Children.Clear();
+            foreach (ScanView v in ScanViews.Sequence)
+            {
+                ViewOutcome o = session.Outcomes.FirstOrDefault(x => x.View == ScanViews.Name(v));
+                CaptureRecord rec = o != null && !string.IsNullOrEmpty(o.AbsoluteFolder) ? ReviewStore.LoadRecord(o.AbsoluteFolder) : null;
+
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                string img = o != null && o.AbsoluteFolder != null ? Path.Combine(o.AbsoluteFolder, "analysed.png") : null;
+                var thumb = Ui.Thumb(img, 80, "#E5E7EB", "not captured");
+                row.Children.Add(thumb);
+
+                var info = new StackPanel { Margin = new Thickness(10, 0, 8, 0) };
+                info.Children.Add(Ui.Text(ScanViews.Title(v) + (o != null && o.Ok ? "  —  " + o.PredictedClass + " " + o.ConfidencePercent.ToString("0.0") + "%" : "  —  not captured"),
+                    12.5, true, Ui.Ink, new Thickness(0)));
+                if (rec != null)
+                {
+                    string quality = SessionImporter.QualityStatus(rec, ScanViews.Name(v));
+                    info.Children.Add(Ui.Text("Overall capture quality: " + quality, 11.5, true, quality == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
+                    if (rec.Quality != null)
+                        info.Children.Add(Ui.Text(
+                            "Sharpness " + rec.Quality.Sharpness.ToString("0") + (rec.Quality.Sharpness >= ScanSettings.Current.MinSharpness ? " ✓" : " (low)") +
+                            "  ·  Brightness " + rec.Quality.Brightness.ToString("0") +
+                            "  ·  Face " + (rec.Quality.FaceFound ? "found" : "not found") +
+                            "  ·  Pose " + (rec.Session != null && rec.Session.PoseGateVerified ? "verified" : "not verified") +
+                            "  ·  " + (rec.Trigger == "auto" ? "auto-captured" : "manual"),
+                            10.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+                }
+                Grid.SetColumn(info, 1);
+                row.Children.Add(info);
+
+                ScanView captured = v;
+                var retake = new Button { Content = o != null ? "Retake" : "Capture", Style = (Style)FindResource("SmallButton"), VerticalAlignment = VerticalAlignment.Center };
+                retake.Click += (s, e) => RetakeView(captured);
+                Grid.SetColumn(retake, 2);
+                row.Children.Add(retake);
+
+                ReviewList.Children.Add(row);
+            }
+
+            AcceptBtn.IsEnabled = session.IsComplete;
+            AcceptBtn.Content = session.IsComplete ? "Accept views and view results  ›" : "Capture the missing view(s) first";
+            ReviewPanel.Visibility = Visibility.Visible;
+        }
+
+        private void RetakeView(ScanView v)
+        {
+            MultiViewSession session = _session;
+            if (session == null || _live == null) return;
+
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            session.Retake(v);
+            StartNextView(session);
+            UpdateScanInfo();
+        }
+
+        private async void AcceptBtn_Click(object sender, RoutedEventArgs e)
+        {
+            MultiViewSession session = _session;
+            if (session == null) return;
+            AcceptBtn.IsEnabled = false;
+
+            string id = await SaveSession(session, finalize: true);
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            if (id == null)
+            {
+                AcceptBtn.IsEnabled = true;
+                ReviewPanel.Visibility = Visibility.Visible;
+                return;
+            }
+            Nav.Go(new ResultsPage(id));
+        }
+
+        private void ViewResultsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_resultSessionId)) Nav.Go(new ResultsPage(_resultSessionId));
+        }
+
+        // ---- researcher CAM controls ---------------------------------------------------
+
+        private void CamOnChk_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+            if (_live != null)
+            {
+                _live.Enabled = CamOnChk.IsChecked == true;
+                _live.InvalidateOverlay();
+            }
+            LegendPanel.Visibility = CamOnChk.IsChecked == true ? LegendPanel.Visibility : Visibility.Collapsed;
+        }
+
+        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (OpacityTxt == null) return;
+            OpacityTxt.Text = OpacitySlider.Value.ToString("0.00");
+            if (!_initialized) return;
+            ClassPalette.AlphaMax = OpacitySlider.Value;          // display only; saved overlays use the Settings value
+            _live?.InvalidateOverlay();
+            if (_lastResult != null && _lastResult.Ok) RenderResultOverlay();
         }
 
         // ============================================================================
@@ -204,6 +517,9 @@ namespace SkinDevApp.Views
             NewScanBtn.IsEnabled = false;
             OpenDetailsBtn.IsEnabled = false;
             GalleryBtn.IsEnabled = false;
+            ViewResultsBtn.IsEnabled = false;
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            StatusPanel.Visibility = Visibility.Collapsed;
             ViewStepTxt.Text = "";
 
             SetBars(null);
@@ -224,6 +540,8 @@ namespace SkinDevApp.Views
 
         private void StartCamBtn_Click(object sender, RoutedEventArgs e)
         {
+            if (!CheckGate()) return;
+
             try
             {
                 videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -272,6 +590,11 @@ namespace SkinDevApp.Views
                     MaxHeatmapAgeSeconds = 6.0
                 };
 
+                ScanSettings.Current.Apply(_live);                     // researcher settings (audited)
+                _live.AutoCaptureEnabled = AutoCaptureChk.IsChecked == true;
+                _live.Enabled = CamOnChk.IsChecked == true;
+                ClassPalette.AlphaMax = OpacitySlider.Value;
+
                 _live.FastUpdated += OnFastUpdated;
                 _live.CaptureTriggered += OnCaptureTriggered;
                 _live.ScanCompleted += OnScanCompleted;
@@ -296,6 +619,12 @@ namespace SkinDevApp.Views
         /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
         private int PickCameraIndex()
         {
+            // A camera chosen in Settings wins.
+            string chosen = (ScanSettings.Current.CameraName ?? "").Trim().ToLowerInvariant();
+            if (chosen.Length > 0)
+                for (int i = 0; i < videoDevices.Count; i++)
+                    if ((videoDevices[i].Name ?? "").ToLowerInvariant() == chosen) return i;
+
             // Prefer Logitech BRIO
             for (int i = 0; i < videoDevices.Count; i++)
             {
@@ -349,7 +678,8 @@ namespace SkinDevApp.Views
                 var caps = videoSource.VideoCapabilities;
                 if (caps != null && caps.Length > 0)
                 {
-                    var best = caps.OrderBy(c => Math.Abs(c.FrameSize.Width - 640) + Math.Abs(c.FrameSize.Height - 480)).First();
+                    int wantW = ScanSettings.Current.CameraWidth, wantH = ScanSettings.Current.CameraHeight;
+                    var best = caps.OrderBy(c => Math.Abs(c.FrameSize.Width - wantW) + Math.Abs(c.FrameSize.Height - wantH)).First();
                     videoSource.VideoResolution = best;
                 }
             }
@@ -423,8 +753,10 @@ namespace SkinDevApp.Views
 
             if (_session != null)
             {
-                try { _session.Abort(); } catch { }      // keep whatever views were captured
+                MultiViewSession ended = _session;
+                try { ended.Abort(); } catch { }      // keep whatever views were captured
                 _session = null;
+                _ = SaveSession(ended, finalize: true);   // partial Front/Left/Right scans are stored as incomplete
             }
 
             _camWatchdog?.Stop();
@@ -614,6 +946,7 @@ namespace SkinDevApp.Views
             SetBars(smoothed);
 
             ScanDecision d = s.Decision;
+            UpdateStatusPanel(s);
 
             // ---- state banner -------------------------------------------------------
             string bannerText = d.Message;
@@ -835,8 +1168,19 @@ namespace SkinDevApp.Views
 
             if (_live != null && _session != null && _live.RequiredView != ScanView.Any)
                 AdvanceMultiView(r);                                   // Front -> Left -> Right -> overall result
-            else if (ResearcherChk.IsChecked == true && !string.IsNullOrEmpty(r.Folder))
-                ShowGallery(r.Folder);                                 // single capture: show the comparison right away
+            else
+            {
+                SaveSingleAndEnableResults(r.Folder);
+                if (ResearcherChk.IsChecked == true && !string.IsNullOrEmpty(r.Folder))
+                    ShowGallery(r.Folder);                             // single capture: show the comparison right away
+            }
+        }
+
+        private async void SaveSingleAndEnableResults(string folder)
+        {
+            string id = await SaveSingle(folder);
+            ViewResultsBtn.IsEnabled = id != null;
+            PrintBtn.IsEnabled = id != null;
         }
 
         // ============================================================================
@@ -858,7 +1202,9 @@ namespace SkinDevApp.Views
 
             try
             {
-                _session = new MultiViewSession(DatabaseHelper.CurrentClientName);
+                _session = new MultiViewSession(_participantId);     // folders are named by PatientID, never by name
+                _resultSessionId = null;
+                _resultSessionLabel = null;
             }
             catch (Exception ex)
             {
@@ -873,6 +1219,7 @@ namespace SkinDevApp.Views
             _live.Session = _session;
             _live.RequiredView = _session.Current;
             UpdateViewStep();
+            UpdateScanInfo();
 
             if (!_live.PoseCheckAvailable)
                 ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Snap Now when the view is right.)";
@@ -911,6 +1258,8 @@ namespace SkinDevApp.Views
             }
 
             UpdateViewStep();
+            UpdateScanInfo();
+            _ = SaveSession(session, finalize: false);            // each finished view is stored straight away
 
             if (next == ScanView.Any)
             {
@@ -919,7 +1268,9 @@ namespace SkinDevApp.Views
             }
 
             NewScanBtn.IsEnabled = true;          // lets the operator restart the whole scan
-            VerdictTxt.Text += "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
+            VerdictTxt.Text += next == doneView
+                ? "\n⚠ " + ScanViews.Title(doneView) + " could not be analysed. Please capture it again."
+                : "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
 
             // Show this view's result for a moment, then move on to the next angle.
             Task.Delay(2500).ContinueWith(_ =>
@@ -991,8 +1342,20 @@ namespace SkinDevApp.Views
 
             SetBanner("Scan complete — " + f.ViewsUsed + " views", ScanState.Results);
             UpdateViewStep();
+            UpdateScanInfo();
+            StatusPanel.Visibility = Visibility.Collapsed;
 
             if (ResearcherChk.IsChecked == true) ShowGallery(session.Folder);
+
+            if (ScanSettings.Current.ReviewBeforeFinish)
+            {
+                PrintBtn.IsEnabled = false;            // report after the views are accepted
+                ShowReviewPanel(session);
+            }
+            else
+            {
+                AcceptBtn_Click(null, null);
+            }
         }
 
         private void MultiViewChk_Changed(object sender, RoutedEventArgs e)
@@ -1102,7 +1465,14 @@ namespace SkinDevApp.Views
             {
                 _resultsFrozen = false;
 
-                if (_session != null) { try { _session.Abort(); } catch { } }   // keep any captured views, start a new scan
+                if (_session != null)
+                {
+                    MultiViewSession ended = _session;
+                    try { ended.Abort(); } catch { }                          // keep any captured views, start a new scan
+                    _ = SaveSession(ended, finalize: true);
+                }
+                ReviewPanel.Visibility = Visibility.Collapsed;
+                ViewResultsBtn.IsEnabled = false;
                 BeginMultiViewIfEnabled();
 
                 _live.NewScan();
@@ -1265,8 +1635,17 @@ namespace SkinDevApp.Views
             }
         }
 
-        private void PrintBtn_Click(object sender, RoutedEventArgs e)
+        private async void PrintBtn_Click(object sender, RoutedEventArgs e)
         {
+            // The research report is built from the saved scan (database + files), never from the live screen.
+            if (_session != null && _session.Outcomes.Count > 0 && _resultSessionId == null)
+                await SaveSession(_session, finalize: false);
+            if (!string.IsNullOrEmpty(_resultSessionId))
+            {
+                ResearchReportWindow.Open(_resultSessionId);
+                return;
+            }
+
             try
             {
                 RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
@@ -1310,8 +1689,7 @@ namespace SkinDevApp.Views
         private void LogoutBtn_Click(object sender, RoutedEventArgs e)
         {
             ResetKioskState();
-            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
-            mainWin.MainFrame.Navigate(new LoginForm());
+            Nav.SignOut();
         }
 
         // ============================================================================

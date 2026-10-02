@@ -158,12 +158,32 @@
 			<DependentUpon>ConsentPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Include="DatabaseHelper.cs" />
+		<Compile Include="Data\AppSession.cs" />
+		<Compile Include="Data\ScanSettings.cs" />
+		<Compile Include="Data\SessionImporter.cs" />
+		<Compile Include="Data\StudyDatabase.cs" />
+		<Compile Include="Data\StudyModels.cs" />
+		<Compile Include="Data\StudyRepository.cs" />
+		<Compile Include="Views\ParticipantPickerWindow.cs" />
+		<Compile Include="Views\ResearchReportWindow.cs" />
+		<Compile Include="Views\Ui.cs" />
+		<Compile Include="Views\HomePage.xaml.cs">
+			<DependentUpon>HomePage.xaml</DependentUpon>
+		</Compile>
+		<Compile Include="Views\ResultsPage.xaml.cs">
+			<DependentUpon>ResultsPage.xaml</DependentUpon>
+		</Compile>
+		<Page Include="Views\HomePage.xaml">
+			<SubType>Designer</SubType>
+			<Generator>MSBuild:Compile</Generator>
+		</Page>
+		<Page Include="Views\ResultsPage.xaml">
+			<SubType>Designer</SubType>
+			<Generator>MSBuild:Compile</Generator>
+		</Page>
 		<Compile Include="AiEngine.cs" />
 		<Compile Include="FrameQuality.cs" />
 		<Compile Include="ImageInterop.cs" />
-		<Compile Include="ImageReviewPage.xaml.cs">
-			<DependentUpon>ImageReviewPage.xaml</DependentUpon>
-		</Compile>
 		<Compile Include="ModelInfo.cs" />
 		<Compile Include="ModelInfoPage.xaml.cs">
 			<DependentUpon>ModelInfoPage.xaml</DependentUpon>
@@ -221,10 +241,6 @@
 			<Generator>MSBuild:Compile</Generator>
 		</Page>
 		<Page Include="ConsentPage.xaml">
-			<SubType>Designer</SubType>
-			<Generator>MSBuild:Compile</Generator>
-		</Page>
-		<Page Include="ImageReviewPage.xaml">
 			<SubType>Designer</SubType>
 			<Generator>MSBuild:Compile</Generator>
 		</Page>

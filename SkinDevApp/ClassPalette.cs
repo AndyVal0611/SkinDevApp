@@ -53,7 +53,7 @@ namespace SkinDevApp.Imaging
             "#FF0000", "#0050FF", "#FFBE00", "#00C83C"
         };
 
-        public const double AlphaMax = 0.60;        // peak opacity
+        public static double AlphaMax { get; set; } = 0.60;   // peak opacity (Settings > overlay opacity)
         public const double Gamma = 1.25;           // >1 keeps weak attribution transparent
         public const double StrengthFloor = 0.35;   // opacity multiplier of the weakest class map
 

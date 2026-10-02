@@ -214,6 +214,7 @@ namespace SkinDevApp.Explainability
         public string Method { get; set; } = "";
         public string ExecMode { get; set; } = "";
         public string ServiceVersion { get; set; } = "";
+        public string TargetLayer { get; set; } = "";
         public double ServiceLatencyMs { get; set; }
         public double RoundTripMs { get; set; }
         public int ImageWidth { get; set; }
@@ -247,6 +248,7 @@ namespace SkinDevApp.Explainability
                 Method = Method,
                 ExecMode = ExecMode,
                 ServiceVersion = ServiceVersion,
+                TargetLayer = TargetLayer,
                 ServiceLatencyMs = ServiceLatencyMs,
                 RoundTripMs = RoundTripMs,
                 SourceSize = sourceSize,
@@ -287,6 +289,18 @@ namespace SkinDevApp.Explainability
         }
     }
 
+    /// <summary>
+    /// Settings read by GradCamService (set from ScanSettings at startup). The HTTP
+    /// timeout is fixed when the client is first used, so a change applies after restart.
+    /// </summary>
+    public static class GradCamServiceConfig
+    {
+        public static int TimeoutSeconds { get; set; } = 60;
+
+        /// <summary>Research/debug override of the service's Grad-CAM++ layer (null = service default).</summary>
+        public static string TargetLayer { get; set; }
+    }
+
     public static class GradCamService
     {
         public const string BaseUrl = "http://127.0.0.1:8765";
@@ -302,7 +316,7 @@ namespace SkinDevApp.Explainability
             return new HttpClient(handler)
             {
                 BaseAddress = new Uri(BaseUrl),
-                Timeout = TimeSpan.FromSeconds(60)
+                Timeout = TimeSpan.FromSeconds(GradCamServiceConfig.TimeoutSeconds)
             };
         }
 
@@ -310,6 +324,25 @@ namespace SkinDevApp.Explainability
         // In the original, a linked CTS with a 3-second timeout was created
         // but the token was never actually given to GetStringAsync, so the
         // timeout did nothing.
+        /// <summary>The service's /health payload, or null when it cannot be reached.</summary>
+        public static async Task<GradCamHealth> GetHealthAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(3));
+                using var response = await Http.GetAsync("/health", cts.Token).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) return null;
+                var jsonString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return JsonSerializer.Deserialize<GradCamHealth>(jsonString, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GradCAM] health query failed: {ex.Message}");
+                return null;
+            }
+        }
+
         public static async Task<bool> IsReadyAsync(CancellationToken ct = default)
         {
             try
@@ -508,6 +541,7 @@ namespace SkinDevApp.Explainability
                     FrameId = frameId,
                     DropIfStale = dropIfStale,
                     AllClasses = true,
+                    Layer = GradCamServiceConfig.TargetLayer,
                     HeatmapMaxSide = heatmapMaxSide,
                     IncludeRawCam = includeRawCam
                 };
@@ -540,6 +574,7 @@ namespace SkinDevApp.Explainability
                     Method = payload.Method ?? "",
                     ExecMode = payload.ExecMode ?? "",
                     ServiceVersion = payload.ServiceVersion ?? "",
+                    TargetLayer = payload.TargetLayer ?? "",
                     ServiceLatencyMs = payload.LatencyMs,
                     Similarity = payload.ClassMapSimilarity
                 };

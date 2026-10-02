@@ -17,6 +17,8 @@ namespace SkinDevApp
         {
             base.OnStartup(e);
             DatabaseHelper.InitializeDatabase(); // Creates lumyvue_db.sqlite table automatically
+            Data.StudyDatabase.Initialize();     // participant / scan / validation tables (same file)
+            Data.ScanSettings.Current.ApplyGlobal();
 
             // Warm up the ONNX model in the background so it's already loaded
             // by the time the user reaches the dashboard and clicks Analyze.

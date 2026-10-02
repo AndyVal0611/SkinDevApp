@@ -65,6 +65,7 @@ namespace SkinDevApp.Explainability
         public string Method { get; set; } = "";
         public string ExecMode { get; set; } = "";
         public string ServiceVersion { get; set; } = "";
+        public string TargetLayer { get; set; } = "";
         public double ServiceLatencyMs { get; set; }
         public double RoundTripMs { get; set; }
 

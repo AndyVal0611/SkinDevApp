@@ -224,6 +224,33 @@ namespace SkinDevApp.Explainability
             _machine.MinConfidence = _stabilizer.ConfidenceThreshold;
         }
 
+        /// <summary>
+        /// Researcher settings (Settings page). Call before Start(). The stabiliser and the
+        /// state machine get the same thresholds so the saved capture metadata matches.
+        /// </summary>
+        public void ApplySettings(int stableFrames, int holdStillMs, double cooldownSeconds,
+                                  float minConfidence, float minMargin, double minConsistency,
+                                  double minSharpness, double minBrightness, double maxBrightness,
+                                  double frontMaxAbsYaw, double sideMinAbsYaw)
+        {
+            _stabilizer.StableFramesRequired = stableFrames;
+            _stabilizer.ConfidenceThreshold = minConfidence;
+
+            _machine.StableFramesRequired = stableFrames;
+            _machine.MinConfidence = minConfidence;
+            _machine.MinMargin = minMargin;
+            _machine.MinConsistency = minConsistency;
+            _machine.HoldStillMs = holdStillMs;
+            _machine.CooldownSeconds = cooldownSeconds;
+
+            _quality.MinSharpness = minSharpness;
+            _quality.MinBrightness = minBrightness;
+            _quality.MaxBrightness = maxBrightness;
+
+            _pose.FrontMaxAbsYaw = frontMaxAbsYaw;
+            _pose.SideMinAbsYaw = sideMinAbsYaw;
+        }
+
         // ── Lifecycle ───────────────────────────────────────────────────────────
 
         public void Start()

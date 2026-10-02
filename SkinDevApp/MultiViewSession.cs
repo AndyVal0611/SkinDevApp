@@ -59,6 +59,7 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("view")] public string View { get; set; }
         [JsonPropertyName("folder")] public string Folder { get; set; }              // relative to the session folder
         [JsonPropertyName("capture_id")] public string CaptureId { get; set; }
+        [JsonPropertyName("frame_id")] public long FrameId { get; set; }
         [JsonPropertyName("captured_utc")] public string CapturedUtc { get; set; }
         [JsonPropertyName("trigger")] public string Trigger { get; set; }
         [JsonPropertyName("ok")] public bool Ok { get; set; }
@@ -294,8 +295,9 @@ namespace SkinDevApp.Scanning
         }
 
         /// <summary>
-        /// Record the finished analysis of the current view and advance to the next one.
-        /// Returns the next view (Any when the sequence is finished).
+        /// Record the finished analysis of the current view and move to the first view that
+        /// still has no usable result (a failed view is asked for again).
+        /// Returns the next view (Any when every view has a result).
         /// </summary>
         public ScanView AddResult(ScanResult r)
         {
@@ -303,11 +305,33 @@ namespace SkinDevApp.Scanning
             Outcomes.RemoveAll(x => x.View == o.View);       // a re-taken view replaces the earlier one
             Outcomes.Add(o);
 
-            Current = ScanViews.Next(Current);
-            if (Current == ScanView.Any) Fusion = ViewFusion.Fuse(Outcomes, ScanViews.Sequence.Length);
+            Current = NextMissing();
+            Fusion = Current == ScanView.Any ? ViewFusion.Fuse(Outcomes, ScanViews.Sequence.Length) : null;
 
             SaveIndex(IsComplete ? "complete" : "in_progress");
             return Current;
+        }
+
+        /// <summary>True when this view has a usable (ONNX-scored) capture.</summary>
+        public bool HasView(ScanView v) => Outcomes.Any(x => x.View == ScanViews.Name(v) && x.Ok);
+
+        private ScanView NextMissing()
+        {
+            foreach (ScanView v in ScanViews.Sequence)
+                if (!HasView(v)) return v;
+            return ScanView.Any;
+        }
+
+        /// <summary>
+        /// Controlled retake of one view (Image Review): the next capture replaces it.
+        /// Registration and the other views are kept.
+        /// </summary>
+        public void Retake(ScanView v)
+        {
+            if (Array.IndexOf(ScanViews.Sequence, v) < 0) return;
+            Current = v;
+            Fusion = null;
+            SaveIndex("in_progress");
         }
 
         /// <summary>The patient stopped early: keep whatever was captured.</summary>
@@ -331,6 +355,7 @@ namespace SkinDevApp.Scanning
             if (r.Request != null)
             {
                 o.CaptureId = r.Request.CaptureId;
+                o.FrameId = r.Request.FrameId;
                 o.CapturedUtc = r.Request.CapturedUtc.ToString("o");
                 o.Trigger = r.Request.Trigger;
                 o.PoseGateVerified = r.Request.PoseVerified;

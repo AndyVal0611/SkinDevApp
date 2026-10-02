@@ -133,6 +133,7 @@ namespace SkinDevApp.Scanning
             record = new CaptureRecord
             {
                 CaptureId = req.CaptureId,
+                FrameId = req.FrameId,
                 TimestampUtc = req.CapturedUtc.ToString("o"),
                 Trigger = req.Trigger,
                 Setup = SetupProfile.Load(),
@@ -263,6 +264,7 @@ namespace SkinDevApp.Scanning
                 record.GradCam["method"] = maps.Method;
                 record.GradCam["service_version"] = maps.ServiceVersion;
                 record.GradCam["exec_mode"] = maps.ExecMode;
+                record.GradCam["target_layer"] = string.IsNullOrEmpty(maps.TargetLayer) ? "service default" : maps.TargetLayer;
                 record.GradCam["service_latency_ms"] = maps.ServiceLatencyMs.ToString("0.0");
                 record.GradCam["round_trip_ms"] = maps.RoundTripMs.ToString("0.0");
                 record.GradCam["normalisation"] =

@@ -1,4 +1,6 @@
 ﻿using AForge.Video.DirectShow;
+using SkinDevApp.Data;
+using SkinDevApp.Views;
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +18,7 @@ namespace SkinDevApp
         private bool _lightingConfirmed;
         private bool _distanceConfirmed;
         private bool _faceConfirmed;
+        private bool _modelReady;
 
         private static readonly SolidColorBrush PendingBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9CA3AF"));
         private static readonly SolidColorBrush ReadyBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#588157"));
@@ -25,11 +28,43 @@ namespace SkinDevApp
         public PreparationPage()
         {
             InitializeComponent();
+            HeaderHost.Content = Ui.Header("Preparation");
+
+            string id = AppSession.CurrentParticipantId;
+            Participant p = string.IsNullOrEmpty(id) ? null : StudyRepository.GetParticipant(id);
+            ParticipantLine.Text = p == null
+                ? "No participant selected. Register or select a participant before scanning."
+                : "Participant " + p.ParticipantID + "  ·  " + p.FullName + ".  Complete each step, then press START SCAN.";
         }
 
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+        private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
             RunCameraCheck();
+            RefreshOverallStatus();
+            await RunServiceChecks();
+        }
+
+        /// <summary>AI classifier (required) and Grad-CAM++ service (optional: scan continues without heatmaps).</summary>
+        private async System.Threading.Tasks.Task RunServiceChecks()
+        {
+            SystemHealth h;
+            try { h = await SystemHealth.CheckAsync(); }
+            catch (Exception ex)
+            {
+                SetStatus(ModelStatusDot, ModelStatusText, WarningBrush, "Check failed");
+                ModelDetailText.Text = ex.Message;
+                return;
+            }
+
+            _modelReady = h.ModelOk;
+            SetStatus(ModelStatusDot, ModelStatusText, h.ModelOk ? ReadyBrush : FailedBrush, h.ModelOk ? "Loaded" : "Unavailable");
+            ModelDetailText.Text = h.ModelText;
+
+            SetStatus(GradCamStatusDot, GradCamStatusText, h.GradCamOk ? ReadyBrush : WarningBrush, h.GradCamOk ? "Available" : "Unavailable");
+            GradCamDetailText.Text = h.GradCamOk
+                ? h.GradCamText
+                : "Grad-CAM++ unavailable. The scan still runs and saves the class scores; heatmaps will be missing. Start gradcam_service.py to enable them.";
+
             RefreshOverallStatus();
         }
 
@@ -110,7 +145,13 @@ namespace SkinDevApp
 
             OverallStatusDetail.Text = $"{complete} of 4 checks complete";
 
-            if (complete == 4)
+            if (complete == 4 && !_modelReady)
+            {
+                SetStatus(OverallStatusDot, null, FailedBrush, null);
+                OverallStatusTitle.Text = "AI classifier not loaded — scanning is not possible";
+                NextBtn.IsEnabled = false;
+            }
+            else if (complete == 4)
             {
                 SetStatus(OverallStatusDot, null, ReadyBrush, null);
                 OverallStatusTitle.Text = "Ready for analysis";
@@ -143,10 +184,7 @@ namespace SkinDevApp
 
         private void BackBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (NavigationService != null && NavigationService.CanGoBack)
-                NavigationService.GoBack();
-            else
-                NavigationService?.Navigate(new ConsentPage());
+            Nav.Back();
         }
 
         private void NextBtn_Click(object sender, RoutedEventArgs e)
@@ -161,7 +199,22 @@ namespace SkinDevApp
                 return;
             }
 
-            NavigationService?.Navigate(new ImageReviewPage());
+            string id = AppSession.CurrentParticipantId;
+            if (string.IsNullOrEmpty(id))
+            {
+                MessageBox.Show("Register or select a participant before scanning.", "LUMYVUE Preparation",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (!Workflow.HasScanConsent(id))
+            {
+                MessageBox.Show("Required consent has not been recorded for " + id + ". The consent screen will open.",
+                    "LUMYVUE Preparation", MessageBoxButton.OK, MessageBoxImage.Information);
+                Nav.Go(new ConsentPage(id));
+                return;
+            }
+
+            Nav.Go(new ClientDashboardForm());
         }
     }
 }

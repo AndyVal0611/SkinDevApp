@@ -1,14 +1,289 @@
 ﻿<Page x:Class="SkinDevApp.RegistrationPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      xmlns:local="clr-namespace:SkinDevApp"
-      mc:Ignorable="d" 
-      d:DesignHeight="450" d:DesignWidth="800"
-      Title="RegistrationPage">
+      Title="Registration" Background="#FBF9F6">
 
-    <Grid>
-        
+    <Grid Margin="25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ContentControl x:Name="HeaderHost"/>
+
+        <StackPanel Grid.Row="1" Margin="8,0,8,8">
+            <TextBlock x:Name="PageTitle" Text="Participant Registration" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
+                       Text="Fields marked * are required. Collect identifiable details only if the approved research protocol requires them. Images are filed by PatientID, never by name."/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Identity / study fields -->
+                <StackPanel Grid.Column="0">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Patient identity / study fields" Style="{StaticResource H2}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="PatientID / ParticipantID (automatic)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="PatientIdTxt" Style="{StaticResource Field}" IsReadOnly="True" Background="#F3F4F6" FontWeight="Bold"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Registration date / time (automatic)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="RegisteredAtTxt" Style="{StaticResource Field}" IsReadOnly="True" Background="#F3F4F6"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="First name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="FirstNameTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Middle name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="MiddleNameTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Last name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="LastNameTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"
+                                       Text="Names are optional. Leave blank if the protocol uses coded IDs only."/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Date of birth" Style="{StaticResource FieldLabel}"/>
+                                    <DatePicker x:Name="DobPicker" Height="36" FontSize="13" SelectedDateChanged="DobPicker_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Age *" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="AgeTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Sex *" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="SexCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="Female"/>
+                                        <ComboBoxItem Content="Male"/>
+                                        <ComboBoxItem Content="Intersex"/>
+                                        <ComboBoxItem Content="Prefer not to say"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Contact (only if the protocol requires it)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="ContactTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Researcher / operator ID *" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="OperatorTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel x:Name="StatusPanel" Visibility="Collapsed">
+                                <TextBlock Text="Record status" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="StatusCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                    <ComboBoxItem Content="Active"/>
+                                    <ComboBoxItem Content="Withdrawn"/>
+                                    <ComboBoxItem Content="Completed"/>
+                                </ComboBox>
+                                <TextBlock Text="Reason for this edit *" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="EditReasonTxt" Style="{StaticResource Field}"/>
+                                <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"
+                                           Text="Editing registration data never changes saved scan results. The edit is written to the audit log."/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Fitzpatrick -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Fitzpatrick skin type" Style="{StaticResource H2}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Manual / self-reported type" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="FitzCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="Not collected" IsSelected="True"/>
+                                        <ComboBoxItem Content="Type I"/>
+                                        <ComboBoxItem Content="Type II"/>
+                                        <ComboBoxItem Content="Type III"/>
+                                        <ComboBoxItem Content="Type IV"/>
+                                        <ComboBoxItem Content="Type V"/>
+                                        <ComboBoxItem Content="Type VI"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Source of this value" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="FitzSourceCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="Self-reported" IsSelected="True"/>
+                                        <ComboBoxItem Content="Researcher-assessed"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <Border Background="#F8FAFC" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="AI Fitzpatrick Assessment: NOT YET AVAILABLE" FontWeight="Bold" FontSize="12.5" Foreground="#1A2328"/>
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="11"
+                                               Text="Reserved for a future trained and validated skin-tone model. The value above is manual data only and is stored separately from any future AI output."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Skin profile -->
+                <StackPanel Grid.Column="1">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Skin profile" Style="{StaticResource H2}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="General skin type *" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="SkinTypeCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="Oily"/>
+                                        <ComboBoxItem Content="Dry"/>
+                                        <ComboBoxItem Content="Combination"/>
+                                        <ComboBoxItem Content="Normal"/>
+                                        <ComboBoxItem Content="Sensitive"/>
+                                        <ComboBoxItem Content="Not sure"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Self-reported skin sensitivity" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="SensitivityCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="None"/>
+                                        <ComboBoxItem Content="Mild"/>
+                                        <ComboBoxItem Content="Moderate"/>
+                                        <ComboBoxItem Content="Severe"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Current visible / reported concern(s) *" Style="{StaticResource FieldLabel}"/>
+                            <WrapPanel x:Name="ConcernPanel">
+                                <CheckBox Content="Acne" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Eczema" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Hyperpigmentation" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="None / Normal" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Other" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                            </WrapPanel>
+                            <TextBox x:Name="ConcernOtherTxt" Style="{StaticResource Field}" ToolTip="Describe 'Other' concern" TextChanged="AnyField_Changed"/>
+
+                            <TextBlock Text="Facial region(s) of concern" Style="{StaticResource FieldLabel}"/>
+                            <WrapPanel x:Name="RegionPanel">
+                                <CheckBox Content="Forehead" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Left cheek" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Right cheek" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Nose" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Chin" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Multiple" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                                <CheckBox Content="Other" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>
+                            </WrapPanel>
+                            <TextBox x:Name="RegionOtherTxt" Style="{StaticResource Field}" ToolTip="Describe 'Other' region" TextChanged="AnyField_Changed"/>
+
+                            <TextBlock Text="Duration of concern" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="DurationCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                <ComboBoxItem Content="Not applicable"/>
+                                <ComboBoxItem Content="Less than 1 month"/>
+                                <ComboBoxItem Content="1-6 months"/>
+                                <ComboBoxItem Content="6-12 months"/>
+                                <ComboBoxItem Content="More than 1 year"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Current skincare / treatments (if in the protocol)" Style="{StaticResource H2}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Cleanser" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="CleanserTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                    <TextBlock Text="Sunscreen" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="SunscreenTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                    <TextBlock Text="Eczema treatment" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="EczemaTxTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Moisturizer" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="MoisturizerTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                    <TextBlock Text="Acne treatment" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="AcneTxTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                    <TextBlock Text="Pigmentation treatment" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="PigmentTxTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="Other study-relevant products" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="OtherProductsTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                            <TextBlock Text="Recent facial procedures / cosmetics (if the methodology requires it)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="ProceduresTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
+                            <TextBlock Text="Other questionnaire responses" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="OtherResponsesTxt" Style="{StaticResource FieldArea}" TextChanged="AnyField_Changed"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Actions -->
+        <Border Grid.Row="3" Background="White" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
+            <DockPanel>
+                <Button x:Name="CancelBtn" Content="Cancel" Style="{StaticResource SecondaryButton}" Width="120" Click="CancelBtn_Click"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="SaveBtn" Content="Save Registration" Style="{StaticResource SecondaryButton}" Width="170" Margin="0,0,10,0" Click="SaveBtn_Click"/>
+                    <Button x:Name="ContinueBtn" Content="Continue to Consent  ›" Style="{StaticResource PrimaryButton}" Width="210" Click="ContinueBtn_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="ValidationTxt" Foreground="#B91C1C" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="14,0"/>
+            </DockPanel>
+        </Border>
     </Grid>
 </Page>

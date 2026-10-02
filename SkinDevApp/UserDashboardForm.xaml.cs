@@ -51,8 +51,7 @@ namespace SkinDevApp.Views
 
         public void LogoutBtn_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
-            mainWin.MainFrame.Navigate(new LoginForm());
+            Nav.Home();       // legacy console is opened from the Dashboard; return there
         }
     }
 }

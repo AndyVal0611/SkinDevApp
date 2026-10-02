@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using SkinDevApp.Data;
 
 namespace SkinDevApp.Views
 {
@@ -18,7 +19,7 @@ namespace SkinDevApp.Views
             {
                 AdminCredentialsPanel.Visibility = Visibility.Collapsed;
                 ClientRegisterPanel.Visibility = Visibility.Visible;
-                EnterPortalBtn.Content = "REGISTER & PROCEED TO KIOSK";
+                EnterPortalBtn.Content = "ENTER OPERATOR MODE";
             }
             else // User / Specialist Admin Portal
             {
@@ -30,28 +31,18 @@ namespace SkinDevApp.Views
 
         private void EnterPortalBtn_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
-
-            if (PortalModeCombo.SelectedIndex == 0) // Client Registration Mode
+            if (PortalModeCombo.SelectedIndex == 0) // Operator / kiosk mode
             {
-                if (string.IsNullOrWhiteSpace(ClientFullNameTxt.Text))
-                {
-                    MessageBox.Show("Please enter your full name to proceed with the skin analysis.", "Registration Required", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                // Save client registration info globally
-                DatabaseHelper.CurrentClientName = ClientFullNameTxt.Text.Trim();
-                DatabaseHelper.CurrentClientAge = string.IsNullOrWhiteSpace(ClientAgeTxt.Text) ? "N/A" : ClientAgeTxt.Text.Trim();
-                DatabaseHelper.CurrentClientContact = string.IsNullOrWhiteSpace(ClientContactTxt.Text) ? "N/A" : ClientContactTxt.Text.Trim();
-
-                mainWin.MainFrame.Navigate(new ClientDashboardForm());
+                AppSession.SignIn(UserRole.Operator, OperatorIdTxt.Text);
+                Nav.Home();
             }
-            else // Specialist Admin Login Mode
+            else // Researcher / admin login
             {
                 if (UsernameTxt.Text.Trim() == "lumyvue_eaf" && PasswordTxt.Password == "eaftrinity")
                 {
-                    mainWin.MainFrame.Navigate(new UserDashboardForm());
+                    AppSession.SignIn(UserRole.Researcher, UsernameTxt.Text.Trim());
+                    StudyRepository.Audit("Sign in", "User", UsernameTxt.Text.Trim(), "researcher / admin");
+                    Nav.Home();
                 }
                 else
                 {
