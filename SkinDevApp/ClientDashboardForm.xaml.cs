@@ -291,11 +291,30 @@ namespace SkinDevApp.Views
         /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
         private int PickCameraIndex()
         {
+            // Prefer Logitech BRIO
             for (int i = 0; i < videoDevices.Count; i++)
             {
-                string n = (videoDevices[i].Name ?? "").ToLowerInvariant();
-                if (!NotARealWebcam.Any(k => n.Contains(k))) return i;
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (name.Contains("brio"))
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[CAM] BRIO found: {videoDevices[i].Name}");
+
+                    return i;
+                }
             }
+
+            // Otherwise prefer Logitech
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (name.Contains("logitech"))
+                    return i;
+            }
+
+            // Fallback
             return 0;
         }
 
@@ -419,13 +438,14 @@ namespace SkinDevApp.Views
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             if (!_cameraLive) return;
-            Interlocked.Increment(ref _framesSeen);
+            // _framesSeen is incremented below, only for frames that are not black
 
             try
             {
                 using (Bitmap rawFrame = (Bitmap)eventArgs.Frame.Clone())
                 using (Bitmap bitmap = PrepareFrame(rawFrame))
                 {
+                    if (Volatile.Read(ref _framesSeen) > 0 || !IsBlackFrame(bitmap)) Interlocked.Increment(ref _framesSeen);
                     StoreLatestFrame(bitmap);                       // the loops always get the newest frame
 
                     if (_resultsFrozen) return;                      // a captured frame is on screen
@@ -470,6 +490,20 @@ namespace SkinDevApp.Views
                 // Frame stream capture catch (a dropped frame is harmless)
                 Interlocked.Exchange(ref _framePending, 0);
             }
+        }
+
+        /// <summary>True when the frame is essentially black (IR / blocked / not-yet-streaming camera).</summary>
+        private static bool IsBlackFrame(Bitmap bmp)
+        {
+            try
+            {
+                using (Mat m = BitmapConverter.ToMat(bmp))
+                {
+                    Scalar s = Cv2.Mean(m);
+                    return (s.Val0 + s.Val1 + s.Val2) / 3.0 < 8.0;
+                }
+            }
+            catch { return false; }
         }
 
         private Bitmap PrepareFrame(Bitmap src)
@@ -1114,7 +1148,7 @@ namespace SkinDevApp.Views
                               "  consistency " + rec.Stability.Consistency.ToString("P0") +
                               "  motion " + rec.Stability.MotionMean.ToString("F1") + "/" + rec.Stability.MotionMax.ToString("F1"));
 
-            if (rec.Quality != null)
+            if (rec.PickCameraIndex != null)
                 sb.AppendLine("quality    : sharp " + rec.Quality.Sharpness.ToString("F0") +
                               "  bright " + rec.Quality.Brightness.ToString("F0") +
                               "  face " + (rec.Quality.FaceFound ? "yes" : "no"));
