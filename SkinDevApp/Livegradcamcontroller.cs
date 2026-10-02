@@ -531,6 +531,8 @@ namespace SkinDevApp.Explainability
 
         // ── SLOW loop (live Grad-CAM++) ─────────────────────────────────────────
 
+        private DateTime _lastHealthCheckUtc = DateTime.MinValue;
+
         private async Task SlowLoopAsync(CancellationToken ct)
         {
             bool online = await GradCamService.IsReadyAsync(ct).ConfigureAwait(false);
@@ -551,6 +553,15 @@ namespace SkinDevApp.Explainability
 
                     if (pf == null)
                     {
+                        // No frame waiting. While the service is flagged offline (or we have
+                        // heard nothing for a while) re-check /health so the badge recovers
+                        // as soon as the service is up, even before the first frame arrives.
+                        if ((!ServiceOnline && (DateTime.UtcNow - _lastHealthCheckUtc).TotalSeconds >= 2.0))
+                        {
+                            _lastHealthCheckUtc = DateTime.UtcNow;
+                            bool up = await GradCamService.IsReadyAsync(ct).ConfigureAwait(false);
+                            if (up) SetStatus(true, null);
+                        }
                         await Task.Delay(30, ct).ConfigureAwait(false);
                         continue;
                     }
