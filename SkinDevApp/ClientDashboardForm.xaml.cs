@@ -286,7 +286,7 @@ namespace SkinDevApp.Views
         // ── camera selection ────────────────────────────────────────────────────
 
         private static readonly string[] NotARealWebcam =
-            { "virtual", "obs", "ir camera", "infrared", " ir ", "snap camera", "droidcam", "ndi", "manycam", "xsplit", "depth" };
+            { "virtual", "obs", "ir camera", "infrared", " ir ", "snap camera", "droidcam", "ndi", "manycam", "xsplit", "depth", "camo", "nvidia broadcast", "phone link" };
 
         /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
         private int PickCameraIndex()
