@@ -1,5 +1,5 @@
 """
-PrecisionSkin - Live Grad-CAM++ Explanation Service  (v2.0)
+PrecisionSkin - Live Grad-CAM++ Explanation Service  (v2.1)
   v1.1: frame_id echo, stale-drop, input fingerprint, concentration diagnostics
   v2.0: ALL-CLASS endpoint - one forward pass yields a Grad-CAM++ map for each of
         the four classes (+ raw_peak / relative_strength / concentration per class),
@@ -28,7 +28,6 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
-import io
 import json
 import logging
 import os
@@ -169,12 +168,20 @@ class GradCAMPlusPlus:
 
         # Head = every top-level layer that is not the InputLayer and not the
         # nested backbone. model.layers is already topologically ordered.
+        # Only layers AFTER the backbone: anything before it (Rescaling,
+        # augmentation) is not part of the feature->logit path and must not be
+        # re-applied to backbone features.
+        _layers = list(model.layers)
+        _bi = next(i for i, l in enumerate(_layers) if l is self.backbone)
         self.head_layers = [
             layer
-            for layer in model.layers
-            if layer is not self.backbone
-            and not isinstance(layer, tf.keras.layers.InputLayer)
+            for layer in _layers[_bi + 1:]
+            if not isinstance(layer, tf.keras.layers.InputLayer)
         ]
+        if any(not isinstance(l, tf.keras.layers.InputLayer) for l in _layers[:_bi]):
+            log.warning("Layers exist before the backbone (%s); they are NOT "
+                        "re-applied. Parity check at startup will confirm.",
+                        [l.name for l in _layers[:_bi]])
 
         if not self.head_layers:
             raise RuntimeError("No classifier head layers found on the model.")
@@ -512,7 +519,12 @@ class GradCAMPlusPlus:
         is defined on Y = exp(S) instead. See verify_higher_order_gradients()
         in the notebook for the diagnostic that demonstrates this.
         """
-        eps = 1e-10
+        gmax = float(np.abs(g1).max())
+        if gmax <= 0.0:
+            notes.append("all gradients zero")
+            return None
+        # Scale-relative threshold: absolute 1e-10 zeroed alpha for gradients ~1e-5.
+        eps = 1e-8 * gmax * gmax
 
         g2 = g1 * g1
         g3 = g2 * g1
@@ -522,7 +534,7 @@ class GradCAMPlusPlus:
         denom = 2.0 * g2 + sum_a * g3
 
         alpha = np.where(np.abs(denom) > eps, g2 / (denom + eps), 0.0)
-        alpha = np.where(np.abs(g1) > eps, alpha, 0.0)      # no gradient -> no weight
+        alpha = np.where(np.abs(g1) > 1e-8 * gmax, alpha, 0.0)      # no gradient -> no weight
 
         if not np.isfinite(alpha).all():
             notes.append("alpha map non-finite")
@@ -715,7 +727,9 @@ def class_map_similarity(cams: List[np.ndarray], heats: List[np.ndarray]) -> dic
     vals: List[float] = []
     ious: List[float] = []
 
-    tops = [h >= np.percentile(h, 90.0) for h in heats]
+    # '> 0' guard: if >90% of a map is zero the percentile is 0 and every pixel
+    # would count as "top 10%", inflating IoU.
+    tops = [(h >= np.percentile(h, 90.0)) & (h > 0.0) for h in heats]
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -797,6 +811,8 @@ class GradCamEngine:
                 f"{len(CLASS_NAMES)}. Refusing to start."
             )
 
+        self._parity_check()
+
         self.lock = threading.Lock()
         self.request_count = 0
         self.dropped_stale = 0
@@ -823,6 +839,24 @@ class GradCamEngine:
         eng.compute_all(dummy)
         log.info("Warm-up all-class pass: trace+2 runs %.0f ms | steady %.0f ms | mode=%s",
                  (t2 - t1) * 1000, (time.perf_counter() - t2) * 1000, eng._all_fn_mode)
+
+    def _parity_check(self) -> None:
+        """The Grad-CAM forward path must reproduce the real model's output."""
+        rng = np.random.default_rng(0)
+        probe = rng.uniform(-1.0, 1.0, (2, IMG_SIZE, IMG_SIZE, 3)).astype("float32")
+        ref = self.model(probe, training=False).numpy()
+        cam = self.cams[self.default_layer]
+        got = np.concatenate([
+            cam._forward(self.tf.convert_to_tensor(probe[i:i + 1]))[2].numpy()
+            for i in range(2)
+        ])
+        diff = float(np.abs(ref - got).max())
+        if diff > 1e-4:
+            raise RuntimeError(
+                f"Grad-CAM forward path differs from model output (max diff "
+                f"{diff:.2e}). Maps would explain a different function. "
+                "Refusing to start.")
+        log.info("Forward-path parity with model verified (max diff %.2e)", diff)
 
     def get_cam(self, layer_name: str) -> GradCAMPlusPlus:
         if layer_name not in self.cams:
@@ -1213,7 +1247,7 @@ def run_fastapi(host: str, port: int) -> bool:
 
     @app.post("/gradcam")
     def gradcam(req: GradCamRequest):
-        result = handle_gradcam(req.model_dump())
+        result = handle_gradcam(req.model_dump() if hasattr(req, "model_dump") else req.dict())
         return JSONResponse(result, status_code=200 if (result.get("ok") or result.get("stale")) else 400)
 
     log.info("Serving with FastAPI/uvicorn on http://%s:%d", host, port)
@@ -1247,6 +1281,10 @@ def run_stdlib(host: str, port: int) -> None:
         def do_POST(self):
             if self.path.rstrip("/") != "/gradcam":
                 self._send({"ok": False, "error": "Not found"}, 404)
+                return
+
+            if "application/json" not in (self.headers.get("Content-Type") or "").lower():
+                self._send({"ok": False, "error": "Content-Type must be application/json"}, 415)
                 return
 
             try:
