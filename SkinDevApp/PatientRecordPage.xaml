@@ -56,9 +56,10 @@
                         <Button Content="Unlinked / legacy scans" Style="{StaticResource SmallButton}" Margin="0,0,0,6" Click="UnlinkedBtn_Click"/>
                         <Button Content="Import saved scans from disk" Style="{StaticResource SmallButton}" Margin="0,0,0,6" Click="ImportBtn_Click"
                                 ToolTip="Index older scan folders (session.json / record.json) that are not in the database yet"/>
-                        <Button Content="Register new participant" Style="{StaticResource SmallButton}" Click="RegisterBtn_Click"/>
+                        <Button Content="Register new participant" Style="{StaticResource SmallButton}" Margin="0" Click="RegisterBtn_Click"/>
                     </StackPanel>
-                    <ListBox x:Name="ParticipantList" BorderThickness="0" SelectionChanged="ParticipantList_SelectionChanged"/>
+                    <ListBox x:Name="ParticipantList" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             HorizontalContentAlignment="Stretch" SelectionChanged="ParticipantList_SelectionChanged"/>
                 </DockPanel>
             </Border>
 

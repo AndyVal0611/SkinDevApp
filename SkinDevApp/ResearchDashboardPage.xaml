@@ -7,7 +7,7 @@
         <StackPanel Margin="25">
             <ContentControl x:Name="HeaderHost"/>
             <DockPanel Margin="8,0,8,8">
-                <Button DockPanel.Dock="Right" Content="Refresh" Style="{StaticResource SmallButton}" VerticalAlignment="Bottom" Click="RefreshBtn_Click"/>
+                <Button DockPanel.Dock="Right" Content="Refresh" Style="{StaticResource SmallButton}" Margin="0" VerticalAlignment="Bottom" Click="RefreshBtn_Click"/>
                 <StackPanel>
                     <TextBlock Text="Research Dashboard" Style="{StaticResource H1}"/>
                     <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
