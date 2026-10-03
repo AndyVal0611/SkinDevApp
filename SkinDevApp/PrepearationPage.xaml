@@ -201,6 +201,8 @@
                             <Ellipse x:Name="GradCamStatusDot" Width="10" Height="10" Fill="#9CA3AF" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="GradCamStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#9CA3AF" VerticalAlignment="Center"/>
                         </StackPanel>
+                        <Button x:Name="StartServiceBtn" Content="Start service" Visibility="Collapsed" HorizontalAlignment="Left"
+                                Style="{StaticResource SmallButton}" Margin="0,0,0,8" Click="StartServiceBtn_Click"/>
                         <TextBlock x:Name="GradCamDetailText" Style="{StaticResource CardBody}"
                                    Text="If the service is unavailable the scan still runs and saves the class scores; heatmaps will be missing."/>
                     </StackPanel>

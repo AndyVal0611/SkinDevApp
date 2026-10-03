@@ -159,12 +159,15 @@
 		</Compile>
 		<Compile Include="DatabaseHelper.cs" />
 		<Compile Include="Data\AppSession.cs" />
+		<Compile Include="Data\AuthService.cs" />
+		<Compile Include="Data\SaveQueue.cs" />
 		<Compile Include="Data\ScanSettings.cs" />
 		<Compile Include="Data\SessionImporter.cs" />
 		<Compile Include="Data\StudyDatabase.cs" />
 		<Compile Include="Data\StudyModels.cs" />
 		<Compile Include="Data\StudyRepository.cs" />
 		<Compile Include="Views\ParticipantPickerWindow.cs" />
+		<Compile Include="Views\GradCamLauncher.cs" />
 		<Compile Include="Views\ReportFindings.cs" />
 		<Compile Include="Views\ResearchReportWindow.cs" />
 		<Compile Include="Views\Ui.cs" />

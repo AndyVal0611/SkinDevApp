@@ -25,12 +25,21 @@
                 <!-- Panel 1: Admin Specialist Login Fields -->
                 <StackPanel x:Name="AdminCredentialsPanel">
                     <TextBlock Text="Username" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
-                    <TextBox x:Name="UsernameTxt" Text="lumyvue_eaf" Height="42" FontSize="13" VerticalContentAlignment="Center" 
+                    <TextBox x:Name="UsernameTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
                              Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,16"/>
 
                     <TextBlock Text="Password" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
                     <PasswordBox x:Name="PasswordTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
-                                 Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,22"/>
+                                 Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,12"/>
+
+                    <!-- First run only: no researcher account exists yet -->
+                    <StackPanel x:Name="FirstRunPanel" Visibility="Collapsed">
+                        <TextBlock Text="Confirm password" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
+                        <PasswordBox x:Name="ConfirmPasswordTxt" Height="42" FontSize="13" VerticalContentAlignment="Center"
+                                     Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,12"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="LoginHintTxt" FontSize="11" Foreground="#8A827A" TextWrapping="Wrap" Margin="0,0,0,14"/>
                 </StackPanel>
 
                 <!-- Panel 2: Operator / kiosk mode. Participants are registered on the Registration screen. -->

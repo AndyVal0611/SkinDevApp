@@ -127,6 +127,16 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- A database save failed: stays visible until it succeeds -->
+                        <Border x:Name="SaveWarnBox" Visibility="Collapsed" Background="#FDECEC" BorderBrush="#F3B4B4"
+                                BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock x:Name="SaveWarnTxt" FontSize="12.5" Foreground="#7F1D1D" TextWrapping="Wrap"/>
+                                <Button x:Name="RetrySaveBtn" Content="Retry save" Style="{StaticResource SmallButton}"
+                                        HorizontalAlignment="Left" Margin="0,8,0,0" Click="RetrySaveBtn_Click"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Image Review: per-view quality, retake, accept -->
                         <Border x:Name="ReviewPanel" Visibility="Collapsed" Background="#FFF8EC" BorderBrush="#F2D9A8"
                                 BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,14">

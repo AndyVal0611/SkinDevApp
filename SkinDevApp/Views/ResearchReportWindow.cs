@@ -245,6 +245,11 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(T("Research Analysis Report", 21, true, Navy, 0));
             sp.Children.Add(T("Multi-view AI skin-image classification  ·  generated " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), 9, false, Muted, 8));
+            if (_d.Participant != null && _d.Participant.Status == "Withdrawn")
+            {
+                sp.Children.Add(Panel(T("This participant has withdrawn from the study. Do not include this scan in any analysis.", 9, true, WarnInk, 0), WarnBg, WarnLine, 7));
+                sp.Children.Add(new Border { Height = 8 });
+            }
 
             // identification
             var two = new Grid();

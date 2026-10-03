@@ -125,6 +125,85 @@ namespace SkinDevApp
             _audit = new StackPanel();
             audit.Children.Add(_audit);
             RefreshAudit();
+
+            BuildAccounts();
+        }
+
+        // ------------------------------------------------------ researcher accounts --
+
+        private TextBlock _acctMsg;
+        private TextBlock _acctList;
+        private PasswordBox _curPw, _newPw, _newPw2, _addPw, _addPw2;
+        private TextBox _addUser;
+
+        private static PasswordBox Pw() => new PasswordBox { Height = 32, FontSize = 13, Padding = new Thickness(8, 0, 8, 0), VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
+
+        private void BuildAccounts()
+        {
+            StackPanel sp = Section(RightColumn, "Researcher accounts", "Local sign-in for the researcher / admin screens. Passwords are stored only as salted hashes.");
+            _acctList = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 6));
+            sp.Children.Add(_acctList);
+
+            sp.Children.Add(Ui.Text("Change my password (" + (string.IsNullOrEmpty(AppSession.UserId) ? "not signed in" : AppSession.UserId) + ")", 12.5, true, Ui.Ink, new Thickness(0, 6, 0, 4)));
+            _curPw = Pw(); _newPw = Pw(); _newPw2 = Pw();
+            sp.Children.Add(Ui.Text("Current password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_curPw);
+            sp.Children.Add(Ui.Text("New password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_newPw);
+            sp.Children.Add(Ui.Text("Confirm new password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_newPw2);
+            Button change = Ui.Btn("Change password", (s, e) => ChangeMyPassword(), "SmallButton");
+            change.HorizontalAlignment = HorizontalAlignment.Left;
+            sp.Children.Add(change);
+
+            sp.Children.Add(Ui.Text("Add a researcher account", 12.5, true, Ui.Ink, new Thickness(0, 14, 0, 4)));
+            _addUser = new TextBox { Style = (Style)FindResource("Field"), Height = 32, Margin = new Thickness(0, 0, 0, 6) };
+            _addPw = Pw(); _addPw2 = Pw();
+            sp.Children.Add(Ui.Text("Username", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addUser);
+            sp.Children.Add(Ui.Text("Password (at least " + AuthService.MinPasswordLength + " characters)", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addPw);
+            sp.Children.Add(Ui.Text("Confirm password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addPw2);
+            Button add = Ui.Btn("Add account", (s, e) => AddAccount(), "SmallButton");
+            add.HorizontalAlignment = HorizontalAlignment.Left;
+            sp.Children.Add(add);
+
+            _acctMsg = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(0, 8, 0, 0));
+            sp.Children.Add(_acctMsg);
+            RefreshAccounts();
+        }
+
+        private void RefreshAccounts()
+        {
+            try { _acctList.Text = "Accounts: " + string.Join(", ", AuthService.Usernames()); }
+            catch (Exception ex) { _acctList.Text = "Could not read accounts: " + ex.Message; }
+        }
+
+        private void AcctMessage(string text, bool ok)
+        {
+            _acctMsg.Foreground = ok ? Ui.Good : Ui.Bad;
+            _acctMsg.Text = text;
+        }
+
+        private void ChangeMyPassword()
+        {
+            if (string.IsNullOrEmpty(AppSession.UserId)) { AcctMessage("Sign in with a researcher account first.", false); return; }
+            if (_newPw.Password != _newPw2.Password) { AcctMessage("The two new passwords do not match.", false); return; }
+            try
+            {
+                AuthService.ChangePassword(AppSession.UserId, _curPw.Password, _newPw.Password);
+                _curPw.Clear(); _newPw.Clear(); _newPw2.Clear();
+                AcctMessage("Password changed.", true);
+            }
+            catch (Exception ex) { AcctMessage(ex.Message, false); }
+        }
+
+        private void AddAccount()
+        {
+            if (_addPw.Password != _addPw2.Password) { AcctMessage("The two passwords do not match.", false); return; }
+            try
+            {
+                AuthService.CreateAccount(_addUser.Text, _addPw.Password, AppSession.ActorId);
+                AcctMessage("Account '" + _addUser.Text.Trim() + "' created.", true);
+                _addUser.Clear(); _addPw.Clear(); _addPw2.Clear();
+                RefreshAccounts();
+            }
+            catch (Exception ex) { AcctMessage(ex.Message, false); }
         }
 
         private void RefreshAudit()

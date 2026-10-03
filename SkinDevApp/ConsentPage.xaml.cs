@@ -30,11 +30,28 @@ namespace SkinDevApp
 
             ParticipantTxt.Text = "Participant " + p.ParticipantID + "  ·  " + p.FullName;
 
+            if (p.Status == "Withdrawn")
+            {
+                ParticipantTxt.Text += "  ·  WITHDRAWN";
+                PreviousConsentTxt.Text = "This participant has withdrawn from the study. Consent cannot be recorded and no images can be captured. " +
+                                          "A researcher can change the record status in Participant Records (Edit) if the withdrawal was entered by mistake.";
+                AgreeBtn.IsEnabled = false;
+                foreach (CheckBox box in new[] { UnderstoodChk, VoluntaryChk, CaptureChk, ProcessingChk, FutureUseChk }) box.IsEnabled = false;
+                HintTxt.Text = "Consent cannot be recorded for a withdrawn participant.";
+                return;
+            }
+
             Consent prev = StudyRepository.GetLatestConsent(p.ParticipantID);
             if (prev != null)
                 PreviousConsentTxt.Text = "Previous consent record: " + prev.Decision + " on " + prev.RecordedAt +
                     (prev.AllowsScanning ? "." : " (does not allow scanning).") +
                     " Please confirm again for this visit. Required items are marked *; nothing is pre-selected.";
+        }
+
+        private bool IsWithdrawnNow()
+        {
+            Participant p = string.IsNullOrEmpty(_participantId) ? null : StudyRepository.GetParticipant(_participantId);
+            return p != null && p.Status == "Withdrawn";
         }
 
         private bool RequiredDone =>
@@ -44,7 +61,7 @@ namespace SkinDevApp
         private void Check_Changed(object sender, RoutedEventArgs e)
         {
             if (AgreeBtn == null) return;
-            AgreeBtn.IsEnabled = !string.IsNullOrEmpty(_participantId) && RequiredDone;
+            AgreeBtn.IsEnabled = !string.IsNullOrEmpty(_participantId) && RequiredDone && !IsWithdrawnNow();
             HintTxt.Text = RequiredDone ? "All required items confirmed." : "Tick all required items to continue.";
         }
 
@@ -78,7 +95,7 @@ namespace SkinDevApp
 
         private void DeclineBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_participantId)) { Nav.Home(); return; }
+            if (string.IsNullOrEmpty(_participantId) || IsWithdrawnNow()) { Nav.Home(); return; }
             if (MessageBox.Show("Record that the participant declined? No images will be captured.", "LUMYVUE Consent",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;

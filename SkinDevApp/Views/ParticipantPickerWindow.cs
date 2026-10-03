@@ -70,6 +70,13 @@ namespace SkinDevApp.Views
                 return;
             }
 
+            if (p.Status == "Withdrawn")
+            {
+                _result.Foreground = Ui.Bad;
+                _result.Text = p.ParticipantID + " has withdrawn from the study. No new scans can be recorded for this participant.";
+                return;
+            }
+
             _found = p;
             _result.Foreground = Ui.Ink;
             Consent k = StudyRepository.GetLatestConsent(p.ParticipantID);

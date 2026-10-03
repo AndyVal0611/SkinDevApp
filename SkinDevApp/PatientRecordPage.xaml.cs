@@ -216,9 +216,15 @@ namespace SkinDevApp
             }, 120));
 
             var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
-            actions.Children.Add(Ui.Btn("New scan", (o, e) => Workflow.ContinueToScan(p.ParticipantID), "SmallButton"));
-            actions.Children.Add(Ui.Btn("Record consent", (o, e) => Nav.Go(new ConsentPage(p.ParticipantID)), "SmallButton"));
+            Button newScan = Ui.Btn("New scan", (o, e) => Workflow.ContinueToScan(p.ParticipantID), "SmallButton");
+            Button recConsent = Ui.Btn("Record consent", (o, e) => Nav.Go(new ConsentPage(p.ParticipantID)), "SmallButton");
+            newScan.IsEnabled = recConsent.IsEnabled = p.Status != "Withdrawn";
+            actions.Children.Add(newScan);
+            actions.Children.Add(recConsent);
             sp.Children.Add(actions);
+            if (p.Status == "Withdrawn")
+                sp.Children.Add(Ui.Text("Withdrawn: this participant's data is excluded from the Research Dashboard, and no new scans or consent can be recorded.",
+                    11, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }
 

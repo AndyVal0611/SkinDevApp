@@ -47,6 +47,9 @@ namespace SkinDevApp
                 Stat("Pending researcher verification", StudyRepository.PendingVerificationCount());
                 Stat("Pending dermatologist validation", StudyRepository.PendingDermatologistCount());
                 Stat("Model versions seen", StudyRepository.AllModelVersions().Count);
+                Stat("Scans with consent for future model use", StudyRepository.SessionsWithFutureUseConsent(), "latest consent ticked the optional permission");
+                int withdrawn = StudyRepository.WithdrawnParticipants();
+                Stat("Withdrawn participants", withdrawn, "excluded from every figure on this page");
 
                 Chart("AI classification distribution", "Overall AI class per scan session", StudyRepository.AiClassDistribution());
                 Chart("Researcher reference distribution", "Latest researcher assessment per session", StudyRepository.ResearcherDistribution());

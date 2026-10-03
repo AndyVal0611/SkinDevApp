@@ -314,6 +314,16 @@ CREATE TABLE IF NOT EXISTS SystemSettings (
     UpdatedBy  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS ResearcherAccounts (
+    Username           TEXT PRIMARY KEY COLLATE NOCASE,
+    Salt               BLOB NOT NULL,
+    Hash               BLOB NOT NULL,
+    Iterations         INTEGER NOT NULL,
+    CreatedAt          TEXT NOT NULL,
+    CreatedBy          TEXT,
+    PasswordChangedAt  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS AuditLog (
     AuditID   INTEGER PRIMARY KEY AUTOINCREMENT,
     At        TEXT NOT NULL,

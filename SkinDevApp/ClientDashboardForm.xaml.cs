@@ -73,7 +73,9 @@ namespace SkinDevApp.Views
 
         // --- study workflow ---------------------------------------------------------
         private readonly string _participantId;          // PatientID the scan is filed under (never the name)
-        private Task _importChain = Task.CompletedTask;   // database imports run one after another, off the UI thread
+        private readonly Dictionary<string, Func<string>> _failedSaves = new Dictionary<string, Func<string>>();
+        private string _lastSaveError;
+        private System.Windows.Window _hostWindow;
         private string _resultSessionId;                  // ScanSessionID of the last saved scan (results / report)
         private string _resultSessionLabel;
         private readonly Dictionary<string, TextBlock> _status = new Dictionary<string, TextBlock>();
@@ -106,7 +108,13 @@ namespace SkinDevApp.Views
             CaptureArchive.CameraMirrored = false;
             RegionAttribution.MirroredCamera = false;
 
-            Unloaded += (s, e) => ResetKioskState();
+            Loaded += (s, e) => { _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
+            Unloaded += (s, e) =>
+            {
+                if (_hostWindow != null) _hostWindow.Closing -= OnHostWindowClosing;
+                _hostWindow = null;
+                ResetKioskState();
+            };
 
             _participantId = AppSession.CurrentParticipantId;
             ApplyRoleAndSettings();
@@ -148,20 +156,29 @@ namespace SkinDevApp.Views
                 problem = AppSession.IsResearcher
                     ? "No participant selected. Live scanning is filed under a PatientID: register or select a participant first. (Researchers may still analyse an uploaded image; it is saved as an unlinked scan.)"
                     : "No participant selected. Register or select a participant from the Dashboard first.";
+            else if (IsWithdrawn(_participantId))
+                problem = _participantId + " has withdrawn from the study. Image capture is blocked.";
             else if (!Workflow.HasScanConsent(_participantId))
                 problem = "Required consent has not been recorded for " + _participantId + ". Image capture is blocked until consent is given.";
 
             GateBox.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
             GateTxt.Text = problem ?? "";
-            GateBtn.Content = string.IsNullOrEmpty(_participantId) ? "Go to Dashboard" : "Go to Consent";
+            GateBtn.Content = string.IsNullOrEmpty(_participantId) || IsWithdrawn(_participantId) ? "Go to Dashboard" : "Go to Consent";
             StartCamBtn.IsEnabled = problem == null;
             if (problem != null) VerdictTxt.Text = "Status: scanning is blocked — see the message above.";
             return problem == null;
         }
 
+        private static bool IsWithdrawn(string participantId)
+        {
+            if (string.IsNullOrEmpty(participantId)) return false;
+            Participant p = StudyRepository.GetParticipant(participantId);
+            return p != null && p.Status == "Withdrawn";
+        }
+
         private void GateBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_participantId)) Nav.Home();
+            if (string.IsNullOrEmpty(_participantId) || IsWithdrawn(_participantId)) Nav.Home();
             else Nav.Go(new ConsentPage(_participantId));
         }
 
@@ -259,20 +276,57 @@ namespace SkinDevApp.Views
 
         // ---- database ------------------------------------------------------------
 
-        /// <summary>Run imports one after another on a worker thread; report failures without blocking scanning.</summary>
-        private async Task<string> SaveToDatabase(Func<string> work)
+        /// <summary>
+        /// Queue a save (one after another, off the UI thread). A failure never blocks scanning: it is kept
+        /// and shown in a red box with a Retry button until it succeeds.
+        /// </summary>
+        private async Task<string> SaveToDatabase(string key, Func<string> work)
         {
-            Task<string> t = _importChain.ContinueWith(_ => work(), TaskScheduler.Default);
-            _importChain = t.ContinueWith(_ => { }, TaskScheduler.Default);
             try
             {
-                return await t;
+                string id = await SaveQueue.Enqueue(work);
+                if (_failedSaves.Remove(key)) UpdateSaveWarning();
+                return id;
             }
             catch (Exception ex)
             {
-                VerdictTxt.Text += "\n⚠ Could not save to the database: " + ex.Message +
-                                   ". The images and record files are saved on disk and can be imported later from Participant Records.";
+                _failedSaves[key] = work;
+                _lastSaveError = ex.Message;
+                UpdateSaveWarning();
                 return null;
+            }
+        }
+
+        private void UpdateSaveWarning()
+        {
+            if (_failedSaves.Count == 0) { SaveWarnBox.Visibility = Visibility.Collapsed; return; }
+            SaveWarnTxt.Text = "⚠ " + _failedSaves.Count + " scan(s) could not be saved to the database (" + _lastSaveError + "). " +
+                               "The images and record files are safe on disk. Press Retry; if it keeps failing, the scan is indexed again automatically the next time the app starts.";
+            SaveWarnBox.Visibility = Visibility.Visible;
+        }
+
+        private async void RetrySaveBtn_Click(object sender, RoutedEventArgs e)
+        {
+            RetrySaveBtn.IsEnabled = false;
+            foreach (string key in _failedSaves.Keys.ToList())
+            {
+                Func<string> work;
+                if (!_failedSaves.TryGetValue(key, out work)) continue;
+                string id = await SaveToDatabase(key, work);
+                if (id != null) RememberSaved(id);
+            }
+            RetrySaveBtn.IsEnabled = true;
+        }
+
+        /// <summary>Closing the app mid-scan: keep what was captured and wait (briefly) for the saves.</summary>
+        private void OnHostWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (_session != null)
+            {
+                MultiViewSession ended = _session;
+                _session = null;
+                try { ended.Abort(); } catch { }
+                _ = SaveSession(ended, finalize: true);
             }
         }
 
@@ -281,7 +335,7 @@ namespace SkinDevApp.Views
             if (session == null || session.Outcomes.Count == 0) return null;
             string folder = session.Folder;
             string pid = _participantId;
-            string id = await SaveToDatabase(() => SessionImporter.ImportSession(folder, pid, finalize));
+            string id = await SaveToDatabase(folder, () => SessionImporter.ImportSession(folder, pid, finalize));
             if (id != null) RememberSaved(id);
             return id;
         }
@@ -290,7 +344,7 @@ namespace SkinDevApp.Views
         {
             if (string.IsNullOrEmpty(captureFolder)) return null;
             string pid = _participantId;
-            string id = await SaveToDatabase(() => SessionImporter.ImportSingleCapture(captureFolder, pid, true));
+            string id = await SaveToDatabase(captureFolder, () => SessionImporter.ImportSingleCapture(captureFolder, pid, true));
             if (id != null) RememberSaved(id);
             return id;
         }

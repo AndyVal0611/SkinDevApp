@@ -106,7 +106,7 @@ namespace SkinDevApp.Data
         /// Folders whose patient id is a registered PS-xxxx are linked; the rest stay unlinked
         /// (Participant Records can link them later). Returns how many were imported.
         /// </summary>
-        public static int ImportArchive(out int failed)
+        public static int ImportArchive(out int failed, bool linkedOnly = false)
         {
             failed = 0;
             int imported = 0;
@@ -128,6 +128,7 @@ namespace SkinDevApp.Data
                             if (idx.Views == null || idx.Views.Count == 0) continue;     // camera opened, nothing captured
                             string link = idx.PatientId != null && pid.IsMatch(idx.PatientId) && StudyRepository.GetParticipant(idx.PatientId) != null
                                 ? idx.PatientId : null;
+                            if (linkedOnly && link == null) continue;       // legacy scans are only imported by the researcher, on request
                             ImportSession(folder, link, true);
                             imported++;
                         }
@@ -135,6 +136,7 @@ namespace SkinDevApp.Data
                         {
                             CaptureRecord rec = ReviewStore.LoadRecord(folder);
                             if (rec == null || known.Contains("single-" + rec.CaptureId)) continue;
+                            if (linkedOnly) continue;                       // a single capture does not record which participant it belongs to
                             ImportSingleCapture(folder, null, true);
                             imported++;
                         }
@@ -149,6 +151,20 @@ namespace SkinDevApp.Data
             if (imported > 0)
                 StudyRepository.Audit("Import archive", "ScanSessions", null, imported + " saved scans indexed, " + failed + " failed");
             return imported;
+        }
+
+        /// <summary>
+        /// Start-up safety net: scans that are on disk and belong to a registered participant but are missing
+        /// from the database (a save failed, or the app was closed mid-scan) are indexed again, finalised as
+        /// "incomplete" if they never finished. Returns how many were recovered.
+        /// </summary>
+        public static int RecoverLinkedSessions()
+        {
+            int failed;
+            int n = ImportArchive(out failed, linkedOnly: true);
+            if (n > 0 || failed > 0)
+                StudyRepository.Audit("Recovered scans", "ScanSessions", null, n + " scan(s) re-indexed at start-up, " + failed + " could not be read");
+            return n;
         }
 
         private static HashSet<string> KnownSessionIds()

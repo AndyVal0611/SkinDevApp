@@ -132,6 +132,13 @@ namespace SkinDevApp.Views
                 return;
             }
 
+            if (p.Status == "Withdrawn")
+            {
+                MessageBox.Show(p.ParticipantID + " has withdrawn from the study. No new scans or consent can be recorded for this participant.",
+                    "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             AppSession.CurrentParticipantId = p.ParticipantID;
             Consent k = StudyRepository.GetLatestConsent(p.ParticipantID);
             if (k == null || !k.AllowsScanning)
@@ -144,6 +151,8 @@ namespace SkinDevApp.Views
         public static bool HasScanConsent(string participantId)
         {
             if (string.IsNullOrEmpty(participantId)) return false;
+            Participant p = StudyRepository.GetParticipant(participantId);
+            if (p == null || p.Status == "Withdrawn") return false;
             Consent k = StudyRepository.GetLatestConsent(participantId);
             return k != null && k.AllowsScanning;
         }

@@ -78,9 +78,7 @@
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0" Margin="0,0,0,15">
-                    <TextBlock Text="Restricted Client Database Logs (Owner View)" FontSize="16" FontWeight="Bold" Foreground="#1A2328" VerticalAlignment="Center"/>
-                    <Button Content="🗑️ Clear Database Logs" Width="170" Height="32" Background="#E76F51" Foreground="White" 
-                            FontWeight="Bold" FontSize="11" HorizontalAlignment="Right" Click="ClearLogsBtn_Click"/>
+                    <TextBlock Text="Legacy report log (read-only)" FontSize="16" FontWeight="Bold" Foreground="#1A2328" VerticalAlignment="Center"/>
                 </Grid>
 
                 <!-- SQLite Patient Records DataGrid -->

@@ -463,7 +463,7 @@ namespace SkinDevApp.Data
         {
             var list = new List<ScanSessionRow>();
             using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, SessionSelect + @" WHERE s.ViewsCompleted > 0
+            using (var cmd = Cmd(c, SessionSelect + @" WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
                 AND NOT EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID = s.ScanSessionID)
                 ORDER BY s.StartedAt DESC;"))
             using (var r = cmd.ExecuteReader())
@@ -762,16 +762,36 @@ namespace SkinDevApp.Data
         }
 
         // ---------------------------------------------------- research stats --
+        //
+        // A participant whose record status is "Withdrawn" is excluded from every figure
+        // below (their data stays stored but is not counted or analysed).
 
-        public static int TotalParticipants() => Count("SELECT COUNT(*) FROM Participants;");
-        public static int TotalSessions() => Count("SELECT COUNT(*) FROM ScanSessions;");
-        public static int TotalCapturedImages() => Count("SELECT COUNT(*) FROM CaptureViews;");
-        public static int TotalAttributionMaps() => Count("SELECT COUNT(*) FROM AttributionMaps;");
-        public static int CompletedAnalyses() => Count("SELECT COUNT(*) FROM ScanSessions WHERE ScanStatus='complete';");
-        public static int PendingVerificationCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0
+        /// <summary>SQL condition on a ScanSessions row aliased "s": not a withdrawn participant's scan.</summary>
+        private const string ActiveSession =
+            "(s.ParticipantID IS NULL OR s.ParticipantID NOT IN (SELECT ParticipantID FROM Participants WHERE Status = 'Withdrawn'))";
+
+        public static int TotalParticipants() => Count("SELECT COUNT(*) FROM Participants WHERE Status <> 'Withdrawn';");
+        public static int WithdrawnParticipants() => Count("SELECT COUNT(*) FROM Participants WHERE Status = 'Withdrawn';");
+        public static int TotalSessions() => Count("SELECT COUNT(*) FROM ScanSessions s WHERE " + ActiveSession + ";");
+        public static int TotalCapturedImages() => Count(
+            "SELECT COUNT(*) FROM CaptureViews v JOIN ScanSessions s ON s.ScanSessionID = v.ScanSessionID WHERE " + ActiveSession + ";");
+        public static int TotalAttributionMaps() => Count(
+            "SELECT COUNT(*) FROM AttributionMaps m JOIN CaptureViews v ON v.CaptureID = m.CaptureID JOIN ScanSessions s ON s.ScanSessionID = v.ScanSessionID WHERE " + ActiveSession + ";");
+        public static int CompletedAnalyses() => Count("SELECT COUNT(*) FROM ScanSessions s WHERE s.ScanStatus='complete' AND " + ActiveSession + ";");
+        public static int PendingVerificationCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND NOT EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID=s.ScanSessionID);");
-        public static int PendingDermatologistCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0
+        public static int PendingDermatologistCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND NOT EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed');");
+
+        /// <summary>
+        /// Scans of participants whose LATEST consent is "Agreed" with the optional future-model-use
+        /// permission ticked, and who have not withdrawn. Any future export of images for model
+        /// improvement must be limited to these.
+        /// </summary>
+        public static int SessionsWithFutureUseConsent() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE " + ActiveSession + @"
+            AND s.ParticipantID IS NOT NULL
+            AND EXISTS (SELECT 1 FROM Consents k WHERE k.ParticipantID = s.ParticipantID AND k.Decision = 'Agreed' AND k.FutureModelUseConsent = 1
+                        AND k.ConsentID = (SELECT MAX(ConsentID) FROM Consents x WHERE x.ParticipantID = s.ParticipantID));");
 
         private static List<CountRow> Group(string sql)
         {
@@ -785,22 +805,25 @@ namespace SkinDevApp.Data
         }
 
         public static List<CountRow> AiClassDistribution() => Group(
-            "SELECT OverallPredictedClass AS Label, COUNT(*) AS N FROM ScanSessions WHERE OverallPredictedClass IS NOT NULL GROUP BY 1 ORDER BY 2 DESC;");
+            "SELECT s.OverallPredictedClass AS Label, COUNT(*) AS N FROM ScanSessions s WHERE s.OverallPredictedClass IS NOT NULL AND " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
 
         /// <summary>Latest researcher label per session (a later evaluation supersedes an earlier one for statistics).</summary>
         public static List<CountRow> ResearcherDistribution() => Group(@"
-            SELECT e.ResearcherClassification AS Label, COUNT(*) AS N FROM ResearcherEvaluations e
-            WHERE e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = e.ScanSessionID)
+            SELECT e.ResearcherClassification AS Label, COUNT(*) AS N
+            FROM ResearcherEvaluations e JOIN ScanSessions s ON s.ScanSessionID = e.ScanSessionID
+            WHERE " + ActiveSession + @"
+              AND e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = e.ScanSessionID)
             GROUP BY 1 ORDER BY 2 DESC;");
 
         public static List<CountRow> DermatologistDistribution() => Group(@"
-            SELECT d.DermatologistAssessment AS Label, COUNT(*) AS N FROM DermatologistValidations d
-            WHERE d.ValidationStatus='Completed'
+            SELECT d.DermatologistAssessment AS Label, COUNT(*) AS N
+            FROM DermatologistValidations d JOIN ScanSessions s ON s.ScanSessionID = d.ScanSessionID
+            WHERE " + ActiveSession + @" AND d.ValidationStatus='Completed'
               AND d.ValidationID = (SELECT MAX(ValidationID) FROM DermatologistValidations x WHERE x.ScanSessionID = d.ScanSessionID AND x.ValidationStatus='Completed')
             GROUP BY 1 ORDER BY 2 DESC;");
 
         public static List<CountRow> SexDistribution() => Group(
-            "SELECT COALESCE(NULLIF(Sex,''),'(not recorded)') AS Label, COUNT(*) AS N FROM Participants GROUP BY 1 ORDER BY 2 DESC;");
+            "SELECT COALESCE(NULLIF(Sex,''),'(not recorded)') AS Label, COUNT(*) AS N FROM Participants WHERE Status <> 'Withdrawn' GROUP BY 1 ORDER BY 2 DESC;");
 
         public static List<CountRow> AgeDistribution() => Group(@"
             SELECT CASE WHEN Age IS NULL THEN '(not recorded)'
@@ -810,20 +833,22 @@ namespace SkinDevApp.Data
                         WHEN Age < 45 THEN '35-44'
                         WHEN Age < 55 THEN '45-54'
                         ELSE '55+' END AS Label, COUNT(*) AS N
-            FROM Participants GROUP BY 1 ORDER BY 1;");
+            FROM Participants WHERE Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
 
         public static List<CountRow> FitzpatrickManualDistribution() => Group(@"
-            SELECT COALESCE(NULLIF(FitzpatrickManual,''),'Not collected') AS Label, COUNT(*) AS N
-            FROM SkinProfiles GROUP BY 1 ORDER BY 1;");
+            SELECT COALESCE(NULLIF(k.FitzpatrickManual,''),'Not collected') AS Label, COUNT(*) AS N
+            FROM SkinProfiles k JOIN Participants p ON p.ParticipantID = k.ParticipantID
+            WHERE p.Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
 
         public static List<CountRow> ViewCompletion() => Group(@"
-            SELECT CASE WHEN ScanMode='Single' THEN 'Single capture'
-                        ELSE ViewsCompleted || ' of ' || ViewsExpected || ' views' END AS Label, COUNT(*) AS N
-            FROM ScanSessions GROUP BY 1 ORDER BY 1 DESC;");
+            SELECT CASE WHEN s.ScanMode='Single' THEN 'Single capture'
+                        ELSE s.ViewsCompleted || ' of ' || s.ViewsExpected || ' views' END AS Label, COUNT(*) AS N
+            FROM ScanSessions s WHERE " + ActiveSession + " GROUP BY 1 ORDER BY 1 DESC;");
 
         public static List<CountRow> ModelVersionDistribution() => Group(@"
             SELECT COALESCE(m.RunName,'unknown') || ' / ' || substr(COALESCE(m.OnnxSha256,'unknown'),1,12) AS Label, COUNT(*) AS N
-            FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID GROUP BY 1 ORDER BY 2 DESC;");
+            FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID
+            WHERE " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
 
         /// <summary>AI overall class vs the latest researcher label (single-label evaluations only).</summary>
         public static List<CountRow> AiVsResearcherAgreement() => Group(@"
@@ -831,7 +856,8 @@ namespace SkinDevApp.Data
                         WHEN instr(e.ResearcherClassification, ',') > 0 THEN 'Multiple reference labels'
                         ELSE 'Disagree' END AS Label, COUNT(*) AS N
             FROM ScanSessions s JOIN ResearcherEvaluations e ON e.ScanSessionID = s.ScanSessionID
-            WHERE e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = s.ScanSessionID)
+            WHERE " + ActiveSession + @"
+              AND e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = s.ScanSessionID)
               AND s.OverallPredictedClass IS NOT NULL
             GROUP BY 1 ORDER BY 2 DESC;");
 
@@ -840,7 +866,7 @@ namespace SkinDevApp.Data
                         WHEN instr(d.DermatologistAssessment, ',') > 0 THEN 'Multiple reference labels'
                         ELSE 'Disagree' END AS Label, COUNT(*) AS N
             FROM ScanSessions s JOIN DermatologistValidations d ON d.ScanSessionID = s.ScanSessionID
-            WHERE d.ValidationStatus='Completed'
+            WHERE " + ActiveSession + @" AND d.ValidationStatus='Completed'
               AND d.ValidationID = (SELECT MAX(ValidationID) FROM DermatologistValidations x WHERE x.ScanSessionID = s.ScanSessionID AND x.ValidationStatus='Completed')
               AND s.OverallPredictedClass IS NOT NULL
             GROUP BY 1 ORDER BY 2 DESC;");

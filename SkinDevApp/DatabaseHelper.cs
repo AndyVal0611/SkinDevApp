@@ -132,20 +132,5 @@ namespace SkinDevApp
                 }
             }
         }
-
-        public static void ClearAllRecords()
-        {
-            if (!File.Exists(dbPath)) return;
-
-            using (var conn = new SQLiteConnection(connectionString))
-            {
-                conn.Open();
-                string deleteQuery = "DELETE FROM PatientLogs; DELETE FROM sqlite_sequence WHERE name='PatientLogs';";
-                using (var cmd = new SQLiteCommand(deleteQuery, conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
     }
 }

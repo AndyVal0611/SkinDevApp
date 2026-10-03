@@ -33,22 +33,6 @@ namespace SkinDevApp.Views
             }
         }
 
-        private void ClearLogsBtn_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBoxResult result = MessageBox.Show(
-                "Are you sure you want to clear all patient logs from the database?",
-                "Clear Database",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                DatabaseHelper.ClearAllRecords();
-                LoadConsoleData(); // Refresh DataGrid and reset count cards to 0
-                MessageBox.Show("All database records have been cleared.", "LUMYVUE Console");
-            }
-        }
-
         public void LogoutBtn_Click(object sender, RoutedEventArgs e)
         {
             Nav.Home();       // legacy console is opened from the Dashboard; return there

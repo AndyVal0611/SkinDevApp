@@ -63,7 +63,8 @@ namespace SkinDevApp
             SetStatus(GradCamStatusDot, GradCamStatusText, h.GradCamOk ? ReadyBrush : WarningBrush, h.GradCamOk ? "Available" : "Unavailable");
             GradCamDetailText.Text = h.GradCamOk
                 ? h.GradCamText
-                : "Grad-CAM++ unavailable. The scan still runs and saves the class scores; heatmaps will be missing. Start gradcam_service.py to enable them.";
+                : "Grad-CAM++ unavailable. The scan still runs and saves the class scores; heatmaps will be missing. Press Start service (or run start_gradcam_service.bat) to enable them.";
+            StartServiceBtn.Visibility = h.GradCamOk ? Visibility.Collapsed : Visibility.Visible;
 
             RefreshOverallStatus();
         }
@@ -101,6 +102,42 @@ namespace SkinDevApp
             {
                 RefreshOverallStatus();
             }
+        }
+
+        /// <summary>Launch start_gradcam_service.bat in its own window, then wait for the service to answer.</summary>
+        private async void StartServiceBtn_Click(object sender, RoutedEventArgs e)
+        {
+            string script = GradCamLauncher.FindScript();
+            if (script == null)
+            {
+                MessageBox.Show("start_gradcam_service.bat was not found next to the application or in a parent folder.\n\n" +
+                                "Start the service by hand from the project folder:\n" +
+                                "  python gradcam_service.py --model precisionskin_best.keras --labels labels.json",
+                                "LUMYVUE Grad-CAM++", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            StartServiceBtn.IsEnabled = false;
+            try
+            {
+                GradCamLauncher.Start(script);
+                SetStatus(GradCamStatusDot, GradCamStatusText, PendingBrush, "Starting...");
+                GradCamDetailText.Text = "The service window opened. Loading the model can take up to a minute; keep that window open while scanning.";
+
+                for (int i = 0; i < 45; i++)       // up to ~90 s
+                {
+                    await System.Threading.Tasks.Task.Delay(2000);
+                    var h = await SkinDevApp.Explainability.GradCamService.GetHealthAsync();
+                    if (h != null && h.Ok) break;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not start the service: " + ex.Message, "LUMYVUE Grad-CAM++", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally { StartServiceBtn.IsEnabled = true; }
+
+            await RunServiceChecks();
         }
 
         private void RecheckCameraBtn_Click(object sender, RoutedEventArgs e)
