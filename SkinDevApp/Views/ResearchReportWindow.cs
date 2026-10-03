@@ -665,10 +665,10 @@ namespace SkinDevApp.Views
 
             if (dermatologist)
             {
-                sp.Children.Add(FieldRow(Tuple.Create("Validator ID (coded) *", (string)null),
-                                         Tuple.Create("Validator name (only if the protocol stores it)", (string)null)));
-                sp.Children.Add(FieldRow(Tuple.Create("Professional role", "Licensed Dermatologist"),
-                                         Tuple.Create("License / credential reference (only if required)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Validator ID *", (string)null),
+                                         Tuple.Create("Validator Name (where permitted by protocol)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Professional Role", "Licensed Dermatologist"),
+                                         Tuple.Create("License / Credential No. (if required by protocol)", (string)null)));
             }
 
             sp.Children.Add(FormLabel((dermatologist ? "Dermatologist reference assessment" : "Reference assessment") + " *"));
@@ -679,7 +679,7 @@ namespace SkinDevApp.Views
 
             if (dermatologist)
             {
-                sp.Children.Add(FormLabel("Agreement with researcher (optional)"));
+                sp.Children.Add(FormLabel("Agreement with Researcher (if applicable)"));
                 sp.Children.Add(Boxes(FormAgreement.Concat(new[] { "No researcher assessment yet" })));
             }
 
@@ -687,7 +687,7 @@ namespace SkinDevApp.Views
 
             if (!dermatologist)
             {
-                sp.Children.Add(FormLabel("Per-view comments (optional)"));
+                sp.Children.Add(FormLabel("Per-view Comments (if any)"));
                 sp.Children.Add(FieldRow(Tuple.Create("Front", (string)null), Tuple.Create("Left", (string)null), Tuple.Create("Right", (string)null)));
                 sp.Children.Add(FieldRow(Tuple.Create("Researcher ID *", (string)null)));
             }

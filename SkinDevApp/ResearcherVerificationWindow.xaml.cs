@@ -201,7 +201,7 @@ namespace SkinDevApp
 
             if (_d.Session.ScanMode != "Single")
             {
-                ResearcherForm.Children.Add(Label("Per-view comments (optional)"));
+                ResearcherForm.Children.Add(Label("Per-view Comments (if any)"));
                 var g = new Grid();
                 for (int i = 0; i < 3; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 _rFront = Field(); _rLeft = Field(); _rRight = Field();
@@ -277,14 +277,14 @@ namespace SkinDevApp
             Grid.SetColumn(right, 2);
             g.Children.Add(left); g.Children.Add(right);
 
-            left.Children.Add(Label("Validator ID (coded) *"));
+            left.Children.Add(Label("Validator ID *"));
             _dId = Field(); left.Children.Add(_dId);
-            right.Children.Add(Label("Validator name (only if the protocol stores it)"));
+            right.Children.Add(Label("Validator Name (where permitted by protocol)"));
             _dName = Field(); right.Children.Add(_dName);
-            left.Children.Add(Label("Professional role"));
+            left.Children.Add(Label("Professional Role"));
             var role = Field(); role.Text = "Licensed Dermatologist"; role.IsReadOnly = true; role.Background = Ui.Brush("#F3F4F6");
             left.Children.Add(role);
-            right.Children.Add(Label("License / credential reference (only if required)"));
+            right.Children.Add(Label("License / Credential No. (if required by protocol)"));
             _dCred = Field(); right.Children.Add(_dCred);
             DermForm.Children.Add(g);
 
@@ -301,7 +301,7 @@ namespace SkinDevApp
             g2.Children.Add(l2); g2.Children.Add(r2);
             l2.Children.Add(Label("Agreement with AI *"));
             _dAgreeAi = Combo(Agreement); l2.Children.Add(_dAgreeAi);
-            r2.Children.Add(Label("Agreement with researcher (optional)"));
+            r2.Children.Add(Label("Agreement with Researcher (if applicable)"));
             var resOptions = new List<string>(Agreement) { "No researcher assessment yet" };
             _dAgreeRes = Combo(resOptions, _d.Evaluations.Count == 0 ? resOptions.Count - 1 : -1);
             r2.Children.Add(_dAgreeRes);

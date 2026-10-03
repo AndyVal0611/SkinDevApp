@@ -105,7 +105,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="Contact (only if the protocol requires it)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Text="Contact (if required by protocol)" Style="{StaticResource FieldLabel}"/>
                                     <TextBox x:Name="ContactTxt" Style="{StaticResource Field}" TextChanged="AnyField_Changed"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
