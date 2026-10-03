@@ -6,7 +6,7 @@
 // exactly what was stored. Page 1: identity, model, overall + per-view scores,
 // disagreement, human assessments, Fitzpatrick (reserved), disclaimer.
 // Page 2: per-view original + four class-specific Grad-CAM++ overlays.
-// Pages 3-4: blank printable forms (researcher / licensed dermatologist) to be completed
+// Pages 3-4: blank printable forms (licensed dermatologist, then researcher) to be completed
 // by hand and signed; staff then transcribe them in the Researcher Verification window.
 // Not titled as a medical / diagnostic report.
 // ============================================================================
@@ -26,6 +26,13 @@ namespace SkinDevApp.Views
     public sealed class ResearchReportWindow : Window
     {
         private const double PageW = 595, PageH = 842;
+        private static readonly string[] ResearchTeamMembers =
+        {
+            "Elaiza Czarina Claire C. Bautista",
+            "Francesca Nicolette S. Pineda",
+            "Andrea M. Valdez"
+        };
+        private static readonly string ResearchTeam = string.Join(" · ", ResearchTeamMembers);
 
         private readonly SessionDetail _d;
         private readonly List<FrameworkElement> _pages = new List<FrameworkElement>();
@@ -61,8 +68,8 @@ namespace SkinDevApp.Views
             var pagesPanel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 16) };
             _pages.Add(SummaryPage());
             _pages.Add(ImagesPage());
-            _pages.Add(FormPage(false));
-            _pages.Add(FormPage(true));
+            _pages.Add(FormPage(true));     // licensed dermatologist first
+            _pages.Add(FormPage(false));    // then the research team
             foreach (FrameworkElement p in _pages) pagesPanel.Children.Add(p);
 
             var bar = new DockPanel { Margin = new Thickness(12), LastChildFill = false };
@@ -120,7 +127,8 @@ namespace SkinDevApp.Views
             top.Children.Add(right);
             top.Children.Add(T("PrecisionSkin / LUMYVUE", 18, true, "#1A2328", 0));
             sp.Children.Add(top);
-            sp.Children.Add(T(subtitle, 10.5, true, "#8A827A", 4));
+            sp.Children.Add(T(subtitle, 10.5, true, "#8A827A", 2));
+            sp.Children.Add(T("Researchers: " + ResearchTeam, 8, false, "#555555", 4));
             sp.Children.Add(new Border { Height = 2, Background = Ui.Ink, Margin = new Thickness(0, 0, 0, 8) });
             return sp;
         }
@@ -418,11 +426,27 @@ namespace SkinDevApp.Views
 
             // signature block
             sp.Children.Add(Rule());
-            sp.Children.Add(FieldRow(
-                Tuple.Create(dermatologist ? "Signature of licensed dermatologist" : "Signature of researcher", (string)null),
-                Tuple.Create("Printed name", (string)null),
-                Tuple.Create("Date", (string)null)));
-            sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 22, 0, 8));
+            if (dermatologist)
+            {
+                sp.Children.Add(FieldRow(
+                    Tuple.Create("Signature of licensed dermatologist", (string)null),
+                    Tuple.Create("Printed name", (string)null),
+                    Tuple.Create("Date", (string)null)));
+                sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 22, 0, 8));
+            }
+            else
+            {
+                // every member of the research team signs
+                sp.Children.Add(T("Signed by the research team (all members)", 8.5, true, "#1A2328", 0));
+                foreach (string name in ResearchTeamMembers)
+                {
+                    sp.Children.Add(FieldRow(
+                        Tuple.Create("Signature", (string)null),
+                        Tuple.Create("Printed name", name),
+                        Tuple.Create("Date", (string)null)));
+                    sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 20, 0, 4));
+                }
+            }
 
             sp.Children.Add(T("After completion, the research team enters these answers in the system (Researcher Verification window, tab \"" +
                               (dermatologist ? "Licensed Dermatologist Validation" : "Researcher Assessment") +
