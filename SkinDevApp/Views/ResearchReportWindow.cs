@@ -4,8 +4,8 @@
 // "PrecisionSkin Research Analysis Report" for one saved scan session. Built only
 // from the database and the saved image files, so a report generated later shows
 // exactly what was stored. Page 1: identity, model, overall + per-view scores,
-// disagreement, human assessments, Fitzpatrick (reserved), disclaimer.
-// Page 2: per-view original + four class-specific Grad-CAM++ overlays.
+// disagreement, Fitzpatrick (reserved), disclaimer. Page 2: researcher assessment +
+// dermatologist validation (full form content + history). Page 3: per-view original + four class-specific Grad-CAM++ overlays.
 // Not titled as a medical / diagnostic report.
 // ============================================================================
 
@@ -58,6 +58,7 @@ namespace SkinDevApp.Views
 
             var pagesPanel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 16) };
             _pages.Add(SummaryPage());
+            _pages.Add(AssessmentPage());
             _pages.Add(ImagesPage());
             foreach (FrameworkElement p in _pages) pagesPanel.Children.Add(p);
 
@@ -217,32 +218,7 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(Rule());
 
-            // human assessments
-            sp.Children.Add(Section("Researcher reference assessment"));
-            ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
-            if (ev == null) sp.Children.Add(T("Pending.", 8.5, false, "#555555"));
-            else
-            {
-                var rows = new List<KeyValuePair<string, string>>
-                {
-                    Ui.KV("Assessment", ev.ResearcherClassification), Ui.KV("Agreement with AI", ev.AgreementWithAI),
-                    Ui.KV("Researcher / date", ev.ResearcherID + " · " + ev.EvaluationDate), Ui.KV("Researcher notes", ev.Notes)
-                };
-                foreach (var c in new[] { Tuple.Create("Front", ev.FrontComment), Tuple.Create("Left", ev.LeftComment), Tuple.Create("Right", ev.RightComment) })
-                    if (!string.IsNullOrWhiteSpace(c.Item2)) rows.Add(Ui.KV(c.Item1 + " comment", c.Item2));
-                sp.Children.Add(Table(rows, 120));
-            }
-
-            sp.Children.Add(Section("Licensed dermatologist validation"));
-            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
-            if (dv == null) sp.Children.Add(T("Pending.", 8.5, false, "#555555"));
-            else sp.Children.Add(Table(new[]
-            {
-                Ui.KV("Assessment", dv.DermatologistAssessment), Ui.KV("Agreement with AI", dv.AgreementWithAI),
-                Ui.KV("Agreement w/ researcher", dv.AgreementWithResearcher),
-                Ui.KV("Validator / date", dv.DermatologistID + " (" + dv.ProfessionalRole + ") · " + dv.ValidationDate),
-                Ui.KV("Status", dv.ValidationStatus), Ui.KV("Notes", dv.Notes)
-            }, 120));
+            sp.Children.Add(T("Researcher assessment and dermatologist validation: see page 2.", 8.5, false, "#555555", 2));
             sp.Children.Add(Rule());
 
             // Fitzpatrick reserved
@@ -257,6 +233,68 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(T("Research prototype disclaimer", 8.5, true, "#1A2328", 1));
             sp.Children.Add(T(StudyText.PrototypeNotice + " " + StudyText.ScoresNote + " " + StudyText.AttributionNote, 7.5, false, "#555555", 0));
+            return Page(sp);
+        }
+
+        private FrameworkElement AssessmentPage()
+        {
+            var sp = Head("Researcher assessment and licensed dermatologist validation");
+            sp.Children.Add(T("PatientID " + (_d.Session.ParticipantID ?? "unlinked") + "   ·   ScanSessionID " + _d.Session.DisplayId, 8.5, false, "#555555", 8));
+            sp.Children.Add(T("Both layers are human reference records, stored separately from the AI prediction. Neither overwrites the AI result.", 8, false, "#555555", 6));
+
+            // ---- researcher (latest record = the form as last saved)
+            sp.Children.Add(Section("Researcher reference assessment"));
+            ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
+            if (ev == null) sp.Children.Add(T("Pending — no researcher assessment has been saved for this scan.", 8.5, false, "#555555"));
+            else
+            {
+                sp.Children.Add(Table(new[]
+                {
+                    Ui.KV("Reference assessment", ev.ResearcherClassification),
+                    Ui.KV("Agreement with AI", ev.AgreementWithAI),
+                    Ui.KV("Researcher notes", ev.Notes),
+                    Ui.KV("Front comment", ev.FrontComment),
+                    Ui.KV("Left comment", ev.LeftComment),
+                    Ui.KV("Right comment", ev.RightComment),
+                    Ui.KV("Researcher ID", ev.ResearcherID),
+                    Ui.KV("Date / time", ev.EvaluationDate)
+                }, 130, 9));
+            }
+            sp.Children.Add(Rule());
+
+            // ---- dermatologist (prefer the latest completed validation)
+            sp.Children.Add(Section("Licensed dermatologist validation"));
+            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
+            if (dv == null) sp.Children.Add(T("Pending — no dermatologist validation has been saved for this scan.", 8.5, false, "#555555"));
+            else
+            {
+                sp.Children.Add(Table(new[]
+                {
+                    Ui.KV("Validator ID (coded)", dv.DermatologistID),
+                    Ui.KV("Validator name", dv.ValidatorName),
+                    Ui.KV("Professional role", dv.ProfessionalRole),
+                    Ui.KV("License / credential ref.", dv.CredentialReference),
+                    Ui.KV("Reference assessment", dv.DermatologistAssessment),
+                    Ui.KV("Agreement with AI", dv.AgreementWithAI),
+                    Ui.KV("Agreement with researcher", dv.AgreementWithResearcher),
+                    Ui.KV("Dermatologist notes", dv.Notes),
+                    Ui.KV("Validation status", dv.ValidationStatus),
+                    Ui.KV("Date / time", dv.ValidationDate)
+                }, 130, 9));
+            }
+
+            // ---- earlier saved records (each save adds a new record)
+            var older = new List<KeyValuePair<string, string>>();
+            foreach (ResearcherEvaluation e in _d.Evaluations.Skip(1))
+                older.Add(Ui.KV("Researcher · " + e.EvaluationDate, e.ResearcherClassification + " · AI: " + e.AgreementWithAI + " · " + e.ResearcherID));
+            foreach (DermatologistValidation v in _d.Validations.Where(x => x != dv))
+                older.Add(Ui.KV("Dermatologist · " + v.ValidationDate, v.DermatologistAssessment + " · AI: " + v.AgreementWithAI + " · " + v.ValidationStatus + " · " + v.DermatologistID));
+            if (older.Count > 0)
+            {
+                sp.Children.Add(Rule());
+                sp.Children.Add(Section("Earlier saved records (history)"));
+                sp.Children.Add(Table(older, 170, 8));
+            }
             return Page(sp);
         }
 
