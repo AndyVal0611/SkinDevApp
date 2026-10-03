@@ -1,62 +1,120 @@
-﻿using System.Windows;
+using System;
+using System.Windows;
 using System.Windows.Controls;
+using SkinDevApp.Data;
 
 namespace SkinDevApp.Views
 {
     public partial class LoginForm : Page
     {
+        private bool _firstRun;
+
         public LoginForm()
         {
             InitializeComponent();
+            RefreshMode();
         }
 
         private void PortalModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (AdminCredentialsPanel == null || ClientRegisterPanel == null || EnterPortalBtn == null) return;
+            RefreshMode();
+        }
 
-            if (PortalModeCombo.SelectedIndex == 0) // Client / Patient Portal
+        /// <summary>Shows the fields that belong to the chosen mode (and the first-run setup when no account exists).</summary>
+        private void RefreshMode()
+        {
+            if (AdminCredentialsPanel == null || ClientRegisterPanel == null || EnterPortalBtn == null || FirstRunPanel == null) return;
+
+            if (PortalModeCombo.SelectedIndex == 0) // Operator / kiosk
             {
                 AdminCredentialsPanel.Visibility = Visibility.Collapsed;
                 ClientRegisterPanel.Visibility = Visibility.Visible;
-                EnterPortalBtn.Content = "REGISTER & PROCEED TO KIOSK";
+                EnterPortalBtn.Content = "ENTER OPERATOR MODE";
+                return;
             }
-            else // User / Specialist Admin Portal
+
+            ClientRegisterPanel.Visibility = Visibility.Collapsed;
+            AdminCredentialsPanel.Visibility = Visibility.Visible;
+
+            try { _firstRun = !AuthService.HasAccounts(); }
+            catch (Exception ex)
             {
-                ClientRegisterPanel.Visibility = Visibility.Collapsed;
-                AdminCredentialsPanel.Visibility = Visibility.Visible;
-                EnterPortalBtn.Content = "ENTER CLINIC PORTAL";
+                _firstRun = false;
+                LoginHintTxt.Text = "The account database could not be read: " + ex.Message;
+            }
+
+            FirstRunPanel.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
+            if (_firstRun)
+            {
+                LoginHintTxt.Text = "No researcher account exists yet. Create the first account now (password at least " +
+                                    AuthService.MinPasswordLength + " characters). Keep it safe: it protects participant records and settings.";
+                EnterPortalBtn.Content = "CREATE ACCOUNT & SIGN IN";
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(LoginHintTxt.Text) || LoginHintTxt.Text.StartsWith("No researcher account")) LoginHintTxt.Text = "";
+                EnterPortalBtn.Content = "SIGN IN";
             }
         }
 
         private void EnterPortalBtn_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
-
-            if (PortalModeCombo.SelectedIndex == 0) // Client Registration Mode
+            if (PortalModeCombo.SelectedIndex == 0) // Operator / kiosk mode
             {
-                if (string.IsNullOrWhiteSpace(ClientFullNameTxt.Text))
-                {
-                    MessageBox.Show("Please enter your full name to proceed with the skin analysis.", "Registration Required", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                // Save client registration info globally
-                DatabaseHelper.CurrentClientName = ClientFullNameTxt.Text.Trim();
-                DatabaseHelper.CurrentClientAge = string.IsNullOrWhiteSpace(ClientAgeTxt.Text) ? "N/A" : ClientAgeTxt.Text.Trim();
-                DatabaseHelper.CurrentClientContact = string.IsNullOrWhiteSpace(ClientContactTxt.Text) ? "N/A" : ClientContactTxt.Text.Trim();
-
-                mainWin.MainFrame.Navigate(new ClientDashboardForm());
+                AppSession.SignIn(UserRole.Operator, OperatorIdTxt.Text);
+                Nav.Home();
+                return;
             }
-            else // Specialist Admin Login Mode
+
+            string user = UsernameTxt.Text.Trim();
+            try
             {
-                if (UsernameTxt.Text.Trim() == "lumyvue_eaf" && PasswordTxt.Password == "eaftrinity")
+                if (_firstRun) { CreateFirstAccount(user); return; }
+
+                switch (AuthService.SignIn(user, PasswordTxt.Password))
                 {
-                    mainWin.MainFrame.Navigate(new UserDashboardForm());
+                    case SignInResult.Ok:
+                        AppSession.SignIn(UserRole.Researcher, user);
+                        Nav.Home();
+                        break;
+
+                    case SignInResult.LockedOut:
+                        PasswordTxt.Clear();
+                        MessageBox.Show("Too many incorrect attempts for this username. Please wait " + AuthService.LockedSeconds(user) +
+                                        " seconds and try again.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        break;
+
+                    default:
+                        PasswordTxt.Clear();
+                        MessageBox.Show("Incorrect username or password.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        break;
                 }
-                else
-                {
-                    MessageBox.Show("Invalid Specialist credentials. Please check your username or password.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sign-in is not available: " + ex.Message, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void CreateFirstAccount(string user)
+        {
+            string pw = PasswordTxt.Password;
+            string err = AuthService.CheckUsername(user) ?? AuthService.CheckNewPassword(user, pw);
+            if (err == null && pw != ConfirmPasswordTxt.Password) err = "The two passwords do not match.";
+            if (err != null)
+            {
+                MessageBox.Show(err, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            AuthService.CreateAccount(user, pw, null);
+            PasswordTxt.Clear();
+            ConfirmPasswordTxt.Clear();
+
+            if (AuthService.SignIn(user, pw) == SignInResult.Ok)
+            {
+                AppSession.SignIn(UserRole.Researcher, user);
+                Nav.Home();
             }
         }
     }

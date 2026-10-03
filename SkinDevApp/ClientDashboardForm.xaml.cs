@@ -1,18 +1,42 @@
-﻿using AForge.Video;
+﻿// ============================================================================
+// ClientDashboardForm_xaml.cs  —  v2 (guided auto-capture, class-coloured heatmaps)
+//
+// What changed vs the previous version
+//   * Live camera -> on-screen face guide ("Move closer", "Center your face", ...)
+//   * Scan flow driven by LiveGradCamController's state machine:
+//       Live -> Scanning -> Stabilizing -> Hold Still -> Stable-Capturing
+//            -> Final Analysis -> Results
+//   * Auto-capture of the EXACT stable frame; Snap Now = manual capture
+//   * "Model Class Scores" (honest label), four class-coloured Grad-CAM++ maps,
+//     approximate region line, view selector (predicted / all / one class)
+//   * Patient view vs Researcher view (live gates + metrics, capture details,
+//     Pending Review window)
+//   * UI never blocks the loops: every controller event is marshalled with
+//     Dispatcher.BeginInvoke and coalesced.
+// ============================================================================
+
+using AForge.Video;
 using AForge.Video.DirectShow;
 using Microsoft.Win32;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 using SkinDevApp.AI;
+using SkinDevApp.Data;
 using SkinDevApp.Explainability;
 using SkinDevApp.Imaging;
+using SkinDevApp.Scanning;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using Media = System.Windows.Media;
 
 namespace SkinDevApp.Views
 {
@@ -20,32 +44,434 @@ namespace SkinDevApp.Views
     {
         private FilterInfoCollection videoDevices;
         private VideoCaptureDevice videoSource;
+        private int _camIndex;                              // device currently in use
+        private int _camTried;                              // devices tried in this start attempt
+        private int _framesSeen;                            // frames received from the current device
+        private System.Windows.Threading.DispatcherTimer _camWatchdog;
 
-        private BitmapSource currentCapturedImage;
-        private string primaryDiagnosis = "Acne";
+        private BitmapSource currentCapturedImage;      // uploaded image only
+        private string primaryDiagnosis = "";
         private string confidencePercent = "0.0%";
 
-        // --- continuous live Grad-CAM++ (runs while the camera is streaming) ---
+        // --- live scan ----------------------------------------------------------
         private LiveGradCamController _live;
         private readonly object _frameStoreLock = new object();
         private Bitmap _latestRawFrame;
-        private readonly bool _showLiveHeatmap = true;
-
-        // --- frame handling ---
-        private Bitmap _snappedRaw;
         private volatile bool _cameraLive;
+        private volatile bool _resultsFrozen;
+
+        private int _framePending;          // 1 while the UI is still drawing the last video frame
+        private int _snapPending;           // 1 while a snapshot update is queued on the UI thread
+        private LiveSnapshot _latestSnap;
+        private bool _serviceOnline;
+
+        private ScanResult _lastResult;     // owned by the dashboard
+        private MultiViewSession _session;  // current Front/Left/Right scan (null = single capture)
+        private ComparisonGalleryWindow _gallery;
+        private OverlayView _view = OverlayView.Predicted;
+        private bool _initialized;
+
+        // --- study workflow ---------------------------------------------------------
+        private readonly string _participantId;          // PatientID the scan is filed under (never the name)
+        private readonly Dictionary<string, Func<string>> _failedSaves = new Dictionary<string, Func<string>>();
+        private string _lastSaveError;
+        private System.Windows.Window _hostWindow;
+        private string _resultSessionId;                  // ScanSessionID of the last saved scan (results / report)
+        private string _resultSessionLabel;
+        private readonly Dictionary<string, TextBlock> _status = new Dictionary<string, TextBlock>();
 
         private readonly bool _cropLiveFrameToSquare = true;
         private const int AnalysisWidth = 640;
+        private const int FastLoopMs = 200;
 
-        /// <summary>Grad-CAM++ refresh period during live preview. Reduced to 1000ms for responsiveness.</summary>
-        private const int LiveGradCamRefreshMs = 1000;
+        // --- brushes (frozen, created once) -----------------------------------------
+        private static readonly Media.Brush OvalIdle = MakeBrush("#99FFFFFF");
+        private static readonly Media.Brush OvalAdjust = MakeBrush("#F59E0B");
+        private static readonly Media.Brush OvalReady = MakeBrush("#22C55E");
+        private static readonly Media.Brush OvalCapture = MakeBrush("#3B82F6");
+
+        private static Media.Brush MakeBrush(string hex)
+        {
+            var b = new Media.SolidColorBrush((Media.Color)Media.ColorConverter.ConvertFromString(hex));
+            b.Freeze();
+            return b;
+        }
 
         public ClientDashboardForm()
         {
             InitializeComponent();
+            _initialized = true;
+
+            CaptureArchive.FrameCropDescription = _cropLiveFrameToSquare
+                ? "live: centre square crop of the camera frame; upload: none"
+                : "none";
+            CaptureArchive.CameraMirrored = false;
+            RegionAttribution.MirroredCamera = false;
+
+            Loaded += (s, e) => { _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
+            Unloaded += (s, e) =>
+            {
+                if (_hostWindow != null) _hostWindow.Closing -= OnHostWindowClosing;
+                _hostWindow = null;
+                ResetKioskState();
+            };
+
+            _participantId = AppSession.CurrentParticipantId;
+            ApplyRoleAndSettings();
+            BuildStatusPanel();
+
             ResetKioskState();
+            CheckGate();
+            UpdateScanInfo();
         }
+
+        // ============================================================================
+        // Study workflow: role, consent gate, settings, status panel, database import
+        // ============================================================================
+
+        private void ApplyRoleAndSettings()
+        {
+            bool r = AppSession.IsResearcher;
+            ScanSettings cfg = ScanSettings.Current;
+
+            ResearcherChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            if (!r) ResearcherChk.IsChecked = false;
+            HeatmapChoicePanel.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            UploadBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            AnalyzeBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            MultiViewChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;   // operators always run the 3-view scan
+            AutoCaptureChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+
+            AutoCaptureChk.IsChecked = cfg.AutoCapture;
+            CamOnChk.IsChecked = cfg.LiveGradCam;
+            OpacitySlider.Value = Math.Max(0.1, Math.Min(1.0, cfg.OverlayOpacity));
+            OpacityTxt.Text = OpacitySlider.Value.ToString("0.00");
+        }
+
+        /// <summary>Scanning needs a registered participant with the required consent.</summary>
+        private bool CheckGate()
+        {
+            string problem = null;
+            if (string.IsNullOrEmpty(_participantId))
+                problem = AppSession.IsResearcher
+                    ? "No participant selected. Live scanning is filed under a PatientID: register or select a participant first. (Researchers may still analyse an uploaded image; it is saved as an unlinked scan.)"
+                    : "No participant selected. Register or select a participant from the Dashboard first.";
+            else if (IsWithdrawn(_participantId))
+                problem = _participantId + " has withdrawn from the study. Image capture is blocked.";
+            else if (!Workflow.HasScanConsent(_participantId))
+                problem = "Required consent has not been recorded for " + _participantId + ". Image capture is blocked until consent is given.";
+
+            GateBox.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
+            GateTxt.Text = problem ?? "";
+            GateBtn.Content = string.IsNullOrEmpty(_participantId) || IsWithdrawn(_participantId) ? "Go to Dashboard" : "Go to Consent";
+            StartCamBtn.IsEnabled = problem == null;
+            if (problem != null) VerdictTxt.Text = "Status: scanning is blocked — see the message above.";
+            return problem == null;
+        }
+
+        private static bool IsWithdrawn(string participantId)
+        {
+            if (string.IsNullOrEmpty(participantId)) return false;
+            Participant p = StudyRepository.GetParticipant(participantId);
+            return p != null && p.Status == "Withdrawn";
+        }
+
+        private void GateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_participantId) || IsWithdrawn(_participantId)) Nav.Home();
+            else Nav.Go(new ConsentPage(_participantId));
+        }
+
+        private void HomeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            Nav.Home();
+        }
+
+        /// <summary>Top bar: PatientID, ScanSessionID, Front/Left/Right progress, required pose.</summary>
+        private void UpdateScanInfo()
+        {
+            var sb = new StringBuilder();
+            sb.Append("PatientID: ").Append(string.IsNullOrEmpty(_participantId) ? "none selected" : _participantId);
+
+            if (_session != null)
+            {
+                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel ?? _session.SessionId.Substring(0, 8) + "…");
+                sb.Append("   ·   ");
+                foreach (ScanView v in ScanViews.Sequence)
+                {
+                    bool done = _session.HasView(v);
+                    bool now = !_session.IsComplete && _session.Current == v;
+                    sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Name(v)).Append("  ");
+                }
+                if (!_session.IsComplete)
+                    sb.Append("  ·   Required pose: ").Append(ScanViews.Instruction(_session.Current));
+            }
+            else if (!string.IsNullOrEmpty(_resultSessionLabel))
+            {
+                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel);
+            }
+            ScanInfoTxt.Text = sb.ToString();
+        }
+
+        private static readonly string[] StatusKeys =
+            { "Face position", "Pose / orientation", "Sharpness", "Brightness / exposure", "Motion", "Stability", "Camera" };
+
+        private void BuildStatusPanel()
+        {
+            StatusGrid.Children.Clear();
+            _status.Clear();
+            foreach (string k in StatusKeys)
+            {
+                var sp = new StackPanel { Margin = new Thickness(0, 2, 8, 4) };
+                sp.Children.Add(new TextBlock { Text = k, FontSize = 10.5, Foreground = Ui.Muted });
+                var val = new TextBlock { Text = "—", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
+                sp.Children.Add(val);
+                _status[k] = val;
+                StatusGrid.Children.Add(sp);
+            }
+        }
+
+        private void SetStatusLine(string key, bool ok, string text)
+        {
+            TextBlock t;
+            if (!_status.TryGetValue(key, out t)) return;
+            t.Text = (ok ? "✓ " : "• ") + text;
+            t.Foreground = ok ? Ui.Good : Ui.Warn;
+        }
+
+        private void UpdateStatusPanel(LiveSnapshot s)
+        {
+            StatusPanel.Visibility = Visibility.Visible;
+            ScanDecision d = s.Decision;
+            ScanGates g = d.Gates;
+            FrameQuality q = s.Quality;
+
+            switch (d.State)
+            {
+                case ScanState.Stabilizing: StabilityTxt.Text = "STABILIZING"; break;
+                case ScanState.HoldStill: StabilityTxt.Text = "HOLD STILL"; break;
+                case ScanState.StableCapturing: StabilityTxt.Text = "STABLE — CAPTURING"; break;
+                case ScanState.FinalAnalysis: StabilityTxt.Text = "CAPTURING"; break;
+                case ScanState.Cooldown: StabilityTxt.Text = "NEXT VIEW"; break;
+                default: StabilityTxt.Text = "ANALYZING"; break;
+            }
+
+            if (q == null || !q.FaceFound) SetStatusLine("Face position", false, "Position your face");
+            else SetStatusLine("Face position", q.Ready || g.Face, q.Ready ? "Centred" : q.GuidanceText);
+
+            if (_live != null && _live.RequiredView != ScanView.Any)
+            {
+                if (!_live.PoseCheckAvailable) SetStatusLine("Pose / orientation", false, "Not verified (pose model missing)");
+                else SetStatusLine("Pose / orientation", g.Pose, g.Pose ? ScanViews.Title(_live.RequiredView) + " confirmed" : (_live.PoseMessage ?? "Turn as instructed"));
+            }
+            else SetStatusLine("Pose / orientation", true, "Any (single capture)");
+
+            SetStatusLine("Sharpness", q != null && q.SharpEnough, q == null ? "—" : (q.SharpEnough ? "Sharp" : "Blurry — hold still / refocus"));
+            SetStatusLine("Brightness / exposure", q != null && q.ExposureOk, q == null ? "—" : (q.ExposureOk ? "OK" : "Check lighting"));
+            SetStatusLine("Motion", g.Still, g.Still ? "Still" : "Moving");
+            SetStatusLine("Stability", g.Stable && g.Consistent,
+                d.Metrics.FramesHeldStable + "/" + d.Metrics.StableFramesRequired + " frames, " + d.Metrics.ConsistencyRatio.ToString("P0") + " consistent");
+            SetStatusLine("Camera", Volatile.Read(ref _framesSeen) > 0, Volatile.Read(ref _framesSeen) > 0 ? "Live" : "Waiting for video");
+        }
+
+        // ---- database ------------------------------------------------------------
+
+        /// <summary>
+        /// Queue a save (one after another, off the UI thread). A failure never blocks scanning: it is kept
+        /// and shown in a red box with a Retry button until it succeeds.
+        /// </summary>
+        private async Task<string> SaveToDatabase(string key, Func<string> work)
+        {
+            try
+            {
+                string id = await SaveQueue.Enqueue(work);
+                if (_failedSaves.Remove(key)) UpdateSaveWarning();
+                return id;
+            }
+            catch (Exception ex)
+            {
+                _failedSaves[key] = work;
+                _lastSaveError = ex.Message;
+                UpdateSaveWarning();
+                return null;
+            }
+        }
+
+        private void UpdateSaveWarning()
+        {
+            if (_failedSaves.Count == 0) { SaveWarnBox.Visibility = Visibility.Collapsed; return; }
+            SaveWarnTxt.Text = "⚠ " + _failedSaves.Count + " scan(s) could not be saved to the database (" + _lastSaveError + "). " +
+                               "The images and record files are safe on disk. Press Retry; if it keeps failing, the scan is indexed again automatically the next time the app starts.";
+            SaveWarnBox.Visibility = Visibility.Visible;
+        }
+
+        private async void RetrySaveBtn_Click(object sender, RoutedEventArgs e)
+        {
+            RetrySaveBtn.IsEnabled = false;
+            foreach (string key in _failedSaves.Keys.ToList())
+            {
+                Func<string> work;
+                if (!_failedSaves.TryGetValue(key, out work)) continue;
+                string id = await SaveToDatabase(key, work);
+                if (id != null) RememberSaved(id);
+            }
+            RetrySaveBtn.IsEnabled = true;
+        }
+
+        /// <summary>Closing the app mid-scan: keep what was captured and wait (briefly) for the saves.</summary>
+        private void OnHostWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (_session != null)
+            {
+                MultiViewSession ended = _session;
+                _session = null;
+                try { ended.Abort(); } catch { }
+                _ = SaveSession(ended, finalize: true);
+            }
+        }
+
+        private async Task<string> SaveSession(MultiViewSession session, bool finalize)
+        {
+            if (session == null || session.Outcomes.Count == 0) return null;
+            string folder = session.Folder;
+            string pid = _participantId;
+            string id = await SaveToDatabase(folder, () => SessionImporter.ImportSession(folder, pid, finalize));
+            if (id != null) RememberSaved(id);
+            return id;
+        }
+
+        private async Task<string> SaveSingle(string captureFolder)
+        {
+            if (string.IsNullOrEmpty(captureFolder)) return null;
+            string pid = _participantId;
+            string id = await SaveToDatabase(captureFolder, () => SessionImporter.ImportSingleCapture(captureFolder, pid, true));
+            if (id != null) RememberSaved(id);
+            return id;
+        }
+
+        private void RememberSaved(string scanSessionId)
+        {
+            _resultSessionId = scanSessionId;
+            try
+            {
+                ScanSessionRow row = StudyRepository.GetSession(scanSessionId);
+                _resultSessionLabel = row != null ? row.DisplayId : null;
+            }
+            catch { _resultSessionLabel = null; }
+            UpdateScanInfo();
+        }
+
+        // ---- image review (per view, retake, accept) ----------------------------------
+
+        private void ShowReviewPanel(MultiViewSession session)
+        {
+            ReviewList.Children.Clear();
+            foreach (ScanView v in ScanViews.Sequence)
+            {
+                ViewOutcome o = session.Outcomes.FirstOrDefault(x => x.View == ScanViews.Name(v));
+                CaptureRecord rec = o != null && !string.IsNullOrEmpty(o.AbsoluteFolder) ? ReviewStore.LoadRecord(o.AbsoluteFolder) : null;
+
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                string img = o != null && o.AbsoluteFolder != null ? Path.Combine(o.AbsoluteFolder, "analysed.png") : null;
+                var thumb = Ui.Thumb(img, 80, "#E5E7EB", "not captured");
+                row.Children.Add(thumb);
+
+                var info = new StackPanel { Margin = new Thickness(10, 0, 8, 0) };
+                info.Children.Add(Ui.Text(ScanViews.Title(v) + (o != null && o.Ok ? "  —  " + o.PredictedClass + " " + o.ConfidencePercent.ToString("0.0") + "%" : "  —  not captured"),
+                    12.5, true, Ui.Ink, new Thickness(0)));
+                if (rec != null)
+                {
+                    string quality = SessionImporter.QualityStatus(rec, ScanViews.Name(v));
+                    info.Children.Add(Ui.Text("Overall capture quality: " + quality, 11.5, true, quality == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
+                    if (rec.Quality != null)
+                        info.Children.Add(Ui.Text(
+                            "Sharpness " + rec.Quality.Sharpness.ToString("0") + (rec.Quality.Sharpness >= ScanSettings.Current.MinSharpness ? " ✓" : " (low)") +
+                            "  ·  Brightness " + rec.Quality.Brightness.ToString("0") +
+                            "  ·  Face " + (rec.Quality.FaceFound ? "found" : "not found") +
+                            "  ·  Pose " + (rec.Session != null && rec.Session.PoseGateVerified ? "verified" : "not verified") +
+                            "  ·  " + (rec.Trigger == "auto" ? "auto-captured" : "manual"),
+                            10.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+                }
+                Grid.SetColumn(info, 1);
+                row.Children.Add(info);
+
+                ScanView captured = v;
+                var retake = new Button { Content = o != null ? "Retake" : "Capture", Style = (Style)FindResource("SmallButton"), VerticalAlignment = VerticalAlignment.Center };
+                retake.Click += (s, e) => RetakeView(captured);
+                Grid.SetColumn(retake, 2);
+                row.Children.Add(retake);
+
+                ReviewList.Children.Add(row);
+            }
+
+            AcceptBtn.IsEnabled = session.IsComplete;
+            AcceptBtn.Content = session.IsComplete ? "Accept views and view results  ›" : "Capture the missing view(s) first";
+            ReviewPanel.Visibility = Visibility.Visible;
+        }
+
+        private void RetakeView(ScanView v)
+        {
+            MultiViewSession session = _session;
+            if (session == null || _live == null) return;
+
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            session.Retake(v);
+            StartNextView(session);
+            UpdateScanInfo();
+        }
+
+        private async void AcceptBtn_Click(object sender, RoutedEventArgs e)
+        {
+            MultiViewSession session = _session;
+            if (session == null) return;
+            AcceptBtn.IsEnabled = false;
+
+            string id = await SaveSession(session, finalize: true);
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            if (id == null)
+            {
+                AcceptBtn.IsEnabled = true;
+                ReviewPanel.Visibility = Visibility.Visible;
+                return;
+            }
+            Nav.Go(new ResultsPage(id));
+        }
+
+        private void ViewResultsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_resultSessionId)) Nav.Go(new ResultsPage(_resultSessionId));
+        }
+
+        // ---- researcher CAM controls ---------------------------------------------------
+
+        private void CamOnChk_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+            if (_live != null)
+            {
+                _live.Enabled = CamOnChk.IsChecked == true;
+                _live.InvalidateOverlay();
+            }
+            LegendPanel.Visibility = CamOnChk.IsChecked == true ? LegendPanel.Visibility : Visibility.Collapsed;
+        }
+
+        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (OpacityTxt == null) return;
+            OpacityTxt.Text = OpacitySlider.Value.ToString("0.00");
+            if (!_initialized) return;
+            ClassPalette.AlphaMax = OpacitySlider.Value;          // display only; saved overlays use the Settings value
+            _live?.InvalidateOverlay();
+            if (_lastResult != null && _lastResult.Ok) RenderResultOverlay();
+        }
+
+        // ============================================================================
+        // Layout
+        // ============================================================================
 
         private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
         {
@@ -78,28 +504,98 @@ namespace SkinDevApp.Views
             }
         }
 
+        private void CameraViewportGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateGuideLayout();
+        }
+
+        /// <summary>Where the (Uniform-stretched) image actually sits inside the viewport.</summary>
+        private System.Windows.Rect GetDisplayedImageRect()
+        {
+            double W = CameraViewportGrid.ActualWidth;
+            double H = CameraViewportGrid.ActualHeight;
+
+            double iw = H, ih = H;     // default: square
+            BitmapSource src = UploadedImageViewer.Source as BitmapSource;
+            if (src != null && src.PixelWidth > 0 && src.PixelHeight > 0)
+            {
+                iw = src.PixelWidth;
+                ih = src.PixelHeight;
+            }
+
+            if (W <= 0 || H <= 0 || iw <= 0 || ih <= 0)
+                return new System.Windows.Rect(0, 0, Math.Max(W, 0), Math.Max(H, 0));
+
+            double scale = Math.Min(W / iw, H / ih);
+            double dw = iw * scale, dh = ih * scale;
+            return new System.Windows.Rect((W - dw) / 2.0, (H - dh) / 2.0, dw, dh);
+        }
+
+        /// <summary>Place the guide oval using the same normalised layout the analyser uses.</summary>
+        private void UpdateGuideLayout()
+        {
+            if (GuideOval == null) return;
+
+            System.Windows.Rect r = GetDisplayedImageRect();
+            if (r.Width < 10 || r.Height < 10) return;
+
+            double rx = r.Width * FaceGuideLayout.RadiusX;
+            double ry = r.Height * FaceGuideLayout.RadiusY;
+            double cx = r.X + r.Width * FaceGuideLayout.CenterX;
+            double cy = r.Y + r.Height * FaceGuideLayout.CenterY;
+
+            GuideOval.Width = rx * 2.0;
+            GuideOval.Height = ry * 2.0;
+            Canvas.SetLeft(GuideOval, cx - rx);
+            Canvas.SetTop(GuideOval, cy - ry);
+        }
+
+        // ============================================================================
+        // Reset / camera lifecycle
+        // ============================================================================
+
         private void ResetKioskState()
         {
             StopCamera();
+
             DetectionDotsCanvas.Children.Clear();
             currentCapturedImage = null;
-            _snappedRaw?.Dispose();
-            _snappedRaw = null;
+
+            _lastResult?.Dispose();
+            _lastResult = null;
+            _resultsFrozen = false;
 
             SnapBtn.IsEnabled = false;
             AnalyzeBtn.IsEnabled = false;
             PrintBtn.IsEnabled = false;
+            NewScanBtn.IsEnabled = false;
+            OpenDetailsBtn.IsEnabled = false;
+            GalleryBtn.IsEnabled = false;
+            ViewResultsBtn.IsEnabled = false;
+            ReviewPanel.Visibility = Visibility.Collapsed;
+            StatusPanel.Visibility = Visibility.Collapsed;
+            ViewStepTxt.Text = "";
 
-            AcneBar.Value = 0; AcneScoreTxt.Text = "0.0%";
-            HyperBar.Value = 0; HyperScoreTxt.Text = "0.0%";
-            EczemaBar.Value = 0; EczemaScoreTxt.Text = "0.0%";
-            NormalBar.Value = 0; NormalScoreTxt.Text = "0.0%";
+            SetBars(null);
 
-            VerdictTxt.Text = "Status: Ready. Click Live Cam to start new scan.";
+            GuideCanvas.Visibility = Visibility.Collapsed;
+            GuideBanner.Visibility = Visibility.Collapsed;
+            StateBanner.Visibility = Visibility.Collapsed;
+            HoldBar.Visibility = Visibility.Collapsed;
+            LegendPanel.Visibility = Visibility.Collapsed;
+
+            UploadedImageViewer.Source = null;
+            PlaceholderPanel.Visibility = Visibility.Visible;
+
+            VerdictTxt.Text = "Status: Ready. Click Live Cam to start a new scan.";
+            RegionTxt.Text = "";
+            ResearcherMetricsTxt.Text = "";
         }
 
         private void StartCamBtn_Click(object sender, RoutedEventArgs e)
         {
+            if (!CheckGate()) return;
+
             try
             {
                 videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -110,29 +606,54 @@ namespace SkinDevApp.Views
                     return;
                 }
 
+                if (!AiEngine.IsAvailable) AiEngine.EnsureLoaded();
+
+                if (!AiEngine.IsAvailable)
+                {
+                    MessageBox.Show(
+                        "The AI model is not loaded.\n\n" + (AiEngine.LoadErrorMessage ?? "Unknown error."),
+                        "LUMYVUE Camera", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
                 ResetKioskState();
 
                 _cameraLive = true;
-                videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
-                videoSource.NewFrame += VideoSource_NewFrame;
-                videoSource.Start();
+                _resultsFrozen = false;
+
+                _camTried = 0;
+                OpenCamera(PickCameraIndex());
 
                 PlaceholderPanel.Visibility = Visibility.Collapsed;
                 UploadedImageViewer.Visibility = Visibility.Visible;
 
-                SnapBtn.IsEnabled = true;
-                VerdictTxt.Text = "Status: Live Camera Active. Click Snap Frame.";
+                GuideCanvas.Visibility = Visibility.Visible;
+                UpdateGuideLayout();
 
-                // Start continuous, throttled Grad-CAM++ with relaxed gating thresholds
+                SnapBtn.IsEnabled = true;
+                VerdictTxt.Text = "Status: Live camera active. Position your face in the oval.";
+
                 _live = new LiveGradCamController(GetLatestFrameMatForLiveLoop)
                 {
-                    RefreshIntervalMs = LiveGradCamRefreshMs,
+                    FastLoopMs = FastLoopMs,
                     WorkingWidth = 640,
-                    MotionThreshold = 25.0,    // Relaxed threshold to prevent flickering during head movements
-                    MaxHeatmapAgeSeconds = 8.0  // Extended timeout to allow smooth response transitions
+                    View = _view,
+                    AutoCaptureEnabled = AutoCaptureChk.IsChecked == true,
+                    RequireFaceForAutoCapture = true,
+                    MotionThreshold = 25.0,
+                    MaxHeatmapAgeSeconds = 6.0
                 };
-                _live.AnalysisUpdated += OnLiveAnalysisUpdated;
+
+                ScanSettings.Current.Apply(_live);                     // researcher settings (audited)
+                _live.AutoCaptureEnabled = AutoCaptureChk.IsChecked == true;
+                _live.Enabled = CamOnChk.IsChecked == true;
+                ClassPalette.AlphaMax = OpacitySlider.Value;
+
+                _live.FastUpdated += OnFastUpdated;
+                _live.CaptureTriggered += OnCaptureTriggered;
+                _live.ScanCompleted += OnScanCompleted;
                 _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
+                BeginMultiViewIfEnabled();
                 _live.Start();
 
                 LiveStatusTxt.Text = "Connecting to Grad-CAM++ service...";
@@ -143,56 +664,251 @@ namespace SkinDevApp.Views
             }
         }
 
+
+        // ── camera selection ────────────────────────────────────────────────────
+
+        private static readonly string[] NotARealWebcam =
+            { "virtual", "obs", "ir camera", "infrared", " ir ", "snap camera", "droidcam", "ndi", "manycam", "xsplit", "depth", "camo", "nvidia broadcast", "phone link" };
+
+        /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
+        private int PickCameraIndex()
+        {
+            // A camera chosen in Settings wins.
+            string chosen = (ScanSettings.Current.CameraName ?? "").Trim().ToLowerInvariant();
+            if (chosen.Length > 0)
+                for (int i = 0; i < videoDevices.Count; i++)
+                    if ((videoDevices[i].Name ?? "").ToLowerInvariant() == chosen) return i;
+
+            // Prefer Logitech BRIO
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (name.Contains("brio"))
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[CAM] BRIO found: {videoDevices[i].Name}");
+
+                    return i;
+                }
+            }
+
+            // Otherwise prefer another Logitech camera
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (name.Contains("logitech"))
+                    return i;
+            }
+
+            // Otherwise use first normal webcam
+            for (int i = 0; i < videoDevices.Count; i++)
+            {
+                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
+
+                if (!NotARealWebcam.Any(k => name.Contains(k)))
+                    return i;
+            }
+
+            return 0;
+        }
+
+        private void OpenCamera(int index)
+        {
+            CloseCameraDevice();
+
+            _camIndex = index;
+            _framesSeen = 0;
+            string name = videoDevices[index].Name;
+            LiveStatusTxt.Text = "Opening camera: " + name + " ...";
+
+            videoSource = new VideoCaptureDevice(videoDevices[index].MonikerString);
+
+            // Use a common, widely supported mode (about 640x480 or closest) to avoid
+            // drivers that open silently but never deliver frames at their default mode.
+            try
+            {
+                var caps = videoSource.VideoCapabilities;
+                if (caps != null && caps.Length > 0)
+                {
+                    int wantW = ScanSettings.Current.CameraWidth, wantH = ScanSettings.Current.CameraHeight;
+                    var best = caps.OrderBy(c => Math.Abs(c.FrameSize.Width - wantW) + Math.Abs(c.FrameSize.Height - wantH)).First();
+                    videoSource.VideoResolution = best;
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[CAM] caps: " + ex.Message); }
+
+            videoSource.NewFrame += VideoSource_NewFrame;
+            videoSource.VideoSourceError += VideoSource_Error;
+            videoSource.Start();
+
+            // If this device gives no frames within 4 s, try the next one.
+            _camWatchdog?.Stop();
+            _camWatchdog = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            _camWatchdog.Tick += CamWatchdog_Tick;
+            _camWatchdog.Start();
+        }
+
+        private void CloseCameraDevice()
+        {
+            var src = videoSource;
+            videoSource = null;
+            if (src == null) return;
+            try
+            {
+                src.NewFrame -= VideoSource_NewFrame;
+                src.VideoSourceError -= VideoSource_Error;
+                if (src.IsRunning) { src.SignalToStop(); }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[CAM] close: " + ex.Message); }
+        }
+
+        private void CamWatchdog_Tick(object sender, EventArgs e)
+        {
+            if (!_cameraLive) { _camWatchdog?.Stop(); return; }
+
+            if (Volatile.Read(ref _framesSeen) > 0)
+            {
+                _camWatchdog.Stop();
+                LiveStatusTxt.Text = "Camera: " + videoDevices[_camIndex].Name;
+                return;
+            }
+
+            _camTried++;
+            if (_camTried >= videoDevices.Count)
+            {
+                _camWatchdog.Stop();
+                var names = string.Join("\n", Enumerable.Range(0, videoDevices.Count)
+                    .Select(i => "  " + (i + 1) + ". " + videoDevices[i].Name));
+                MessageBox.Show(
+                    "No camera delivered any video.\n\nDevices found:\n" + names +
+                    "\n\nClose other apps that use the camera (Teams, Zoom, Windows Camera, browser tabs) and check " +
+                    "Settings > Privacy & security > Camera > 'Let desktop apps access your camera'.",
+                    "LUMYVUE Camera", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            OpenCamera((_camIndex + 1) % videoDevices.Count);
+        }
+
+        private void VideoSource_Error(object sender, VideoSourceErrorEventArgs eventArgs)
+        {
+            System.Diagnostics.Debug.WriteLine("[CAM] error: " + eventArgs.Description);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_cameraLive) LiveStatusTxt.Text = "Camera error: " + eventArgs.Description;
+            }));
+        }
+
+        private void StopCamera()
+        {
+            _cameraLive = false;
+
+            if (_session != null)
+            {
+                MultiViewSession ended = _session;
+                try { ended.Abort(); } catch { }      // keep whatever views were captured
+                _session = null;
+                _ = SaveSession(ended, finalize: true);   // partial Front/Left/Right scans are stored as incomplete
+            }
+
+            _camWatchdog?.Stop();
+            CloseCameraDevice();
+
+            if (_live != null)
+            {
+                _live.FastUpdated -= OnFastUpdated;
+                _live.CaptureTriggered -= OnCaptureTriggered;
+                _live.ScanCompleted -= OnScanCompleted;
+                _live.ServiceStatusChanged -= OnLiveServiceStatusChanged;
+                _live.Dispose();
+                _live = null;
+            }
+
+            lock (_frameStoreLock)
+            {
+                _latestRawFrame?.Dispose();
+                _latestRawFrame = null;
+            }
+
+            Interlocked.Exchange(ref _latestSnap, null);
+            LiveStatusTxt.Text = "";
+        }
+
+        // ============================================================================
+        // Camera thread: store the frame, draw the (cheap) overlay, hand off to the UI
+        // ============================================================================
+
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             if (!_cameraLive) return;
+            // _framesSeen is incremented below, only for frames that are not black
 
             try
             {
                 using (Bitmap rawFrame = (Bitmap)eventArgs.Frame.Clone())
                 using (Bitmap bitmap = PrepareFrame(rawFrame))
                 {
-                    StoreLatestFrame(bitmap);
+                    if (Volatile.Read(ref _framesSeen) > 0 || !IsBlackFrame(bitmap)) Interlocked.Increment(ref _framesSeen);
+                    StoreLatestFrame(bitmap);                       // the loops always get the newest frame
 
-                    LiveGradCamController live = _live;
+                    if (_resultsFrozen) return;                      // a captured frame is on screen
+                    if (Volatile.Read(ref _framePending) == 1) return;   // UI still busy: drop this frame
+
                     BitmapSource displaySource = null;
-                    Mat heat = live?.GetLatestHeatmapClone();
+                    LiveGradCamController live = _live;
 
-                    if (_showLiveHeatmap && live != null && heat != null && !heat.Empty())
+                    if (live != null)
                     {
-                        using (heat)
                         using (Mat frameMat = EnsureBgr(BitmapConverter.ToMat(bitmap)))
+                        using (Mat blended = live.RenderLiveOverlay(frameMat))
                         {
-                            double alpha = live.GetOverlayAlpha(frameMat);
-
-                            if (alpha > 0.01)
-                            {
-                                using (Mat blended = HeatmapRenderer.Blend(frameMat, heat, alpha))
-                                {
-                                    displaySource = ImageInterop.MatToBitmapSource(blended);
-                                }
-                            }
+                            if (blended != null)
+                                displaySource = ImageInterop.MatToBitmapSource(blended);
                         }
-                    }
-                    else
-                    {
-                        heat?.Dispose();
                     }
 
                     if (displaySource == null)
                         displaySource = ConvertBitmapToBitmapSource(bitmap);
 
-                    Dispatcher.Invoke(() =>
+                    Interlocked.Exchange(ref _framePending, 1);
+
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        if (!_cameraLive) return;
-                        UploadedImageViewer.Source = displaySource;
-                    });
+                        try
+                        {
+                            if (_cameraLive && !_resultsFrozen)
+                            {
+                                UploadedImageViewer.Source = displaySource;
+                            }
+                        }
+                        finally
+                        {
+                            Interlocked.Exchange(ref _framePending, 0);
+                        }
+                    }));
                 }
             }
             catch
             {
-                // Frame stream capture catch
+                // Frame stream capture catch (a dropped frame is harmless)
+                Interlocked.Exchange(ref _framePending, 0);
             }
+        }
+
+        /// <summary>True when the frame is essentially black (IR / blocked / not-yet-streaming camera).</summary>
+        private static bool IsBlackFrame(Bitmap bmp)
+        {
+            try
+            {
+                using (Mat m = BitmapConverter.ToMat(bmp))
+                {
+                    Scalar s = Cv2.Mean(m);
+                    return (s.Val0 + s.Val1 + s.Val2) / 3.0 < 8.0;
+                }
+            }
+            catch { return false; }
         }
 
         private Bitmap PrepareFrame(Bitmap src)
@@ -234,120 +950,6 @@ namespace SkinDevApp.Views
             }
         }
 
-        // ============================================================================
-        // ClientDashboardForm_LiveUpdates.cs
-        //
-        // This is NOT a standalone file — it shows the two methods you need to
-        // REPLACE inside your existing ClientDashboardForm_xaml.cs.
-        //
-        // HOW TO USE:
-        //   1. Open ClientDashboardForm_xaml.cs in Visual Studio.
-        //   2. Find the method  OnLiveAnalysisUpdated(LiveInfo info)
-        //      and replace its entire body with the one below.
-        //   3. The method  OnLiveServiceStatusChanged  is UNCHANGED — leave it alone.
-        //   4. No other changes are needed in the dashboard file.
-        //
-        // WHY THIS CHANGES:
-        //   The progress bars (AcneBar, HyperBar, etc.) now show the EMA-smoothed
-        //   probabilities from info.Stable instead of the raw per-tick values.
-        //   This makes the bars move smoothly rather than jumping every second.
-        //
-        //   VerdictTxt now shows a "Confirming…" or "Analyzing… low confidence"
-        //   message during uncertain periods instead of a flickering diagnosis.
-        // ============================================================================
-
-        // ─── REPLACE THIS METHOD IN ClientDashboardForm_xaml.cs ───────────────────
-
-        private void OnLiveAnalysisUpdated(LiveInfo info)
-        {
-            try
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    if (info.Onnx == null) return;
-
-                    // ── Progress bars: use smoothed probabilities ─────────────────
-                    // info.Stable.SmoothedProbabilities is EMA-smoothed, so the bars
-                    // animate gradually rather than jumping every tick.
-                    float[] smoothed = info.Stable?.SmoothedProbabilities ?? info.Onnx.Probabilities;
-
-                    double acneScore = smoothed.Length > 0 ? smoothed[0] * 100.0 : 0;
-                    double hyperScore = smoothed.Length > 1 ? smoothed[1] * 100.0 : 0;
-                    double eczemaScore = smoothed.Length > 2 ? smoothed[2] * 100.0 : 0;
-                    double normalScore = smoothed.Length > 3 ? smoothed[3] * 100.0 : 0;
-
-                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
-                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
-                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
-                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
-
-                    // ── Verdict text: use the stabilized display class ────────────
-                    if (info.Stable != null)
-                    {
-                        if (info.Stable.IsUncertain)
-                        {
-                            // Model is guessing — don't show a diagnosis.
-                            VerdictTxt.Text = "Status: Analyzing\u2026 Maintain position and lighting.";
-                        }
-                        else if (!info.Stable.IsStable)
-                        {
-                            // Confidence is sufficient but the class hasn't held long enough yet.
-                            VerdictTxt.Text = $"Status: {info.Stable.StatusText}";
-                        }
-                        else
-                        {
-                            // Stable confirmed result.
-                            primaryDiagnosis = info.Stable.DisplayClass;
-                            confidencePercent = $"{info.Stable.DisplayConfidence * 100f:F1}%";
-                            VerdictTxt.Text =
-                                $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
-                        }
-                    }
-                    else
-                    {
-                        // Fallback: stabilizer not available, use raw (shouldn't happen).
-                        primaryDiagnosis = info.Onnx.PredictedClass;
-                        confidencePercent = info.Onnx.ConfidenceText;
-                        VerdictTxt.Text =
-                            $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence) [Live]";
-                    }
-
-                    // ── Service status line ───────────────────────────────────────
-                    if (info.Disagreement)
-                    {
-                        LiveStatusTxt.Text =
-                            $"\u26a0 ONNX/Keras mismatch: {info.Onnx.PredictedClass} vs {info.ServiceClass}";
-                    }
-                    else
-                    {
-                        LiveStatusTxt.Text = $"\u25cf Live Grad-CAM++ \u2014 {info.GradCamMs:0} ms";
-                    }
-                });
-            }
-            catch (System.Threading.Tasks.TaskCanceledException) { }
-        }
-
-        // ─── NO OTHER CHANGES NEEDED IN ClientDashboardForm_xaml.cs ───────────────
-        //
-        // The _live controller is already constructed and started correctly in
-        // StartCamBtn_Click.  The stabilizer lives inside LiveGradCamController and
-        // is automatically reset when Stop() is called, so each camera session starts
-        // with a clean EMA state.
-
-        private void OnLiveServiceStatusChanged(bool online, string error)
-        {
-            try
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    LiveStatusTxt.Text = online
-                        ? "● Live Grad-CAM++ connected"
-                        : $"○ Grad-CAM++ offline - {error}";
-                });
-            }
-            catch (System.Threading.Tasks.TaskCanceledException) { }
-        }
-
         private BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
         {
             using (MemoryStream stream = new MemoryStream())
@@ -364,31 +966,580 @@ namespace SkinDevApp.Views
             }
         }
 
-        private void SnapBtn_Click(object sender, RoutedEventArgs e)
-        {
-            Bitmap snapped = null;
+        // ============================================================================
+        // Controller events (background threads -> UI via BeginInvoke, coalesced)
+        // ============================================================================
 
-            lock (_frameStoreLock)
+        private void OnFastUpdated(LiveSnapshot s)
+        {
+            Interlocked.Exchange(ref _latestSnap, s);
+
+            if (Interlocked.Exchange(ref _snapPending, 1) == 1) return;   // an update is already queued
+
+            try
             {
-                if (_latestRawFrame != null)
-                    snapped = (Bitmap)_latestRawFrame.Clone();
+                Dispatcher.BeginInvoke(new Action(ApplyLatestSnapshot));
+            }
+            catch
+            {
+                Interlocked.Exchange(ref _snapPending, 0);
+            }
+        }
+
+        private void ApplyLatestSnapshot()
+        {
+            Interlocked.Exchange(ref _snapPending, 0);
+
+            LiveSnapshot s = Volatile.Read(ref _latestSnap);
+            if (s == null || !_cameraLive || _resultsFrozen || s.Onnx == null) return;
+
+            // ---- Model Class Scores: smoothed, so the bars glide ---------------------
+            float[] smoothed = (s.Stable != null && s.Stable.SmoothedProbabilities != null
+                                && s.Stable.SmoothedProbabilities.Length == 4)
+                ? s.Stable.SmoothedProbabilities : s.Onnx.Probabilities;
+            SetBars(smoothed);
+
+            ScanDecision d = s.Decision;
+            UpdateStatusPanel(s);
+
+            // ---- state banner -------------------------------------------------------
+            string bannerText = d.Message;
+            if (_live != null && _live.RequiredView != ScanView.Any && !string.IsNullOrEmpty(bannerText))
+                bannerText = ScanViews.StepText(_live.RequiredView) + " — " + bannerText;
+            SetBanner(bannerText, d.State);
+
+            // ---- guide oval + instruction + hold progress -----------------------------
+            UpdateGuide(s.Quality, d);
+
+            // ---- verdict (live read) ----------------------------------------------------
+            StabilizedResult st = s.Stable;
+            if (st == null || st.IsUncertain)
+            {
+                VerdictTxt.Text = "Analyzing… keep your face in the oval.";
+                RegionTxt.Text = "";
+            }
+            else if (!st.IsStable)
+            {
+                VerdictTxt.Text = "Confirming… " + st.StatusText;
+                RegionTxt.Text = "";
+            }
+            else
+            {
+                primaryDiagnosis = st.DisplayClass;
+                confidencePercent = (st.DisplayConfidence * 100f).ToString("F1") + "%";
+                VerdictTxt.Text = "Live read: " + primaryDiagnosis + " (" + confidencePercent + " model score)";
+                RegionTxt.Text = s.HeatmapAvailable && s.HeatmapAgeSeconds < 6.0 ? s.RegionText : "";
             }
 
-            if (snapped == null) return;
+            // ---- service line -------------------------------------------------------------
+            if (_serviceOnline && s.HeatmapAvailable)
+                LiveStatusTxt.Text = "● Grad-CAM++ " + s.GradCamMs.ToString("0") + " ms";
+            else if (_serviceOnline)
+                LiveStatusTxt.Text = "● Grad-CAM++ connected — waiting for first map";
+            else
+                LiveStatusTxt.Text = "○ Grad-CAM++ offline — scores still live, no heatmap";
 
-            StopCamera();
+            LegendPanel.Visibility = s.HeatmapAvailable ? Visibility.Visible : Visibility.Collapsed;
 
-            _snappedRaw?.Dispose();
-            _snappedRaw = snapped;
+            if (ResearcherChk.IsChecked == true)
+                ResearcherMetricsTxt.Text = BuildLiveMetrics(s);
+        }
 
-            BitmapSource frozen = ConvertBitmapToBitmapSource(snapped);
-            UploadedImageViewer.Source = frozen;
-            currentCapturedImage = frozen;
+        private void UpdateGuide(FrameQuality q, ScanDecision d)
+        {
+            bool showGuide = _live != null && !_resultsFrozen;
+            GuideCanvas.Visibility = showGuide ? Visibility.Visible : Visibility.Collapsed;
+            if (!showGuide) return;
+
+            UpdateGuideLayout();
+
+            string text = q != null ? q.GuidanceText : "";
+            bool ready = q != null && q.Ready;
+
+            if (d.State == ScanState.HoldStill) text = "Hold still…";
+            else if (d.State == ScanState.StableCapturing) text = "Capturing…";
+            else if (d.State == ScanState.Cooldown)
+                text = (_live.RequiredView != ScanView.Any ? ScanViews.Instruction(_live.RequiredView) + " — " : "") + d.Message;
+
+            GuideTxt.Text = text;
+            GuideBanner.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+
+            Media.Brush stroke;
+            if (d.State == ScanState.StableCapturing || d.State == ScanState.FinalAnalysis) stroke = OvalCapture;
+            else if (ready) stroke = OvalReady;
+            else if (q == null || q.Guidance == GuidanceState.NoFace || q.Guidance == GuidanceState.Unavailable) stroke = OvalIdle;
+            else stroke = OvalAdjust;
+
+            GuideOval.Stroke = stroke;
+            GuideOval.StrokeThickness = ready ? 4 : 3;
+
+            bool showHold = d.State == ScanState.HoldStill
+                         || (d.State == ScanState.Stabilizing && d.Progress > 0.0);
+            HoldBar.Visibility = showHold ? Visibility.Visible : Visibility.Collapsed;
+            HoldBar.Value = d.Progress;
+        }
+
+        private void SetBanner(string text, ScanState state)
+        {
+            if (string.IsNullOrEmpty(text) || state == ScanState.Idle)
+            {
+                StateBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            StateTxt.Text = text;
+            StateBanner.Visibility = Visibility.Visible;
+        }
+
+        private void OnCaptureTriggered(string trigger, Mat frozen)
+        {
+            // Convert on this (background) thread; the Mat clone is ours to dispose.
+            BitmapSource bmp = null;
+            try { bmp = ImageInterop.MatToBitmapSource(frozen); }
+            finally { frozen.Dispose(); }
+
+            _resultsFrozen = true;      // stop the camera thread from drawing over the captured frame
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UploadedImageViewer.Source = bmp;
+
+                GuideCanvas.Visibility = Visibility.Collapsed;
+                GuideBanner.Visibility = Visibility.Collapsed;
+                HoldBar.Visibility = Visibility.Collapsed;
+                LegendPanel.Visibility = Visibility.Collapsed;
+
+                SetBanner("Stable — Capturing", ScanState.StableCapturing);
+                SnapBtn.IsEnabled = false;
+
+                VerdictTxt.Text = trigger == "auto"
+                    ? "Reading is stable — frame captured. Running final analysis…"
+                    : "Frame captured. Running final analysis…";
+                RegionTxt.Text = "";
+            }));
+        }
+
+        private void OnScanCompleted(ScanResult result)
+        {
+            Dispatcher.BeginInvoke(new Action(() => ShowResult(result)));
+        }
+
+        private void OnLiveServiceStatusChanged(bool online, string error)
+        {
+            _serviceOnline = online;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!_cameraLive) return;
+                    LiveStatusTxt.Text = online
+                        ? "● Grad-CAM++ connected"
+                        : "○ Grad-CAM++ offline — " + error;
+                }));
+            }
+            catch (TaskCanceledException) { }
+        }
+
+        // ============================================================================
+        // Results
+        // ============================================================================
+
+        private void ShowResult(ScanResult r)
+        {
+            if (r == null) return;
+
+            // The page was reset while the analysis was running: discard.
+            if (_live == null && currentCapturedImage == null)
+            {
+                r.Dispose();
+                return;
+            }
+
+            _lastResult?.Dispose();
+            _lastResult = r;
+            _resultsFrozen = true;
+
+            GuideCanvas.Visibility = Visibility.Collapsed;
+            GuideBanner.Visibility = Visibility.Collapsed;
+            HoldBar.Visibility = Visibility.Collapsed;
+
+            NewScanBtn.IsEnabled = true;
+            SnapBtn.IsEnabled = false;
+
+            if (!r.Ok || r.Request == null || r.Request.Onnx == null)
+            {
+                SetBanner("Results — error", ScanState.Results);
+                VerdictTxt.Text = "Analysis failed: " + (r.Error ?? "unknown error") + ". Press New Scan to try again.";
+                RegionTxt.Text = "";
+                return;
+            }
+
+            PredictionResult onnx = r.Request.Onnx;
+
+            // Scores of the EXACT captured frame.
+            SetBars(onnx.Probabilities);
+
+            primaryDiagnosis = onnx.PredictedClass;
+            confidencePercent = onnx.ConfidenceText;
+
+            var verdict = new StringBuilder();
+            verdict.Append("Primary prediction: ").Append(primaryDiagnosis)
+                   .Append(" (").Append(confidencePercent).Append(" model score)");
+
+            StabilizedResult st = r.Request.Stable;
+            if (st != null && !string.IsNullOrEmpty(st.DisplayClass) && st.DisplayClass != onnx.PredictedClass)
+                verdict.Append("\nStabilised across frames: ").Append(st.DisplayClass);
+
+            string warning = r.Record != null && r.Record.Consistency != null ? r.Record.Consistency.Warning : null;
+            if (!string.IsNullOrEmpty(warning))
+                verdict.Append("\n⚠ ").Append(warning);
+
+            VerdictTxt.Text = verdict.ToString();
+
+            if (r.Maps != null)
+            {
+                RegionTxt.Text = r.Maps.RegionSummary();
+                LegendPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                RegionTxt.Text = "Heatmap unavailable (" + (r.Error ?? "Grad-CAM++ service not reachable") +
+                                 "). Scores come from the ONNX classifier only.";
+                LegendPanel.Visibility = Visibility.Collapsed;
+            }
+
+            RenderResultOverlay();
+
+            SetBanner(r.Request.Trigger == "auto" ? "Results — auto-captured" : "Results", ScanState.Results);
+
+            PrintBtn.IsEnabled = true;
+            OpenDetailsBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
+            GalleryBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
+
+            if (ResearcherChk.IsChecked == true)
+                ResearcherMetricsTxt.Text = BuildResultMetrics(r);
+
+            if (_live != null && _session != null && _live.RequiredView != ScanView.Any)
+                AdvanceMultiView(r);                                   // Front -> Left -> Right -> overall result
+            else
+            {
+                SaveSingleAndEnableResults(r.Folder);
+                if (ResearcherChk.IsChecked == true && !string.IsNullOrEmpty(r.Folder))
+                    ShowGallery(r.Folder);                             // single capture: show the comparison right away
+            }
+        }
+
+        private async void SaveSingleAndEnableResults(string folder)
+        {
+            string id = await SaveSingle(folder);
+            ViewResultsBtn.IsEnabled = id != null;
+            PrintBtn.IsEnabled = id != null;
+        }
+
+        // ============================================================================
+        // Multi-view scan: Front -> Left -> Right
+        // ============================================================================
+
+        private void BeginMultiViewIfEnabled()
+        {
+            _session = null;
+            if (_live == null) return;
+
+            if (MultiViewChk.IsChecked != true)
+            {
+                _live.Session = null;
+                _live.RequiredView = ScanView.Any;
+                ViewStepTxt.Text = "";
+                return;
+            }
+
+            try
+            {
+                _session = new MultiViewSession(_participantId);     // folders are named by PatientID, never by name
+                _resultSessionId = null;
+                _resultSessionLabel = null;
+            }
+            catch (Exception ex)
+            {
+                _session = null;
+                _live.Session = null;
+                _live.RequiredView = ScanView.Any;
+                MessageBox.Show("Could not create the scan folder, falling back to a single capture.\n\n" + ex.Message,
+                    "LUMYVUE Scan", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _live.Session = _session;
+            _live.RequiredView = _session.Current;
+            UpdateViewStep();
+            UpdateScanInfo();
+
+            if (!_live.PoseCheckAvailable)
+                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Snap Now when the view is right.)";
+        }
+
+        private void UpdateViewStep()
+        {
+            if (_session == null || _live == null) { ViewStepTxt.Text = ""; return; }
+
+            var sb = new StringBuilder();
+            foreach (ScanView v in ScanViews.Sequence)
+            {
+                bool done = _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
+                bool now = !_session.IsComplete && _session.Current == v;
+                sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Title(v));
+                if (v != ScanViews.Sequence[ScanViews.Sequence.Length - 1]) sb.Append("   ");
+            }
+            if (!_session.IsComplete)
+                sb.Append("\n").Append(ScanViews.Instruction(_session.Current));
+            ViewStepTxt.Text = sb.ToString();
+        }
+
+        /// <summary>A view finished (ONNX + Grad-CAM++ + saved): file it, then guide the patient to the next one.</summary>
+        private void AdvanceMultiView(ScanResult r)
+        {
+            MultiViewSession session = _session;
+            if (session == null || _live == null) return;
+
+            ScanView doneView = _live.RequiredView;
+            ScanView next;
+            try { next = session.AddResult(r); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not record this view: " + ex.Message, "LUMYVUE Scan");
+                return;
+            }
+
+            UpdateViewStep();
+            UpdateScanInfo();
+            _ = SaveSession(session, finalize: false);            // each finished view is stored straight away
+
+            if (next == ScanView.Any)
+            {
+                FinishMultiView(session);
+                return;
+            }
+
+            NewScanBtn.IsEnabled = true;          // lets the operator restart the whole scan
+            VerdictTxt.Text += next == doneView
+                ? "\n⚠ " + ScanViews.Title(doneView) + " could not be analysed. Please capture it again."
+                : "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
+
+            // Show this view's result for a moment, then move on to the next angle.
+            Task.Delay(2500).ContinueWith(_ =>
+            {
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_session != session || _live == null || session.IsComplete) return;
+                        StartNextView(session);
+                    }));
+                }
+                catch { }
+            });
+        }
+
+        private void StartNextView(MultiViewSession session)
+        {
+            _lastResult?.Dispose();
+            _lastResult = null;
+            _resultsFrozen = false;
+
+            PrintBtn.IsEnabled = false;
+            OpenDetailsBtn.IsEnabled = false;
+            GalleryBtn.IsEnabled = false;
+            RegionTxt.Text = "";
+            SetBars(null);
+            LegendPanel.Visibility = Visibility.Collapsed;
+
+            _live.RequiredView = session.Current;
+            _live.NewScan();                       // cool-down, fresh stabiliser and pose history
+
+            GuideCanvas.Visibility = Visibility.Visible;
+            SnapBtn.IsEnabled = true;
+            NewScanBtn.IsEnabled = true;
+            VerdictTxt.Text = ScanViews.StepText(session.Current) + ": " + ScanViews.Instruction(session.Current);
+            UpdateViewStep();
+        }
+
+        private void FinishMultiView(MultiViewSession session)
+        {
+            FusedResult f = session.Fusion;
+
+            NewScanBtn.IsEnabled = true;
+            SnapBtn.IsEnabled = false;
+            PrintBtn.IsEnabled = true;
+            GalleryBtn.IsEnabled = true;
+
+            if (f == null || f.ViewsUsed == 0)
+            {
+                VerdictTxt.Text = "Scan finished, but no view could be analysed. Press New Scan to try again.";
+                return;
+            }
+
+            primaryDiagnosis = f.TopClass;
+            confidencePercent = f.TopClassPercent.ToString("F1") + "%";
+            SetBars(f.Pooled);
+
+            var v = new StringBuilder();
+            v.Append("Overall result (").Append(f.ViewsUsed).Append(" views): ").Append(f.TopClass)
+             .Append(" (").Append(confidencePercent).Append(" pooled model score)");
+            if (f.Disagreement)
+                v.Append("\n⚠ The views differ from each other. Each angle is kept and can be reviewed separately.");
+            foreach (SideSpecificNote n in f.SideSpecific)
+                v.Append("\n• ").Append(n.Class).Append(" scored ").Append(n.ViewScorePercent.ToString("0"))
+                 .Append("% in the ").Append(n.View).Append(" view.");
+            VerdictTxt.Text = v.ToString();
+            RegionTxt.Text = "Front, Left and Right captures are saved together. Heatmaps show model attribution, not lesion outlines.";
+
+            SetBanner("Scan complete — " + f.ViewsUsed + " views", ScanState.Results);
+            UpdateViewStep();
+            UpdateScanInfo();
+            StatusPanel.Visibility = Visibility.Collapsed;
+
+            if (ResearcherChk.IsChecked == true) ShowGallery(session.Folder);
+
+            if (ScanSettings.Current.ReviewBeforeFinish)
+            {
+                PrintBtn.IsEnabled = false;            // report after the views are accepted
+                ShowReviewPanel(session);
+            }
+            else
+            {
+                AcceptBtn_Click(null, null);
+            }
+        }
+
+        private void MultiViewChk_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+            if (_live == null) return;                // takes effect when the camera starts
+            NewScanBtn_Click(null, null);             // restart cleanly in the chosen mode
+        }
+
+        private void ShowGallery(string folder)
+        {
+            if (string.IsNullOrEmpty(folder)) return;
+            try
+            {
+                _gallery = new ComparisonGalleryWindow(folder);
+                _gallery.Owner = Application.Current.MainWindow;
+                _gallery.Show();                       // not modal: the kiosk keeps running
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the comparison gallery: " + ex.Message, "LUMYVUE Review",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void GalleryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session != null && !string.IsNullOrEmpty(_session.Folder) && _session.Outcomes.Count > 0)
+                ShowGallery(_session.Folder);
+            else if (_lastResult != null)
+                ShowGallery(_lastResult.Folder);
+        }
+
+        /// <summary>Draw the captured frame with the selected class map(s).</summary>
+        private void RenderResultOverlay()
+        {
+            ScanResult r = _lastResult;
+            if (r == null || r.Request == null || r.Request.Working == null || r.Request.Onnx == null) return;
+
+            Mat shown;
+            if (r.Maps != null)
+                shown = ClassHeatmapRenderer.RenderOverlay(
+                    r.Request.Working, r.Maps, _view, r.Request.Onnx.PredictedIndex);
+            else
+                shown = r.Request.Working.Clone();
+
+            using (shown)
+            {
+                UploadedImageViewer.Source = ImageInterop.MatToBitmapSource(shown);
+            }
+        }
+
+        private void SetBars(float[] probs)
+        {
+            double a = probs != null && probs.Length > 0 ? probs[0] * 100.0 : 0;
+            double h = probs != null && probs.Length > 1 ? probs[1] * 100.0 : 0;
+            double e = probs != null && probs.Length > 2 ? probs[2] * 100.0 : 0;
+            double n = probs != null && probs.Length > 3 ? probs[3] * 100.0 : 0;
+
+            AcneBar.Value = a; AcneScoreTxt.Text = a.ToString("F1") + "%";
+            HyperBar.Value = h; HyperScoreTxt.Text = h.ToString("F1") + "%";
+            EczemaBar.Value = e; EczemaScoreTxt.Text = e.ToString("F1") + "%";
+            NormalBar.Value = n; NormalScoreTxt.Text = n.ToString("F1") + "%";
+        }
+
+        // ============================================================================
+        // Buttons
+        // ============================================================================
+
+        private void SnapBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_live == null) return;
 
             SnapBtn.IsEnabled = false;
-            AnalyzeBtn.IsEnabled = true;
+            VerdictTxt.Text = "Capturing…";
+            _live.RequestManualCapture();
 
-            VerdictTxt.Text = "Status: Frame Captured. Click Run Aesthetic Analysis.";
+            // If nothing was captured (e.g. no frame yet), give the button back.
+            Task.Delay(4000).ContinueWith(_ =>
+            {
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_live != null && !_resultsFrozen) SnapBtn.IsEnabled = true;
+                    }));
+                }
+                catch { }
+            });
+        }
+
+        private void NewScanBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _lastResult?.Dispose();
+            _lastResult = null;
+
+            PrintBtn.IsEnabled = false;
+            OpenDetailsBtn.IsEnabled = false;
+            NewScanBtn.IsEnabled = false;
+            RegionTxt.Text = "";
+            SetBars(null);
+            LegendPanel.Visibility = Visibility.Collapsed;
+
+            GalleryBtn.IsEnabled = false;
+
+            if (_live != null)
+            {
+                _resultsFrozen = false;
+
+                if (_session != null)
+                {
+                    MultiViewSession ended = _session;
+                    try { ended.Abort(); } catch { }                          // keep any captured views, start a new scan
+                    _ = SaveSession(ended, finalize: true);
+                }
+                ReviewPanel.Visibility = Visibility.Collapsed;
+                ViewResultsBtn.IsEnabled = false;
+                BeginMultiViewIfEnabled();
+
+                _live.NewScan();
+                GuideCanvas.Visibility = Visibility.Visible;
+                SnapBtn.IsEnabled = true;
+                VerdictTxt.Text = _session != null
+                    ? ScanViews.StepText(_session.Current) + ": " + ScanViews.Instruction(_session.Current)
+                    : "Status: Live camera active. Position your face in the oval.";
+            }
+            else
+            {
+                ResetKioskState();      // upload mode: back to the start screen
+            }
         }
 
         private void UploadBtn_Click(object sender, RoutedEventArgs e)
@@ -410,93 +1561,51 @@ namespace SkinDevApp.Views
                 UploadedImageViewer.Visibility = Visibility.Visible;
 
                 AnalyzeBtn.IsEnabled = true;
-                VerdictTxt.Text = "Status: Image Loaded. Click Run Aesthetic Analysis.";
+                VerdictTxt.Text = "Status: Image loaded. Click Run Aesthetic Analysis.";
             }
         }
 
         private async void AnalyzeBtn_Click(object sender, RoutedEventArgs e)
         {
-            await RunAnalysisAndRender();
+            await RunUploadAnalysis();
         }
 
-        private async Task RunAnalysisAndRender()
+        /// <summary>Uploaded image: ONNX + all-class Grad-CAM++ + archive, same pipeline as a live capture.</summary>
+        private async Task RunUploadAnalysis()
         {
             if (currentCapturedImage == null)
             {
-                MessageBox.Show("Please capture a frame or upload an image first.", "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Please upload an image first.", "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            if (!AiEngine.IsAvailable)
-            {
-                AiEngine.EnsureLoaded();
-            }
+            if (!AiEngine.IsAvailable) AiEngine.EnsureLoaded();
 
             if (!AiEngine.IsAvailable)
             {
                 MessageBox.Show(
-                    "The AI model is not loaded.\n\n" +
-                    (AiEngine.LoadErrorMessage ?? "Unknown error.") +
+                    "The AI model is not loaded.\n\n" + (AiEngine.LoadErrorMessage ?? "Unknown error.") +
                     "\n\nSee the instructions at the top of AiEngine.cs.",
                     "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             AnalyzeBtn.IsEnabled = false;
-            VerdictTxt.Text = "Status: Running skin analysis...";
+            VerdictTxt.Text = "Status: Running skin analysis…";
 
             try
             {
-                using (Mat frame = GetAnalysisMat())
+                CaptureRequest req;
+
+                using (Mat full = ImageInterop.BitmapSourceToMat(currentCapturedImage))
                 {
-                    PredictionResult prediction = await Task.Run(() => AiEngine.Predict(frame));
-
-                    double acneScore = prediction.Probabilities[0] * 100.0;
-                    double hyperScore = prediction.Probabilities[1] * 100.0;
-                    double eczemaScore = prediction.Probabilities[2] * 100.0;
-                    double normalScore = prediction.Probabilities[3] * 100.0;
-
-                    primaryDiagnosis = prediction.PredictedClass;
-                    confidencePercent = prediction.ConfidenceText;
-
-                    AcneBar.Value = acneScore; AcneScoreTxt.Text = $"{acneScore:F1}%";
-                    HyperBar.Value = hyperScore; HyperScoreTxt.Text = $"{hyperScore:F1}%";
-                    EczemaBar.Value = eczemaScore; EczemaScoreTxt.Text = $"{eczemaScore:F1}%";
-                    NormalBar.Value = normalScore; NormalScoreTxt.Text = $"{normalScore:F1}%";
-
-                    VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  |  Rendering Grad-CAM++...";
-
-                    byte[] pngBytes = frame.ImEncode(".png");
-
-                    using (GradCamResult gradcam = await GradCamService.ExplainAsync(
-                        pngBytes, classIndex: null, method: "gradcam++"))
-                    {
-                        if (gradcam.Ok && gradcam.Overlay != null)
-                        {
-                            UploadedImageViewer.Source = ImageInterop.ToBitmapSource(gradcam.Overlay);
-
-                            if (gradcam.PredictedIndex != prediction.PredictedIndex)
-                            {
-                                VerdictTxt.Text =
-                                    $"WARNING: ONNX says {prediction.PredictedClass}, but the Grad-CAM " +
-                                    $"service says {gradcam.PredictedClass}. This indicates a preprocessing " +
-                                    "mismatch - do not trust this result until it's fixed.";
-                            }
-                            else
-                            {
-                                VerdictTxt.Text = $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)";
-                            }
-                        }
-                        else
-                        {
-                            VerdictTxt.Text =
-                                $"Primary Status: {primaryDiagnosis} ({confidencePercent} Confidence)  " +
-                                $"[Grad-CAM unavailable: {gradcam.Error}]";
-                        }
-                    }
-
-                    PrintBtn.IsEnabled = true;
+                    req = await Task.Run(() => ScanPipeline.BuildUploadRequest(full, AnalysisWidth));
                 }
+
+                VerdictTxt.Text = "Status: Rendering Grad-CAM++…";
+
+                ScanResult result = await ScanPipeline.FinalAnalysisAsync(req);
+                ShowResult(result);
             }
             catch (Exception ex)
             {
@@ -509,27 +1618,90 @@ namespace SkinDevApp.Views
             }
         }
 
-        private Mat GetAnalysisMat()
+        private void AutoCaptureChk_Changed(object sender, RoutedEventArgs e)
         {
-            Mat full = _snappedRaw != null
-                ? EnsureBgr(BitmapConverter.ToMat(_snappedRaw))
-                : ImageInterop.BitmapSourceToMat(currentCapturedImage);
-
-            using (full)
-            {
-                return LiveGradCamController.ResizeToWidth(full, AnalysisWidth);
-            }
+            if (!_initialized) return;
+            if (_live != null) _live.AutoCaptureEnabled = AutoCaptureChk.IsChecked == true;
         }
 
-        private void PrintBtn_Click(object sender, RoutedEventArgs e)
+        private void OverlayViewRb_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+
+            if (ReferenceEquals(sender, ViewAllRb)) _view = OverlayView.All;
+            else if (ReferenceEquals(sender, ViewAcneRb)) _view = OverlayView.Acne;
+            else if (ReferenceEquals(sender, ViewHyperRb)) _view = OverlayView.Hyperpigmentation;
+            else if (ReferenceEquals(sender, ViewEczemaRb)) _view = OverlayView.Eczema;
+            else if (ReferenceEquals(sender, ViewNormalRb)) _view = OverlayView.Normal;
+            else _view = OverlayView.Predicted;
+
+            if (_live != null)
+            {
+                _live.View = _view;
+                _live.InvalidateOverlay();
+            }
+
+            if (_lastResult != null && _lastResult.Ok) RenderResultOverlay();
+        }
+
+        private void ResearcherChk_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+
+            ResearcherPanel.Visibility = ResearcherChk.IsChecked == true
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            if (ResearcherChk.IsChecked == true && _lastResult != null && _lastResult.Ok)
+                ResearcherMetricsTxt.Text = BuildResultMetrics(_lastResult);
+        }
+
+        private void OpenDetailsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lastResult == null || string.IsNullOrEmpty(_lastResult.Folder)) return;
+            ShowReviewWindow(_lastResult.Folder);
+        }
+
+        private void PendingBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var pending = ReviewStore.ListPending();
+
+            if (pending.Count == 0)
+            {
+                MessageBox.Show("There are no captures waiting for review.", "LUMYVUE Review");
+                return;
+            }
+
+            ShowReviewWindow(pending[0]);
+        }
+
+        private void ShowReviewWindow(string folder)
         {
             try
             {
-                if (currentCapturedImage == null)
-                {
-                    currentCapturedImage = UploadedImageViewer.Source as BitmapSource;
-                }
+                var win = new ResearcherResultWindow(folder);
+                win.Owner = Application.Current.MainWindow;
+                win.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the capture: " + ex.Message, "LUMYVUE Review",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
+        private async void PrintBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // The research report is built from the saved scan (database + files), never from the live screen.
+            if (_session != null && _session.Outcomes.Count > 0 && _resultSessionId == null)
+                await SaveSession(_session, finalize: false);
+            if (!string.IsNullOrEmpty(_resultSessionId))
+            {
+                ResearchReportWindow.Open(_resultSessionId);
+                return;
+            }
+
+            try
+            {
                 RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
                     (int)ImageCard.ActualWidth,
                     (int)ImageCard.ActualHeight,
@@ -546,6 +1718,19 @@ namespace SkinDevApp.Views
                     AcneBar.Value, HyperBar.Value, EczemaBar.Value, NormalBar.Value
                 );
 
+                // Page 2 of the report: every captured view with the original and the four class maps.
+                try
+                {
+                    string shotsFolder = (_session != null && _session.Outcomes.Count > 0) ? _session.Folder
+                                       : (_lastResult != null ? _lastResult.Folder : null);
+                    if (!string.IsNullOrEmpty(shotsFolder))
+                        printWin.SetShots(GalleryModel.Load(shotsFolder));
+                }
+                catch (Exception shotsEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[PRINT] shots page skipped: " + shotsEx.Message);
+                }
+
                 printWin.Owner = Application.Current.MainWindow;
                 printWin.ShowDialog();
             }
@@ -557,37 +1742,109 @@ namespace SkinDevApp.Views
 
         private void LogoutBtn_Click(object sender, RoutedEventArgs e)
         {
-            StopCamera();
-            MainWindow mainWin = (MainWindow)Application.Current.MainWindow;
-            mainWin.MainFrame.Navigate(new LoginForm());
+            ResetKioskState();
+            Nav.SignOut();
         }
 
-        private void StopCamera()
+        // ============================================================================
+        // Researcher view text
+        // ============================================================================
+
+        private static string Ok(bool v) { return v ? "ok" : "--"; }
+
+        private string BuildLiveMetrics(LiveSnapshot s)
         {
-            _cameraLive = false;
+            var sb = new StringBuilder();
+            ScanDecision d = s.Decision;
+            ScanGates g = d.Gates;
+            StabilityMetrics m = d.Metrics;
+            FrameQuality q = s.Quality;
 
-            if (videoSource != null && videoSource.IsRunning)
+            sb.AppendLine("state      : " + d.State);
+            if (_live != null && _live.RequiredView != ScanView.Any)
             {
-                videoSource.SignalToStop();
-                videoSource.NewFrame -= VideoSource_NewFrame;
-                videoSource = null;
+                PoseReading pr = _live.LastPose;
+                sb.AppendLine("view       : " + ScanViews.Title(_live.RequiredView) + "  pose gate " + Ok(g.Pose) +
+                              (pr != null && pr.FaceFound ? "  yaw " + pr.YawRatio.ToString("F2") + " (measured " + ScanViews.Name(pr.Observed) + ")" : "  no face for pose") +
+                              "  \"" + _live.PoseMessage + "\"");
+            }
+            sb.AppendLine("gates      : face " + Ok(g.Face) + " | quality " + Ok(g.Quality) + " | stable " + Ok(g.Stable) +
+                          " | conf " + Ok(g.Confident) + " | margin " + Ok(g.Margin) +
+                          " | consistent " + Ok(g.Consistent) + " | still " + Ok(g.Still));
+            if (!g.AllOk) sb.AppendLine("waiting on : " + g.FirstFailure);
+            sb.AppendLine("stability  : held " + m.FramesHeldStable + "/" + m.StableFramesRequired +
+                          "  consistency " + m.ConsistencyRatio.ToString("P0") +
+                          "  margin " + (m.Margin * 100f).ToString("F1") + " pts");
+            sb.AppendLine("motion     : " + s.Motion.ToString("F1"));
+
+            if (q != null)
+            {
+                string face = q.FaceFound ? q.FaceW.ToString("P0") + " of frame width" : "no face";
+                sb.AppendLine("image      : sharpness " + q.Sharpness.ToString("F0") +
+                              "  brightness " + q.Brightness.ToString("F0"));
+                sb.AppendLine("face guide : " + face + "  (" + q.Guidance + ")");
             }
 
-            if (_live != null)
+            sb.AppendLine("fast loop  : " + s.FastLoopMs.ToString("F0") + " ms   ONNX " + s.Onnx.InferenceMs.ToString("F0") + " ms");
+
+            if (s.HeatmapAvailable)
             {
-                _live.AnalysisUpdated -= OnLiveAnalysisUpdated;
-                _live.ServiceStatusChanged -= OnLiveServiceStatusChanged;
-                _live.Dispose();
-                _live = null;
+                sb.AppendLine("grad-cam++ : " + s.GradCamMs.ToString("F0") + " ms service / " +
+                              s.GradCamRoundTripMs.ToString("F0") + " ms round trip  [" + s.ExecMode + "]");
+                sb.AppendLine("heatmap age: " + s.HeatmapAgeSeconds.ToString("F1") + " s   frame #" + s.FrameId);
+                sb.AppendLine("ONNX vs service top class: " + (s.Disagreement
+                    ? "DIFFER (" + s.Onnx.PredictedClass + " vs " + s.ServiceClass + ")"
+                    : "same"));
+            }
+            else
+            {
+                sb.AppendLine("grad-cam++ : " + (s.ServiceOnline ? "waiting for first map" : "service offline"));
             }
 
-            lock (_frameStoreLock)
+            return sb.ToString();
+        }
+
+        private string BuildResultMetrics(ScanResult r)
+        {
+            var sb = new StringBuilder();
+
+            if (r.Record == null)
             {
-                _latestRawFrame?.Dispose();
-                _latestRawFrame = null;
+                sb.AppendLine("No record available.");
+                return sb.ToString();
             }
 
-            LiveStatusTxt.Text = "";
+            CaptureRecord rec = r.Record;
+            sb.AppendLine("capture    : " + rec.CaptureId.Substring(0, 8) + "  (" + rec.Trigger + ")");
+            sb.AppendLine("status     : " + rec.ReviewStatus + "   training use: " + rec.TrainingUse);
+            sb.AppendLine("model      : " + rec.Model.RunName + "  onnx " + Short(rec.Model.OnnxSha256));
+
+            if (rec.Stability != null)
+                sb.AppendLine("stability  : held " + rec.Stability.FramesHeldStable + "/" + rec.Stability.StableFramesRequired +
+                              "  consistency " + rec.Stability.Consistency.ToString("P0") +
+                              "  motion " + rec.Stability.MotionMean.ToString("F1") + "/" + rec.Stability.MotionMax.ToString("F1"));
+
+            if (rec.Quality != null)
+                sb.AppendLine("quality    : sharp " + rec.Quality.Sharpness.ToString("F0") +
+                              "  bright " + rec.Quality.Brightness.ToString("F0") +
+                              "  face " + (rec.Quality.FaceFound ? "yes" : "no"));
+
+            if (rec.Consistency != null && rec.Consistency.KerasAvailable && rec.Consistency.MaxAbsDifference.HasValue)
+                sb.AppendLine("ONNX/Keras : same top class " + (rec.Consistency.SameTopClass == true ? "yes" : "NO") +
+                              "  max diff " + rec.Consistency.MaxAbsDifference.Value.ToString("F4"));
+
+            foreach (MapSection m in rec.ClassMaps)
+                sb.AppendLine(m.Class.PadRight(18) + " strength " + m.RelativeStrength.ToString("F2") + "  " +
+                              (m.Diffuse ? "diffuse" : m.TopZone));
+
+            sb.AppendLine("saved to   : " + r.Folder);
+            return sb.ToString();
+        }
+
+        private static string Short(string hash)
+        {
+            if (string.IsNullOrEmpty(hash)) return "unknown";
+            return hash.Length > 12 ? hash.Substring(0, 12) + "…" : hash;
         }
     }
 }

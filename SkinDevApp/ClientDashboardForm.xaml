@@ -9,15 +9,20 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Top Clinic Bar -->
-        <Border Grid.Row="0" Background="#1A2328" CornerRadius="16" Padding="20,15" Margin="0,0,0,20">
+        <!-- Top bar: participant, scan session, Front / Left / Right progress, required pose -->
+        <Border Grid.Row="0" Background="#1A2328" CornerRadius="16" Padding="20,12" Margin="0,0,0,16">
             <DockPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="22" FontWeight="Bold"/>
-                    <TextBlock Text=" |  Skin Health Monitor" Foreground="#E0B0A2" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Dashboard" Style="{StaticResource HeaderButton}" Click="HomeBtn_Click"/>
+                    <Button Content="Sign Out" Style="{StaticResource HeaderButton}" Click="LogoutBtn_Click"/>
                 </StackPanel>
-                <Button Content="Sign Out" Width="95" Height="36" Background="Transparent" Foreground="#E0B0A2" 
-                        BorderBrush="#E0B0A2" BorderThickness="1" HorizontalAlignment="Right" Click="LogoutBtn_Click"/>
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="LUMYVUE" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                        <TextBlock Text=" |  PrecisionSkin  ·  Multi-View Scan" Foreground="#E0B0A2" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock x:Name="ScanInfoTxt" Text="" Foreground="#E2EADF" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
             </DockPanel>
         </Border>
 
@@ -29,17 +34,41 @@
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.04" Direction="270"/>
                 </Border.Effect>
-                <Grid x:Name="CameraViewportGrid" ClipToBounds="True">
-                    <Image x:Name="UploadedImageViewer" 
-                           Stretch="Uniform" 
-                           HorizontalAlignment="Center" 
+                <Grid x:Name="CameraViewportGrid" ClipToBounds="True" SizeChanged="CameraViewportGrid_SizeChanged">
+                    <Image x:Name="UploadedImageViewer"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality"/>
 
-                    <!-- Canvas layer for Drawing AI Detection Dots -->
+                    <!-- Canvas layer for Drawing AI Detection Dots (kept from the previous version) -->
                     <Canvas x:Name="DetectionDotsCanvas" IsHitTestVisible="False"/>
 
-                    <!-- Live Grad-CAM++ status - shown only while the camera is streaming -->
+                    <!-- Face-positioning guide: oval + short instruction. Shown only while the camera is live. -->
+                    <Canvas x:Name="GuideCanvas" IsHitTestVisible="False" Visibility="Collapsed">
+                        <Ellipse x:Name="GuideOval" Stroke="#99FFFFFF" StrokeThickness="3"
+                                 StrokeDashArray="4,3" Fill="Transparent"/>
+                    </Canvas>
+
+                    <!-- Top: scan state banner -->
+                    <Border x:Name="StateBanner" Visibility="Collapsed"
+                            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12,0,0"
+                            Background="#B3000000" CornerRadius="14" Padding="14,6" IsHitTestVisible="False">
+                        <TextBlock x:Name="StateTxt" Text="" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                    </Border>
+
+                    <!-- Bottom centre: positioning instruction + hold-still progress -->
+                    <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,14" IsHitTestVisible="False">
+                        <Border x:Name="GuideBanner" Visibility="Collapsed"
+                                Background="#B3000000" CornerRadius="14" Padding="16,7" HorizontalAlignment="Center">
+                            <TextBlock x:Name="GuideTxt" Text="" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <ProgressBar x:Name="HoldBar" Minimum="0" Maximum="1" Value="0" Height="6" Width="220"
+                                     Margin="0,8,0,0" Foreground="#22C55E" Background="#55FFFFFF"
+                                     BorderThickness="0" Visibility="Collapsed"/>
+                    </StackPanel>
+
+                    <!-- Live service status (kept) -->
                     <TextBlock x:Name="LiveStatusTxt"
                                Text=""
                                FontSize="11" FontWeight="SemiBold"
@@ -47,16 +76,41 @@
                                Padding="8,4" VerticalAlignment="Bottom" HorizontalAlignment="Left"
                                Margin="10" IsHitTestVisible="False"/>
 
+                    <!-- Colour legend: colour = class, opacity = attribution strength -->
+                    <Border x:Name="LegendPanel" Visibility="Collapsed"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,52,10,0"
+                            Background="#B3000000" CornerRadius="10" Padding="10,8" IsHitTestVisible="False">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                <Ellipse Width="10" Height="10" Fill="#FF0000" Margin="0,0,6,0"/>
+                                <TextBlock Text="Acne" FontSize="11" Foreground="White"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                <Ellipse Width="10" Height="10" Fill="#0050FF" Margin="0,0,6,0"/>
+                                <TextBlock Text="Hyperpigmentation" FontSize="11" Foreground="White"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                <Ellipse Width="10" Height="10" Fill="#FFBE00" Margin="0,0,6,0"/>
+                                <TextBlock Text="Eczema" FontSize="11" Foreground="White"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <Ellipse Width="10" Height="10" Fill="#00C83C" Margin="0,0,6,0"/>
+                                <TextBlock Text="Normal" FontSize="11" Foreground="White"/>
+                            </StackPanel>
+                            <TextBlock Text="Colour = class&#x0a;Opacity = strength" FontSize="9" Foreground="#CCFFFFFF"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Initial Placeholder -->
                     <StackPanel x:Name="PlaceholderPanel" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="✨" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Open Live Cam or Upload Image to Start Evaluation" 
+                        <TextBlock Text="&#x2728;" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Open Live Cam or Upload Image to Start Evaluation"
                                    FontSize="16" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Diagnostic Results Panel -->
+            <!-- Results Panel -->
             <Border x:Name="ControlsCard" Background="White" CornerRadius="16" Padding="25" Margin="8">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.03" Direction="270"/>
@@ -64,8 +118,40 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 
+                        <!-- Participant / consent gate message -->
+                        <Border x:Name="GateBox" Style="{StaticResource NoticeBox}" Margin="0,0,0,12" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock x:Name="GateTxt" FontSize="13" Foreground="#1A2328" TextWrapping="Wrap"/>
+                                <Button x:Name="GateBtn" Content="Go to Consent" Style="{StaticResource SmallButton}" HorizontalAlignment="Left"
+                                        Margin="0,8,0,0" Click="GateBtn_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- A database save failed: stays visible until it succeeds -->
+                        <Border x:Name="SaveWarnBox" Visibility="Collapsed" Background="#FDECEC" BorderBrush="#F3B4B4"
+                                BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock x:Name="SaveWarnTxt" FontSize="12.5" Foreground="#7F1D1D" TextWrapping="Wrap"/>
+                                <Button x:Name="RetrySaveBtn" Content="Retry save" Style="{StaticResource SmallButton}"
+                                        HorizontalAlignment="Left" Margin="0,8,0,0" Click="RetrySaveBtn_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Image Review: per-view quality, retake, accept -->
+                        <Border x:Name="ReviewPanel" Visibility="Collapsed" Background="#FFF8EC" BorderBrush="#F2D9A8"
+                                BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Image Review" FontSize="17" FontWeight="Bold" Foreground="#1A2328"/>
+                                <TextBlock Text="Check each captured view. Retake any view without repeating registration. Results are finalised when you accept."
+                                           FontSize="11.5" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,2,0,10"/>
+                                <StackPanel x:Name="ReviewList"/>
+                                <Button x:Name="AcceptBtn" Content="Accept views and view results  ›" Style="{StaticResource PrimaryButton}"
+                                        Margin="0,10,0,0" Click="AcceptBtn_Click"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Camera / File Controls -->
-                        <Grid Margin="0,0,0,12">
+                        <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="6"/>
@@ -74,58 +160,135 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button x:Name="StartCamBtn" Grid.Column="0" Content="📷 Live Cam" Height="46" FontSize="12" 
+                            <Button x:Name="StartCamBtn" Grid.Column="0" Content="&#x1F4F7; Live Cam" Height="46" FontSize="12"
                                     Background="#E2EADF" Foreground="#1A2328" FontWeight="SemiBold" BorderThickness="0" Click="StartCamBtn_Click"/>
 
-                            <Button x:Name="SnapBtn" Grid.Column="2" Content="📸 Snap Frame" Height="46" FontSize="12" 
+                            <Button x:Name="SnapBtn" Grid.Column="2" Content="&#x1F4F8; Snap Now" Height="46" FontSize="12"
                                     Background="#E0B0A2" Foreground="#1A2328" FontWeight="Bold" BorderThickness="0" IsEnabled="False" Click="SnapBtn_Click"/>
 
-                            <Button x:Name="UploadBtn" Grid.Column="4" Content="📁 File Upload" Height="46" FontSize="12" 
+                            <Button x:Name="UploadBtn" Grid.Column="4" Content="&#x1F4C1; File Upload" Height="46" FontSize="12"
                                     Background="#E2EADF" Foreground="#1A2328" FontWeight="SemiBold" BorderThickness="0" Click="UploadBtn_Click"/>
                         </Grid>
 
-                        <Button x:Name="AnalyzeBtn" Content="🌿 Run Aesthetic Analysis" Height="52" FontSize="14" 
-                                Background="#1A2328" Foreground="White" FontWeight="Bold" IsEnabled="False" Margin="0,0,0,16" Click="AnalyzeBtn_Click"/>
+                        <CheckBox x:Name="AutoCaptureChk" Content="Auto-capture when the reading is stable" IsChecked="True"
+                                  FontSize="12" Foreground="#1A2328" Margin="0,0,0,10"
+                                  Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
-                        <Separator Margin="0,0,0,16" Background="#F1F5F9"/>
+                        <CheckBox x:Name="MultiViewChk" Content="3-view scan: Front, Left side, Right side" IsChecked="True"
+                                  FontSize="12" Foreground="#1A2328" Margin="0,0,0,6"
+                                  Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
 
-                        <TextBlock Text="Dermatological Assessment" FontSize="16" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,12"/>
+                        <TextBlock x:Name="ViewStepTxt" Text="" FontSize="12" FontWeight="SemiBold" Foreground="#2563EB"
+                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
 
-                        <!-- Progress Bars for 4 Target Classes -->
+                        <!-- Live capture status (face, pose, sharpness, exposure, motion, stability, camera) -->
+                        <Border x:Name="StatusPanel" Background="#F8FAFC" CornerRadius="10" Padding="12,10" Margin="0,0,0,12" Visibility="Collapsed">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBlock Text="Prediction stability" FontSize="12" Foreground="#6B7280" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="StabilityTxt" Text="ANALYZING" FontSize="15" FontWeight="Bold" Foreground="#1A2328"
+                                               HorizontalAlignment="Right"/>
+                                </DockPanel>
+                                <UniformGrid x:Name="StatusGrid" Columns="2"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Button x:Name="NewScanBtn" Content="&#x1F501; New Scan" Height="42" FontSize="13"
+                                Background="#1A2328" Foreground="White" FontWeight="Bold" IsEnabled="False"
+                                Margin="0,0,0,10" Click="NewScanBtn_Click"/>
+
+                        <Button x:Name="AnalyzeBtn" Content="&#x1F33F; Analyse uploaded image (researcher)" Height="46" FontSize="13"
+                                Background="#1A2328" Foreground="White" FontWeight="Bold" IsEnabled="False" Margin="0,0,0,14" Click="AnalyzeBtn_Click"/>
+
+                        <Separator Margin="0,0,0,14" Background="#F1F5F9"/>
+
+                        <TextBlock Text="Model Class Scores" FontSize="16" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,2"/>
+                        <TextBlock Text="The model's scores across four mutually exclusive classes. They are not independent disease probabilities."
+                                   FontSize="10.5" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <!-- Progress Bars for 4 target classes (colours = heatmap colours) -->
                         <StackPanel>
                             <DockPanel Margin="0,0,0,4">
                                 <TextBlock Text="Acne" FontSize="13" Foreground="#1A2328" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="AcneScoreTxt" Text="0.0%" HorizontalAlignment="Right" FontWeight="Bold" Foreground="#1A2328"/>
                             </DockPanel>
-                            <ProgressBar x:Name="AcneBar" Height="8" Foreground="#E0B0A2" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
+                            <ProgressBar x:Name="AcneBar" Height="8" Foreground="#FF0000" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
 
                             <DockPanel Margin="0,0,0,4">
                                 <TextBlock Text="Hyperpigmentation" FontSize="13" Foreground="#1A2328" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="HyperScoreTxt" Text="0.0%" HorizontalAlignment="Right" FontWeight="Bold" Foreground="#1A2328"/>
                             </DockPanel>
-                            <ProgressBar x:Name="HyperBar" Height="8" Foreground="#D4A373" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
+                            <ProgressBar x:Name="HyperBar" Height="8" Foreground="#0050FF" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
 
                             <DockPanel Margin="0,0,0,4">
                                 <TextBlock Text="Eczema" FontSize="13" Foreground="#1A2328" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="EczemaScoreTxt" Text="0.0%" HorizontalAlignment="Right" FontWeight="Bold" Foreground="#1A2328"/>
                             </DockPanel>
-                            <ProgressBar x:Name="EczemaBar" Height="8" Foreground="#A3B18A" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
+                            <ProgressBar x:Name="EczemaBar" Height="8" Foreground="#FFBE00" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,12"/>
 
                             <DockPanel Margin="0,0,0,4">
                                 <TextBlock Text="Normal" FontSize="13" Foreground="#1A2328" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="NormalScoreTxt" Text="0.0%" HorizontalAlignment="Right" FontWeight="Bold" Foreground="#1A2328"/>
                             </DockPanel>
-                            <ProgressBar x:Name="NormalBar" Height="8" Foreground="#588157" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,16"/>
+                            <ProgressBar x:Name="NormalBar" Height="8" Foreground="#00C83C" Background="#FBF9F6" Minimum="0" Maximum="100" Margin="0,0,0,14"/>
+                        </StackPanel>
+
+                        <!-- Which heatmap is drawn on the image (researcher CAM target class) -->
+                        <StackPanel x:Name="HeatmapChoicePanel">
+                        <TextBlock Text="CAM target class" FontSize="12" FontWeight="SemiBold" Foreground="#1A2328" Margin="0,0,0,4"/>
+                        <WrapPanel Margin="0,0,0,14">
+                            <RadioButton x:Name="ViewPredictedRb" GroupName="OverlayView" Content="Predicted" IsChecked="True" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                            <RadioButton x:Name="ViewAllRb" GroupName="OverlayView" Content="All classes" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                            <RadioButton x:Name="ViewAcneRb" GroupName="OverlayView" Content="Acne" Foreground="#CC0000" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                            <RadioButton x:Name="ViewHyperRb" GroupName="OverlayView" Content="Hyperpigmentation" Foreground="#0040CC" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                            <RadioButton x:Name="ViewEczemaRb" GroupName="OverlayView" Content="Eczema" Foreground="#B38600" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                            <RadioButton x:Name="ViewNormalRb" GroupName="OverlayView" Content="Normal" Foreground="#008A28" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
+                        </WrapPanel>
                         </StackPanel>
 
                         <!-- Primary Result Callout -->
-                        <Border Background="#FBF9F6" BorderBrush="#E2EADF" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,16">
-                            <TextBlock x:Name="VerdictTxt" Text="Primary Status: Awaiting Camera / Image" FontSize="14" FontWeight="Bold" Foreground="#1A2328"/>
+                        <Border Background="#FBF9F6" BorderBrush="#E2EADF" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="VerdictTxt" Text="Status: Awaiting camera / image" FontSize="14" FontWeight="Bold" Foreground="#1A2328" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="RegionTxt" Text="" FontSize="12" FontStyle="Italic" Foreground="#4B5563" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                            </StackPanel>
                         </Border>
 
-                        <!-- PRINT FORM BUTTON (Enabled after analysis) -->
-                        <Button x:Name="PrintBtn" Content="🖨️ Print Assessment Report" Height="48" FontSize="13" 
-                                Background="#E0B0A2" Foreground="#1A2328" FontWeight="Bold" BorderThickness="0" 
+                        <TextBlock x:Name="DisclaimerTxt"
+                                   Text="Screening aid only. Not a medical diagnosis. Heatmaps show regions that influenced the model, not lesion outlines. Results are pending review."
+                                   FontSize="10.5" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                        <!-- Researcher view -->
+                        <CheckBox x:Name="ResearcherChk" Content="Researcher view" FontSize="12" Foreground="#1A2328"
+                                  Margin="0,0,0,8" Checked="ResearcherChk_Changed" Unchecked="ResearcherChk_Changed"/>
+
+                        <Border x:Name="ResearcherPanel" Visibility="Collapsed" Background="#F3F4F6" CornerRadius="10" Padding="12" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="CAM controls" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="CamOnChk" Content="Live Grad-CAM++ ON" IsChecked="True" FontSize="12" Margin="0,0,0,6"
+                                          Checked="CamOnChk_Changed" Unchecked="CamOnChk_Changed"/>
+                                <DockPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Overlay opacity" FontSize="12" Width="100" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="OpacityTxt" DockPanel.Dock="Right" Width="40" FontSize="12" TextAlignment="Right" VerticalAlignment="Center"/>
+                                    <Slider x:Name="OpacitySlider" Minimum="0.1" Maximum="1.0" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
+                                </DockPanel>
+                                <TextBlock x:Name="ResearcherMetricsTxt" Text="" FontFamily="Consolas" FontSize="11" Foreground="#111827" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="OpenDetailsBtn" Content="Capture details / review" Height="32" Padding="12,0" Margin="0,0,8,0"
+                                            IsEnabled="False" Click="OpenDetailsBtn_Click"/>
+                                    <Button x:Name="GalleryBtn" Content="Comparison gallery" Height="32" Padding="12,0" Margin="0,0,8,0"
+                                            IsEnabled="False" Click="GalleryBtn_Click"/>
+                                    <Button x:Name="PendingBtn" Content="Pending reviews" Height="32" Padding="12,0" Click="PendingBtn_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Results / report (enabled once the scan is saved) -->
+                        <Button x:Name="ViewResultsBtn" Content="View Results  ›" Style="{StaticResource PrimaryButton}" Height="46"
+                                IsEnabled="False" Margin="0,0,0,8" Click="ViewResultsBtn_Click"/>
+                        <Button x:Name="PrintBtn" Content="&#x1F5A8;&#xFE0F; Research Analysis Report" Height="46" FontSize="13"
+                                Background="#E0B0A2" Foreground="#1A2328" FontWeight="Bold" BorderThickness="0"
                                 IsEnabled="False" Click="PrintBtn_Click"/>
 
                     </StackPanel>

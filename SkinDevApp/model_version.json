@@ -1,0 +1,35 @@
+{
+  "project": "PrecisionSkin",
+  "run_name": "facial_only",
+  "best_seed": 1,
+  "created_utc": "2026-10-01T15:22:07Z",
+  "classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "service_version": "2.1",
+  "sha256": {
+    "precisionskin.onnx": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+    "precisionskin_best.keras": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+    "gradcam_service.py": "3146c0cdbd4bee46916bd99944f0f59068416f74c85fbbfd23382464f5e90b49",
+    "labels.json": "f987fcc55e3d43201186f969daf3bb3e617e49957f757b80939f47758faf51d9"
+  },
+  "preprocessing": "BGR->RGB, cv2.resize 224x224 INTER_LINEAR, float32, (p/127.5)-1.0, NHWC",
+  "consistency": {
+    "run_name": "facial_only",
+    "n_test": 1604,
+    "deploy_vs_training_pipeline_agreement": 0.9918952618453866,
+    "keras_vs_onnx_max_abs_prob_diff": 0.005223751068115234,
+    "keras_vs_onnx_argmax_agreement": 0.9993765586034913
+  },
+  "ui_wording": {
+    "scores_title": "Model Class Scores",
+    "scores_note": "Scores are the model's softmax output over four mutually exclusive classes. They are not independent disease probabilities and not a diagnosis.",
+    "heatmap_note": "Colour shows which class a map explains; opacity shows attribution strength. Maps show regions that influenced the model, not lesion outlines.",
+    "region_note": "Approximate facial region of strongest model attribution.",
+    "review_note": "AI output is a screening aid pending review. It is not ground truth."
+  },
+  "ground_truth_policy": "Captured images start as Pending Review. They are never added to training data automatically."
+}

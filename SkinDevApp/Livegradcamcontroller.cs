@@ -1,18 +1,32 @@
-﻿// ============================================================================
-// Livegradcamcontroller.cs  —  UPDATED VERSION
+// ============================================================================
+// Livegradcamcontroller.cs  —  v2 (decoupled loops + auto-capture)
 //
-// Changes from your original (search "// FIX" to find every change):
+// WHY THIS WAS REWRITTEN
+//   The old controller ran ONNX -> stabiliser -> Grad-CAM in ONE loop. With a
+//   slow Grad-CAM (several seconds on a weak CPU) the UI state, the scores and
+//   the heatmap all waited for it, and the heatmap was hidden by the age gate
+//   before the next one arrived.
 //
-//   FIX 1  Added _frameCounter for monotonic frame IDs (frame_id echo)
-//   FIX 2  Added _stabilizer field (PredictionStabilizer)
-//   FIX 3  LiveInfo now also carries StabilizedResult so the UI can read it
-//   FIX 4  ExplainRawAsync receives the frame ID and its echo is verified;
-//          stale responses are silently skipped (no error logged, no status flip)
-//   FIX 5  ONNX Predict() offloaded to Task.Run so the background task thread
-//          is not blocked during CPU inference
-//   FIX 6  Frame encode switched from PNG to JPEG Q90 (saves ~10ms per tick)
-//   FIX 7  PredictionStabilizer is updated and its result stored in LiveInfo
-//   FIX 8  Stabilizer is Reset() when Stop() is called
+// NOW: two independent loops, plus a final analysis path
+//
+//   FAST loop  (~200 ms)   latest frame -> quality/face guide -> ONNX ->
+//                          temporal stabiliser -> scan state machine.
+//                          NEVER waits for Grad-CAM.
+//   SLOW loop  (as fast as the service allows)
+//                          latest frame -> all-class Grad-CAM++ (service v2.0).
+//                          "Latest frame wins": a newer frame replaces a
+//                          waiting one; results whose frame_id does not match
+//                          are discarded.
+//   FINAL path (once per capture)
+//                          the EXACT frame that satisfied the gates -> all-class
+//                          Grad-CAM++ (PNG, never dropped) -> archive
+//                          -> ScanCompleted event.
+//
+// The camera thread only calls RenderLiveOverlay(frame) (cheap: it blends a
+// pre-composited class-coloured layer) so the video never blocks.
+//
+// Threading: events are raised on background threads. The UI must marshal with
+// Dispatcher.BeginInvoke (never Invoke) so it cannot stall the loops.
 // ============================================================================
 
 using System;
@@ -22,30 +36,36 @@ using System.Threading.Tasks;
 using OpenCvSharp;
 using SkinDevApp.AI;
 using SkinDevApp.Imaging;
+using SkinDevApp.Scanning;
 
 namespace SkinDevApp.Explainability
 {
-    public sealed class LiveInfo
+    /// <summary>One fast-loop tick, plus the freshest heatmap facts. Immutable snapshot.</summary>
+    public sealed class LiveSnapshot
     {
-        public bool HasData { get; set; }
+        public long FrameId { get; set; }
+        public DateTime TickUtc { get; set; }
 
-        /// <summary>Raw ONNX result for the current tick.</summary>
         public PredictionResult Onnx { get; set; }
-
-        /// <summary>
-        /// Stabilized display state (EMA + hysteresis + stable-frames gate).
-        /// Read this for what to show in the UI instead of Onnx.PredictedClass.
-        /// </summary>
         public StabilizedResult Stable { get; set; }
+        public FrameQuality Quality { get; set; }
+        public ScanDecision Decision { get; set; }
 
-        public string ServiceClass { get; set; } = "";
-        public int ServiceIndex { get; set; } = -1;
-        public float ServiceConfidence { get; set; }
-        public string Method { get; set; } = "";
+        public double Motion { get; set; }
+        public double FastLoopMs { get; set; }
 
+        // Heatmap side (slow loop)
+        public bool HeatmapAvailable { get; set; }
+        public double HeatmapAgeSeconds { get; set; }
         public double GradCamMs { get; set; }
-        public DateTime ComputedAtUtc { get; set; }
+        public double GradCamRoundTripMs { get; set; }
+        public string ExecMode { get; set; } = "";
+        public int ServiceIndex { get; set; } = -1;
+        public string ServiceClass { get; set; } = "";
+        public string RegionText { get; set; } = "";
+        public bool ServiceOnline { get; set; }
 
+        /// <summary>ONNX top class differs from the service's top class (researcher info only).</summary>
         public bool Disagreement =>
             Onnx != null && ServiceIndex >= 0 && Onnx.PredictedIndex != ServiceIndex;
     }
@@ -55,95 +75,200 @@ namespace SkinDevApp.Explainability
         private readonly Func<Mat> _frameProvider;
 
         private CancellationTokenSource _cts;
-        private Task _loop;
+        private Task _fastLoop;
+        private Task _slowLoop;
+        private Task _finalTask;
 
-        private readonly object _stateLock = new object();
-        private Mat _latestHeatmap;
-        private Mat _latestSourceGray;
-        private LiveInfo _latestInfo = new LiveInfo { HasData = false };
-
-        // FIX 1: Monotonically increasing ID.  Each tick increments this and
-        // sends the string value as frame_id to the service.  The echoed value
-        // is compared on return; a mismatch means the response is stale.
-        private long _frameCounter = 0;
-
-        // FIX 2: Temporal stabilizer — keeps one instance alive for the whole
-        // camera session so the EMA state accumulates across ticks.
+        private readonly FrameQualityAnalyzer _quality = new FrameQualityAnalyzer();
         private readonly PredictionStabilizer _stabilizer;
+        private readonly ScanStateMachine _machine = new ScanStateMachine();
+        private readonly ViewPoseEstimator _pose = new ViewPoseEstimator();
+        private volatile int _requiredView = (int)ScanView.Any;
+        private volatile MultiViewSession _session;
+        private volatile PoseReading _lastPose;
+        private volatile string _poseMessage = "";
 
+        // --- shared state (guarded by _stateLock) -------------------------------
+        private readonly object _stateLock = new object();
+        private ClassHeatmapSet _maps;
+        private ClassOverlayLayer _layer;
+        private string _layerKey = "";
+        private int _displayIndex = -1;
+
+        // --- hand-off from fast loop to slow loop (latest frame wins) ----------
+        private readonly object _pendingLock = new object();
+        private PendingFrame _pending;
+
+        private Mat _prevThumb;
+        private long _frameCounter;
+        private int _manualCaptureFlag;
+        private volatile bool _finalBusy;
         private bool _disposed;
 
-        // ── Tuneable properties ───────────────────────────────────────────────
+        private sealed class PendingFrame : IDisposable
+        {
+            public long Id;
+            public Mat Working;
+            public Mat Thumb;
+            public Rect? FaceBox;
+            public void Dispose() { Working?.Dispose(); Thumb?.Dispose(); }
+        }
 
-        /// <summary>Grad-CAM++ refresh period in ms.</summary>
-        public int RefreshIntervalMs { get; set; } = 1000;
+        // ── Tunables ────────────────────────────────────────────────────────────
 
-        /// <summary>Working frame width fed to ONNX and the Grad-CAM service.</summary>
+        /// <summary>Fast loop period (ONNX + guide + state machine).</summary>
+        public int FastLoopMs { get; set; } = 200;
+
+        /// <summary>Pause between Grad-CAM requests, to leave CPU for the UI.</summary>
+        public int MinGradCamIntervalMs { get; set; } = 80;
+
+        /// <summary>Working frame width for ONNX and Grad-CAM.</summary>
         public int WorkingWidth { get; set; } = 640;
 
-        /// <summary>Heatmap is fully hidden once it is older than this.</summary>
-        public double MaxHeatmapAgeSeconds { get; set; } = 8.0;
+        /// <summary>A heatmap older than this is never drawn.</summary>
+        public double MaxHeatmapAgeSeconds { get; set; } = 6.0;
 
-        /// <summary>
-        /// Mean-absolute-difference motion score above which the heatmap fades.
-        /// 25.0 tolerates normal head movement during live video.
-        /// </summary>
+        /// <summary>Mean-removed motion score above which the overlay fades out.</summary>
         public double MotionThreshold { get; set; } = 25.0;
 
-        public double LastMotionScore { get; private set; }
+        /// <summary>Which class map(s) the live overlay draws.</summary>
+        public OverlayView View { get; set; } = OverlayView.Predicted;
+
+        /// <summary>Show the freeze frame for this long before the final analysis starts.</summary>
+        public int CaptureFlashMs { get; set; } = 600;
 
         public bool Enabled { get; set; } = true;
 
+        // ── Multi-view scan ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The view the patient must show before auto-capture may fire.
+        /// ScanView.Any (default) = the old single-capture behaviour, no pose gate.
+        /// </summary>
+        public ScanView RequiredView
+        {
+            get { return (ScanView)_requiredView; }
+            set { _requiredView = (int)value; _pose.Reset(); }
+        }
+
+        /// <summary>When set (with RequiredView != Any) captures are filed under this session.</summary>
+        public MultiViewSession Session
+        {
+            get { return _session; }
+            set { _session = value; }
+        }
+
+        /// <summary>Latest head-pose measurement (null when no view is required).</summary>
+        public PoseReading LastPose { get { return _lastPose; } }
+
+        /// <summary>Latest pose instruction, for researcher metrics.</summary>
+        public string PoseMessage { get { return _poseMessage; } }
+
+        /// <summary>False when the YuNet model file is missing: pose is then instruction-only.</summary>
+        public bool PoseCheckAvailable { get { return _pose.Available; } }
+        public string PoseLoadError { get { return _pose.LoadError; } }
+
+        public bool AutoCaptureEnabled
+        {
+            get { return _machine.AutoCaptureEnabled; }
+            set { _machine.AutoCaptureEnabled = value; }
+        }
+
+        /// <summary>
+        /// Require a well-positioned face before auto-capture. Ignored (treated as
+        /// false) when the Haar cascade file is missing.
+        /// </summary>
+        public bool RequireFaceForAutoCapture { get; set; } = true;
+
+        public ScanStateMachine Machine => _machine;
+
+        public double LastMotionScore { get; private set; }
         public bool ServiceOnline { get; private set; }
         public string LastError { get; private set; }
+        public bool FaceGuideAvailable => _quality.CascadeAvailable;
 
-        public event Action<LiveInfo> AnalysisUpdated;
+        // ── Events (raised on background threads!) ──────────────────────────────
+
+        /// <summary>Every fast-loop tick.</summary>
+        public event Action<LiveSnapshot> FastUpdated;
+
+        /// <summary>
+        /// A capture was triggered. The Mat is a CLONE of the exact frame; the
+        /// receiver owns and must dispose it.
+        /// </summary>
+        public event Action<string, Mat> CaptureTriggered;
+
+        /// <summary>Final analysis finished. The receiver owns and must dispose the result.</summary>
+        public event Action<ScanResult> ScanCompleted;
+
         public event Action<bool, string> ServiceStatusChanged;
 
-        // ── Constructor ───────────────────────────────────────────────────────
+        // ── Construction ────────────────────────────────────────────────────────
 
         public LiveGradCamController(Func<Mat> frameProvider)
         {
-            _frameProvider = frameProvider
-                ?? throw new ArgumentNullException(nameof(frameProvider));
+            _frameProvider = frameProvider ?? throw new ArgumentNullException(nameof(frameProvider));
 
-            // FIX 2: Build the stabilizer with the canonical class order.
-            _stabilizer = new PredictionStabilizer(PredictionResult.ClassNames);
-        }
-
-        // ── Public state accessors ────────────────────────────────────────────
-
-        public TimeSpan HeatmapAge
-        {
-            get
+            // At ~5 ticks/s: alpha 0.25 gives a ~0.8 s memory; 8 consecutive ticks ~ 1.6 s.
+            _stabilizer = new PredictionStabilizer(PredictionResult.ClassNames)
             {
-                lock (_stateLock)
-                {
-                    if (!_latestInfo.HasData) return TimeSpan.MaxValue;
-                    return DateTime.UtcNow - _latestInfo.ComputedAtUtc;
-                }
-            }
+                EmaAlpha = 0.25f,
+                ConfidenceThreshold = 0.65f,
+                HysteresisMargin = 0.10f,
+                StableFramesRequired = 8
+            };
+
+            _machine.EmaAlpha = _stabilizer.EmaAlpha;
+            _machine.HysteresisMargin = _stabilizer.HysteresisMargin;
+            _machine.StableFramesRequired = _stabilizer.StableFramesRequired;
+            _machine.MinConfidence = _stabilizer.ConfidenceThreshold;
         }
 
-        public Mat GetLatestHeatmapClone()
+        /// <summary>
+        /// Researcher settings (Settings page). Call before Start(). The stabiliser and the
+        /// state machine get the same thresholds so the saved capture metadata matches.
+        /// </summary>
+        public void ApplySettings(int stableFrames, int holdStillMs, double cooldownSeconds,
+                                  float minConfidence, float minMargin, double minConsistency,
+                                  double minSharpness, double minBrightness, double maxBrightness,
+                                  double frontMaxAbsYaw, double sideMinAbsYaw)
         {
-            lock (_stateLock) { return _latestHeatmap?.Clone(); }
+            _stabilizer.StableFramesRequired = stableFrames;
+            _stabilizer.ConfidenceThreshold = minConfidence;
+
+            _machine.StableFramesRequired = stableFrames;
+            _machine.MinConfidence = minConfidence;
+            _machine.MinMargin = minMargin;
+            _machine.MinConsistency = minConsistency;
+            _machine.HoldStillMs = holdStillMs;
+            _machine.CooldownSeconds = cooldownSeconds;
+
+            _quality.MinSharpness = minSharpness;
+            _quality.MinBrightness = minBrightness;
+            _quality.MaxBrightness = maxBrightness;
+
+            _pose.FrontMaxAbsYaw = frontMaxAbsYaw;
+            _pose.SideMinAbsYaw = sideMinAbsYaw;
         }
 
-        public LiveInfo GetLatestInfo()
-        {
-            lock (_stateLock) { return _latestInfo; }
-        }
-
-        // ── Lifecycle ─────────────────────────────────────────────────────────
+        // ── Lifecycle ───────────────────────────────────────────────────────────
 
         public void Start()
         {
             if (_disposed) throw new ObjectDisposedException(nameof(LiveGradCamController));
-            if (_loop != null && !_loop.IsCompleted) return;
+            if (_fastLoop != null && !_fastLoop.IsCompleted) return;
+
+            _stabilizer.Reset();
+            _quality.Reset();
+            Interlocked.Exchange(ref _manualCaptureFlag, 0);
+            _machine.Start();
+            _finalBusy = false;
 
             _cts = new CancellationTokenSource();
-            _loop = Task.Run(() => LoopAsync(_cts.Token), _cts.Token);
+            CancellationToken ct = _cts.Token;
+
+            _fastLoop = Task.Run(() => FastLoopAsync(ct));
+            _slowLoop = Task.Run(() => SlowLoopAsync(ct));
         }
 
         public void Stop()
@@ -151,37 +276,79 @@ namespace SkinDevApp.Explainability
             try
             {
                 _cts?.Cancel();
-                _loop?.Wait(TimeSpan.FromSeconds(3));
+                Task[] tasks = { _fastLoop, _slowLoop, _finalTask };
+                foreach (Task t in tasks)
+                    if (t != null) t.Wait(TimeSpan.FromSeconds(3));
             }
             catch (AggregateException) { }
 
             _cts?.Dispose();
             _cts = null;
-            _loop = null;
+            _fastLoop = _slowLoop = _finalTask = null;
+
+            lock (_pendingLock)
+            {
+                _pending?.Dispose();
+                _pending = null;
+            }
 
             lock (_stateLock)
             {
-                _latestHeatmap?.Dispose();
-                _latestHeatmap = null;
-                _latestSourceGray?.Dispose();
-                _latestSourceGray = null;
-                _latestInfo = new LiveInfo { HasData = false };
+                _layer?.Dispose(); _layer = null; _layerKey = "";
+                _maps?.Dispose(); _maps = null;
             }
 
-            // FIX 8: Reset the EMA state so a re-started camera begins fresh.
+            _prevThumb?.Dispose();
+            _prevThumb = null;
+
             _stabilizer.Reset();
+            _quality.Reset();
+            _machine.Stop();
+            _finalBusy = false;
         }
 
         public void Dispose()
         {
             if (_disposed) return;
             Stop();
+            _quality.Dispose();
+            _pose.Dispose();
             _disposed = true;
         }
 
-        // ── Frame helpers ─────────────────────────────────────────────────────
+        /// <summary>User pressed "New Scan": cooldown, fresh stabiliser, back to Live.</summary>
+        public void NewScan()
+        {
+            lock (_stateLock)
+            {
+                _layer?.Dispose(); _layer = null; _layerKey = "";
+                _maps?.Dispose(); _maps = null;
+            }
 
-        private Mat ToWorkingFrame(Mat frame) => ResizeToWidth(frame, WorkingWidth);
+            lock (_pendingLock)
+            {
+                _pending?.Dispose();
+                _pending = null;
+            }
+
+            _stabilizer.Reset();
+            _quality.Reset();
+            _pose.Reset();
+            _prevThumb?.Dispose();
+            _prevThumb = null;
+
+            Interlocked.Exchange(ref _manualCaptureFlag, 0);
+            _machine.NewScan(DateTime.UtcNow);
+            _finalBusy = false;
+        }
+
+        /// <summary>Manual Snap: capture the next analysed frame regardless of the gates.</summary>
+        public void RequestManualCapture()
+        {
+            Interlocked.Exchange(ref _manualCaptureFlag, 1);
+        }
+
+        // ── Frame helpers ───────────────────────────────────────────────────────
 
         public static Mat ResizeToWidth(Mat frame, int width)
         {
@@ -191,229 +358,472 @@ namespace SkinDevApp.Explainability
             Mat resized = new Mat();
             Cv2.Resize(
                 frame, resized,
-                new Size(width, (int)Math.Round(frame.Height * scale)),
+                new OpenCvSharp.Size(width, (int)Math.Round(frame.Height * scale)),
                 interpolation: InterpolationFlags.Linear);
             return resized;
         }
 
-        private static Mat MakeMotionThumb(Mat bgr)
+        // ── Live overlay (called for every video frame, camera thread) ──────────
+
+        /// <summary>
+        /// Blend the freshest class-coloured heatmap onto <paramref name="frameBgr"/>.
+        /// Returns null when there is nothing valid to draw (no heatmap yet, too
+        /// old, or the subject moved too much since the heatmap's frame). Caller
+        /// disposes the returned Mat.
+        /// </summary>
+        public Mat RenderLiveOverlay(Mat frameBgr)
         {
-            using (Mat gray = new Mat())
+            if (frameBgr == null || frameBgr.Empty()) return null;
+
+            using (Mat cur = MotionMeter.MakeThumb(frameBgr))
             {
-                if (bgr.Channels() == 1) bgr.CopyTo(gray);
-                else Cv2.CvtColor(bgr, gray, bgr.Channels() == 4
-                    ? ColorConversionCodes.BGRA2GRAY
-                    : ColorConversionCodes.BGR2GRAY);
-
-                Mat small = new Mat();
-                Cv2.Resize(gray, small, new Size(96, 96),
-                    interpolation: InterpolationFlags.Area);
-                Cv2.GaussianBlur(small, small, new Size(5, 5), 0);
-                return small;
-            }
-        }
-
-        // ── Overlay alpha (called every video frame from the camera thread) ───
-
-        public double GetOverlayAlpha(
-            Mat currentFrameBgr,
-            double baseAlpha = HeatmapRenderer.DefaultAlpha)
-        {
-            Mat srcThumb;
-            double ageSec;
-
-            lock (_stateLock)
-            {
-                if (!_latestInfo.HasData || _latestSourceGray == null) return 0.0;
-                ageSec = (DateTime.UtcNow - _latestInfo.ComputedAtUtc).TotalSeconds;
-                srcThumb = _latestSourceGray.Clone();
-            }
-
-            using (srcThumb)
-            {
-                if (ageSec >= MaxHeatmapAgeSeconds) return 0.0;
-
-                double half = MaxHeatmapAgeSeconds * 0.5;
-                double ageFactor = ageSec <= half
-                    ? 1.0
-                    : Math.Max(0.0, 1.0 - (ageSec - half) / half);
-
-                using (Mat cur = MakeMotionThumb(currentFrameBgr))
-                using (Mat a = new Mat())
-                using (Mat b = new Mat())
-                using (Mat d = new Mat())
+                lock (_stateLock)
                 {
-                    srcThumb.ConvertTo(a, MatType.CV_32FC1);
-                    cur.ConvertTo(b, MatType.CV_32FC1);
+                    if (_maps == null || _maps.SourceThumb == null) return null;
 
-                    Cv2.Subtract(a, new Scalar(Cv2.Mean(a).Val0), a);
-                    Cv2.Subtract(b, new Scalar(Cv2.Mean(b).Val0), b);
+                    double ageSec = (DateTime.UtcNow - _maps.ComputedAtUtc).TotalSeconds;
+                    if (ageSec >= MaxHeatmapAgeSeconds) return null;
 
-                    Cv2.Absdiff(a, b, d);
-                    double motion = Cv2.Mean(d).Val0;
+                    double half = MaxHeatmapAgeSeconds * 0.5;
+                    double ageFactor = ageSec <= half
+                        ? 1.0
+                        : Math.Max(0.0, 1.0 - (ageSec - half) / half);
+
+                    double motion = MotionMeter.Between(_maps.SourceThumb, cur);
                     LastMotionScore = motion;
 
                     double motionFactor = Math.Max(0.0, Math.Min(1.0,
                         (MotionThreshold - motion) / (MotionThreshold * 0.5)));
 
-                    return baseAlpha * ageFactor * motionFactor;
+                    double factor = ageFactor * motionFactor;
+                    if (factor < 0.02) return null;
+
+                    ClassOverlayLayer layer = GetLayerLocked();
+                    if (layer == null) return null;
+
+                    return layer.Blend(frameBgr, factor);
                 }
             }
         }
 
-        // ── Background loop ───────────────────────────────────────────────────
+        // _stateLock must be held.
+        private ClassOverlayLayer GetLayerLocked()
+        {
+            if (_maps == null) return null;
 
-        private async Task LoopAsync(CancellationToken ct)
+            string key = _maps.FrameId + "|" + (int)View + "|" + _displayIndex;
+            if (_layer != null && _layerKey == key) return _layer;
+
+            _layer?.Dispose();
+            _layer = ClassHeatmapRenderer.BuildLayer(_maps, _maps.IndicesForView(View, _displayIndex));
+            _layerKey = key;
+            return _layer;
+        }
+
+        /// <summary>Force the cached layer to be rebuilt (e.g. after changing View).</summary>
+        public void InvalidateOverlay()
+        {
+            lock (_stateLock) { _layerKey = ""; }
+        }
+
+        // ── FAST loop ───────────────────────────────────────────────────────────
+
+        private async Task FastLoopAsync(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                DateTime tickStart = DateTime.UtcNow;
+
+                try
+                {
+                    if (!Enabled || _machine.IsBusy)
+                    {
+                        await DelayRemainder(tickStart, FastLoopMs, ct).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    Mat raw = _frameProvider();
+
+                    if (raw == null || raw.Empty())
+                    {
+                        raw?.Dispose();
+                        await DelayRemainder(tickStart, FastLoopMs, ct).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    Mat working = ResizeToWidth(raw, WorkingWidth);
+                    bool rawOwnedByCapture = false;
+
+                    try
+                    {
+                        // ---- quality / guide (positioning aid only) ---------------
+                        FrameQuality q = _quality.Analyze(working);
+
+                        // ---- multi-view: head-pose gate for the requested view ------
+                        ScanView required = RequiredView;
+                        PoseReading pose = null;
+                        PoseVerdict verdict = null;
+                        if (required != ScanView.Any)
+                        {
+                            pose = _pose.Estimate(working);
+                            verdict = _pose.Evaluate(required, pose, working.Width, working.Height);
+                            _lastPose = pose;
+                            ApplyPoseToQuality(q, required, pose, verdict);
+                            _poseMessage = verdict.Message;
+                        }
+                        else
+                        {
+                            _lastPose = null;
+                            _poseMessage = "";
+                        }
+
+                        // ---- motion between consecutive ticks ---------------------
+                        Mat thumb = MotionMeter.MakeThumb(working);
+                        double motion = _prevThumb == null ? 0.0 : MotionMeter.Between(_prevThumb, thumb);
+                        _prevThumb?.Dispose();
+                        _prevThumb = thumb.Clone();
+
+                        // ---- classification: ALWAYS on the whole frame -----------
+                        // (no face-detection gate: the face box never reaches the model)
+                        PredictionResult onnx = AiEngine.Predict(working);
+                        StabilizedResult stable = _stabilizer.Update(onnx.Probabilities);
+
+                        long id = Interlocked.Increment(ref _frameCounter);
+
+                        int displayIdx = Array.IndexOf(PredictionResult.ClassNames, stable.DisplayClass);
+                        lock (_stateLock) { _displayIndex = displayIdx; }
+
+                        // ---- offer the frame to the slow loop (latest wins) -------
+                        Offer(new PendingFrame
+                        {
+                            Id = id,
+                            Working = working.Clone(),
+                            Thumb = thumb,                    // ownership moves to PendingFrame
+                            FaceBox = q.FaceBox
+                        });
+
+                        // ---- scan state machine -------------------------------------
+                        bool requireFace = RequireFaceForAutoCapture && q.CascadeAvailable;
+                        DateTime now = DateTime.UtcNow;
+
+                        bool manual = Interlocked.Exchange(ref _manualCaptureFlag, 0) == 1;
+
+                        ScanDecision decision = manual
+                            ? _machine.ForceCapture(stable, now)
+                            : _machine.Update(new ScanInputs
+                            {
+                                NowUtc = now,
+                                FaceFound = q.FaceFound,
+                                FaceReady = q.Ready,
+                                QualityOk = q.QualityOk,
+                                Motion = motion,
+                                Stable = stable,
+                                RawPredictedIndex = onnx.PredictedIndex,
+                                RequireFace = requireFace,
+                                PoseOk = verdict == null || verdict.Ok,
+                                PoseMessage = verdict != null ? verdict.Message : ""
+                            });
+
+                        // ---- publish ---------------------------------------------
+                        FastUpdated?.Invoke(BuildSnapshot(id, now, onnx, stable, q, decision, motion, tickStart));
+
+                        // ---- capture: the EXACT frame that was just analysed -------
+                        if (decision.CaptureNow)
+                        {
+                            _finalBusy = true;
+
+                            var req = new CaptureRequest
+                            {
+                                Trigger = decision.Metrics.Trigger,
+                                FrameId = id,
+                                Original = raw,               // full-resolution frame as captured
+                                Working = working.Clone(),    // what ONNX and Grad-CAM see
+                                Onnx = onnx,
+                                Stable = stable,
+                                Quality = q,
+                                Stability = decision.Metrics,
+                                Pose = pose,
+                                PoseVerified = verdict != null && verdict.Verified && verdict.Ok
+                            };
+
+                            MultiViewSession session = _session;
+                            if (session != null && required != ScanView.Any)
+                                session.Stamp(req, required);
+
+                            rawOwnedByCapture = true;
+                            _finalTask = Task.Run(() => RunCaptureAsync(req, ct));
+                        }
+                    }
+                    finally
+                    {
+                        working.Dispose();
+                        if (!rawOwnedByCapture) raw.Dispose();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[LIVE] fast tick failed: " + ex);
+                }
+
+                await DelayRemainder(tickStart, FastLoopMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        private LiveSnapshot BuildSnapshot(
+            long id, DateTime now, PredictionResult onnx, StabilizedResult stable,
+            FrameQuality q, ScanDecision decision, double motion, DateTime tickStart)
+        {
+            var snap = new LiveSnapshot
+            {
+                FrameId = id,
+                TickUtc = now,
+                Onnx = onnx,
+                Stable = stable,
+                Quality = q,
+                Decision = decision,
+                Motion = motion,
+                FastLoopMs = (DateTime.UtcNow - tickStart).TotalMilliseconds,
+                ServiceOnline = ServiceOnline
+            };
+
+            lock (_stateLock)
+            {
+                if (_maps != null)
+                {
+                    snap.HeatmapAvailable = true;
+                    snap.HeatmapAgeSeconds = (now - _maps.ComputedAtUtc).TotalSeconds;
+                    snap.GradCamMs = _maps.ServiceLatencyMs;
+                    snap.GradCamRoundTripMs = _maps.RoundTripMs;
+                    snap.ExecMode = _maps.ExecMode;
+                    snap.ServiceIndex = _maps.PredictedIndex;
+                    snap.ServiceClass = _maps.PredictedIndex >= 0
+                        ? ClassPalette.Names[_maps.PredictedIndex] : "";
+                    snap.RegionText = _maps.RegionSummary();
+                }
+            }
+
+            return snap;
+        }
+
+        private void Offer(PendingFrame frame)
+        {
+            lock (_pendingLock)
+            {
+                _pending?.Dispose();      // newer frame replaces the waiting one
+                _pending = frame;
+            }
+        }
+
+        // ── SLOW loop (live Grad-CAM++) ─────────────────────────────────────────
+
+        private DateTime _lastHealthCheckUtc = DateTime.MinValue;
+
+        private async Task SlowLoopAsync(CancellationToken ct)
         {
             bool online = await GradCamService.IsReadyAsync(ct).ConfigureAwait(false);
             SetStatus(online, online ? null : "Grad-CAM service not reachable");
 
             while (!ct.IsCancellationRequested)
             {
-                DateTime tickStart = DateTime.UtcNow;
-
-                if (!Enabled)
-                {
-                    await DelayRemainder(tickStart, ct).ConfigureAwait(false);
-                    continue;
-                }
-
-                Mat raw = null;
-
                 try
                 {
-                    raw = _frameProvider();
-
-                    if (raw == null || raw.Empty())
+                    if (!Enabled || _finalBusy)
                     {
-                        await DelayRemainder(tickStart, ct).ConfigureAwait(false);
+                        await Task.Delay(100, ct).ConfigureAwait(false);
                         continue;
                     }
 
-                    using (Mat working = ToWorkingFrame(raw))
+                    PendingFrame pf;
+                    lock (_pendingLock) { pf = _pending; _pending = null; }
+
+                    if (pf == null)
                     {
-                        Mat sourceThumb = MakeMotionThumb(working);
+                        // No frame waiting. While the service is flagged offline (or we have
+                        // heard nothing for a while) re-check /health so the badge recovers
+                        // as soon as the service is up, even before the first frame arrives.
+                        if ((!ServiceOnline && (DateTime.UtcNow - _lastHealthCheckUtc).TotalSeconds >= 2.0))
+                        {
+                            _lastHealthCheckUtc = DateTime.UtcNow;
+                            bool up = await GradCamService.IsReadyAsync(ct).ConfigureAwait(false);
+                            if (up) SetStatus(true, null);
+                        }
+                        await Task.Delay(30, ct).ConfigureAwait(false);
+                        continue;
+                    }
 
-                        // FIX 5: Offload ONNX inference to the thread pool so
-                        // this async method doesn't block its thread during CPU work.
-                        PredictionResult onnx =
-                            await Task.Run(() => AiEngine.Predict(working), ct)
-                                      .ConfigureAwait(false);
+                    bool handedOver = false;
 
-                        // FIX 7: Feed raw probabilities into the stabilizer immediately
-                        // after ONNX returns, before even sending to the Grad-CAM service.
-                        StabilizedResult stable = _stabilizer.Update(onnx.Probabilities);
-
-                        // FIX 1 + FIX 6: Monotonic frame ID for stale detection;
-                        // JPEG Q90 instead of PNG (~10ms saved per tick at 640px).
-                        long thisFrameId = Interlocked.Increment(ref _frameCounter);
-                        string frameIdStr = thisFrameId.ToString();
-
-                        byte[] jpg = working.ImEncode(".jpg", new[]
+                    try
+                    {
+                        byte[] jpg = pf.Working.ImEncode(".jpg", new[]
                         {
                             new ImageEncodingParam(ImwriteFlags.JpegQuality, 90)
                         });
 
-                        GradCamRawResult cam = await GradCamService
-                            .ExplainRawAsync(jpg, frameId: frameIdStr, ct: ct)
+                        string idStr = pf.Id.ToString();
+
+                        GradCamAllResult r = await GradCamService
+                            .ExplainAllClassesAsync(jpg, idStr, true, ScanPipeline.ServiceHeatmapMaxSide, ct)
                             .ConfigureAwait(false);
 
-                        // FIX 4a: Silently skip stale responses — no error, no status flip.
-                        if (cam.WasStale)
+                        try
                         {
-                            cam.Dispose();
-                            sourceThumb.Dispose();
-                            await DelayRemainder(tickStart, ct).ConfigureAwait(false);
-                            continue;
-                        }
+                            if (r.Stale) continue;          // superseded: normal in live mode
 
-                        if (!cam.Ok)
-                        {
-                            SetStatus(false, cam.Error);
-                            cam.Dispose();
-                            sourceThumb.Dispose();
-                        }
-                        else
-                        {
-                            // FIX 4b: Discard response if the echoed frame_id doesn't
-                            // match.  This catches the case where the service processed
-                            // a previous frame even without drop_if_stale firing.
-                            if (cam.EchoedFrameId != null && cam.EchoedFrameId != frameIdStr)
+                            if (!r.Ok)
                             {
-                                Debug.WriteLine(
-                                    $"[LIVE] frame_id mismatch: sent {frameIdStr}, got {cam.EchoedFrameId} — discarded");
-                                cam.Dispose();
-                                sourceThumb.Dispose();
-                                await DelayRemainder(tickStart, ct).ConfigureAwait(false);
+                                SetStatus(false, r.Error);
+                                await Task.Delay(500, ct).ConfigureAwait(false);
+                                continue;
+                            }
+
+                            if (r.FrameId != idStr)
+                            {
+                                Debug.WriteLine("[LIVE] frame_id mismatch: sent " + idStr + ", got " + r.FrameId);
                                 continue;
                             }
 
                             SetStatus(true, null);
 
-                            // FIX 7: Store stable result alongside the raw result.
-                            var info = new LiveInfo
-                            {
-                                HasData = true,
-                                Onnx = onnx,
-                                Stable = stable,    // <-- new field
-                                ServiceIndex = cam.PredictedIndex,
-                                ServiceClass = cam.PredictedClass,
-                                ServiceConfidence = cam.Confidence,
-                                Method = cam.Method,
-                                GradCamMs = cam.ServiceLatencyMs,
-                                ComputedAtUtc = DateTime.UtcNow
-                            };
+                            ClassHeatmapSet set = r.ToHeatmapSet(
+                                pf.Id, pf.Thumb, pf.Working.Size(), pf.FaceBox);
+                            handedOver = true;                       // set owns pf.Thumb now
 
-                            Mat previousHeatmap;
-                            Mat previousThumb;
-
+                            ClassHeatmapSet old;
                             lock (_stateLock)
                             {
-                                previousHeatmap = _latestHeatmap;
-                                previousThumb = _latestSourceGray;
-                                _latestHeatmap = cam.Heatmap;
-                                _latestSourceGray = sourceThumb;
-                                _latestInfo = info;
+                                old = _maps;
+                                _maps = set;
+                                _layer?.Dispose();
+                                _layer = null;
+                                _layerKey = "";
                             }
-
-                            previousHeatmap?.Dispose();
-                            previousThumb?.Dispose();
-
-                            if (info.Disagreement)
-                            {
-                                Debug.WriteLine(
-                                    $"[LIVE MISMATCH] onnx={onnx.PredictedClass} keras={info.ServiceClass}");
-                            }
-
-                            AnalysisUpdated?.Invoke(info);
+                            old?.Dispose();
                         }
+                        finally
+                        {
+                            r.Dispose();
+                        }
+                    }
+                    finally
+                    {
+                        if (handedOver)
+                        {
+                            pf.Thumb = null;                         // moved into the set
+                        }
+                        pf.Dispose();
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    raw?.Dispose();
                     break;
                 }
                 catch (Exception ex)
                 {
                     SetStatus(false, ex.Message);
-                    Debug.WriteLine($"[LIVE] tick failed: {ex}");
-                }
-                finally
-                {
-                    raw?.Dispose();
+                    Debug.WriteLine("[LIVE] slow tick failed: " + ex);
+                    try { await Task.Delay(500, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { break; }
                 }
 
-                await DelayRemainder(tickStart, ct).ConfigureAwait(false);
+                try { await Task.Delay(MinGradCamIntervalMs, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
             }
         }
 
-        // ── Helpers ───────────────────────────────────────────────────────────
+        // ── FINAL analysis ──────────────────────────────────────────────────────
 
-        private async Task DelayRemainder(DateTime tickStart, CancellationToken ct)
+        private async Task RunCaptureAsync(CaptureRequest req, CancellationToken ct)
+        {
+            try
+            {
+                // 1. freeze notification (the UI shows the exact captured frame)
+                Mat freeze = req.Working.Clone();
+                var handler = CaptureTriggered;
+                if (handler != null) handler(req.Trigger, freeze);
+                else freeze.Dispose();
+
+                // brief "Stable — Capturing" flash before the heavy work
+                await Task.Delay(CaptureFlashMs, ct).ConfigureAwait(false);
+
+                _machine.BeginFinalAnalysis();
+
+                // 2. all-class Grad-CAM++ on THE SAME frame + archive
+                ScanResult result = await ScanPipeline.FinalAnalysisAsync(req, ct).ConfigureAwait(false);
+
+                _machine.CompleteAnalysis();
+
+                var done = ScanCompleted;
+                if (done != null) done(result);
+                else result.Dispose();
+            }
+            catch (OperationCanceledException)
+            {
+                req.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[LIVE] capture failed: " + ex);
+                _machine.CompleteAnalysis();
+                ScanCompleted?.Invoke(new ScanResult { Ok = false, Error = ex.Message, Request = req });
+            }
+        }
+
+        // ── Helpers ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Folds the pose measurement into the quality/guide object the rest of the loop already uses.
+        /// Front: the Haar positioning gate stays; a wrong pose only changes the message.
+        /// Left/Right: the frontal Haar cascade cannot see a turned face, so the YuNet result supplies
+        /// "face found / ready". FaceBox is cleared so the zone attribution never names a facial
+        /// region from a box that was not measured on a frontal face.
+        /// </summary>
+        private void ApplyPoseToQuality(FrameQuality q, ScanView required, PoseReading pose, PoseVerdict verdict)
+        {
+            if (!_pose.Available)
+            {
+                if (required != ScanView.Front)
+                {
+                    q.FaceFound = false;
+                    q.FaceBox = null;
+                    q.Guidance = GuidanceState.Unavailable;
+                    q.GuidanceText = "Pose model missing: press Snap Now when the view is right";
+                }
+                return;
+            }
+
+            if (required == ScanView.Front)
+            {
+                if (!verdict.Ok && q.Ready)
+                {
+                    q.Guidance = GuidanceState.CenterFace;
+                    q.GuidanceText = verdict.Message;
+                }
+                return;
+            }
+
+            q.FaceFound = pose != null && pose.FaceFound;
+            q.FaceBox = null;
+            if (verdict.Ok)
+            {
+                q.Guidance = GuidanceState.Ready;
+                q.GuidanceText = verdict.Message;
+            }
+            else
+            {
+                q.Guidance = q.FaceFound ? GuidanceState.CenterFace : GuidanceState.NoFace;
+                q.GuidanceText = verdict.Message;
+            }
+        }
+
+        private static async Task DelayRemainder(DateTime tickStart, int periodMs, CancellationToken ct)
         {
             TimeSpan elapsed = DateTime.UtcNow - tickStart;
-            TimeSpan remaining = TimeSpan.FromMilliseconds(RefreshIntervalMs) - elapsed;
+            TimeSpan remaining = TimeSpan.FromMilliseconds(periodMs) - elapsed;
 
             if (remaining > TimeSpan.Zero)
             {

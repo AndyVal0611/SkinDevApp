@@ -18,46 +18,37 @@
                 <TextBlock Text="Select Portal Mode" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
                 <ComboBox x:Name="PortalModeCombo" Height="42" FontSize="13" Padding="10,8" 
                           SelectionChanged="PortalModeCombo_SelectionChanged" Margin="0,0,0,18">
-                    <ComboBoxItem Content="Client / Patient Portal"/>
-                    <ComboBoxItem Content="User / Specialist Admin Portal" IsSelected="True"/>
+                    <ComboBoxItem Content="Operator / Kiosk (registration, consent, scanning)"/>
+                    <ComboBoxItem Content="Researcher / Admin (records, verification, settings)" IsSelected="True"/>
                 </ComboBox>
 
                 <!-- Panel 1: Admin Specialist Login Fields -->
                 <StackPanel x:Name="AdminCredentialsPanel">
                     <TextBlock Text="Username" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
-                    <TextBox x:Name="UsernameTxt" Text="lumyvue_eaf" Height="42" FontSize="13" VerticalContentAlignment="Center" 
+                    <TextBox x:Name="UsernameTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
                              Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,16"/>
 
                     <TextBlock Text="Password" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
                     <PasswordBox x:Name="PasswordTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
-                                 Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,22"/>
+                                 Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,12"/>
+
+                    <!-- First run only: no researcher account exists yet -->
+                    <StackPanel x:Name="FirstRunPanel" Visibility="Collapsed">
+                        <TextBlock Text="Confirm password" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
+                        <PasswordBox x:Name="ConfirmPasswordTxt" Height="42" FontSize="13" VerticalContentAlignment="Center"
+                                     Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,12"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="LoginHintTxt" FontSize="11" Foreground="#8A827A" TextWrapping="Wrap" Margin="0,0,0,14"/>
                 </StackPanel>
 
-                <!-- Panel 2: Client Registration Fields (Visible when Client Portal is Selected) -->
+                <!-- Panel 2: Operator / kiosk mode. Participants are registered on the Registration screen. -->
                 <StackPanel x:Name="ClientRegisterPanel" Visibility="Collapsed">
-                    <TextBlock Text="Full Name" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
-                    <TextBox x:Name="ClientFullNameTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
-                             Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,14"/>
-
-                    <Grid Margin="0,0,0,18">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="1*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Age" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
-                            <TextBox x:Name="ClientAgeTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
-                                     Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Contact No." FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
-                            <TextBox x:Name="ClientContactTxt" Height="42" FontSize="13" VerticalContentAlignment="Center" 
-                                     Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB"/>
-                        </StackPanel>
-                    </Grid>
+                    <TextBlock Text="Operator ID" FontSize="12" FontWeight="Bold" Foreground="#1A2328" Margin="0,0,0,6"/>
+                    <TextBox x:Name="OperatorIdTxt" Height="42" FontSize="13" VerticalContentAlignment="Center"
+                             Padding="10,0" BorderBrush="#E0B0A2" BorderThickness="1" Background="#FFFBFB" Margin="0,0,0,8"/>
+                    <TextBlock Text="Participant details are entered on the Registration screen, where a PatientID is generated."
+                               FontSize="11" Foreground="#8A827A" TextWrapping="Wrap" Margin="0,0,0,18"/>
                 </StackPanel>
 
                 <!-- Dynamic Action Button -->

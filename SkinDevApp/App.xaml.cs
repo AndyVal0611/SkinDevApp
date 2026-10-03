@@ -17,6 +17,11 @@ namespace SkinDevApp
         {
             base.OnStartup(e);
             DatabaseHelper.InitializeDatabase(); // Creates lumyvue_db.sqlite table automatically
+            Data.StudyDatabase.Initialize();     // participant / scan / validation tables (same file)
+            Data.ScanSettings.Current.ApplyGlobal();
+
+            // Safety net: re-index scans that are on disk (and belong to a registered participant) but missing from the database.
+            Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } });
 
             // Warm up the ONNX model in the background so it's already loaded
             // by the time the user reaches the dashboard and clicks Analyze.
