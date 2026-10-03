@@ -165,6 +165,7 @@
 		<Compile Include="Data\StudyModels.cs" />
 		<Compile Include="Data\StudyRepository.cs" />
 		<Compile Include="Views\ParticipantPickerWindow.cs" />
+		<Compile Include="Views\ReportFindings.cs" />
 		<Compile Include="Views\ResearchReportWindow.cs" />
 		<Compile Include="Views\Ui.cs" />
 		<Compile Include="Views\HomePage.xaml.cs">
