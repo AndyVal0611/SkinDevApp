@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using OpenCvSharp;
 using SkinDevApp.AI;
+using SkinDevApp.Data;
 using SkinDevApp.Explainability;
 using SkinDevApp.Imaging;
 
@@ -56,6 +57,24 @@ namespace SkinDevApp.Scanning
                     }
                 }
 
+                // ---- lesion localization: separate detector, SAME frozen frame, independent of Grad-CAM++ ----
+                // A failure here never fails the scan: it is recorded (status Failed + message) and the scan is saved.
+                LesionDetectionSet det = null;
+                string detError = null;
+                ScanSettings cfg = ScanSettings.Current;
+                if (cfg.DetectorEnabled)
+                {
+                    try
+                    {
+                        double[] thr = cfg.DetectorThresholds();
+                        det = await Task.Run(() => LesionEngine.Detect(req.Working, thr)).ConfigureAwait(false);
+                    }
+                    catch (Exception dex)
+                    {
+                        detError = dex.GetType().Name + ": " + dex.Message;
+                    }
+                }
+
                 CaptureRecord record = null;
                 ClassHeatmapSet setForSave = set;
                 string err = gradcamError;
@@ -63,12 +82,13 @@ namespace SkinDevApp.Scanning
                 string folder = await Task.Run(() =>
                 {
                     CaptureRecord rec;
-                    string f = CaptureArchive.Save(req, setForSave, err, out rec);
+                    string f = CaptureArchive.Save(req, setForSave, err, out rec, det, detError);
                     record = rec;
                     return f;
                 }).ConfigureAwait(false);
 
                 result.Maps = set;
+                result.Detections = det;
                 result.Record = record;
                 result.Folder = folder;
                 result.Ok = true;

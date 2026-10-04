@@ -256,6 +256,33 @@ CREATE TABLE IF NOT EXISTS AttributionMaps (
     UNIQUE (CaptureID, TargetClassIndex)
 );
 
+CREATE TABLE IF NOT EXISTS LocalizationRuns (
+    RunID           INTEGER PRIMARY KEY AUTOINCREMENT,
+    CaptureID       TEXT NOT NULL UNIQUE REFERENCES CaptureViews(CaptureID),
+    Status          TEXT NOT NULL,
+    ErrorText       TEXT,
+    ModelFile       TEXT,
+    ModelSha256     TEXT,
+    ModelTag        TEXT,
+    ImageSize       INTEGER,
+    ThresholdsJson  TEXT,
+    LatencyMs       REAL,
+    BoxCount        INTEGER,
+    OverlayPath     TEXT,
+    CombinedPath    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS LesionDetections (
+    DetectionID  INTEGER PRIMARY KEY AUTOINCREMENT,
+    CaptureID    TEXT NOT NULL REFERENCES CaptureViews(CaptureID),
+    ClassName    TEXT NOT NULL,
+    ClassIndex   INTEGER NOT NULL,
+    Confidence   REAL NOT NULL,
+    X0 REAL, Y0 REAL, X1 REAL, Y1 REAL,
+    NX0 REAL, NY0 REAL, NX1 REAL, NY1 REAL
+);
+CREATE INDEX IF NOT EXISTS IX_LesionDetections_Capture ON LesionDetections(CaptureID);
+
 CREATE TABLE IF NOT EXISTS ResearcherEvaluations (
     EvaluationID             INTEGER PRIMARY KEY AUTOINCREMENT,
     ScanSessionID            TEXT NOT NULL REFERENCES ScanSessions(ScanSessionID),

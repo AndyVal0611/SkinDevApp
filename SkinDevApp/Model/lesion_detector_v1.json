@@ -1,0 +1,64 @@
+{
+  "model": "PrecisionSkin lesion detector",
+  "weights": "yolov8n.pt",
+  "dataset_version": "v1",
+  "created": "2026-10-03T23:01:59",
+  "classes": [
+    "acne",
+    "hyperpigmentation",
+    "eczema"
+  ],
+  "imgsz": 640,
+  "default_conf": 0.25,
+  "nms_iou": 0.45,
+  "onnx_sha256": "86072d96cb49d43621afa259774d293294daedbed17b53cc04e4143b2c0a3182",
+  "test_metrics_by_seed": {
+    "42": {
+      "overall": {
+        "precision": 0.4235025332050279,
+        "recall": 0.3930588632743313,
+        "mAP50": 0.3491597050908641,
+        "mAP50_95": 0.12161427547273379
+      },
+      "per_class": {
+        "acne": {
+          "precision": 0.49722503121429446,
+          "recall": 0.34926234765875563,
+          "mAP50": 0.3573172649272013,
+          "mAP50_95": 0.10962356610700845
+        },
+        "hyperpigmentation": {
+          "precision": 0.419076542776152,
+          "recall": 0.36578947368421055,
+          "mAP50": 0.32265246712644036,
+          "mAP50_95": 0.12746914602835088
+        },
+        "eczema": {
+          "precision": 0.3542060256246373,
+          "recall": 0.4641247684800277,
+          "mAP50": 0.3675093832189506,
+          "mAP50_95": 0.12775011428284194
+        }
+      }
+    }
+  },
+  "split_images": {
+    "test": 566,
+    "train": 9868,
+    "val": 566
+  },
+  "test_photos_per_class": {
+    "Acne": 370,
+    "Eczema": 32,
+    "Hyperpigmentation": 164
+  },
+  "box_origin": "human-drawn by the source dataset annotators; no machine-generated boxes",
+  "cpu_latency": {
+    "median_ms": 31.5,
+    "p95_ms": 41.3,
+    "threads": 4
+  },
+  "preprocess": "letterbox to IMGSZxIMGSZ (pad 114), RGB, float32 / 255, NCHW",
+  "output": "[1, 4+num_classes, N]: rows cx,cy,w,h (pixels of the letterboxed input) then class scores; no objectness; apply NMS",
+  "note": "Research prototype. Boxes show candidate lesion locations; not a diagnosis. Eczema is a pilot class."
+}

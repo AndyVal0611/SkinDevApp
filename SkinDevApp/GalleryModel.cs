@@ -66,6 +66,11 @@ namespace SkinDevApp.Scanning
         public string PoseText { get; set; } = "";
         public string SimilarityText { get; set; } = "";
         public bool SimilarityHigh { get; set; }
+
+        // Lesion localization (separate detector). Independent of the Grad-CAM++ class cards above.
+        public string LocalizationText { get; set; } = "";
+        public GalleryCard LocalizationCard { get; set; }
+        public GalleryCard CombinedCard { get; set; }
     }
 
     public sealed class GalleryModel
@@ -205,6 +210,40 @@ namespace SkinDevApp.Scanning
 
                 gv.Cards.Add(card);
             }
+
+            // lesion localization (separate detector; independent of Grad-CAM++)
+            LocalizationSection lz = rec.Localization;
+            if (lz == null)
+                gv.LocalizationText = "Lesion localization was not recorded for this capture (saved before this feature existed).";
+            else if (lz.Status == "OK")
+            {
+                string counts = string.Join(", ", (lz.CountsByClass ?? new Dictionary<string, int>()).Where(kv => kv.Value > 0).Select(kv => kv.Key + " " + kv.Value));
+                string thr = string.Join(", ", (lz.Thresholds ?? new Dictionary<string, double>()).Select(kv => kv.Key + " " + kv.Value.ToString("0.00")));
+                string summary = lz.BoxCount == 0 ? "No candidate boxes above the thresholds" : lz.BoxCount + " candidate box" + (lz.BoxCount == 1 ? "" : "es") + " (" + counts + ")";
+                gv.LocalizationText = summary + ".  Model " + lz.ModelTag + " (" + lz.ImageSize + " px), " + lz.LatencyMs.ToString("0") + " ms.  Thresholds: " + thr + ".";
+                if (!string.IsNullOrEmpty(lz.OverlayFile))
+                    gv.LocalizationCard = new GalleryCard
+                    {
+                        Title = "Localization (candidate boxes)",
+                        ColorHex = "#6B7280",
+                        ImagePath = Path.Combine(folder, lz.OverlayFile),
+                        ScoreText = summary,
+                        Note = "Acne red, hyperpigmentation blue, eczema orange. Not segmentation."
+                    };
+                if (!string.IsNullOrEmpty(lz.CombinedFile))
+                    gv.CombinedCard = new GalleryCard
+                    {
+                        Title = "Combined",
+                        ColorHex = "#6B7280",
+                        ImagePath = Path.Combine(folder, lz.CombinedFile),
+                        ScoreText = "Predicted-class Grad-CAM++ + boxes",
+                        Note = "Two independent outputs drawn together."
+                    };
+            }
+            else if (lz.Status == "Failed")
+                gv.LocalizationText = "Lesion localization failed for this capture: " + lz.Error + " (the scan and Grad-CAM++ are unaffected).";
+            else
+                gv.LocalizationText = "Lesion localization was not run for this capture.";
 
             // header texts
             gv.SummaryLine = rec.Primary != null

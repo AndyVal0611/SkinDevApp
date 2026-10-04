@@ -48,6 +48,15 @@ namespace SkinDevApp.Data
         public int GradCamTimeoutSeconds { get; set; } = 60;
         public string GradCamTargetLayer { get; set; } = "";      // "" = service default (research/debug only)
 
+        // Lesion localization (separate detector model; never changes Grad-CAM++ or the class scores)
+        public bool DetectorEnabled { get; set; } = true;
+        public double DetectorThresholdAcne { get; set; } = 0.20;               // best F1 on validation ~0.16-0.20
+        public double DetectorThresholdHyperpigmentation { get; set; } = 0.25;
+        public double DetectorThresholdEczema { get; set; } = 0.25;             // pilot class
+
+        /// <summary>Confidence thresholds by palette class index (Acne, Hyperpigmentation, Eczema).</summary>
+        public double[] DetectorThresholds() => new[] { DetectorThresholdAcne, DetectorThresholdHyperpigmentation, DetectorThresholdEczema };
+
         private static ScanSettings _current;
         public static ScanSettings Current
         {
@@ -91,6 +100,11 @@ namespace SkinDevApp.Data
                 s.OverlayOpacity = Dbl(d, "gradcam.overlay_opacity", s.OverlayOpacity);
                 s.GradCamTimeoutSeconds = Int(d, "gradcam.timeout_s", s.GradCamTimeoutSeconds);
                 s.GradCamTargetLayer = Str(d, "gradcam.target_layer", s.GradCamTargetLayer);
+
+                s.DetectorEnabled = Bool(d, "detector.enabled", s.DetectorEnabled);
+                s.DetectorThresholdAcne = Dbl(d, "detector.thr_acne", s.DetectorThresholdAcne);
+                s.DetectorThresholdHyperpigmentation = Dbl(d, "detector.thr_hyper", s.DetectorThresholdHyperpigmentation);
+                s.DetectorThresholdEczema = Dbl(d, "detector.thr_eczema", s.DetectorThresholdEczema);
             }
             catch (Exception ex)
             {
@@ -124,7 +138,11 @@ namespace SkinDevApp.Data
                 { "gradcam.max_age_s", F(MaxHeatmapAgeSeconds) },
                 { "gradcam.overlay_opacity", F(OverlayOpacity) },
                 { "gradcam.timeout_s", F(GradCamTimeoutSeconds) },
-                { "gradcam.target_layer", GradCamTargetLayer ?? "" }
+                { "gradcam.target_layer", GradCamTargetLayer ?? "" },
+                { "detector.enabled", F(DetectorEnabled) },
+                { "detector.thr_acne", F(DetectorThresholdAcne) },
+                { "detector.thr_hyper", F(DetectorThresholdHyperpigmentation) },
+                { "detector.thr_eczema", F(DetectorThresholdEczema) }
             };
         }
 

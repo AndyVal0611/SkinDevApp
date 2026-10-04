@@ -2,6 +2,7 @@
 // Everything shown is read from the database / saved files: nothing is re-run, so a
 // historical scan always shows the output of the model that produced it.
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +17,10 @@ namespace SkinDevApp.Views
         private readonly string _sessionId;
         private SessionDetail _d;
 
+        // per-view image holders, so the view toggle (Original / Grad-CAM++ / Localization / Combined) can swap the picture
+        private readonly List<KeyValuePair<CaptureViewRow, Border>> _viewThumbs = new List<KeyValuePair<CaptureViewRow, Border>>();
+        private string _viewMode = "Original";
+
         public ResultsPage(string scanSessionId)
         {
             InitializeComponent();
@@ -28,6 +33,8 @@ namespace SkinDevApp.Views
         {
             MainColumn.Children.Clear();
             SideColumn.Children.Clear();
+            _viewThumbs.Clear();
+            _viewMode = "Original";
 
             try { _d = StudyRepository.GetSessionDetail(_sessionId); }
             catch (Exception ex)
@@ -131,6 +138,28 @@ namespace SkinDevApp.Views
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "Captured image" : "Per-view summary", 16, true));
 
+            // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
+            var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
+            foreach (string mode in new[] { "Original", "Grad-CAM++", "Localization", "Combined" })
+            {
+                var rb = new RadioButton
+                {
+                    Content = mode,
+                    GroupName = "viewmode",
+                    IsChecked = mode == "Original",
+                    Margin = new Thickness(0, 0, 18, 0),
+                    FontSize = 12.5,
+                    ToolTip = mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
+                            : mode == "Grad-CAM++" ? "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map)."
+                            : mode == "Localization" ? "Candidate lesion locations from a separate research detector."
+                            : "The exact frame that was analysed."
+                };
+                string m = mode;
+                rb.Checked += (s, e) => { _viewMode = m; RefreshThumbs(); };
+                toggle.Children.Add(rb);
+            }
+            sp.Children.Add(toggle);
+
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
             string[] names = _d.Session.ScanMode == "Single" ? new[] { "Single" } : StudyText.Views;
             foreach (string name in names)
@@ -138,8 +167,10 @@ namespace SkinDevApp.Views
                 CaptureViewRow v = _d.View(name);
                 var col = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
                 col.Children.Add(Ui.Text(name.ToUpperInvariant(), 13, true));
-                col.Children.Add(Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB",
-                    v == null ? "not captured" : null));
+                Border thumb = Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB",
+                    v == null ? "not captured" : null);
+                col.Children.Add(thumb);
+                if (v != null) _viewThumbs.Add(new KeyValuePair<CaptureViewRow, Border>(v, thumb));
 
                 if (v?.Scores != null)
                 {
@@ -150,6 +181,8 @@ namespace SkinDevApp.Views
                         v.QualityStatus == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
                     col.Children.Add(Ui.Text(v.Maps.Count == 4 ? "4 class-specific Grad-CAM++ maps saved" : "Grad-CAM++ unavailable for this view",
                         10.5, false, v.Maps.Count == 4 ? Ui.Muted : Ui.Warn, new Thickness(0)));
+                    bool locWarn;
+                    col.Children.Add(Ui.Text(LocalizationLine(v, out locWarn), 10.5, false, locWarn ? Ui.Warn : Ui.Muted, new Thickness(0, 2, 0, 0)));
                 }
                 else
                 {
@@ -159,7 +192,54 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(grid);
             sp.Children.Add(Ui.Text(StudyText.AttributionNote, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
+            sp.Children.Add(Ui.Text("Localization boxes are candidate lesion locations from a separate research detector (acne red, hyperpigmentation blue, eczema orange). " +
+                                    "They are not lesion segmentation, not a diagnosis and not a lesion count: lesions can be missed and boxes can be wrong. " +
+                                    "Eczema is a pilot class. The detector does not change the Grad-CAM++ maps or the class scores.",
+                                    10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
+        }
+
+        // ------------------------------------------------------ view toggle --
+
+        private string PathFor(CaptureViewRow v, string mode)
+        {
+            switch (mode)
+            {
+                case "Grad-CAM++":
+                    string pred = v.Scores != null ? v.Scores.PredictedClass : null;
+                    AttributionMapRow map = v.Maps.FirstOrDefault(x => x.TargetClass == pred);
+                    return map != null ? map.OverlayPath : null;
+                case "Localization":
+                    return v.Localization != null && v.Localization.Status == "OK" ? v.Localization.OverlayPath : null;
+                case "Combined":
+                    return v.Localization != null && v.Localization.Status == "OK" ? v.Localization.CombinedPath : null;
+                default:
+                    return v.AnalysedImagePath ?? v.OriginalImagePath;
+            }
+        }
+
+        private void RefreshThumbs()
+        {
+            foreach (var kv in _viewThumbs)
+            {
+                string path = PathFor(kv.Key, _viewMode);
+                var src = path != null ? Ui.LoadImage(path, 480) : null;
+                kv.Value.Child = src != null
+                    ? (UIElement)new System.Windows.Controls.Image { Source = src, Stretch = System.Windows.Media.Stretch.Uniform }
+                    : Ui.Text(_viewMode == "Original" ? "image not available" : _viewMode + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));
+            }
+        }
+
+        private static string LocalizationLine(CaptureViewRow v, out bool warn)
+        {
+            warn = false;
+            LocalizationRunRow r = v.Localization;
+            if (r == null) return "Localization: not available (scan saved before this feature)";
+            if (r.Status == "Failed") { warn = true; return "Localization failed: " + (r.ErrorText ?? "unknown error") + " (scan and Grad-CAM++ are unaffected)"; }
+            if (r.Status != "OK") return "Localization was not run for this view";
+            if (v.Lesions.Count == 0) return "Localization: no candidate boxes above the thresholds";
+            var parts = v.Lesions.GroupBy(x => x.ClassName).Select(g => g.Key + " " + g.Count());
+            return "Localization: " + v.Lesions.Count + " candidate box" + (v.Lesions.Count == 1 ? "" : "es") + " (" + string.Join(", ", parts) + ")";
         }
 
         // --------------------------------------------------------------- side --
