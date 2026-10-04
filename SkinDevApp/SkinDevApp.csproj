@@ -151,6 +151,7 @@
 		</ApplicationDefinition>
 		<Compile Include="CaptureArchive.cs" />
 		<Compile Include="CaptureRecord.cs" />
+		<Compile Include="LesionDetector.cs" />
 		<Compile Include="ClassHeatmapRenderer.cs" />
 		<Compile Include="ClassHeatmapSet.cs" />
 		<Compile Include="ClassPalette.cs" />
@@ -323,6 +324,12 @@
 			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
 		</EmbeddedResource>
 		<None Include="Model\precisionskin.onnx">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_v1.onnx">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_v1.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Include="packages.config" />
