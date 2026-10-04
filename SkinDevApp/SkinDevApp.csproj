@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Import Project="..\packages\OpenCvSharp4.runtime.win.4.13.0.20260627\build\netstandard\OpenCvSharp4.runtime.win.props" Condition="Exists('..\packages\OpenCvSharp4.runtime.win.4.13.0.20260627\build\netstandard\OpenCvSharp4.runtime.win.props')" />
-	<Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-	<PropertyGroup>
-		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-		<Platform Condition=" '$(Platform)' == '' ">x64</Platform>
-		<ProjectGuid>{C45B5ADB-1BF4-45C7-8B8F-87F0729AB4AB}</ProjectGuid>
-		<OutputType>WinExe</OutputType>
-		<RootNamespace>SkinDevApp</RootNamespace>
-		<AssemblyName>SkinDevApp</AssemblyName>
-		<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-		<FileAlignment>512</FileAlignment>
-		<!-- Needed for using-declarations ("using var x = ...") used by the
+  <Import Project="..\packages\OpenCvSharp4.runtime.win.4.13.0.20260627\build\netstandard\OpenCvSharp4.runtime.win.props" Condition="Exists('..\packages\OpenCvSharp4.runtime.win.4.13.0.20260627\build\netstandard\OpenCvSharp4.runtime.win.props')" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{C45B5ADB-1BF4-45C7-8B8F-87F0729AB4AB}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>SkinDevApp</RootNamespace>
+    <AssemblyName>SkinDevApp</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <!-- Needed for using-declarations ("using var x = ...") used by the
          AI/Grad-CAM integration files. LangVersion is independent of the
          target framework - this does not change which .NET APIs are
          available, only which C# syntax the compiler accepts. -->
@@ -146,18 +146,33 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="CaptureArchive.cs" />
+    <Compile Include="CaptureRecord.cs" />
+    <Compile Include="ClassHeatmapRenderer.cs" />
+    <Compile Include="ClassHeatmapSet.cs" />
+    <Compile Include="ClassPalette.cs" />
+    <Compile Include="ComparisonGalleryWindow.cs" />
     <Compile Include="ConsentPage.xaml.cs">
       <DependentUpon>ConsentPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="DatabaseHelper.cs" />
     <Compile Include="AiEngine.cs" />
+    <Compile Include="Data\AppSession.cs" />
+    <Compile Include="Data\AuthService.cs" />
+    <Compile Include="Data\SaveQueue.cs" />
+    <Compile Include="Data\ScanSettings.cs" />
+    <Compile Include="Data\SessionImporter.cs" />
+    <Compile Include="Data\StudyDatabase.cs" />
+    <Compile Include="Data\StudyModels.cs" />
+    <Compile Include="Data\StudyRepository.cs" />
+    <Compile Include="FrameQuality.cs" />
+    <Compile Include="GalleryModel.cs" />
     <Compile Include="ImageInterop.cs" />
-    <Compile Include="ImageReviewPage.xaml.cs">
-      <DependentUpon>ImageReviewPage.xaml</DependentUpon>
-    </Compile>
+    <Compile Include="ModelInfo.cs" />
     <Compile Include="ModelInfoPage.xaml.cs">
       <DependentUpon>ModelInfoPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MultiViewSession.cs" />
     <Compile Include="OnnxInference.cs" />
     <Compile Include="PatientRecordPage.xaml.cs">
       <DependentUpon>PatientRecordPage.xaml</DependentUpon>
@@ -180,30 +195,45 @@
     <Compile Include="PrintReportWindow.xaml.cs">
       <DependentUpon>PrintReportWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="RegionAttribution.cs" />
     <Compile Include="RegistrationPage.xaml.cs">
       <DependentUpon>RegistrationPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="ResearchDashboardPage.xaml.cs">
       <DependentUpon>ResearchDashboardPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ResearcherResultWindow.xaml.cs">
+      <DependentUpon>ResearcherResultWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ResearcherVerificationWindow.xaml.cs">
       <DependentUpon>ResearcherVerificationWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ScanPipeline.cs" />
+    <Compile Include="ScanStateMachine.cs" />
+    <Compile Include="ScanView.cs" />
     <Compile Include="SettingsPage.xaml.cs">
       <DependentUpon>SettingsPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="UserDashboardForm.xaml.cs">
       <DependentUpon>UserDashboardForm.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ViewPoseEstimator.cs" />
+    <Compile Include="Views\GradCamLauncher.cs" />
+    <Compile Include="Views\HomePage.xaml.cs">
+      <DependentUpon>HomePage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ParticipantPickerWindow.cs" />
+    <Compile Include="Views\ReportFindings.cs" />
+    <Compile Include="Views\ResearchReportWindow.cs" />
+    <Compile Include="Views\ResultsPage.xaml.cs">
+      <DependentUpon>ResultsPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Ui.cs" />
     <Page Include="ClientDashboardForm.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ConsentPage.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ImageReviewPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -246,6 +276,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ResearcherResultWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="ResearcherVerificationWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -257,6 +291,14 @@
     <Page Include="UserDashboardForm.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\HomePage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ResultsPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
   </ItemGroup>
   <ItemGroup>
@@ -277,10 +319,15 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <None Include="bin\Debug\lumyvue_db.sqlite" />
+    <None Include="face_detection_yunet_2023mar.onnx" />
+    <None Include="labels.json" />
     <None Include="Model\precisionskin.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="model_version.json" />
     <None Include="packages.config" />
+    <None Include="precisionskin_best.keras" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -290,12 +337,21 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="haarcascade_frontalface_default.xml" />
     <Content Include="onnxruntime.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="onnxruntime_providers_shared.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="bin\ARM64\Debug\" />
+    <Folder Include="bin\Debug\dll\x64\" />
+    <Folder Include="bin\Debug\Model\" />
+    <Folder Include="bin\Debug\x64\" />
+    <Folder Include="bin\Debug\x86\" />
+    <Folder Include="bin\Release\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

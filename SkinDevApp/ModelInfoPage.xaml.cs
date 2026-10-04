@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-﻿using System.Windows.Controls;
-=======
 // ModelInfoPage.xaml.cs - traceable model identity (researcher / admin).
 using System;
 using System.IO;
@@ -12,7 +9,6 @@ using SkinDevApp.AI;
 using SkinDevApp.Data;
 using SkinDevApp.Explainability;
 using SkinDevApp.Views;
->>>>>>> 3cbcdfbb559e6bea23da4a2d16b46fd32f6778fb
 
 namespace SkinDevApp.Views
 {

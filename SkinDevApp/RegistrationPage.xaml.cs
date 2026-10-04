@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-﻿using System;
-using System.Windows;
-using System.Windows.Controls;
-=======
 // RegistrationPage.xaml.cs - detailed participant registration with an automatic PatientID.
 // New mode: Save Registration -> Continue to Consent. Edit mode (from Participant Records):
 // explicit edit with a reason; scan results are never touched.
@@ -14,7 +9,6 @@ using System.Windows;
 using System.Windows.Controls;
 using SkinDevApp.Data;
 using SkinDevApp.Views;
->>>>>>> 3cbcdfbb559e6bea23da4a2d16b46fd32f6778fb
 
 namespace SkinDevApp.Views
 {
@@ -30,40 +24,6 @@ namespace SkinDevApp.Views
         public RegistrationPage(string editParticipantId)
         {
             InitializeComponent();
-<<<<<<< HEAD
-            GeneratePatientId();
-        }
-
-        private void GeneratePatientId()
-        {
-            // Auto-generate Participant ID (Halimbawa: PS-0001)
-            string uniqueId = "PS-" + new Random().Next(1000, 9999).ToString();
-            ParticipantIdTxt.Text = uniqueId;
-        }
-
-        private void BackBtn_Click(object sender, RoutedEventArgs e)
-        {
-            if (NavigationService != null && NavigationService.CanGoBack)
-            {
-                NavigationService.GoBack();
-            }
-        }
-
-        private void NextBtn_Click(object sender, RoutedEventArgs e)
-        {
-            // Validation para masigurong napunan ang mga pangunahing impormasyon
-            if (string.IsNullOrWhiteSpace(FullNameTxt.Text) || string.IsNullOrWhiteSpace(AgeTxt.Text))
-            {
-                MessageBox.Show("Please fill in the required participant information (Full Name and Age).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Dito mo maaaring i-save ang data sa SQLite database patungo sa Participants at SkinProfiles tables[cite: 8]
-            MessageBox.Show($"Participant {ParticipantIdTxt.Text} profile saved successfully! Proceeding to Consent.", "Registration Success", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            // Halimbawa ng pag-navigate patungong ConsentPage:
-            // NavigationService.Navigate(new ConsentPage());
-=======
             _editMode = !string.IsNullOrEmpty(editParticipantId);
             HeaderHost.Content = Ui.Header(_editMode ? "Edit Registration" : "Registration");
 
@@ -306,7 +266,6 @@ namespace SkinDevApp.Views
                     MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
             Nav.Back();
->>>>>>> 3cbcdfbb559e6bea23da4a2d16b46fd32f6778fb
         }
     }
 }

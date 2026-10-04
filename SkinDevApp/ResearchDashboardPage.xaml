@@ -3,12 +3,6 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Research Dashboard" Background="#FBF9F6">
 
-<<<<<<< HEAD
-    <Grid>
-
-    </Grid>
-</Page>
-=======
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="25">
             <ContentControl x:Name="HeaderHost"/>
@@ -25,4 +19,3 @@
         </StackPanel>
     </ScrollViewer>
 </Page>
->>>>>>> 3cbcdfbb559e6bea23da4a2d16b46fd32f6778fb

@@ -3,10 +3,6 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Participant Records" Background="#FBF9F6">
 
-<<<<<<< HEAD
-    <Grid>
-
-=======
     <Grid Margin="25">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -72,6 +68,5 @@
                 <StackPanel x:Name="RecordPanel"/>
             </ScrollViewer>
         </Grid>
->>>>>>> 3cbcdfbb559e6bea23da4a2d16b46fd32f6778fb
     </Grid>
 </Page>
