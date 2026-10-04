@@ -31,9 +31,7 @@ namespace SkinDevApp.Scanning
 {
     public static class CaptureArchive
     {
-        public static string RootDirectory { get; set; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "LUMYVUE", "Captures");
+        public static string RootDirectory { get; set; } = SkinDevApp.Data.DataLocation.CapturesDir;
 
         /// <summary>Set to match how the camera/driver delivers frames. See RegionAttribution.</summary>
         public static bool CameraMirrored { get; set; } = false;

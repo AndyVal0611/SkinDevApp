@@ -432,7 +432,7 @@ namespace SkinDevApp.Data
             ScanMode = S(r, "ScanMode"),
             Finalized = B(r, "Finalized"),
             ModelVersionID = L(r, "ModelVersionID"),
-            SessionFolder = S(r, "SessionFolder"),
+            SessionFolder = DataLocation.Rebase(S(r, "SessionFolder")),
             OperatorID = S(r, "OperatorID"),
             FusionJson = S(r, "FusionJson"),
             ModelLabel = S(r, "ModelLabel"),
@@ -513,8 +513,8 @@ namespace SkinDevApp.Data
                             FrameID = L(r, "FrameID"),
                             CapturedAt = S(r, "CapturedAt"),
                             Trigger = S(r, "Trigger"),
-                            OriginalImagePath = S(r, "OriginalImagePath"),
-                            AnalysedImagePath = S(r, "AnalysedImagePath"),
+                            OriginalImagePath = DataLocation.Rebase(S(r, "OriginalImagePath")),
+                            AnalysedImagePath = DataLocation.Rebase(S(r, "AnalysedImagePath")),
                             ImageWidth = (int)(L(r, "ImageWidth") ?? 0),
                             ImageHeight = (int)(L(r, "ImageHeight") ?? 0),
                             Sharpness = D(r, "Sharpness"),
@@ -530,7 +530,7 @@ namespace SkinDevApp.Data
                             StabilityScore = D(r, "StabilityScore"),
                             QualityWeight = D(r, "QualityWeight"),
                             QualityStatus = S(r, "QualityStatus"),
-                            RecordFolder = S(r, "RecordFolder")
+                            RecordFolder = DataLocation.Rebase(S(r, "RecordFolder"))
                         });
 
                 foreach (CaptureViewRow v in d.Views)
@@ -558,9 +558,9 @@ namespace SkinDevApp.Data
                                 TargetClass = S(r, "TargetClass"),
                                 TargetClassIndex = (int)(L(r, "TargetClassIndex") ?? 0),
                                 TargetLayer = S(r, "TargetLayer"),
-                                RawMapPath = S(r, "RawMapPath"),
-                                RenderedMapPath = S(r, "RenderedMapPath"),
-                                OverlayPath = S(r, "OverlayPath"),
+                                RawMapPath = DataLocation.Rebase(S(r, "RawMapPath")),
+                                RenderedMapPath = DataLocation.Rebase(S(r, "RenderedMapPath")),
+                                OverlayPath = DataLocation.Rebase(S(r, "OverlayPath")),
                                 RelativeStrength = D(r, "RelativeStrength") ?? 0,
                                 Diffuse = B(r, "Diffuse"),
                                 TopZone = S(r, "TopZone"),
@@ -583,8 +583,8 @@ namespace SkinDevApp.Data
                                 ThresholdsJson = S(r, "ThresholdsJson"),
                                 LatencyMs = D(r, "LatencyMs") ?? 0,
                                 BoxCount = (int)(L(r, "BoxCount") ?? 0),
-                                OverlayPath = S(r, "OverlayPath"),
-                                CombinedPath = S(r, "CombinedPath")
+                                OverlayPath = DataLocation.Rebase(S(r, "OverlayPath")),
+                                CombinedPath = DataLocation.Rebase(S(r, "CombinedPath"))
                             };
 
                     using (var cmd = Cmd(c, "SELECT * FROM LesionDetections WHERE CaptureID=@id ORDER BY ClassIndex, Confidence DESC;", null, "@id", v.CaptureID))

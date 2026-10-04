@@ -480,7 +480,8 @@ namespace SkinDevApp.Views
             ContentGrid.ColumnDefinitions.Clear();
             ContentGrid.RowDefinitions.Clear();
 
-            if (e.NewSize.Width > 850)
+            bool portrait = e.NewSize.Height > e.NewSize.Width;
+            if (e.NewSize.Width > 850 && !portrait)
             {
                 ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
                 ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -493,7 +494,8 @@ namespace SkinDevApp.Views
             }
             else
             {
-                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(320) });
+                // Portrait / narrow: the camera takes the larger share of the screen, controls scroll below it.
+                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = portrait ? new GridLength(1.5, GridUnitType.Star) : new GridLength(320) });
                 ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
                 Grid.SetRow(ImageCard, 0);

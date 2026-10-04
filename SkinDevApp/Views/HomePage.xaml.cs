@@ -8,6 +8,11 @@ namespace SkinDevApp.Views
 {
     public partial class HomePage : Page
     {
+        private void Page_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+        {
+            if (NavGrid != null) NavGrid.Columns = e.NewSize.Width < 760 ? 2 : 3;
+        }
+
         public HomePage()
         {
             InitializeComponent();

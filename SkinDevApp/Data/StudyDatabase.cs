@@ -28,12 +28,88 @@ using System.IO;
 
 namespace SkinDevApp.Data
 {
+    /// <summary>
+    /// Where the study database and captured images live. By default they stay on this PC. To share one
+    /// database between several PCs, point every PC at the same synced folder (OneDrive, Google Drive,
+    /// Dropbox, a network share) with either:
+    ///   - the environment variable LUMYVUE_DATA_DIR, or
+    ///   - a text file %LOCALAPPDATA%\LUMYVUE\data_folder.txt whose first line is the folder path.
+    /// The database file and the Captures folder are then read and written inside that folder.
+    /// </summary>
+    public static class DataLocation
+    {
+        private static readonly string LocalDb =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumyvue_db.sqlite");
+
+        private static readonly string LocalCaptures = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE", "Captures");
+
+        /// <summary>The shared data folder, or null when this PC keeps its own data.</summary>
+        public static string SharedFolder { get; } = FindSharedFolder();
+
+        public static bool IsShared => SharedFolder != null;
+
+        public static string DbFile { get; } = ResolveDb();
+
+        public static string CapturesDir => SharedFolder != null ? Path.Combine(SharedFolder, "Captures") : LocalCaptures;
+
+        private static string FindSharedFolder()
+        {
+            try
+            {
+                string p = Environment.GetEnvironmentVariable("LUMYVUE_DATA_DIR");
+                if (string.IsNullOrWhiteSpace(p))
+                {
+                    string cfg = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE", "data_folder.txt");
+                    if (File.Exists(cfg))
+                        foreach (string line in File.ReadAllLines(cfg))
+                            if (!string.IsNullOrWhiteSpace(line)) { p = line; break; }
+                }
+                if (string.IsNullOrWhiteSpace(p)) return null;
+                p = p.Trim().Trim('"');
+                Directory.CreateDirectory(p);
+                return p;
+            }
+            catch { return null; }
+        }
+
+        private static string ResolveDb()
+        {
+            if (SharedFolder == null) return LocalDb;
+            string shared = Path.Combine(SharedFolder, "lumyvue_db.sqlite");
+            try
+            {
+                // First PC to join: bring its existing local data (accounts, scans) into the shared folder.
+                if (!File.Exists(shared) && File.Exists(LocalDb)) File.Copy(LocalDb, shared);
+            }
+            catch { }
+            return shared;
+        }
+
+        /// <summary>
+        /// Records store absolute paths. If a saved path does not exist on this PC (another PC wrote it),
+        /// re-point it at this PC's Captures folder.
+        /// </summary>
+        public static string Rebase(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            try
+            {
+                if (File.Exists(path) || Directory.Exists(path)) return path;
+                int i = path.IndexOf("\\Captures\\", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return path;
+                return Path.Combine(CapturesDir, path.Substring(i + 10));
+            }
+            catch { return path; }
+        }
+    }
+
     public static class StudyDatabase
     {
         public const int SchemaVersion = 1;
 
-        public static string DbPath { get; } =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumyvue_db.sqlite");
+        public static string DbPath { get; } = DataLocation.DbFile;
 
         private static string ConnectionString => "Data Source=" + DbPath + ";Version=3;Foreign Keys=True;";
 

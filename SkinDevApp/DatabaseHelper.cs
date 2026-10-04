@@ -20,7 +20,7 @@ namespace SkinDevApp
         public static string CurrentClientAge { get; set; } = "N/A";
         public static string CurrentClientContact { get; set; } = "N/A";
 
-        private static string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumyvue_db.sqlite");
+        private static string dbPath = SkinDevApp.Data.DataLocation.DbFile;
         private static string connectionString = $"Data Source={dbPath};Version=3;";
 
         public static void InitializeDatabase()

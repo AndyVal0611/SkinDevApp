@@ -91,7 +91,7 @@ namespace SkinDevApp.Views
             return bs;
         }
 
-        public static TextBlock Text(string text, double size = 12, bool bold = false, string color = "#1A2328", Thickness? margin = null)
+        public static TextBlock Text(string text, double size = 12, bool bold = false, string color = "#34362E", Thickness? margin = null)
         {
             return new TextBlock
             {
@@ -119,7 +119,7 @@ namespace SkinDevApp.Views
             Width = 1380;
             Height = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = GalleryUi.Brush("#FBF9F6");
+            Background = GalleryUi.Brush("#F8F1E6");
 
             Content = BuildRoot();
         }
@@ -181,11 +181,11 @@ namespace SkinDevApp.Views
 
             if (!v.Available)
             {
-                sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#6B7280"));
+                sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#6B6658"));
                 return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             }
 
-            sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#1A2328", new Thickness(0, 0, 0, 8)));
+            sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#34362E", new Thickness(0, 0, 0, 8)));
 
             var wrap = new WrapPanel();
             foreach (GalleryCard c in v.Cards) wrap.Children.Add(BuildCard(v, c));
@@ -193,24 +193,24 @@ namespace SkinDevApp.Views
 
             if (!string.IsNullOrEmpty(v.LocalizationText))
             {
-                sp.Children.Add(GalleryUi.Text("Lesion localization (separate detector, independent of Grad-CAM++)", 13, true, "#1A2328", new Thickness(0, 6, 0, 4)));
-                sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#374151", new Thickness(0, 0, 0, 6)));
+                sp.Children.Add(GalleryUi.Text("Lesion localization (separate detector, independent of Grad-CAM++)", 13, true, "#34362E", new Thickness(0, 6, 0, 4)));
+                sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#3D3732", new Thickness(0, 0, 0, 6)));
                 var lw = new WrapPanel();
                 if (v.LocalizationCard != null) lw.Children.Add(BuildLocalizationCard(v.LocalizationCard));
                 if (v.CombinedCard != null) lw.Children.Add(BuildLocalizationCard(v.CombinedCard));
                 sp.Children.Add(lw);
                 sp.Children.Add(GalleryUi.Text("Boxes are candidate lesion locations from a research detector: not segmentation, not a diagnosis, not a lesion count; lesions can be missed and boxes can be wrong. Eczema is a pilot class.",
-                    11, false, "#6B7280", new Thickness(0, 4, 0, 0)));
+                    11, false, "#6B6658", new Thickness(0, 4, 0, 0)));
             }
 
             if (!string.IsNullOrEmpty(v.SimilarityText))
                 sp.Children.Add(new Border
                 {
-                    Background = GalleryUi.Brush(v.SimilarityHigh ? "#FFF7E0" : "#F3F4F6"),
+                    Background = GalleryUi.Brush(v.SimilarityHigh ? "#FFF7E0" : "#F3E4D3"),
                     CornerRadius = new CornerRadius(6),
                     Padding = new Thickness(10, 6, 10, 6),
                     Margin = new Thickness(0, 8, 0, 0),
-                    Child = GalleryUi.Text(v.SimilarityText, 12, false, v.SimilarityHigh ? "#6B4A00" : "#374151")
+                    Child = GalleryUi.Text(v.SimilarityText, 12, false, v.SimilarityHigh ? "#6B4A00" : "#3D3732")
                 });
 
             var details = new StringBuilder();
@@ -247,11 +247,11 @@ namespace SkinDevApp.Views
                 ToolTip = "Click to enlarge"
             };
             img.MouseLeftButtonUp += (s, e) => SkinDevApp.Views.ImagePopup.Show(c.ImagePath, c.Title);
-            stack.Children.Add(new Border { Background = GalleryUi.Brush("#111827"), CornerRadius = new CornerRadius(4), Child = img });
-            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#1A2328", new Thickness(0, 6, 0, 0)));
-            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, false, "#1A2328", new Thickness(0, 2, 0, 0)));
+            stack.Children.Add(new Border { Background = GalleryUi.Brush("#2B2C26"), CornerRadius = new CornerRadius(4), Child = img });
+            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#34362E", new Thickness(0, 6, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, false, "#34362E", new Thickness(0, 2, 0, 0)));
             if (!string.IsNullOrEmpty(c.Note))
-                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, "#4B5563", new Thickness(0, 2, 0, 0)));
+                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, "#5A524B", new Thickness(0, 2, 0, 0)));
             return new Border
             {
                 BorderBrush = GalleryUi.Brush(c.ColorHex),
@@ -283,13 +283,13 @@ namespace SkinDevApp.Views
                 w.Show();
             };
 
-            var imgHost = new Border { Background = GalleryUi.Brush("#111827"), CornerRadius = new CornerRadius(4), Child = img };
+            var imgHost = new Border { Background = GalleryUi.Brush("#2B2C26"), CornerRadius = new CornerRadius(4), Child = img };
             stack.Children.Add(imgHost);
 
-            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#1A2328", new Thickness(0, 6, 0, 0)));
-            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, c.IsPredicted, "#1A2328", new Thickness(0, 2, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#34362E", new Thickness(0, 6, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, c.IsPredicted, "#34362E", new Thickness(0, 2, 0, 0)));
             if (!string.IsNullOrEmpty(c.Note))
-                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, c.Diffuse ? "#8A5A00" : "#4B5563", new Thickness(0, 2, 0, 0)));
+                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, c.Diffuse ? "#8A5A00" : "#5A524B", new Thickness(0, 2, 0, 0)));
 
             return new Border
             {
@@ -314,7 +314,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(GalleryUi.Text("Overall multi-view result", 16, true));
             sp.Children.Add(GalleryUi.Text(
                 "Each angle keeps its own scores and class maps (see the Front / Left / Right tabs). " +
-                "The three photographs are never merged into one heatmap.", 12, false, "#4B5563", new Thickness(0, 2, 0, 10)));
+                "The three photographs are never merged into one heatmap.", 12, false, "#5A524B", new Thickness(0, 2, 0, 10)));
 
             if (f == null || f.ViewsUsed == 0)
             {
@@ -365,11 +365,11 @@ namespace SkinDevApp.Views
                 });
                 sp.Children.Add(GalleryUi.Text(
                     "Pooled = quality-weighted average over views. Mean = unweighted average. Max = highest single-view score " +
-                    "(a one-sided finding shows here even when the pooled score is low).", 11, false, "#6B7280", new Thickness(0, 2, 0, 0)));
+                    "(a one-sided finding shows here even when the pooled score is low).", 11, false, "#6B6658", new Thickness(0, 2, 0, 0)));
             }
 
             // per-view table (always shown)
-            sp.Children.Add(GalleryUi.Text("Per view", 14, true, "#1A2328", new Thickness(0, 14, 0, 4)));
+            sp.Children.Add(GalleryUi.Text("Per view", 14, true, "#34362E", new Thickness(0, 14, 0, 4)));
             var pv = new StringBuilder();
             pv.AppendLine("View".PadRight(8) + "Top class".PadRight(20) + "Score".PadLeft(8) + "  Weight".PadRight(10) + "Pose");
             if (s != null)
@@ -392,7 +392,7 @@ namespace SkinDevApp.Views
             });
 
             if (f != null)
-                sp.Children.Add(GalleryUi.Text("Method: " + f.Method, 11, false, "#6B7280", new Thickness(0, 10, 0, 0)));
+                sp.Children.Add(GalleryUi.Text("Method: " + f.Method, 11, false, "#6B6658", new Thickness(0, 10, 0, 0)));
 
             return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
@@ -417,7 +417,7 @@ namespace SkinDevApp.Views
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Background = GalleryUi.Brush("#111827")
+            Background = GalleryUi.Brush("#2B2C26")
         };
         private readonly TextBlock _info = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
         private bool _ready;
@@ -434,7 +434,7 @@ namespace SkinDevApp.Views
             Title = "LUMYVUE - " + view.TabTitle + ": original vs Grad-CAM++ attribution";
             Width = 1100;
             Height = 900;
-            Background = GalleryUi.Brush("#FBF9F6");
+            Background = GalleryUi.Brush("#F8F1E6");
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             foreach (GalleryCard c in _classCards) _classBox.Items.Add(c.Title);
@@ -451,13 +451,13 @@ namespace SkinDevApp.Views
             _modeBox.SelectedIndex = startClassIndex >= 0 ? 0 : 1;      // opened from the Original card: show side by side
 
             var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-            bar.Children.Add(GalleryUi.Text("Class ", 12, true, "#1A2328", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Class ", 12, true, "#34362E", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_classBox);
-            bar.Children.Add(GalleryUi.Text("Mode ", 12, true, "#1A2328", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Mode ", 12, true, "#34362E", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_modeBox);
-            bar.Children.Add(GalleryUi.Text("Heatmap opacity ", 12, true, "#1A2328", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Heatmap opacity ", 12, true, "#34362E", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_opacity);
-            bar.Children.Add(GalleryUi.Text("   Zoom ", 12, true, "#1A2328", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("   Zoom ", 12, true, "#34362E", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_zoom);
 
             var banner = GalleryUi.Text(GalleryModel.AttributionStatement, 11, false, "#6B4A00");

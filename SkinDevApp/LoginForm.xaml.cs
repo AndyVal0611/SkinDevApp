@@ -9,6 +9,15 @@ namespace SkinDevApp.Views
     {
         private bool _firstRun;
 
+        private void Page_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+        {
+            // Portrait screens: hide the brand panel so the form gets the full width.
+            bool portrait = e.NewSize.Height > e.NewSize.Width || e.NewSize.Width < 760;
+            BrandPanel.Visibility = portrait ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+            BrandCol.MinWidth = portrait ? 0 : 340;
+            BrandCol.Width = portrait ? new System.Windows.GridLength(0) : new System.Windows.GridLength(5, System.Windows.GridUnitType.Star);
+        }
+
         public LoginForm()
         {
             InitializeComponent();
@@ -29,7 +38,7 @@ namespace SkinDevApp.Views
             {
                 AdminCredentialsPanel.Visibility = Visibility.Collapsed;
                 ClientRegisterPanel.Visibility = Visibility.Visible;
-                EnterPortalBtn.Content = "ENTER OPERATOR MODE";
+                EnterPortalBtn.Content = "Enter operator mode";
                 return;
             }
 
@@ -48,12 +57,12 @@ namespace SkinDevApp.Views
             {
                 LoginHintTxt.Text = "No researcher account exists yet. Create the first account now (password at least " +
                                     AuthService.MinPasswordLength + " characters). Keep it safe: it protects participant records and settings.";
-                EnterPortalBtn.Content = "CREATE ACCOUNT & SIGN IN";
+                EnterPortalBtn.Content = "Create account and sign in";
             }
             else
             {
                 if (string.IsNullOrEmpty(LoginHintTxt.Text) || LoginHintTxt.Text.StartsWith("No researcher account")) LoginHintTxt.Text = "";
-                EnterPortalBtn.Content = "SIGN IN";
+                EnterPortalBtn.Content = "Sign in";
             }
         }
 

@@ -1,11 +1,11 @@
 ﻿<Page x:Class="SkinDevApp.Views.HomePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Dashboard" Background="#FBF9F6" Loaded="Page_Loaded">
+      Title="Dashboard" Background="#F8F1E6" Loaded="Page_Loaded" SizeChanged="Page_SizeChanged">
 
     <Page.Resources>
         <Style x:Key="BigAction" TargetType="Button">
-            <Setter Property="Background" Value="#1A2328"/>
+            <Setter Property="Background" Value="#5F6652"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -17,13 +17,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="18" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="22" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -35,7 +35,9 @@
         </Style>
         <Style x:Key="NavTile" TargetType="Button" BasedOn="{StaticResource BigAction}">
             <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="#1A2328"/>
+            <Setter Property="Foreground" Value="#34362E"/>
+            <Setter Property="BorderBrush" Value="#E0D9C8"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Height" Value="96"/>
             <Setter Property="Padding" Value="20,0"/>
         </Style>
@@ -65,7 +67,7 @@
             <Border x:Name="CurrentParticipantBox" Style="{StaticResource NoticeBox}" Margin="8,4,8,4" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}" Margin="0" Click="ClearParticipantBtn_Click"/>
-                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13" Foreground="#1A2328" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13" Foreground="#34362E" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </DockPanel>
             </Border>
 
@@ -77,16 +79,16 @@
                 </Grid.ColumnDefinitions>
                 <Button x:Name="NewRegistrationBtn" Style="{StaticResource BigAction}" Click="NewRegistrationBtn_Click">
                     <StackPanel>
-                        <TextBlock Text="NEW REGISTRATION" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="New registration" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                         <TextBlock Text="Register a participant. A PatientID is generated automatically, then consent is recorded."
-                                   FontSize="13" Foreground="#E0B0A2" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                   FontSize="13" Foreground="#D09F7C" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="#3A4A40" Click="SkinAnalysisBtn_Click">
+                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="#6E7560" Click="SkinAnalysisBtn_Click">
                     <StackPanel>
-                        <TextBlock Text="SKIN ANALYSIS" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Skin analysis" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                         <TextBlock Text="Select an existing participant (or continue with the current one) and run the Front / Left / Right scan."
-                                   FontSize="13" Foreground="#E2EADF" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                   FontSize="13" Foreground="#E3E3D2" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Button>
             </Grid>

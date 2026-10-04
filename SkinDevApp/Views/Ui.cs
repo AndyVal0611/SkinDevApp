@@ -61,13 +61,14 @@ namespace SkinDevApp.Views
             return b;
         }
 
-        public static readonly SolidColorBrush Ink = Brush("#1A2328");
-        public static readonly SolidColorBrush Muted = Brush("#6B7280");
+        public static readonly SolidColorBrush Ink = Brush("#34362E");
+        public static readonly SolidColorBrush Bar = Brush("#5F6652");
+        public static readonly SolidColorBrush Muted = Brush("#6B6658");
         public static readonly SolidColorBrush Good = Brush("#588157");
         public static readonly SolidColorBrush Warn = Brush("#B7791F");
         public static readonly SolidColorBrush Bad = Brush("#B91C1C");
-        public static readonly SolidColorBrush Info = Brush("#2563EB");
-        public static readonly SolidColorBrush Line = Brush("#E5E7EB");
+        public static readonly SolidColorBrush Info = Brush("#7A816B");
+        public static readonly SolidColorBrush Line = Brush("#E0D9C8");
 
         public static readonly string[] ClassHex = { "#E11D1D", "#1D4ED8", "#E8A200", "#16A34A" };   // Acne, Hyper, Eczema, Normal
 
@@ -90,7 +91,7 @@ namespace SkinDevApp.Views
             right.Children.Add(new TextBlock
             {
                 Text = AppSession.RoleTitle + (string.IsNullOrEmpty(AppSession.UserId) ? "" : " · " + AppSession.UserId),
-                Foreground = Brush("#CBD5E1"),
+                Foreground = Brush("#D6CEC6"),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
@@ -98,15 +99,15 @@ namespace SkinDevApp.Views
 
             if (showBack) right.Children.Add(HeaderButton("Back", (s, e) => Nav.Back()));
             if (showHome) right.Children.Add(HeaderButton("Dashboard", (s, e) => Nav.Home()));
-            right.Children.Add(HeaderButton("Sign Out", (s, e) => Nav.SignOut()));
+            right.Children.Add(HeaderButton("Sign out", (s, e) => Nav.SignOut()));
             dock.Children.Add(right);
 
             var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            left.Children.Add(new TextBlock { Text = "LUMYVUE", Foreground = Brushes.White, FontSize = 22, FontWeight = FontWeights.Bold });
+            left.Children.Add(new TextBlock { Text = "LUMYVUE", Foreground = Brushes.White, FontSize = 24, FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont"), FontStyle = FontStyles.Italic });
             left.Children.Add(new TextBlock
             {
-                Text = "  |  PrecisionSkin  ·  " + title,
-                Foreground = Brush("#E0B0A2"),
+                Text = "   PrecisionSkin  ·  " + title,
+                Foreground = Brush("#D09F7C"),
                 FontSize = 14,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 0, 0)
@@ -115,12 +116,24 @@ namespace SkinDevApp.Views
 
             return new Border
             {
-                Background = Ink,
+                Background = Bar,
                 CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(20, 14, 20, 14),
+                Padding = new Thickness(24, 14, 24, 12),
                 Margin = new Thickness(8, 0, 8, 16),
-                Child = dock
+                Child = BuildHeaderBody(dock)
             };
+        }
+
+        // Skin-tone ribbon: the app's one signature detail, six Fitzpatrick-inspired swatches.
+        private static UIElement BuildHeaderBody(UIElement dock)
+        {
+            var ribbon = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+            foreach (var hex in new[] { "#F3DFD0", "#E9C6A8", "#D9A97F", "#BC8559", "#8C5A3C", "#5B3A29" })
+                ribbon.Children.Add(new Border { Width = 30, Height = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 4, 0), Background = Brush(hex) });
+            var sp = new StackPanel();
+            sp.Children.Add(dock);
+            sp.Children.Add(ribbon);
+            return sp;
         }
 
         private static Button HeaderButton(string text, RoutedEventHandler click)
@@ -173,13 +186,13 @@ namespace SkinDevApp.Views
 
         public static KeyValuePair<string, string> KV(string k, string v) => new KeyValuePair<string, string>(k, v);
 
-        public static Border Pill(string text, Brush fg, string bgHex = "#F3F4F6")
+        public static Border Pill(string text, Brush fg, string bgHex = "#F3E4D3")
         {
             return new Border
             {
                 Background = Brush(bgHex),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10, 3, 10, 3),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(11, 3, 11, 4),
                 Margin = new Thickness(0, 0, 6, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Child = new TextBlock { Text = text, Foreground = fg, FontSize = 11.5, FontWeight = FontWeights.SemiBold }
@@ -235,7 +248,7 @@ namespace SkinDevApp.Views
             catch { return null; }
         }
 
-        public static Border Thumb(string path, double height, string borderHex = "#E5E7EB", string caption = null)
+        public static Border Thumb(string path, double height, string borderHex = "#E0D9C8", string caption = null)
         {
             var src = LoadImage(path, 480);
             UIElement content = src != null
@@ -244,7 +257,7 @@ namespace SkinDevApp.Views
             return new Border
             {
                 Height = height,
-                Background = Brush("#111827"),
+                Background = Brush("#2B2C26"),
                 BorderBrush = Brush(borderHex),
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(6),
@@ -266,7 +279,7 @@ namespace SkinDevApp.Views
             }));
             sp.Children.Add(Text(StudyText.FitzpatrickAiDetail, 11, false, Muted, new Thickness(0, 6, 0, 0)));
             var b = Card(sp);
-            b.Background = Brush("#F8FAFC");
+            b.Background = Brush("#F3E4D3");
             return b;
         }
 
@@ -292,7 +305,7 @@ namespace SkinDevApp.Views
                 Height = 860,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = Application.Current.MainWindow,
-                Background = Ui.Brush("#111827"),
+                Background = Ui.Brush("#2B2C26"),
                 Content = new Image { Source = src, Stretch = Stretch.Uniform, Margin = new Thickness(10) }
             };
             w.Show();

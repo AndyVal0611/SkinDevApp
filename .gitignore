@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# LUMYVUE study data (participant info, scans) - never commit
+*.sqlite
+*.sqlite-journal
+Captures/
+data_folder.txt

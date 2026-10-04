@@ -1,7 +1,7 @@
 ﻿<Page x:Class="SkinDevApp.PatientRecordPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Participant Records" Background="#FBF9F6">
+      Title="Participant Records" Background="#F8F1E6">
 
     <Grid Margin="25">
         <Grid.RowDefinitions>

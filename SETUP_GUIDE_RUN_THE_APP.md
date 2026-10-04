@@ -91,3 +91,20 @@ Quick check: open `http://127.0.0.1:8765/health` in a browser. It should show `"
 - Localization boxes are **candidate lesion locations** from a research detector: not a diagnosis, not a lesion count; lesions can be missed. Eczema is a pilot class.
 - Do not copy real participants' photos to other computers or online tools without the study's consent terms.
 - Training and the notebooks are **not** needed to run the app.
+
+---
+
+## Sharing one database between laptops
+
+The database (`lumyvue_db.sqlite`) and the scan images (`Captures`) are never pushed to GitHub. To work on the **same** participants and scans from two laptops, put them in a folder that both laptops sync (Google Drive, OneDrive, Dropbox).
+
+1. Make a folder, for example `LUMYVUE_Data`, and share it so it syncs on both laptops. Wait until it has fully synced.
+2. On **each** laptop create this text file (the path can differ per laptop):
+
+       %LOCALAPPDATA%\LUMYVUE\data_folder.txt
+
+   Its first line is the full path of the synced folder, for example `C:\Users\<you>\OneDrive\LUMYVUE_Data`.
+   (Or set the environment variable `LUMYVUE_DATA_DIR` to that path.)
+3. Start the app. The first laptop to start copies its existing database into the folder. After that both laptops read and write the same database and the same `Captures` folder.
+
+**Rules:** only one person has the app open at a time. Close the app and wait for the sync to finish before the other person opens it. Opening it on two laptops at once, or before the sync finishes, can corrupt the database. Keep a copy of `lumyvue_db.sqlite` as a backup now and then.
