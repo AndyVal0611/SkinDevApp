@@ -191,6 +191,18 @@ namespace SkinDevApp.Views
             foreach (GalleryCard c in v.Cards) wrap.Children.Add(BuildCard(v, c));
             sp.Children.Add(wrap);
 
+            if (!string.IsNullOrEmpty(v.LocalizationText))
+            {
+                sp.Children.Add(GalleryUi.Text("Lesion localization (separate detector, independent of Grad-CAM++)", 13, true, "#1A2328", new Thickness(0, 6, 0, 4)));
+                sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#374151", new Thickness(0, 0, 0, 6)));
+                var lw = new WrapPanel();
+                if (v.LocalizationCard != null) lw.Children.Add(BuildLocalizationCard(v.LocalizationCard));
+                if (v.CombinedCard != null) lw.Children.Add(BuildLocalizationCard(v.CombinedCard));
+                sp.Children.Add(lw);
+                sp.Children.Add(GalleryUi.Text("Boxes are candidate lesion locations from a research detector: not segmentation, not a diagnosis, not a lesion count; lesions can be missed and boxes can be wrong. Eczema is a pilot class.",
+                    11, false, "#6B7280", new Thickness(0, 4, 0, 0)));
+            }
+
             if (!string.IsNullOrEmpty(v.SimilarityText))
                 sp.Children.Add(new Border
                 {
@@ -221,6 +233,35 @@ namespace SkinDevApp.Views
             });
 
             return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        }
+
+        private UIElement BuildLocalizationCard(GalleryCard c)
+        {
+            var stack = new StackPanel { Width = 236 };
+            var img = new Image
+            {
+                Source = GalleryUi.LoadBitmap(c.ImagePath),
+                Stretch = Stretch.Uniform,
+                Height = 236,
+                Cursor = Cursors.Hand,
+                ToolTip = "Click to enlarge"
+            };
+            img.MouseLeftButtonUp += (s, e) => SkinDevApp.Views.ImagePopup.Show(c.ImagePath, c.Title);
+            stack.Children.Add(new Border { Background = GalleryUi.Brush("#111827"), CornerRadius = new CornerRadius(4), Child = img });
+            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#1A2328", new Thickness(0, 6, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, false, "#1A2328", new Thickness(0, 2, 0, 0)));
+            if (!string.IsNullOrEmpty(c.Note))
+                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, "#4B5563", new Thickness(0, 2, 0, 0)));
+            return new Border
+            {
+                BorderBrush = GalleryUi.Brush(c.ColorHex),
+                BorderThickness = new Thickness(3),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(6),
+                Margin = new Thickness(0, 0, 10, 10),
+                Background = Brushes.White,
+                Child = stack
+            };
         }
 
         private UIElement BuildCard(GalleryView v, GalleryCard c)

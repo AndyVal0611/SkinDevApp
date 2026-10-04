@@ -84,6 +84,83 @@ namespace SkinDevApp.Scanning
         }
 
         /// <summary>
+        /// Writes localization_overlay.png (boxes on the analysed frame) and localization_combined.png
+        /// (predicted-class Grad-CAM++ overlay with the boxes on top - two independent outputs drawn together)
+        /// and returns the record.json section. Never throws for a missing/failed detector.
+        /// </summary>
+        private static LocalizationSection BuildLocalization(CaptureRequest req, ClassHeatmapSet maps,
+            LesionDetectionSet det, string detectionError, string folder, Dictionary<string, string> files)
+        {
+            var loc = new LocalizationSection
+            {
+                Note = "Candidate lesion locations from a separate research detector (YOLOv8) trained on public box-annotated datasets. " +
+                       "Not lesion segmentation, not a diagnosis, not a lesion count: it misses lesions and can draw wrong boxes. " +
+                       "Eczema is a pilot class. It does not change Grad-CAM++ or the class scores."
+            };
+
+            if (det == null)
+            {
+                loc.Status = string.IsNullOrEmpty(detectionError) ? "NotRun" : "Failed";
+                loc.Error = detectionError;
+                return loc;
+            }
+
+            loc.Status = "OK";
+            loc.ModelFile = det.ModelFile;
+            loc.ModelSha256 = det.ModelSha256;
+            loc.ModelTag = det.ModelTag;
+            loc.ImageSize = det.ImageSize;
+            loc.LatencyMs = Math.Round(det.LatencyMs, 1);
+            loc.Thresholds = new Dictionary<string, double>
+            {
+                { ClassPalette.Names[0], det.Thresholds[0] },
+                { ClassPalette.Names[1], det.Thresholds[1] },
+                { ClassPalette.Names[2], det.Thresholds[2] }
+            };
+            loc.BoxCount = det.Boxes.Count;
+            loc.CountsByClass = new Dictionary<string, int>
+            {
+                { ClassPalette.Names[0], det.Count(0) },
+                { ClassPalette.Names[1], det.Count(1) },
+                { ClassPalette.Names[2], det.Count(2) }
+            };
+
+            double fw = Math.Max(1, det.FrameWidth), fh = Math.Max(1, det.FrameHeight);
+            foreach (LesionBox b in det.Boxes)
+            {
+                loc.Boxes.Add(new LocalizationBox
+                {
+                    Class = b.ClassName,
+                    ClassIndex = b.ClassIndex,
+                    Confidence = Math.Round(b.Confidence, 4),
+                    XyxyPx = new[] { Math.Round(b.X0, 1), Math.Round(b.Y0, 1), Math.Round(b.X1, 1), Math.Round(b.Y1, 1) },
+                    XyxyNorm = new[] { Math.Round(b.X0 / fw, 5), Math.Round(b.Y0 / fh, 5), Math.Round(b.X1 / fw, 5), Math.Round(b.Y1 / fh, 5) }
+                });
+            }
+
+            if (req.Working != null && !req.Working.Empty())
+            {
+                using (Mat ov = LesionOverlay.Draw(req.Working, det, true))
+                    WritePng(Path.Combine(folder, "localization_overlay.png"), ov);
+                files["localization_overlay"] = "localization_overlay.png";
+                loc.OverlayFile = "localization_overlay.png";
+
+                Mat basis = null;
+                try
+                {
+                    if (maps != null && maps.PredictedIndex >= 0)
+                        basis = ClassHeatmapRenderer.RenderSingleClass(req.Working, maps, maps.PredictedIndex);
+                    using (Mat comb = LesionOverlay.Draw(basis ?? req.Working, det, false))
+                        WritePng(Path.Combine(folder, "localization_combined.png"), comb);
+                    files["localization_combined"] = "localization_combined.png";
+                    loc.CombinedFile = "localization_combined.png";
+                }
+                finally { basis?.Dispose(); }
+            }
+            return loc;
+        }
+
+        /// <summary>
         /// Save a capture. Heavy (disk + PNG encoding): call from Task.Run.
         /// <paramref name="maps"/> may be null if the Grad-CAM service was unavailable;
         /// the capture is still saved, with a note explaining why.
@@ -92,7 +169,9 @@ namespace SkinDevApp.Scanning
             CaptureRequest req,
             ClassHeatmapSet maps,
             string gradcamError,
-            out CaptureRecord record)
+            out CaptureRecord record,
+            LesionDetectionSet detections = null,
+            string detectionError = null)
         {
             string day = req.CapturedUtc.ToLocalTime().ToString("yyyy-MM-dd");
             string stamp = req.CapturedUtc.ToLocalTime().ToString("HHmmss") + "_" + req.CaptureId.Substring(0, 8);
@@ -334,6 +413,9 @@ namespace SkinDevApp.Scanning
                 record.Notes.Add("Grad-CAM++ maps unavailable: " + (gradcamError ?? "service not reachable") +
                                  ". Scores come from the ONNX classifier only.");
             }
+
+            // ---- lesion localization (separate detector; independent of Grad-CAM++) ----
+            record.Localization = BuildLocalization(req, maps, detections, detectionError, folder, files);
 
             record.Files = files;
             record.Notes.Add("Pending Review: this AI output is not ground truth and is never added to training data automatically.");

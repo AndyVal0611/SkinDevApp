@@ -567,6 +567,36 @@ namespace SkinDevApp.Data
                                 GradCAMVersion = S(r, "GradCAMVersion"),
                                 SimilarityDebugMetadata = S(r, "SimilarityDebugMetadata")
                             });
+
+                    using (var cmd = Cmd(c, "SELECT * FROM LocalizationRuns WHERE CaptureID=@id;", null, "@id", v.CaptureID))
+                    using (var r = cmd.ExecuteReader())
+                        if (r.Read())
+                            v.Localization = new LocalizationRunRow
+                            {
+                                CaptureID = v.CaptureID,
+                                Status = S(r, "Status"),
+                                ErrorText = S(r, "ErrorText"),
+                                ModelFile = S(r, "ModelFile"),
+                                ModelSha256 = S(r, "ModelSha256"),
+                                ModelTag = S(r, "ModelTag"),
+                                ImageSize = (int)(L(r, "ImageSize") ?? 0),
+                                ThresholdsJson = S(r, "ThresholdsJson"),
+                                LatencyMs = D(r, "LatencyMs") ?? 0,
+                                BoxCount = (int)(L(r, "BoxCount") ?? 0),
+                                OverlayPath = S(r, "OverlayPath"),
+                                CombinedPath = S(r, "CombinedPath")
+                            };
+
+                    using (var cmd = Cmd(c, "SELECT * FROM LesionDetections WHERE CaptureID=@id ORDER BY ClassIndex, Confidence DESC;", null, "@id", v.CaptureID))
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read())
+                            v.Lesions.Add(new LesionDetectionRow
+                            {
+                                ClassName = S(r, "ClassName"),
+                                ClassIndex = (int)(L(r, "ClassIndex") ?? 0),
+                                Confidence = D(r, "Confidence") ?? 0,
+                                X0 = D(r, "X0") ?? 0, Y0 = D(r, "Y0") ?? 0, X1 = D(r, "X1") ?? 0, Y1 = D(r, "Y1") ?? 0
+                            });
                 }
             }
 

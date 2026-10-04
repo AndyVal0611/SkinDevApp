@@ -121,6 +121,14 @@ namespace SkinDevApp
             _layer.ToolTip = "Leave empty to use the service's default layer.";
             cam2.Children.Add(_layer);
 
+            StackPanel det = Section(RightColumn, "Lesion localization (detector)",
+                "A separate research model that proposes candidate lesion boxes on the same frame. It never changes Grad-CAM++ or the class scores. " +
+                "The default thresholds were chosen on validation images (best F1); document any change.");
+            Bool(det, "detector.enabled", "Lesion localization enabled");
+            Num(det, "detector.thr_acne", "Acne confidence threshold", "0.01-0.99 (default 0.20)");
+            Num(det, "detector.thr_hyper", "Hyperpigmentation confidence threshold", "0.01-0.99 (default 0.25)");
+            Num(det, "detector.thr_eczema", "Eczema confidence threshold (pilot class)", "0.01-0.99 (default 0.25)");
+
             StackPanel audit = Section(RightColumn, "Recent changes (audit log)", null);
             _audit = new StackPanel();
             audit.Children.Add(_audit);
@@ -249,6 +257,10 @@ namespace SkinDevApp
             _num["gradcam.overlay_opacity"].Text = F(s.OverlayOpacity);
             _num["gradcam.timeout_s"].Text = s.GradCamTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
             _layer.Text = s.GradCamTargetLayer;
+            _bool["detector.enabled"].IsChecked = s.DetectorEnabled;
+            _num["detector.thr_acne"].Text = F(s.DetectorThresholdAcne);
+            _num["detector.thr_hyper"].Text = F(s.DetectorThresholdHyperpigmentation);
+            _num["detector.thr_eczema"].Text = F(s.DetectorThresholdEczema);
         }
 
         private bool Read(out ScanSettings s, out string error)
@@ -295,6 +307,10 @@ namespace SkinDevApp
             s.OverlayOpacity = D("gradcam.overlay_opacity", 0.05, 1);
             s.GradCamTimeoutSeconds = I("gradcam.timeout_s", 5, 600);
             s.GradCamTargetLayer = (_layer.Text ?? "").Trim();
+            s.DetectorEnabled = _bool["detector.enabled"].IsChecked == true;
+            s.DetectorThresholdAcne = D("detector.thr_acne", 0.01, 0.99);
+            s.DetectorThresholdHyperpigmentation = D("detector.thr_hyper", 0.01, 0.99);
+            s.DetectorThresholdEczema = D("detector.thr_eczema", 0.01, 0.99);
 
             if (s.MinBrightness >= s.MaxBrightness) bad.Add("minimum brightness must be below maximum brightness");
             if (s.FrontMaxAbsYaw >= s.SideMinAbsYaw) bad.Add("Front max yaw must be below Left/Right min yaw");

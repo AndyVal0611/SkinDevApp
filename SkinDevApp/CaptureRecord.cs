@@ -74,6 +74,8 @@ namespace SkinDevApp.Scanning
 
         public CaptureRequest Request { get; set; }
         public ClassHeatmapSet Maps { get; set; }
+        /// <summary>Candidate lesion boxes from the separate detector (null when disabled or unavailable).</summary>
+        public SkinDevApp.AI.LesionDetectionSet Detections { get; set; }
         public CaptureRecord Record { get; set; }
         public string Folder { get; set; }
 
@@ -272,9 +274,42 @@ namespace SkinDevApp.Scanning
         [JsonPropertyName("class_maps")] public List<MapSection> ClassMaps { get; set; } = new List<MapSection>();
         // v2.1 (additive): how much the four class maps agree (raw CAMs). Null with an older service.
         [JsonPropertyName("class_map_similarity")] public ClassMapSimilarityDto ClassMapSimilarity { get; set; }
+        // Lesion localization (separate detector). Null in records made before this feature existed.
+        [JsonPropertyName("localization")] public LocalizationSection Localization { get; set; }
         [JsonPropertyName("gradcam")] public Dictionary<string, string> GradCam { get; set; } = new Dictionary<string, string>();
         [JsonPropertyName("files")] public Dictionary<string, string> Files { get; set; } = new Dictionary<string, string>();
         [JsonPropertyName("notes")] public List<string> Notes { get; set; } = new List<string>();
+    }
+
+    /// <summary>record.json: what the lesion detector did for this frame. Independent of Grad-CAM++.</summary>
+    public sealed class LocalizationSection
+    {
+        /// <summary>OK | NotRun | Failed</summary>
+        [JsonPropertyName("status")] public string Status { get; set; } = "NotRun";
+        [JsonPropertyName("error")] public string Error { get; set; }
+        [JsonPropertyName("model_file")] public string ModelFile { get; set; }
+        [JsonPropertyName("model_sha256")] public string ModelSha256 { get; set; }
+        [JsonPropertyName("model_tag")] public string ModelTag { get; set; }
+        [JsonPropertyName("image_size")] public int ImageSize { get; set; }
+        [JsonPropertyName("latency_ms")] public double LatencyMs { get; set; }
+        [JsonPropertyName("thresholds")] public Dictionary<string, double> Thresholds { get; set; }
+        [JsonPropertyName("box_count")] public int BoxCount { get; set; }
+        [JsonPropertyName("counts_by_class")] public Dictionary<string, int> CountsByClass { get; set; }
+        [JsonPropertyName("boxes")] public List<LocalizationBox> Boxes { get; set; } = new List<LocalizationBox>();
+        [JsonPropertyName("overlay_file")] public string OverlayFile { get; set; }
+        [JsonPropertyName("combined_file")] public string CombinedFile { get; set; }
+        [JsonPropertyName("note")] public string Note { get; set; }
+    }
+
+    public sealed class LocalizationBox
+    {
+        [JsonPropertyName("class")] public string Class { get; set; }
+        [JsonPropertyName("class_index")] public int ClassIndex { get; set; }
+        [JsonPropertyName("confidence")] public double Confidence { get; set; }
+        /// <summary>x0, y0, x1, y1 in pixels of analysed.png</summary>
+        [JsonPropertyName("xyxy_px")] public double[] XyxyPx { get; set; }
+        /// <summary>x0, y0, x1, y1 as fractions of the frame width / height</summary>
+        [JsonPropertyName("xyxy_norm")] public double[] XyxyNorm { get; set; }
     }
 
     public sealed class ReviewRecord

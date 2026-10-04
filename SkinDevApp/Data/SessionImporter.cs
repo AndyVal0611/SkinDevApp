@@ -277,7 +277,7 @@ namespace SkinDevApp.Data
         private static void DeleteViews(SQLiteConnection c, SQLiteTransaction tx, string sessionId)
         {
             const string sub = "(SELECT CaptureID FROM CaptureViews WHERE ScanSessionID=@s)";
-            foreach (string t in new[] { "AttributionMaps", "AnalysisImages", "ClassScores", "AnalysisResults" })
+            foreach (string t in new[] { "AttributionMaps", "LesionDetections", "LocalizationRuns", "AnalysisImages", "ClassScores", "AnalysisResults" })
                 using (var cmd = StudyRepository.Cmd(c, "DELETE FROM " + t + " WHERE CaptureID IN " + sub + ";", tx, "@s", sessionId))
                     cmd.ExecuteNonQuery();
             using (var cmd = StudyRepository.Cmd(c, "DELETE FROM CaptureViews WHERE ScanSessionID=@s;", tx, "@s", sessionId))
@@ -368,6 +368,31 @@ namespace SkinDevApp.Data
                     "@ov", m.OverlayFile != null ? Path.Combine(folder, m.OverlayFile) : null,
                     "@rs", m.RelativeStrength, "@d", m.Diffuse ? 1 : 0, "@z", m.TopZone, "@sim", similarity, "@ver", G("service_version")))
                     cmd.ExecuteNonQuery();
+            }
+
+            // ---- lesion localization (separate detector; older records simply have none) ----
+            LocalizationSection lz = rec.Localization;
+            if (lz != null)
+            {
+                using (var cmd = StudyRepository.Cmd(c, @"INSERT OR REPLACE INTO LocalizationRuns
+                    (CaptureID, Status, ErrorText, ModelFile, ModelSha256, ModelTag, ImageSize, ThresholdsJson, LatencyMs, BoxCount, OverlayPath, CombinedPath)
+                    VALUES (@id,@st,@er,@mf,@sh,@mt,@sz,@th,@lat,@n,@ov,@cb);", tx,
+                    "@id", rec.CaptureId, "@st", lz.Status ?? "NotRun", "@er", lz.Error, "@mf", lz.ModelFile, "@sh", lz.ModelSha256,
+                    "@mt", lz.ModelTag, "@sz", lz.ImageSize, "@th", lz.Thresholds != null ? JsonSerializer.Serialize(lz.Thresholds) : null,
+                    "@lat", lz.LatencyMs, "@n", lz.BoxCount, "@ov", P("localization_overlay"), "@cb", P("localization_combined")))
+                    cmd.ExecuteNonQuery();
+
+                foreach (LocalizationBox b in lz.Boxes ?? new List<LocalizationBox>())
+                {
+                    if (b.XyxyPx == null || b.XyxyPx.Length != 4 || b.XyxyNorm == null || b.XyxyNorm.Length != 4) continue;
+                    using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO LesionDetections
+                        (CaptureID, ClassName, ClassIndex, Confidence, X0, Y0, X1, Y1, NX0, NY0, NX1, NY1)
+                        VALUES (@id,@c,@i,@cf,@x0,@y0,@x1,@y1,@n0,@n1,@n2,@n3);", tx,
+                        "@id", rec.CaptureId, "@c", b.Class, "@i", b.ClassIndex, "@cf", b.Confidence,
+                        "@x0", b.XyxyPx[0], "@y0", b.XyxyPx[1], "@x1", b.XyxyPx[2], "@y1", b.XyxyPx[3],
+                        "@n0", b.XyxyNorm[0], "@n1", b.XyxyNorm[1], "@n2", b.XyxyNorm[2], "@n3", b.XyxyNorm[3]))
+                        cmd.ExecuteNonQuery();
+                }
             }
         }
 

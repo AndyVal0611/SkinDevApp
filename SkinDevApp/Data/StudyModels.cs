@@ -190,6 +190,38 @@ namespace SkinDevApp.Data
 
         public ClassScoreRow Scores { get; set; }
         public List<AttributionMapRow> Maps { get; set; } = new List<AttributionMapRow>();
+
+        /// <summary>Lesion localization (separate detector). Null for scans saved before the feature existed.</summary>
+        public LocalizationRunRow Localization { get; set; }
+        public List<LesionDetectionRow> Lesions { get; set; } = new List<LesionDetectionRow>();
+    }
+
+    public sealed class LocalizationRunRow
+    {
+        public string CaptureID { get; set; }
+        /// <summary>OK | NotRun | Failed</summary>
+        public string Status { get; set; }
+        public string ErrorText { get; set; }
+        public string ModelFile { get; set; }
+        public string ModelSha256 { get; set; }
+        public string ModelTag { get; set; }
+        public int ImageSize { get; set; }
+        public string ThresholdsJson { get; set; }
+        public double LatencyMs { get; set; }
+        public int BoxCount { get; set; }
+        public string OverlayPath { get; set; }
+        public string CombinedPath { get; set; }
+    }
+
+    public sealed class LesionDetectionRow
+    {
+        public string ClassName { get; set; }
+        public int ClassIndex { get; set; }
+        public double Confidence { get; set; }
+        public double X0 { get; set; }
+        public double Y0 { get; set; }
+        public double X1 { get; set; }
+        public double Y1 { get; set; }
     }
 
     public sealed class ClassScoreRow

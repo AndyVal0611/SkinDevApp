@@ -177,6 +177,8 @@ namespace SkinDevApp.Views
                 SummaryBody(),
                 OriginalsBody()
             };
+            if (_d.Views.Any(v => v.Localization != null && v.Localization.Status == "OK"))
+                bodies.Add(LocalizationBody());          // candidate lesion boxes (separate detector), same frames
             bodies.AddRange(EvidenceBodies());
             bodies.Add(FormBody(true));      // licensed dermatologist first
             bodies.Add(FormBody(false));     // then the research team
@@ -471,6 +473,71 @@ namespace SkinDevApp.Views
             if (_d.Session.ScanMode == "Single") cells.Add(OriginalCell(_d.Views.FirstOrDefault(), "Single", imgH));
             else foreach (string name in StudyText.Views) cells.Add(OriginalCell(_d.View(name), name, imgH));
             cells.Add(FindingsBox());
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (i % 2 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                cells[i].Margin = new Thickness(0, 0, 0, 12);
+                Grid.SetRow(cells[i], i / 2);
+                Grid.SetColumn(cells[i], i % 2 == 0 ? 0 : 2);
+                grid.Children.Add(cells[i]);
+            }
+            sp.Children.Add(grid);
+            return sp;
+        }
+
+        // ------------------------------------------- candidate lesion localization --
+
+        private FrameworkElement LocalizationCell(CaptureViewRow v, string viewName)
+        {
+            var cell = new StackPanel { Width = ImgW };
+            LocalizationRunRow r = v == null ? null : v.Localization;
+            bool ok = r != null && r.Status == "OK";
+            cell.Children.Add(ImageBox(ok ? r.OverlayPath : null,
+                v == null ? viewName + " view was not captured" : r == null ? "localization not recorded (older scan)" : ok ? "image not available on disk" : "localization " + (r.Status ?? "not run"),
+                OriginalH, "#6B7280"));
+            cell.Children.Add(T(viewName == "Single" ? "Captured image" : viewName + " View", 9.5, true, Navy, 1));
+            if (ok)
+            {
+                if (v.Lesions.Count == 0) cell.Children.Add(T("No candidate boxes above the thresholds", 8.5, false, TextInk, 0));
+                else cell.Children.Add(T(v.Lesions.Count + " candidate box" + (v.Lesions.Count == 1 ? "" : "es") + ": " +
+                    string.Join(", ", v.Lesions.GroupBy(x => x.ClassName).Select(g => g.Key + " " + g.Count())), 8.5, false, TextInk, 0));
+            }
+            return cell;
+        }
+
+        private FrameworkElement LocalizationBody()
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(T("Candidate Lesion Localization", 17, true, Navy, 0));
+            sp.Children.Add(T("Boxes proposed by a separate research detector on the same frames the classifier and Grad-CAM++ analysed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+
+            var cells = new List<FrameworkElement>();
+            if (_d.Session.ScanMode == "Single") cells.Add(LocalizationCell(_d.Views.FirstOrDefault(), "Single"));
+            else foreach (string name in StudyText.Views) cells.Add(LocalizationCell(_d.View(name), name));
+
+            LocalizationRunRow any = _d.Views.Select(x => x.Localization).FirstOrDefault(x => x != null && x.Status == "OK");
+            var note = new StackPanel();
+            note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
+            note.Children.Add(T("•  Candidate locations only: not lesion segmentation, not a diagnosis, not a lesion count.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  Lesions can be missed and boxes can be wrong. Eczema is a pilot class (smallest training set).", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  Independent of Grad-CAM++ and of the class scores: neither is changed by the other.", 8.5, false, TextInk, 4));
+            if (any != null)
+            {
+                note.Children.Add(T("Detector: " + any.ModelTag + ", " + any.ImageSize + " px" +
+                                    (string.IsNullOrEmpty(any.ModelSha256) ? "" : ", SHA-256 " + any.ModelSha256.Substring(0, Math.Min(12, any.ModelSha256.Length)) + "…"), 8, false, Muted, 3));
+                if (!string.IsNullOrEmpty(any.ThresholdsJson))
+                    note.Children.Add(T("Confidence thresholds: " + any.ThresholdsJson.Replace("\"", "").Replace("{", "").Replace("}", "").Replace(":", " ").Replace(",", ", "), 8, false, Muted, 0));
+            }
+            var nb = Panel(note, PanelBg, null, 10);
+            nb.Width = ImgW;
+            nb.VerticalAlignment = VerticalAlignment.Top;
+            nb.MinHeight = OriginalH;
+            cells.Add(nb);
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });

@@ -30,6 +30,9 @@ namespace SkinDevApp
             // report it later instead of crashing the app at startup.
             Task.Run(() => AiEngine.EnsureLoaded());
 
+            // Lesion localization detector (separate model). Same quiet-failure behaviour.
+            Task.Run(() => AI.LesionEngine.EnsureLoaded());
+
         }
     }
 }
