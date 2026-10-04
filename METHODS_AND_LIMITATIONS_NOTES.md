@@ -128,13 +128,37 @@ Hardware: RTX 4060 Laptop GPU (8 GB). Software: ultralytics 8.4.172, PyTorch 2.1
 Best F1 over confidence: 0.39 at 0.175 (acne peaks ≈ 0.16–0.2; hyperpigmentation/eczema hold up to ≈ 0.35). **CPU latency (ONNX, 4 threads, this laptop): median 31.5 ms (p95 41.3 ms).**
 Visual check: boxes land on real acne spots, an eczema patch and pigmented patches; many lesions are missed and confidences are low (0.25–0.5).
 
-### 5.4 Pending experiments ⏳
+### 5.4 Larger images and longer training (runs B and C) ✅
 
-- 960-px run (same data, same split): table of the same metrics → compare with 5.3.
-- Eczema extension: machine-drafted boxes on ~458 additional facial eczema images, corrected by three reviewers → report **draft precision/recall** (share of draft boxes kept / final boxes found), retrain as `v2`, and compare v1 vs v2 **on the same test photos**.
-- Latency on the target CPU-only Mini PC (i5, 4 cores, 8 GB).
+Same data and split as 5.3. A 960-px run (B, 79 epochs, best epoch 54) reached validation mAP@0.5 = 0.319 / mAP@0.5–0.95 = 0.114, and a full 100-epoch 640-px run (C, no early stopping) reached 0.333 / 0.116 at its best epoch (66) and 0.299 / 0.109 at the last epoch (overfitting after epoch 66). **Neither helped; run A (5.3) is the deployed model.** Test scores for B and C were not computed.
+
+### 5.5 Eczema extension (dataset v2) ✅ – result: **no improvement; v1 kept**
+
+**Method.** The v1 detector drafted eczema boxes (confidence ≥ 0.20) on 338 additional unique facial eczema photos from the classifier's own folders (exact duplicates removed). The researchers corrected every image in a local box editor (adjust, add, delete, or mark "no eczema"). **Draft quality: 96.7 % of draft boxes were kept (IoU ≥ 0.5) but the draft found only 36.1 % of the final boxes** (recall); 326 images had at least one box (895 final boxes) and entered a new source, `eczema_corrected.yolov8`, whose boxes are labelled `machine-drafted, human-corrected` in the manifest and used for **training only**.
+Dataset v2 = v1 + these images (322 after the audit's duplicate handling): training photos 9,868 → 10,190, eczema training photos 277 → 599 (still oversampled ×3). Everything else, including the recipe, was unchanged (YOLOv8n, 640 px, batch 16, 100 epochs, patience 25, seed 42). **Validation and test sets were pinned to exactly the same 566 + 566 photos as v1** (checked by source and original file name: identical), so the two models are compared on the same images.
+Run details: all 100 epochs ran (best epoch 55, validation mAP@0.5 0.308 / mAP@0.5–0.95 0.110). The run was interrupted by a memory stall of the laptop at epoch 78 and **resumed from the saved checkpoint (`last.pt`) with the same settings**.
+
+**Test results (566 photos: acne 370, hyperpigmentation 164, eczema 32):**
+
+| Class | Metric | v1 (deployed) | v2 | Change |
+|---|---|---|---|---|
+| All | mAP@0.5 | 0.349 | 0.303 | −0.046 |
+| All | mAP@0.5–0.95 | 0.122 | 0.107 | −0.015 |
+| Acne | mAP@0.5 | 0.357 | 0.358 | 0.000 |
+| Hyperpigmentation | mAP@0.5 | 0.323 | 0.312 | −0.011 |
+| **Eczema** (n = 32) | mAP@0.5 | 0.368 | 0.241 | **−0.127** |
+| Eczema | precision / recall | 0.354 / 0.464 | 0.235 / 0.385 | −0.120 / −0.080 |
+| All | CPU latency (median, 4 threads) | 31.5 ms | 35.1 ms | similar |
+
+Full table: `06_training_runs/v1_vs_v2_test_comparison.csv`. **Decision: v1 stays in the app** (`lesion_detector_v1.onnx`). v2 is archived as `lesion_detector_v2_yolov8n_imgsz640.onnx/.json`.
+**Interpretation (hypotheses, not tested):** the drafts came from the v1 detector, so lesions it missed (draft recall 36 %) are probably unboxed in these images; training on partly unboxed images teaches the model to treat real lesions as background and lowers precision. The extra eczema images also changed the class balance. With only 32 eczema test photos and one seed, part of the change may be run-to-run noise (not measured; would need seeds 7 and 123). Acne and hyperpigmentation were not touched by the extension and stayed the same, as expected. This is a negative result and should be reported as such: machine-drafted boxes did not improve eczema detection in this study.
+
+### 5.6 Still pending ⏳
+
+- Latency on the CPU-only Mini PC (i5, 4 cores, 8 GB).
 - Overlap analysis Grad-CAM++ vs detector boxes (exploratory only).
 - Validation of the detector on the team's own captures by a dermatologist (small set).
+- Optional: more complete eczema boxing (all lesions in the 326 images) and a 3-seed repeat to separate noise from effect.
 
 ---
 
@@ -144,13 +168,13 @@ Visual check: boxes land on real acne spots, an eczema patch and pigmented patch
 2. **Class maps are similar** because the classifier uses largely shared facial features for the three skin conditions (measured correlation 0.95–0.99). This is a model property, not a bug.
 3. **Detector accuracy is modest** (mAP@0.5 ≈ 0.35; localisation precision mAP@0.5–0.95 ≈ 0.12). It finds a good share of lesions and misses many. Treat boxes as *candidate* locations, not a diagnosis or a count.
 4. **Label quality is limited by the public sources.** Annotators boxed acne, pigment patches and eczema inconsistently (very large boxes for pigment patches, tiny boxes for acne). Part of the low score is label noise, not only model error.
-5. **Eczema is a pilot class:** 324 unique boxed photos, 32 test photos (wide uncertainty). Report it separately and, if possible, with a spread over seeds.
+5. **Eczema is a pilot class:** 324 unique human-boxed photos, 32 test photos (wide uncertainty). Report it separately. One seed only; the v1 → v2 eczema change (−0.127 mAP@0.5) could partly be noise.
 6. **Facial status is partly assumed:** six sources were declared facial from small visual samples, not verified per image.
 7. **Domain gap:** training mixes close-ups, crops and full faces from public datasets; live webcam frames are different (lighting, resolution, skin-tone mix). Only informal checks were done on live captures.
 8. **Duplicate handling is heuristic** (thumbnail correlation + names). It was calibrated on this data and visually checked, but is not perfect.
 9. **Skin-tone coverage is not quantified** for the detector datasets (no Fitzpatrick labels). Performance across skin tones is unknown.
 10. **Research prototype; not a medical device.** No claim of clinical accuracy.
-11. **Machine-assisted labels (if used):** they inherit the first detector's mistakes; reviewers correct them, but residual errors remain. They are used for **training only**; the test set stays human-drawn.
+11. **Machine-assisted labels:** drafted by the v1 detector and corrected by researchers, they inherit its misses (draft recall 36 %): lesions it did not find may remain unboxed. They were used for **training only** (the test set stays human-drawn) and **did not improve** eczema detection (5.5).
 
 ---
 
@@ -165,9 +189,9 @@ Visual check: boxes land on real acne spots, an eczema patch and pigmented patch
 ## 8. Reproducibility checklist
 
 - Audit reports: `localization_dataset/01_audit_reports/` (`master_metadata.csv`, `annotations_long.csv`, `all_issues.csv`, `label_mapping_proposal.csv`, `review_decisions.csv`, `duplicate_groups.csv`, `audit_report.json`).
-- Dataset: `detector_work/dataset_v1/` + `dataset_manifest.csv` (split, source, group, box origin per image). Seed 42.
+- Datasets: `detector_work/dataset_v1/` (deployed) and `dataset_v2/` (eczema extension), each with `dataset_manifest.csv` (split, source, group, box origin per image). Seed 42; v2 validation/test pinned to v1's photos.
 - Runs: `detector_work/runs/…`, exports: `detector_work/export/` (ONNX + JSON with metrics, speed, SHA-256).
-- Notebooks (repo root): `PrecisionSkin_Localization_Dataset_Audit.ipynb`, `PrecisionSkin_Detector_Export_and_Train.ipynb`, `PrecisionSkin_Eczema_Draft_and_Review.ipynb`; Grad-CAM study: `gradcam_layer_study.py`.
+- Notebooks (repo root): `PrecisionSkin_Localization_Dataset_Audit.ipynb`, `PrecisionSkin_Detector_Export_and_Train.ipynb`, `PrecisionSkin_Eczema_Draft_and_Review.ipynb`, `PrecisionSkin_Eczema_v2_Pipeline.ipynb` (one-run pipeline for v2), `PrecisionSkin_Eczema_v2_Finish.ipynb` (test evaluation + export after the resumed training); Grad-CAM study: `gradcam_layer_study.py`.
 
 ---
 
@@ -177,3 +201,4 @@ Visual check: boxes land on real acne spots, an eczema patch and pigmented patch
 > Splits were made by photo group; validation and test images were facial, de-duplicated to one image per photo, and their boxes were drawn by the original dataset annotators.
 > The detector reaches mAP@0.5 = 0.35 on 566 held-out photos (acne 0.36, hyperpigmentation 0.32, eczema 0.37; eczema n = 32), and runs in ≈ 32 ms per image on a laptop CPU.
 > It is intended to indicate candidate lesion locations alongside, and independently of, the Grad-CAM++ attribution of the classifier, which explains the classifier's score but does not localise lesions.
+> An extension with 322 machine-drafted, human-corrected eczema images (training only) did not improve the detector on the unchanged test photos (eczema mAP@0.5 0.37 → 0.24; overall 0.35 → 0.30), so the original detector was kept.
