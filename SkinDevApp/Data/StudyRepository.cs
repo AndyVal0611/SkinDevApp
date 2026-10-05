@@ -722,6 +722,28 @@ namespace SkinDevApp.Data
 
         // --------------------------------------------------------- fitzpatrick --
 
+        /// <summary>
+        /// Stores the dermatologist-assigned Fitzpatrick type as its own record (SourceType 'Dermatologist').
+        /// It never overwrites the self-reported/manual value and is never mixed with any AI output.
+        /// </summary>
+        public static void SaveDermatologistFitzpatrick(string scanSessionId, string fitzType, string dermatologistId)
+        {
+            if (string.IsNullOrWhiteSpace(fitzType) || fitzType == "Not assessed") return;
+            ScanSessionRow s = GetSession(scanSessionId);
+            using (var c = StudyDatabase.Open())
+            using (var tx = c.BeginTransaction())
+            {
+                using (var cmd = Cmd(c, @"INSERT INTO FitzpatrickAssessments
+                    (ParticipantID, ScanSessionID, SourceType, ManualType, PredictedType, ModelVersionID, ScoreData, AssessmentDate, Status)
+                    VALUES (@p, @s, 'Dermatologist', @m, NULL, NULL, NULL, @at, @st);", tx,
+                    "@p", s == null ? null : s.ParticipantID, "@s", scanSessionId, "@m", fitzType, "@at", Now(),
+                    "@st", "Dermatologist-assessed (" + dermatologistId + "); any AI estimate is experimental and not shown to the participant"))
+                    cmd.ExecuteNonQuery();
+                Audit(c, tx, "Dermatologist Fitzpatrick type", "ScanSession", scanSessionId, fitzType);
+                tx.Commit();
+            }
+        }
+
         public static List<FitzpatrickAssessment> FitzpatrickFor(string participantId)
         {
             var list = new List<FitzpatrickAssessment>();

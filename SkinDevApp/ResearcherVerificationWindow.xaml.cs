@@ -28,7 +28,7 @@ namespace SkinDevApp
 
         // dermatologist form
         private WrapPanel _dLabels;
-        private ComboBox _dAgreeAi, _dAgreeRes, _dStatus;
+        private ComboBox _dAgreeAi, _dAgreeRes, _dStatus, _dFitz;
         private TextBox _dId, _dName, _dCred, _dNotes;
 
         public ResearcherVerificationWindow(string scanSessionId)
@@ -308,6 +308,10 @@ namespace SkinDevApp
             DermForm.Children.Add(g2);
             HookSuggestion(_dLabels, _dAgreeAi);
 
+            DermForm.Children.Add(Label("Dermatologist-assigned Fitzpatrick type (reference for validating any experimental skin-tone estimate)"));
+            _dFitz = Combo(new[] { "Not assessed", "Type I", "Type II", "Type III", "Type IV", "Type V", "Type VI" }, 0);
+            DermForm.Children.Add(_dFitz);
+
             DermForm.Children.Add(Label("Dermatologist notes"));
             _dNotes = Field(area: true); DermForm.Children.Add(_dNotes);
 
@@ -345,6 +349,7 @@ namespace SkinDevApp
                     Notes = _dNotes.Text,
                     ValidationStatus = status
                 }, labels);
+                StudyRepository.SaveDermatologistFitzpatrick(_sessionId, (string)_dFitz.SelectedItem, _dId.Text.Trim());
 
                 MessageBox.Show("Dermatologist validation saved (" + status + "). The AI prediction is unchanged.", "LUMYVUE Validation",
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -396,6 +401,20 @@ namespace SkinDevApp
                         Ui.KV("Agreement w/ researcher", v.AgreementWithResearcher), Ui.KV("Status", v.ValidationStatus), Ui.KV("Notes", v.Notes)
                     }, 160)
                 });
+            }
+
+            var dermFitz = string.IsNullOrEmpty(_d.Session.ParticipantID)
+                ? new List<FitzpatrickAssessment>()
+                : StudyRepository.FitzpatrickFor(_d.Session.ParticipantID).Where(a => a.SourceType == "Dermatologist").ToList();
+            if (dermFitz.Count > 0)
+            {
+                HistoryPanel.Children.Add(Ui.Text("Dermatologist-assigned Fitzpatrick type", 15, true, Ui.Ink, new Thickness(0, 16, 0, 4)));
+                foreach (FitzpatrickAssessment a in dermFitz)
+                    HistoryPanel.Children.Add(new Border
+                    {
+                        BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 6, 0, 6),
+                        Child = Ui.KeyValues(new[] { Ui.KV("Type", a.ManualType), Ui.KV("Date", a.AssessmentDate), Ui.KV("Status", a.Status) }, 160)
+                    });
             }
         }
 

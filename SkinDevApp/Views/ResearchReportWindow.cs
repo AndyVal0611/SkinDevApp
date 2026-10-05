@@ -386,7 +386,8 @@ namespace SkinDevApp.Views
             {
                 Ui.KV("Researcher assessment", ev == null ? "Pending" : ev.ResearcherClassification + " · " + ev.AgreementWithAI + " · " + ev.ResearcherID + " · " + ev.EvaluationDate),
                 Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + dv.ValidationStatus + " · " + dv.DermatologistID + " · " + dv.ValidationDate),
-                Ui.KV("Fitzpatrick / skin-tone AI", "Not available in this model version"),
+                Ui.KV("Fitzpatrick (dermatologist)", DermatologistFitzpatrickText(s.ParticipantID)),
+                Ui.KV("Fitzpatrick / skin-tone AI", "Experimental; not displayed to participants"),
                 Ui.KV("Fitzpatrick (manual)", skin == null || string.IsNullOrWhiteSpace(skin.FitzpatrickManual) || skin.FitzpatrickManual == "Not collected"
                     ? "Not collected" : skin.FitzpatrickManual + " (" + skin.FitzpatrickSource + ")")
             }, 150));
@@ -666,6 +667,13 @@ namespace SkinDevApp.Views
 
         private static readonly string[] FormLabels =
             { "Acne", "Eczema", "Hyperpigmentation", "Normal", "Other / uncertain", "Unusable image" };
+        private static string DermatologistFitzpatrickText(string participantId)
+        {
+            if (string.IsNullOrEmpty(participantId)) return "Not assessed";
+            FitzpatrickAssessment a = StudyRepository.FitzpatrickFor(participantId).FirstOrDefault(x => x.SourceType == "Dermatologist");
+            return a == null ? "Not assessed" : a.ManualType + " (" + a.AssessmentDate + ")";
+        }
+
         private static readonly string[] FormAgreement = { "Agree", "Partially agree", "Disagree", "Uncertain" };
 
         private static TextBlock FormLabel(string text) => T(text, 8.5, true, Navy, 3);
@@ -753,6 +761,8 @@ namespace SkinDevApp.Views
             {
                 sp.Children.Add(FormLabel("Agreement with Researcher (if applicable)"));
                 sp.Children.Add(Boxes(FormAgreement.Concat(new[] { "No researcher assessment yet" })));
+                sp.Children.Add(FormLabel("Dermatologist-assigned Fitzpatrick type"));
+                sp.Children.Add(Boxes(new[] { "Not assessed", "Type I", "Type II", "Type III", "Type IV", "Type V", "Type VI" }));
             }
 
             sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Researcher notes", dermatologist ? 8 : 5));

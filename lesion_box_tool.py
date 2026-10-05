@@ -128,13 +128,14 @@ class Store:
             with open(self.log_path, "a", encoding="utf-8", newline="") as fh:
                 w = csv.writer(fh)
                 if new:
-                    w.writerow(["timestamp", "image", "action", "n_boxes", "seconds"])
-                w.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), row.get("image", ""), row.get("action", ""), row.get("n", ""), row.get("seconds", "")])
+                    w.writerow(["timestamp", "annotator", "image", "action", "n_boxes", "seconds"])
+                w.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), ANNOT, row.get("image", ""), row.get("action", ""), row.get("n", ""), row.get("seconds", "")])
 
 
 STORE = None
 LABEL = "lesion"
 RULE = ""
+ANNOT = ""
 
 PAGE = r"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Lesion box tool - {{LABEL}}</title>
@@ -167,7 +168,7 @@ PAGE = r"""<!doctype html>
 </style></head>
 <body>
 <div id="top">
-  <b>{{LABEL}}</b> <span id="title"></span>
+  <b>{{LABEL}}</b> <span style="color:#9fb0b8">{{ANNOT}}</span> <span id="title"></span>
   <button id="prev">&larr; Prev (A)</button><button id="next">Next (D) &rarr;</button><button id="nextun">Next unreviewed (N)</button>
   <button id="del">Delete (Del)</button><button id="undo">Undo</button><button id="redo">Redo</button>
   <button id="hide">Hide boxes (H)</button><button id="enh">Contrast (E)</button><button id="fit">Fit (0)</button>
@@ -371,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         p = urlparse(self.path).path
         if p == "/":
-            page = PAGE.replace("{{LABEL}}", LABEL).replace("{{RULE_JSON}}", json.dumps(RULE))
+            page = PAGE.replace("{{LABEL}}", LABEL).replace("{{ANNOT}}", ANNOT).replace("{{RULE_JSON}}", json.dumps(RULE))
             self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
         elif p == "/api/list":
             self._json(STORE.listing())
@@ -417,15 +418,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global STORE, LABEL, RULE
+    global STORE, LABEL, RULE, ANNOT
     ap = argparse.ArgumentParser(description="Fast local lesion box editor (stdlib only).")
     ap.add_argument("folder", help="folder containing images\\ and labels\\")
     ap.add_argument("--label", default="acne", help="condition shown on the page and used for the default rule (acne, hyperpigmentation, eczema)")
     ap.add_argument("--rule", default=None, help="your own labelling rule text (default: a rule for the chosen condition)")
+    ap.add_argument("--annotator", default="", help="your name (saved in labeling_log.csv and shown on the page)")
     ap.add_argument("--port", type=int, default=8800)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
     LABEL = a.label.lower()
+    ANNOT = a.annotator
     RULE = a.rule or RULES.get(LABEL, "One tight box per visible lesion. If you cannot see any, press X.")
     STORE = Store(a.folder)
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
