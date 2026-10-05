@@ -243,7 +243,6 @@ namespace SkinDevApp
             {
                 Ui.KV("Skin type", s.GeneralSkinType),
                 Ui.KV("Fitzpatrick (manual)", string.IsNullOrEmpty(s.FitzpatrickManual) ? "Not collected" : s.FitzpatrickManual + (s.FitzpatrickSource == "Not collected" ? "" : " · " + s.FitzpatrickSource)),
-                Ui.KV("Fitzpatrick AI status", "Not Yet Trained — " + StudyText.FitzpatrickAiStatus),
                 Ui.KV("Sensitivity", s.Sensitivity),
                 Ui.KV("Reported concerns", concerns),
                 Ui.KV("Regions", regions),
@@ -292,9 +291,6 @@ namespace SkinDevApp
             if (d == null) return;
             _detailHost.Children.Add(DetailCard(d));
             _detailHost.Children.Add(EvidenceCard(d));
-
-            SkinProfile sp = string.IsNullOrEmpty(row.ParticipantID) ? null : StudyRepository.GetSkinProfile(row.ParticipantID);
-            _detailHost.Children.Add(Ui.FitzpatrickReservedCard(sp?.FitzpatrickManual, sp?.FitzpatrickSource));
         }
 
         internal static Border DetailCard(SessionDetail d)

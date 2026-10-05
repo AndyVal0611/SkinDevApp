@@ -178,6 +178,13 @@ Full table: `06_training_runs/v1_vs_v2_test_comparison.csv`. **Decision: v1 stay
 
 ---
 
+### 6.1 Fitzpatrick skin-type model – discontinued (negative finding) ✅
+
+- A MobileNetV2 skin-type model was trained on a public face-photo set with six folders (Types I–VI, 3,000 images per type, split by duplicate group). Validation: exact accuracy 51.9 %, within one type 79.8 %, Type I recall 0.009, Type IV recall 0.173. The frozen test split was never scored.
+- Diagnosis (validation and training data only): Types I and II could not be told apart (AUC 0.48); 78 % of both were predicted as Type II. Types II/III and III/IV separated almost perfectly (AUC 0.97/0.96) although median skin colour (ITA) does not support that order. Visual inspection showed the six folders follow apparent ethnicity groups, not measured skin tone. The model therefore learned facial/ethnic appearance, not skin phototype. No train-validation leakage was found.
+- Decision: the AI Fitzpatrick module was removed from the system. It was not connected to the disease classifier or the lesion detector, so their results are unaffected. Skin phototype in the app is recorded only as a participant/researcher-entered value (screening, Types III–V) and a dermatologist-assigned value; the software does not estimate it.
+- Consequence for claims: the classifier was not evaluated per skin tone (the classifier data has no Fitzpatrick labels). Do not state that it was validated across Fitzpatrick types; stratified results can only come from the dermatologist-assigned types of the participant pilot.
+
 ## 7. Ethics / data handling
 
 - Training data are public CC BY 4.0 Roboflow datasets: keep attributions (project, author, URL) in the paper's references.

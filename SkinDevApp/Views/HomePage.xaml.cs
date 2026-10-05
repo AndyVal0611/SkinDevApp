@@ -96,8 +96,7 @@ namespace SkinDevApp.Views
                 "four-class skin-image classifier (Acne, Hyperpigmentation, Eczema, Normal) and shows class-specific " +
                 "Grad-CAM++ attribution maps.\n\n" +
                 "• Model Class Scores are softmax outputs, not independent disease probabilities.\n" +
-                "• Grad-CAM++ maps show model attribution, not lesion segmentation.\n" +
-                "• The Fitzpatrick / skin-tone AI module is not yet available.\n\n" +
+                "• Grad-CAM++ maps show model attribution, not lesion segmentation.\n\n" +
                 StudyText.PrototypeNotice,
                 "About PrecisionSkin", MessageBoxButton.OK, MessageBoxImage.Information);
         }

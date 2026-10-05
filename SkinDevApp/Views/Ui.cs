@@ -252,24 +252,6 @@ namespace SkinDevApp.Views
             };
         }
 
-        /// <summary>Card shown wherever a skin-tone result will appear once a validated model exists.</summary>
-        public static Border FitzpatrickReservedCard(string manualType, string manualSource)
-        {
-            var sp = new StackPanel();
-            sp.Children.Add(Text("Fitzpatrick / Skin-Tone Assessment", 15, true));
-            sp.Children.Add(KeyValues(new[]
-            {
-                KV("AI assessment", StudyText.FitzpatrickAiStatus + " — pending model development"),
-                KV("Manual / self-reported", string.IsNullOrWhiteSpace(manualType) ? "Not collected" :
-                    manualType + (string.IsNullOrWhiteSpace(manualSource) ? "" : " (" + manualSource + ")")),
-                KV("Model version", "N/A")
-            }));
-            sp.Children.Add(Text(StudyText.FitzpatrickAiDetail, 11, false, Muted, new Thickness(0, 6, 0, 0)));
-            var b = Card(sp);
-            b.Background = Brush("#F8FAFC");
-            return b;
-        }
-
         public static string Pct(double v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 

@@ -72,8 +72,6 @@ namespace SkinDevApp.Views
             }, 190));
             LeftColumn.Children.Add(Ui.Card(cls));
 
-            LeftColumn.Children.Add(Ui.FitzpatrickReservedCard(null, null));
-
             var cam = new StackPanel();
             cam.Children.Add(Ui.Text("Grad-CAM++ service", 16, true));
             cam.Children.Add(Ui.Text("Checking service…", 12, false, Ui.Muted));

@@ -308,7 +308,7 @@ namespace SkinDevApp
             DermForm.Children.Add(g2);
             HookSuggestion(_dLabels, _dAgreeAi);
 
-            DermForm.Children.Add(Label("Dermatologist-assigned Fitzpatrick type (reference for validating any experimental skin-tone estimate)"));
+            DermForm.Children.Add(Label("Dermatologist-assigned Fitzpatrick type (reference record)"));
             _dFitz = Combo(new[] { "Not assessed", "Type I", "Type II", "Type III", "Type IV", "Type V", "Type VI" }, 0);
             DermForm.Children.Add(_dFitz);
 

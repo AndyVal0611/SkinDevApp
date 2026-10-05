@@ -199,7 +199,7 @@ namespace SkinDevApp.Data
                 (ParticipantID, ScanSessionID, SourceType, ManualType, PredictedType, ModelVersionID, ScoreData, AssessmentDate, Status)
                 VALUES (@id, NULL, 'Manual', @m, NULL, NULL, NULL, @at, @st);", tx,
                 "@id", participantId, "@m", sp.FitzpatrickManual, "@at", Now(),
-                "@st", (sp.FitzpatrickSource ?? "Self-reported") + "; AI assessment not available"))
+                "@st", (sp.FitzpatrickSource ?? "Self-reported")))
                 cmd.ExecuteNonQuery();
         }
 

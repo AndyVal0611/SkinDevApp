@@ -7,7 +7,7 @@
 //   CaptureView -> Prediction (AnalysisResult) + ClassScores + images + 4 AttributionMaps
 //   ScanSession -> ResearcherEvaluations and DermatologistValidations (append-only,
 //                  never overwrite the AI output)
-//   Participant -> FitzpatrickAssessments (manual now; AI reserved for a future model)
+//   Participant -> FitzpatrickAssessments (manual / dermatologist-assigned only; there is no AI skin-tone model)
 // ============================================================================
 
 using System.Collections.Generic;
@@ -27,10 +27,6 @@ namespace SkinDevApp.Data
         public const string AttributionNote =
             "Grad-CAM++ maps show model attribution (which image areas influenced each class score). " +
             "They are not lesion segmentation.";
-
-        public const string FitzpatrickAiStatus = "NOT YET AVAILABLE";
-        public const string FitzpatrickAiDetail =
-            "Reserved for a future trained and validated skin-tone model. The current four-class classifier does not estimate skin tone.";
 
         public static readonly string[] Classes = { "Acne", "Hyperpigmentation", "Eczema", "Normal" };
         public static readonly string[] Views = { "Front", "Left", "Right" };

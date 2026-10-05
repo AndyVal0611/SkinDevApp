@@ -10,7 +10,7 @@
 //    3 Consents                10 ResearcherEvaluations
 //    4 ScanSessions            11 DermatologistValidations
 //    5 CaptureViews            12 ModelVersions
-//    6 AnalysisResults         13 FitzpatrickAssessments  (reserved / future AI)
+//    6 AnalysisResults         13 FitzpatrickAssessments  (manual / dermatologist only)
 //    7 ClassScores             14 SystemSettings + AuditLog
 //  + AssessmentLabels: lets one human assessment carry several reference labels.
 //

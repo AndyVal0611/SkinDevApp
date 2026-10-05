@@ -285,10 +285,6 @@ namespace SkinDevApp.Views
             human.Children.Add(Ui.Text("Human assessments are stored separately and never overwrite the AI prediction.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
 
-            // Fitzpatrick reserved
-            SkinProfile sp = string.IsNullOrEmpty(_d.Session.ParticipantID) ? null : StudyRepository.GetSkinProfile(_d.Session.ParticipantID);
-            SideColumn.Children.Add(Ui.FitzpatrickReservedCard(sp?.FitzpatrickManual, sp?.FitzpatrickSource));
-
             // Notice
             var notice = new Border { Style = (Style)FindResource("NoticeBox"), Margin = new Thickness(8) };
             var n = new StackPanel();

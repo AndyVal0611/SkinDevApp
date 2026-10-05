@@ -159,13 +159,8 @@
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
-                            <Border Background="#F8FAFC" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="AI Fitzpatrick Assessment: NOT YET AVAILABLE" FontWeight="Bold" FontSize="12.5" Foreground="#1A2328"/>
-                                    <TextBlock Style="{StaticResource Muted}" FontSize="11"
-                                               Text="Reserved for a future trained and validated skin-tone model. The value above is manual data only and is stored separately from any future AI output."/>
-                                </StackPanel>
-                            </Border>
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,12,0,0"
+                                       Text="Recorded by the researcher or reported by the participant. It is not estimated by the software."/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
