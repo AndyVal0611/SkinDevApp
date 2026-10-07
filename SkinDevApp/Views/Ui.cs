@@ -265,24 +265,6 @@ namespace SkinDevApp.Views
             };
         }
 
-        /// <summary>Card shown wherever a skin-tone result will appear once a validated model exists.</summary>
-        public static Border FitzpatrickReservedCard(string manualType, string manualSource)
-        {
-            var sp = new StackPanel();
-            sp.Children.Add(Text("Fitzpatrick / Skin-Tone Assessment", 15, true));
-            sp.Children.Add(KeyValues(new[]
-            {
-                KV("AI assessment", StudyText.FitzpatrickAiStatus + " — pending model development"),
-                KV("Manual / self-reported", string.IsNullOrWhiteSpace(manualType) ? "Not collected" :
-                    manualType + (string.IsNullOrWhiteSpace(manualSource) ? "" : " (" + manualSource + ")")),
-                KV("Model version", "N/A")
-            }));
-            sp.Children.Add(Text(StudyText.FitzpatrickAiDetail, 11, false, Muted, new Thickness(0, 6, 0, 0)));
-            var b = Card(sp);
-            b.Background = Brush("#F3E4D3");
-            return b;
-        }
-
         public static string Pct(double v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 
@@ -335,18 +317,15 @@ namespace SkinDevApp.Views
             {
                 try
                 {
-                    var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-                    if (devices.Count == 0)
+                    var cams = CameraDiscovery.List();
+                    if (cams.Count == 0)
                     {
                         h.CameraText = "No camera detected";
                     }
                     else
                     {
-                        string brio = null;
-                        for (int i = 0; i < devices.Count; i++)
-                            if ((devices[i].Name ?? "").ToLowerInvariant().Contains("brio")) brio = devices[i].Name;
-                        h.CameraOk = true;
-                        h.CameraText = brio ?? devices[0].Name + " (Logitech BRIO not found)";
+                        h.CameraOk = true;                      // listed; the Preparation page proves that frames arrive
+                        h.CameraText = cams[0].Name + (cams[0].IsBrio ? "" : cams[0].IsVirtual ? " (virtual / infrared only)" : " (Logitech BRIO not found; using this camera)");
                     }
                 }
                 catch (Exception ex) { h.CameraText = "Check failed: " + ex.Message; }

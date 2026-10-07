@@ -199,7 +199,7 @@ namespace SkinDevApp.Data
                 (ParticipantID, ScanSessionID, SourceType, ManualType, PredictedType, ModelVersionID, ScoreData, AssessmentDate, Status)
                 VALUES (@id, NULL, 'Manual', @m, NULL, NULL, NULL, @at, @st);", tx,
                 "@id", participantId, "@m", sp.FitzpatrickManual, "@at", Now(),
-                "@st", (sp.FitzpatrickSource ?? "Self-reported") + "; AI assessment not available"))
+                "@st", (sp.FitzpatrickSource ?? "Self-reported")))
                 cmd.ExecuteNonQuery();
         }
 
@@ -241,21 +241,46 @@ namespace SkinDevApp.Data
                 return r.Read() ? ReadParticipant(r) : null;
         }
 
-        /// <summary>Filter by ID / name text, registration date (yyyy-MM-dd) and status. Empty = no filter.</summary>
+        /// <summary>
+        /// Find participants by PatientID or name, case-insensitive, partial matches allowed. Every word typed must match
+        /// the ID or the full name (first + middle + last), so "elaiza bautista" and "ps-0003" and "0003" all work.
+        /// An exact PatientID ("PS-0003", "ps3", "3") always sorts first. Optional registration date (yyyy-MM-dd) and status filters.
+        /// Search only reads: it never creates a participant.
+        /// </summary>
         public static List<Participant> SearchParticipants(string text, string date, string status)
         {
             var list = new List<Participant>();
             string t = (text ?? "").Trim();
+            string[] tokens = t.Length == 0 ? new string[0] : t.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+            var sql = new System.Text.StringBuilder("SELECT * FROM Participants WHERE 1=1");
+            var args = new List<object>();
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                sql.Append(" AND (ParticipantID LIKE @t" + i + @" ESCAPE '\' OR (COALESCE(FirstName,'') || ' ' || COALESCE(MiddleName,'') || ' ' || COALESCE(LastName,'')) LIKE @t" + i + @" ESCAPE '\')");
+                args.Add("@t" + i);
+                args.Add("%" + tokens[i].Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%");
+            }
+            string d = (date ?? "").Trim(), st = (status ?? "").Trim();
+            if (d.Length > 0) { sql.Append(" AND substr(RegisteredAt,1,10) = @d"); args.Add("@d"); args.Add(d); }
+            if (st.Length > 0) { sql.Append(" AND Status = @s"); args.Add("@s"); args.Add(st); }
+            sql.Append(" ORDER BY Seq DESC;");
+
             using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, @"SELECT * FROM Participants
-                WHERE (@t = '' OR ParticipantID LIKE @like OR FirstName LIKE @like OR LastName LIKE @like OR MiddleName LIKE @like
-                       OR (COALESCE(FirstName,'') || ' ' || COALESCE(LastName,'')) LIKE @like)
-                  AND (@d = '' OR substr(RegisteredAt,1,10) = @d)
-                  AND (@s = '' OR Status = @s)
-                ORDER BY Seq DESC;", null,
-                "@t", t, "@like", "%" + t + "%", "@d", (date ?? "").Trim(), "@s", (status ?? "").Trim()))
+            using (var cmd = Cmd(c, sql.ToString(), null, args.ToArray()))
             using (var r = cmd.ExecuteReader())
                 while (r.Read()) list.Add(ReadParticipant(r));
+
+            // "ps3", "PS 3" or "3" mean PS-0003 even though the text is not inside the stored ID: add that exact participant.
+            string exact = NormaliseParticipantId(t);
+            bool idLike = System.Text.RegularExpressions.Regex.IsMatch(t, @"^\s*(ps[\s-]*)?\d+\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (idLike && d.Length == 0 && st.Length == 0 && !list.Any(p => string.Equals(p.ParticipantID, exact, StringComparison.OrdinalIgnoreCase)))
+            {
+                Participant hit = GetParticipant(exact);
+                if (hit != null) list.Insert(0, hit);
+            }
+            if (exact.Length > 0)
+                list = list.OrderBy(p => string.Equals(p.ParticipantID, exact, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToList();   // stable: keeps newest-first otherwise
             return list;
         }
 
@@ -408,10 +433,10 @@ namespace SkinDevApp.Data
             SELECT s.*,
                    (COALESCE(m.RunName,'unknown') || ' / ' || substr(COALESCE(m.OnnxSha256,'unknown'),1,12)) AS ModelLabel,
                    CASE WHEN EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed')
-                             THEN 'Dermatologist validated'
+                             THEN 'Dermatologist Validated'
                         WHEN EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID=s.ScanSessionID)
-                             THEN 'Researcher assessed'
-                        ELSE 'Pending' END AS ValidationStatus
+                             THEN 'Researcher Verified - Dermatologist Validation Pending'
+                        ELSE 'AI Analysis Complete - Researcher Verification Pending' END AS ValidationStatus
             FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID ";
 
         private static ScanSessionRow ReadSession(SQLiteDataReader r) => new ScanSessionRow
@@ -649,11 +674,13 @@ namespace SkinDevApp.Data
                 long id;
                 using (var cmd = Cmd(c, @"INSERT INTO DermatologistValidations
                     (ScanSessionID, DermatologistID, ValidatorName, ProfessionalRole, CredentialReference, DermatologistAssessment,
-                     AgreementWithAI, AgreementWithResearcher, Notes, ValidationDate, ValidationStatus)
-                    VALUES (@s,@id,@nm,@role,@cr,@as,@ai,@ar,@n,@d,@st); SELECT last_insert_rowid();", tx,
+                     AgreementWithAI, AgreementWithResearcher, Notes, ValidationDate, ValidationStatus,
+                     LocalizationRelevance, GradCamUsefulness, FrontComment, LeftComment, RightComment)
+                    VALUES (@s,@id,@nm,@role,@cr,@as,@ai,@ar,@n,@d,@st,@lr,@gu,@fc,@lc,@rc); SELECT last_insert_rowid();", tx,
                     "@s", v.ScanSessionID, "@id", v.DermatologistID, "@nm", v.ValidatorName, "@role", v.ProfessionalRole,
                     "@cr", v.CredentialReference, "@as", v.DermatologistAssessment, "@ai", v.AgreementWithAI,
-                    "@ar", v.AgreementWithResearcher, "@n", v.Notes, "@d", v.ValidationDate, "@st", v.ValidationStatus))
+                    "@ar", v.AgreementWithResearcher, "@n", v.Notes, "@d", v.ValidationDate, "@st", v.ValidationStatus,
+                    "@lr", v.LocalizationRelevance, "@gu", v.GradCamUsefulness, "@fc", v.FrontComment, "@lc", v.LeftComment, "@rc", v.RightComment))
                     id = Convert.ToInt64(cmd.ExecuteScalar());
 
                 InsertLabels(c, tx, "Dermatologist", id, labels);
@@ -714,33 +741,13 @@ namespace SkinDevApp.Data
                         AgreementWithAI = S(r, "AgreementWithAI"),
                         AgreementWithResearcher = S(r, "AgreementWithResearcher"),
                         Notes = S(r, "Notes"),
+                        LocalizationRelevance = S(r, "LocalizationRelevance"),
+                        GradCamUsefulness = S(r, "GradCamUsefulness"),
+                        FrontComment = S(r, "FrontComment"),
+                        LeftComment = S(r, "LeftComment"),
+                        RightComment = S(r, "RightComment"),
                         ValidationDate = S(r, "ValidationDate"),
                         ValidationStatus = S(r, "ValidationStatus")
-                    });
-            return list;
-        }
-
-        // --------------------------------------------------------- fitzpatrick --
-
-        public static List<FitzpatrickAssessment> FitzpatrickFor(string participantId)
-        {
-            var list = new List<FitzpatrickAssessment>();
-            using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, "SELECT * FROM FitzpatrickAssessments WHERE ParticipantID=@p ORDER BY FitzpatrickAssessmentID DESC;", null, "@p", participantId))
-            using (var r = cmd.ExecuteReader())
-                while (r.Read())
-                    list.Add(new FitzpatrickAssessment
-                    {
-                        FitzpatrickAssessmentID = L(r, "FitzpatrickAssessmentID") ?? 0,
-                        ParticipantID = S(r, "ParticipantID"),
-                        ScanSessionID = S(r, "ScanSessionID"),
-                        SourceType = S(r, "SourceType"),
-                        ManualType = S(r, "ManualType"),
-                        PredictedType = S(r, "PredictedType"),
-                        ModelVersionID = L(r, "ModelVersionID"),
-                        ScoreData = S(r, "ScoreData"),
-                        AssessmentDate = S(r, "AssessmentDate"),
-                        Status = S(r, "Status")
                     });
             return list;
         }
@@ -864,11 +871,6 @@ namespace SkinDevApp.Data
                         WHEN Age < 55 THEN '45-54'
                         ELSE '55+' END AS Label, COUNT(*) AS N
             FROM Participants WHERE Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
-
-        public static List<CountRow> FitzpatrickManualDistribution() => Group(@"
-            SELECT COALESCE(NULLIF(k.FitzpatrickManual,''),'Not collected') AS Label, COUNT(*) AS N
-            FROM SkinProfiles k JOIN Participants p ON p.ParticipantID = k.ParticipantID
-            WHERE p.Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
 
         public static List<CountRow> ViewCompletion() => Group(@"
             SELECT CASE WHEN s.ScanMode='Single' THEN 'Single capture'

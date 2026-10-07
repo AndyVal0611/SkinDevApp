@@ -59,14 +59,7 @@ namespace SkinDevApp
                 Chart("View completion rate", "Views captured per scan session", StudyRepository.ViewCompletion());
                 Chart("Age distribution", "Participants by age group", StudyRepository.AgeDistribution(), sortByCount: false);
                 Chart("Sex distribution", "Participants", StudyRepository.SexDistribution());
-                Chart("Fitzpatrick distribution (manual / self-reported)", "Collected at registration; not AI-derived", StudyRepository.FitzpatrickManualDistribution(), sortByCount: false);
                 Chart("Model-version distribution", "Scan sessions per model (run / ONNX hash)", StudyRepository.ModelVersionDistribution());
-
-                var reserved = new StackPanel();
-                reserved.Children.Add(Ui.Text("Subgroup analysis by AI Fitzpatrick / skin-tone category", 15, true));
-                reserved.Children.Add(Ui.Text("Reserved. " + StudyText.FitzpatrickAiDetail +
-                    " AI-derived skin-tone statistics will appear here only after a validated model is integrated.", 12, false, Ui.Muted));
-                ChartGrid.Children.Add(Ui.Card(reserved));
             }
             catch (Exception ex)
             {

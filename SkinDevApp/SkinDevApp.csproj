@@ -169,6 +169,7 @@
 		<Compile Include="Data\StudyRepository.cs" />
 		<Compile Include="Views\ParticipantPickerWindow.cs" />
 		<Compile Include="Views\GradCamLauncher.cs" />
+		<Compile Include="Views\DermatologistReviewWindow.cs" />
 		<Compile Include="Views\ReportFindings.cs" />
 		<Compile Include="Views\ResearchReportWindow.cs" />
 		<Compile Include="Views\Ui.cs" />
@@ -232,6 +233,8 @@
 		<Compile Include="ScanStateMachine.cs" />
 		<Compile Include="ScanView.cs" />
 		<Compile Include="ViewPoseEstimator.cs" />
+		<Compile Include="CameraDiscovery.cs" />
+		<Compile Include="GradCamEnvironment.cs" />
 		<Compile Include="MultiViewSession.cs" />
 		<Compile Include="GalleryModel.cs" />
 		<Compile Include="ComparisonGalleryWindow.cs" />

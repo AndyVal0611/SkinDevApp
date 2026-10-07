@@ -15,11 +15,11 @@
         <!-- PatientID search -->
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="18,12">
             <DockPanel>
-                <TextBlock Text="Patient / Participant ID" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Text="Search by Patient ID or participant name" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <Button x:Name="SearchBtn" DockPanel.Dock="Right" Content="SEARCH" Style="{StaticResource PrimaryButton}" Height="38" Width="120"
                         Margin="10,0,0,0" Click="SearchBtn_Click"/>
                 <TextBox x:Name="IdSearchTxt" Style="{StaticResource Field}" Height="38" FontSize="14" KeyDown="IdSearchTxt_KeyDown"
-                         ToolTip="Example: PS-0001"/>
+                         ToolTip="Patient ID (PS-0001 or 0001) or a name (Elaiza, Bautista). Partial text works."/>
             </DockPanel>
         </Border>
 

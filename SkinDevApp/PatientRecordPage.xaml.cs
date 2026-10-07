@@ -89,10 +89,38 @@ namespace SkinDevApp
 
         private void SearchBtn_Click(object sender, RoutedEventArgs e)
         {
-            string id = StudyRepository.NormaliseParticipantId(IdSearchTxt.Text);
-            if (id.Length == 0) return;
-            IdSearchTxt.Text = id;
-            LoadParticipant(id);
+            string text = (IdSearchTxt.Text ?? "").Trim();
+            if (text.Length == 0) return;
+
+            List<Participant> found;
+            try { found = StudyRepository.SearchParticipants(text, "", ""); }
+            catch (Exception ex)
+            {
+                RecordPanel.Children.Clear();
+                RecordPanel.Children.Add(Ui.Card(Ui.Text("Database error: " + ex.Message, 13, false, Ui.Bad)));
+                return;
+            }
+
+            if (found.Count == 1) { IdSearchTxt.Text = found[0].ParticipantID; LoadParticipant(found[0].ParticipantID); return; }
+            if (found.Count == 0) { LoadParticipant(StudyRepository.NormaliseParticipantId(text)); return; }   // shows the "not found" card
+
+            // several matches: never pick one silently - show them as clickable rows
+            _p = null;
+            RecordPanel.Children.Clear();
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text(found.Count + " participants match \"" + text + "\"", 18, true));
+            sp.Children.Add(Ui.Text("Click the participant to open the record.", 13, false, Ui.Muted));
+            foreach (Participant p in found.Take(100))
+            {
+                string id = p.ParticipantID;
+                Button b = Ui.Btn(p.ParticipantID + " — " + p.FullName + (p.Age.HasValue ? " — Age " + p.Age : "") + (string.IsNullOrEmpty(p.Sex) ? "" : " — " + p.Sex)
+                                  + (p.Status == "Withdrawn" ? " — WITHDRAWN" : ""),
+                                  (s, e) => { IdSearchTxt.Text = id; LoadParticipant(id); }, "SmallButton");
+                b.HorizontalContentAlignment = HorizontalAlignment.Left;
+                b.Margin = new Thickness(0, 6, 0, 0);
+                sp.Children.Add(b);
+            }
+            RecordPanel.Children.Add(Ui.Card(sp));
         }
 
         private void ShowWelcome()
@@ -100,7 +128,7 @@ namespace SkinDevApp
             RecordPanel.Children.Clear();
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Find a participant", 18, true));
-            sp.Children.Add(Ui.Text("Enter a Patient ID such as PS-0001 and press SEARCH, or pick a participant from the list. " +
+            sp.Children.Add(Ui.Text("Type a Patient ID (PS-0001) or part of a participant's name and press SEARCH, or pick a participant from the list. " +
                                     "The record, consent status, latest result and the full analysis history load automatically.", 13, false, Ui.Muted));
             RecordPanel.Children.Add(Ui.Card(sp));
         }
@@ -242,8 +270,6 @@ namespace SkinDevApp
             sp.Children.Add(Ui.KeyValues(new[]
             {
                 Ui.KV("Skin type", s.GeneralSkinType),
-                Ui.KV("Fitzpatrick (manual)", string.IsNullOrEmpty(s.FitzpatrickManual) ? "Not collected" : s.FitzpatrickManual + (s.FitzpatrickSource == "Not collected" ? "" : " · " + s.FitzpatrickSource)),
-                Ui.KV("Fitzpatrick AI status", "Not Yet Trained — " + StudyText.FitzpatrickAiStatus),
                 Ui.KV("Sensitivity", s.Sensitivity),
                 Ui.KV("Reported concerns", concerns),
                 Ui.KV("Regions", regions),
@@ -292,9 +318,6 @@ namespace SkinDevApp
             if (d == null) return;
             _detailHost.Children.Add(DetailCard(d));
             _detailHost.Children.Add(EvidenceCard(d));
-
-            SkinProfile sp = string.IsNullOrEmpty(row.ParticipantID) ? null : StudyRepository.GetSkinProfile(row.ParticipantID);
-            _detailHost.Children.Add(Ui.FitzpatrickReservedCard(sp?.FitzpatrickManual, sp?.FitzpatrickSource));
         }
 
         internal static Border DetailCard(SessionDetail d)
@@ -305,9 +328,13 @@ namespace SkinDevApp
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(buttons, Dock.Right);
             buttons.Children.Add(Ui.Btn("Results", (o, e) => Nav.Go(new ResultsPage(s.ScanSessionID)), "SmallButton"));
-            buttons.Children.Add(Ui.Btn("Verification", (o, e) =>
+            buttons.Children.Add(Ui.Btn("Researcher Verification", (o, e) =>
             {
                 new ResearcherVerificationWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
+            }, "SmallButton"));
+            buttons.Children.Add(Ui.Btn("Dermatologist Review", (o, e) =>
+            {
+                new DermatologistReviewWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
             }, "SmallButton"));
             buttons.Children.Add(Ui.Btn("Report", (o, e) => ResearchReportWindow.Open(s.ScanSessionID), "SmallButton"));
             head.Children.Add(buttons);

@@ -101,8 +101,12 @@
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
                                    Text="Ensure your webcam is connected and not in use by another application."/>
-                        <TextBlock Grid.Row="2" x:Name="CameraDetailText" Style="{StaticResource CardBody}" Margin="0,8,0,0"
-                                   Text="Scanning for video input devices..."/>
+                        <StackPanel Grid.Row="2">
+                            <TextBlock x:Name="CameraDetailText" Style="{StaticResource CardBody}" Margin="0,8,0,0"
+                                       Text="Scanning for video input devices..."/>
+                            <ComboBox x:Name="CameraPicker" Visibility="Collapsed" Margin="0,8,0,0" Height="32" HorizontalAlignment="Left" MinWidth="280"
+                                      ToolTip="Choose another physical camera, then it is re-checked" SelectionChanged="CameraPicker_SelectionChanged"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -201,7 +205,7 @@
                             <Ellipse x:Name="GradCamStatusDot" Width="10" Height="10" Fill="#A39689" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="GradCamStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#A39689" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <Button x:Name="StartServiceBtn" Content="Start service" Visibility="Collapsed" HorizontalAlignment="Left"
+                        <Button x:Name="StartServiceBtn" Content="Start / Retry Grad-CAM++ service" Visibility="Collapsed" HorizontalAlignment="Left"
                                 Style="{StaticResource SmallButton}" Margin="0,0,0,8" Click="StartServiceBtn_Click"/>
                         <TextBlock x:Name="GradCamDetailText" Style="{StaticResource CardBody}"
                                    Text="If the service is unavailable the scan still runs and saves the class scores; heatmaps will be missing."/>

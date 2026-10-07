@@ -263,6 +263,11 @@ namespace SkinDevApp.Views
             {
                 Add("Comparison Gallery (original + 4 CAMs per view)", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
                 Add("Researcher Verification", (s, e) => OpenVerification(), "PrimaryButton");
+                Add("Dermatologist Review (clinical summary)", (s, e) =>
+                {
+                    new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
+                    Render();
+                }, "SecondaryButton");
             }
             Add("Generate Research Report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))
@@ -284,10 +289,6 @@ namespace SkinDevApp.Views
             }, 110));
             human.Children.Add(Ui.Text("Human assessments are stored separately and never overwrite the AI prediction.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
-
-            // Fitzpatrick reserved
-            SkinProfile sp = string.IsNullOrEmpty(_d.Session.ParticipantID) ? null : StudyRepository.GetSkinProfile(_d.Session.ParticipantID);
-            SideColumn.Children.Add(Ui.FitzpatrickReservedCard(sp?.FitzpatrickManual, sp?.FitzpatrickSource));
 
             // Notice
             var notice = new Border { Style = (Style)FindResource("NoticeBox"), Margin = new Thickness(8) };

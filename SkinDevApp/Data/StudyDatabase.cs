@@ -10,7 +10,7 @@
 //    3 Consents                10 ResearcherEvaluations
 //    4 ScanSessions            11 DermatologistValidations
 //    5 CaptureViews            12 ModelVersions
-//    6 AnalysisResults         13 FitzpatrickAssessments  (reserved / future AI)
+//    6 AnalysisResults         13 FitzpatrickAssessments  (manual / dermatologist only)
 //    7 ClassScores             14 SystemSettings + AuditLog
 //  + AssessmentLabels: lets one human assessment carry several reference labels.
 //
@@ -135,6 +135,9 @@ namespace SkinDevApp.Data
                 using (var tx = c.BeginTransaction())
                 {
                     Exec(c, tx, Schema);
+                    // Additive, non-destructive upgrade: new dermatologist-review answers are extra nullable columns, so existing rows stay valid.
+                    foreach (string col in new[] { "LocalizationRelevance", "GradCamUsefulness", "FrontComment", "LeftComment", "RightComment" })
+                        EnsureColumn(c, tx, "DermatologistValidations", col, "TEXT");
                     Exec(c, tx, "INSERT OR IGNORE INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('schema_version', '" +
                                 SchemaVersion + "', datetime('now','localtime'), 'system');");
                     tx.Commit();
@@ -154,6 +157,16 @@ namespace SkinDevApp.Data
         private static void Exec(SQLiteConnection c, SQLiteTransaction tx, string sql)
         {
             using (var cmd = new SQLiteCommand(sql, c, tx)) cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>ALTER TABLE ADD COLUMN only when the column is missing (safe to run on every start; never drops or rewrites data).</summary>
+        private static void EnsureColumn(SQLiteConnection c, SQLiteTransaction tx, string table, string column, string type)
+        {
+            using (var cmd = new SQLiteCommand("PRAGMA table_info(" + table + ");", c, tx))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read())
+                    if (string.Equals(Convert.ToString(r["name"]), column, StringComparison.OrdinalIgnoreCase)) return;
+            Exec(c, tx, "ALTER TABLE " + table + " ADD COLUMN " + column + " " + type + ";");
         }
 
         private const string Schema = @"

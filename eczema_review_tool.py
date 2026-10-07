@@ -316,12 +316,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global STORE
+    global STORE, PAGE
     ap = argparse.ArgumentParser(description="Local eczema box review tool (stdlib only).")
     ap.add_argument("folder", help="one reviewer's folder containing images\\ and labels\\")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--label", default="eczema", help="condition name shown on the page (default: eczema), e.g. --label acne")
     a = ap.parse_args()
+    PAGE = PAGE.replace("eczema", a.label.lower()).replace("Eczema", a.label.capitalize())
     STORE = Store(a.folder)
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     url = "http://127.0.0.1:%d" % a.port

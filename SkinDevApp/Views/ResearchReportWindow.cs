@@ -381,14 +381,11 @@ namespace SkinDevApp.Views
             ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
             SkinProfile skin = string.IsNullOrEmpty(s.ParticipantID) ? null : StudyRepository.GetSkinProfile(s.ParticipantID);
-            sp.Children.Add(Heading("Human assessment and skin-tone module"));
+            sp.Children.Add(Heading("Human assessment"));
             sp.Children.Add(Table(new[]
             {
                 Ui.KV("Researcher assessment", ev == null ? "Pending" : ev.ResearcherClassification + " · " + ev.AgreementWithAI + " · " + ev.ResearcherID + " · " + ev.EvaluationDate),
-                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + dv.ValidationStatus + " · " + dv.DermatologistID + " · " + dv.ValidationDate),
-                Ui.KV("Fitzpatrick / skin-tone AI", "Not available in this model version"),
-                Ui.KV("Fitzpatrick (manual)", skin == null || string.IsNullOrWhiteSpace(skin.FitzpatrickManual) || skin.FitzpatrickManual == "Not collected"
-                    ? "Not collected" : skin.FitzpatrickManual + " (" + skin.FitzpatrickSource + ")")
+                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + dv.ValidationStatus + " · " + dv.DermatologistID + " · " + dv.ValidationDate)
             }, 150));
 
             // disclaimer + full hash
