@@ -304,18 +304,15 @@ namespace SkinDevApp.Views
             {
                 try
                 {
-                    var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-                    if (devices.Count == 0)
+                    var cams = CameraDiscovery.List();
+                    if (cams.Count == 0)
                     {
                         h.CameraText = "No camera detected";
                     }
                     else
                     {
-                        string brio = null;
-                        for (int i = 0; i < devices.Count; i++)
-                            if ((devices[i].Name ?? "").ToLowerInvariant().Contains("brio")) brio = devices[i].Name;
-                        h.CameraOk = true;
-                        h.CameraText = brio ?? devices[0].Name + " (Logitech BRIO not found)";
+                        h.CameraOk = true;                      // listed; the Preparation page proves that frames arrive
+                        h.CameraText = cams[0].Name + (cams[0].IsBrio ? "" : cams[0].IsVirtual ? " (virtual / infrared only)" : " (Logitech BRIO not found; using this camera)");
                     }
                 }
                 catch (Exception ex) { h.CameraText = "Check failed: " + ex.Message; }

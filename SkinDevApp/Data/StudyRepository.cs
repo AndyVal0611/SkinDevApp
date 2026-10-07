@@ -241,21 +241,46 @@ namespace SkinDevApp.Data
                 return r.Read() ? ReadParticipant(r) : null;
         }
 
-        /// <summary>Filter by ID / name text, registration date (yyyy-MM-dd) and status. Empty = no filter.</summary>
+        /// <summary>
+        /// Find participants by PatientID or name, case-insensitive, partial matches allowed. Every word typed must match
+        /// the ID or the full name (first + middle + last), so "elaiza bautista" and "ps-0003" and "0003" all work.
+        /// An exact PatientID ("PS-0003", "ps3", "3") always sorts first. Optional registration date (yyyy-MM-dd) and status filters.
+        /// Search only reads: it never creates a participant.
+        /// </summary>
         public static List<Participant> SearchParticipants(string text, string date, string status)
         {
             var list = new List<Participant>();
             string t = (text ?? "").Trim();
+            string[] tokens = t.Length == 0 ? new string[0] : t.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+            var sql = new System.Text.StringBuilder("SELECT * FROM Participants WHERE 1=1");
+            var args = new List<object>();
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                sql.Append(" AND (ParticipantID LIKE @t" + i + @" ESCAPE '\' OR (COALESCE(FirstName,'') || ' ' || COALESCE(MiddleName,'') || ' ' || COALESCE(LastName,'')) LIKE @t" + i + @" ESCAPE '\')");
+                args.Add("@t" + i);
+                args.Add("%" + tokens[i].Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%");
+            }
+            string d = (date ?? "").Trim(), st = (status ?? "").Trim();
+            if (d.Length > 0) { sql.Append(" AND substr(RegisteredAt,1,10) = @d"); args.Add("@d"); args.Add(d); }
+            if (st.Length > 0) { sql.Append(" AND Status = @s"); args.Add("@s"); args.Add(st); }
+            sql.Append(" ORDER BY Seq DESC;");
+
             using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, @"SELECT * FROM Participants
-                WHERE (@t = '' OR ParticipantID LIKE @like OR FirstName LIKE @like OR LastName LIKE @like OR MiddleName LIKE @like
-                       OR (COALESCE(FirstName,'') || ' ' || COALESCE(LastName,'')) LIKE @like)
-                  AND (@d = '' OR substr(RegisteredAt,1,10) = @d)
-                  AND (@s = '' OR Status = @s)
-                ORDER BY Seq DESC;", null,
-                "@t", t, "@like", "%" + t + "%", "@d", (date ?? "").Trim(), "@s", (status ?? "").Trim()))
+            using (var cmd = Cmd(c, sql.ToString(), null, args.ToArray()))
             using (var r = cmd.ExecuteReader())
                 while (r.Read()) list.Add(ReadParticipant(r));
+
+            // "ps3", "PS 3" or "3" mean PS-0003 even though the text is not inside the stored ID: add that exact participant.
+            string exact = NormaliseParticipantId(t);
+            bool idLike = System.Text.RegularExpressions.Regex.IsMatch(t, @"^\s*(ps[\s-]*)?\d+\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (idLike && d.Length == 0 && st.Length == 0 && !list.Any(p => string.Equals(p.ParticipantID, exact, StringComparison.OrdinalIgnoreCase)))
+            {
+                Participant hit = GetParticipant(exact);
+                if (hit != null) list.Insert(0, hit);
+            }
+            if (exact.Length > 0)
+                list = list.OrderBy(p => string.Equals(p.ParticipantID, exact, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToList();   // stable: keeps newest-first otherwise
             return list;
         }
 

@@ -673,45 +673,9 @@ namespace SkinDevApp.Views
         /// <summary>Prefers a normal RGB webcam; skips virtual and infrared cameras when possible.</summary>
         private int PickCameraIndex()
         {
-            // A camera chosen in Settings wins.
-            string chosen = (ScanSettings.Current.CameraName ?? "").Trim().ToLowerInvariant();
-            if (chosen.Length > 0)
-                for (int i = 0; i < videoDevices.Count; i++)
-                    if ((videoDevices[i].Name ?? "").ToLowerInvariant() == chosen) return i;
-
-            // Prefer Logitech BRIO
-            for (int i = 0; i < videoDevices.Count; i++)
-            {
-                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
-
-                if (name.Contains("brio"))
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[CAM] BRIO found: {videoDevices[i].Name}");
-
-                    return i;
-                }
-            }
-
-            // Otherwise prefer another Logitech camera
-            for (int i = 0; i < videoDevices.Count; i++)
-            {
-                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
-
-                if (name.Contains("logitech"))
-                    return i;
-            }
-
-            // Otherwise use first normal webcam
-            for (int i = 0; i < videoDevices.Count; i++)
-            {
-                string name = (videoDevices[i].Name ?? "").ToLowerInvariant();
-
-                if (!NotARealWebcam.Any(k => name.Contains(k)))
-                    return i;
-            }
-
-            return 0;
+            // Same ranking as the Preparation page (CameraDiscovery): a camera chosen in Settings / on the preparation page,
+            // then Logitech BRIO, then other Logitech, then any other physical webcam; virtual / infrared cameras last.
+            return CameraDiscovery.PickIndex(videoDevices);
         }
 
         private void OpenCamera(int index)

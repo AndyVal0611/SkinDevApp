@@ -89,10 +89,38 @@ namespace SkinDevApp
 
         private void SearchBtn_Click(object sender, RoutedEventArgs e)
         {
-            string id = StudyRepository.NormaliseParticipantId(IdSearchTxt.Text);
-            if (id.Length == 0) return;
-            IdSearchTxt.Text = id;
-            LoadParticipant(id);
+            string text = (IdSearchTxt.Text ?? "").Trim();
+            if (text.Length == 0) return;
+
+            List<Participant> found;
+            try { found = StudyRepository.SearchParticipants(text, "", ""); }
+            catch (Exception ex)
+            {
+                RecordPanel.Children.Clear();
+                RecordPanel.Children.Add(Ui.Card(Ui.Text("Database error: " + ex.Message, 13, false, Ui.Bad)));
+                return;
+            }
+
+            if (found.Count == 1) { IdSearchTxt.Text = found[0].ParticipantID; LoadParticipant(found[0].ParticipantID); return; }
+            if (found.Count == 0) { LoadParticipant(StudyRepository.NormaliseParticipantId(text)); return; }   // shows the "not found" card
+
+            // several matches: never pick one silently - show them as clickable rows
+            _p = null;
+            RecordPanel.Children.Clear();
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text(found.Count + " participants match \"" + text + "\"", 18, true));
+            sp.Children.Add(Ui.Text("Click the participant to open the record.", 13, false, Ui.Muted));
+            foreach (Participant p in found.Take(100))
+            {
+                string id = p.ParticipantID;
+                Button b = Ui.Btn(p.ParticipantID + " — " + p.FullName + (p.Age.HasValue ? " — Age " + p.Age : "") + (string.IsNullOrEmpty(p.Sex) ? "" : " — " + p.Sex)
+                                  + (p.Status == "Withdrawn" ? " — WITHDRAWN" : ""),
+                                  (s, e) => { IdSearchTxt.Text = id; LoadParticipant(id); }, "SmallButton");
+                b.HorizontalContentAlignment = HorizontalAlignment.Left;
+                b.Margin = new Thickness(0, 6, 0, 0);
+                sp.Children.Add(b);
+            }
+            RecordPanel.Children.Add(Ui.Card(sp));
         }
 
         private void ShowWelcome()
@@ -100,7 +128,7 @@ namespace SkinDevApp
             RecordPanel.Children.Clear();
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Find a participant", 18, true));
-            sp.Children.Add(Ui.Text("Enter a Patient ID such as PS-0001 and press SEARCH, or pick a participant from the list. " +
+            sp.Children.Add(Ui.Text("Type a Patient ID (PS-0001) or part of a participant's name and press SEARCH, or pick a participant from the list. " +
                                     "The record, consent status, latest result and the full analysis history load automatically.", 13, false, Ui.Muted));
             RecordPanel.Children.Add(Ui.Card(sp));
         }

@@ -232,6 +232,8 @@
 		<Compile Include="ScanStateMachine.cs" />
 		<Compile Include="ScanView.cs" />
 		<Compile Include="ViewPoseEstimator.cs" />
+		<Compile Include="CameraDiscovery.cs" />
+		<Compile Include="GradCamEnvironment.cs" />
 		<Compile Include="MultiViewSession.cs" />
 		<Compile Include="GalleryModel.cs" />
 		<Compile Include="ComparisonGalleryWindow.cs" />
