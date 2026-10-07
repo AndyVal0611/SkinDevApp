@@ -14,6 +14,7 @@ namespace SkinDevApp.Views
 {
     public partial class RegistrationPage : Page
     {
+        private string _legacyFitz, _legacyFitzSource;
         private readonly bool _editMode;
         private string _participantId;          // set once saved (new) or from the record (edit)
         private bool _loading = true;
@@ -69,8 +70,7 @@ namespace SkinDevApp.Views
 
             Select(SkinTypeCombo, sp.GeneralSkinType);
             Select(SensitivityCombo, sp.Sensitivity);
-            Select(FitzCombo, string.IsNullOrEmpty(sp.FitzpatrickManual) ? "Not collected" : sp.FitzpatrickManual);
-            Select(FitzSourceCombo, sp.FitzpatrickSource ?? "Self-reported");
+            _legacyFitz = sp.FitzpatrickManual; _legacyFitzSource = sp.FitzpatrickSource;      // retired feature: kept as-is in the database, never shown or edited
             SetChecks(ConcernPanel, sp.Concerns);
             ConcernOtherTxt.Text = sp.ConcernOther;
             SetChecks(RegionPanel, sp.Regions);
@@ -169,12 +169,11 @@ namespace SkinDevApp.Views
                 Status = _editMode ? (Selected(StatusCombo) ?? "Active") : "Active"
             };
 
-            string fitz = Selected(FitzCombo) ?? "Not collected";
             sp = new SkinProfile
             {
                 GeneralSkinType = Selected(SkinTypeCombo),
-                FitzpatrickManual = fitz,
-                FitzpatrickSource = fitz == "Not collected" ? "Not collected" : Selected(FitzSourceCombo),
+                FitzpatrickManual = _legacyFitz,                 // legacy column carried through unchanged
+                FitzpatrickSource = _legacyFitzSource,
                 Sensitivity = Selected(SensitivityCombo),
                 Concerns = concerns,
                 ConcernOther = T(ConcernOtherTxt),

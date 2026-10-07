@@ -270,7 +270,6 @@ namespace SkinDevApp
             sp.Children.Add(Ui.KeyValues(new[]
             {
                 Ui.KV("Skin type", s.GeneralSkinType),
-                Ui.KV("Fitzpatrick (manual)", string.IsNullOrEmpty(s.FitzpatrickManual) ? "Not collected" : s.FitzpatrickManual + (s.FitzpatrickSource == "Not collected" ? "" : " · " + s.FitzpatrickSource)),
                 Ui.KV("Sensitivity", s.Sensitivity),
                 Ui.KV("Reported concerns", concerns),
                 Ui.KV("Regions", regions),
@@ -329,9 +328,13 @@ namespace SkinDevApp
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(buttons, Dock.Right);
             buttons.Children.Add(Ui.Btn("Results", (o, e) => Nav.Go(new ResultsPage(s.ScanSessionID)), "SmallButton"));
-            buttons.Children.Add(Ui.Btn("Verification", (o, e) =>
+            buttons.Children.Add(Ui.Btn("Researcher Verification", (o, e) =>
             {
                 new ResearcherVerificationWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
+            }, "SmallButton"));
+            buttons.Children.Add(Ui.Btn("Dermatologist Review", (o, e) =>
+            {
+                new DermatologistReviewWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
             }, "SmallButton"));
             buttons.Children.Add(Ui.Btn("Report", (o, e) => ResearchReportWindow.Open(s.ScanSessionID), "SmallButton"));
             head.Children.Add(buttons);

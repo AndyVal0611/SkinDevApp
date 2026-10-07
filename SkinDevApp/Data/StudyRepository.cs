@@ -433,10 +433,10 @@ namespace SkinDevApp.Data
             SELECT s.*,
                    (COALESCE(m.RunName,'unknown') || ' / ' || substr(COALESCE(m.OnnxSha256,'unknown'),1,12)) AS ModelLabel,
                    CASE WHEN EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed')
-                             THEN 'Dermatologist validated'
+                             THEN 'Dermatologist Validated'
                         WHEN EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID=s.ScanSessionID)
-                             THEN 'Researcher assessed'
-                        ELSE 'Pending' END AS ValidationStatus
+                             THEN 'Researcher Verified - Dermatologist Validation Pending'
+                        ELSE 'AI Analysis Complete - Researcher Verification Pending' END AS ValidationStatus
             FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID ";
 
         private static ScanSessionRow ReadSession(SQLiteDataReader r) => new ScanSessionRow
@@ -674,11 +674,13 @@ namespace SkinDevApp.Data
                 long id;
                 using (var cmd = Cmd(c, @"INSERT INTO DermatologistValidations
                     (ScanSessionID, DermatologistID, ValidatorName, ProfessionalRole, CredentialReference, DermatologistAssessment,
-                     AgreementWithAI, AgreementWithResearcher, Notes, ValidationDate, ValidationStatus)
-                    VALUES (@s,@id,@nm,@role,@cr,@as,@ai,@ar,@n,@d,@st); SELECT last_insert_rowid();", tx,
+                     AgreementWithAI, AgreementWithResearcher, Notes, ValidationDate, ValidationStatus,
+                     LocalizationRelevance, GradCamUsefulness, FrontComment, LeftComment, RightComment)
+                    VALUES (@s,@id,@nm,@role,@cr,@as,@ai,@ar,@n,@d,@st,@lr,@gu,@fc,@lc,@rc); SELECT last_insert_rowid();", tx,
                     "@s", v.ScanSessionID, "@id", v.DermatologistID, "@nm", v.ValidatorName, "@role", v.ProfessionalRole,
                     "@cr", v.CredentialReference, "@as", v.DermatologistAssessment, "@ai", v.AgreementWithAI,
-                    "@ar", v.AgreementWithResearcher, "@n", v.Notes, "@d", v.ValidationDate, "@st", v.ValidationStatus))
+                    "@ar", v.AgreementWithResearcher, "@n", v.Notes, "@d", v.ValidationDate, "@st", v.ValidationStatus,
+                    "@lr", v.LocalizationRelevance, "@gu", v.GradCamUsefulness, "@fc", v.FrontComment, "@lc", v.LeftComment, "@rc", v.RightComment))
                     id = Convert.ToInt64(cmd.ExecuteScalar());
 
                 InsertLabels(c, tx, "Dermatologist", id, labels);
@@ -739,55 +741,13 @@ namespace SkinDevApp.Data
                         AgreementWithAI = S(r, "AgreementWithAI"),
                         AgreementWithResearcher = S(r, "AgreementWithResearcher"),
                         Notes = S(r, "Notes"),
+                        LocalizationRelevance = S(r, "LocalizationRelevance"),
+                        GradCamUsefulness = S(r, "GradCamUsefulness"),
+                        FrontComment = S(r, "FrontComment"),
+                        LeftComment = S(r, "LeftComment"),
+                        RightComment = S(r, "RightComment"),
                         ValidationDate = S(r, "ValidationDate"),
                         ValidationStatus = S(r, "ValidationStatus")
-                    });
-            return list;
-        }
-
-        // --------------------------------------------------------- fitzpatrick --
-
-        /// <summary>
-        /// Stores the dermatologist-assigned Fitzpatrick type as its own record (SourceType 'Dermatologist').
-        /// It never overwrites the self-reported/manual value and is never mixed with any AI output.
-        /// </summary>
-        public static void SaveDermatologistFitzpatrick(string scanSessionId, string fitzType, string dermatologistId)
-        {
-            if (string.IsNullOrWhiteSpace(fitzType) || fitzType == "Not assessed") return;
-            ScanSessionRow s = GetSession(scanSessionId);
-            using (var c = StudyDatabase.Open())
-            using (var tx = c.BeginTransaction())
-            {
-                using (var cmd = Cmd(c, @"INSERT INTO FitzpatrickAssessments
-                    (ParticipantID, ScanSessionID, SourceType, ManualType, PredictedType, ModelVersionID, ScoreData, AssessmentDate, Status)
-                    VALUES (@p, @s, 'Dermatologist', @m, NULL, NULL, NULL, @at, @st);", tx,
-                    "@p", s == null ? null : s.ParticipantID, "@s", scanSessionId, "@m", fitzType, "@at", Now(),
-                    "@st", "Dermatologist-assessed (" + dermatologistId + "); any AI estimate is experimental and not shown to the participant"))
-                    cmd.ExecuteNonQuery();
-                Audit(c, tx, "Dermatologist Fitzpatrick type", "ScanSession", scanSessionId, fitzType);
-                tx.Commit();
-            }
-        }
-
-        public static List<FitzpatrickAssessment> FitzpatrickFor(string participantId)
-        {
-            var list = new List<FitzpatrickAssessment>();
-            using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, "SELECT * FROM FitzpatrickAssessments WHERE ParticipantID=@p ORDER BY FitzpatrickAssessmentID DESC;", null, "@p", participantId))
-            using (var r = cmd.ExecuteReader())
-                while (r.Read())
-                    list.Add(new FitzpatrickAssessment
-                    {
-                        FitzpatrickAssessmentID = L(r, "FitzpatrickAssessmentID") ?? 0,
-                        ParticipantID = S(r, "ParticipantID"),
-                        ScanSessionID = S(r, "ScanSessionID"),
-                        SourceType = S(r, "SourceType"),
-                        ManualType = S(r, "ManualType"),
-                        PredictedType = S(r, "PredictedType"),
-                        ModelVersionID = L(r, "ModelVersionID"),
-                        ScoreData = S(r, "ScoreData"),
-                        AssessmentDate = S(r, "AssessmentDate"),
-                        Status = S(r, "Status")
                     });
             return list;
         }
@@ -911,11 +871,6 @@ namespace SkinDevApp.Data
                         WHEN Age < 55 THEN '45-54'
                         ELSE '55+' END AS Label, COUNT(*) AS N
             FROM Participants WHERE Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
-
-        public static List<CountRow> FitzpatrickManualDistribution() => Group(@"
-            SELECT COALESCE(NULLIF(k.FitzpatrickManual,''),'Not collected') AS Label, COUNT(*) AS N
-            FROM SkinProfiles k JOIN Participants p ON p.ParticipantID = k.ParticipantID
-            WHERE p.Status <> 'Withdrawn' GROUP BY 1 ORDER BY 1;");
 
         public static List<CountRow> ViewCompletion() => Group(@"
             SELECT CASE WHEN s.ScanMode='Single' THEN 'Single capture'

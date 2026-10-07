@@ -129,7 +129,14 @@ namespace SkinDevApp
             try
             {
                 using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
-                    if (k != null) return ((k.GetValue("ProductName") as string) ?? "Windows") + " build " + (k.GetValue("CurrentBuild") as string ?? "?");
+                    if (k != null)
+                    {
+                        string name = (k.GetValue("ProductName") as string) ?? "Windows";
+                        string build = k.GetValue("CurrentBuild") as string ?? "?";
+                        int b;
+                        if (int.TryParse(build, out b) && b >= 22000) name = name.Replace("Windows 10", "Windows 11");   // the registry still says "Windows 10" on Windows 11
+                        return name + " build " + build;
+                    }
             }
             catch { }
             return Environment.OSVersion.VersionString;
@@ -140,7 +147,7 @@ namespace SkinDevApp
             var list = new List<string>();
             try
             {
-                using (RegistryKey cls = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11cd-b6a3-3c1d6e6a9b7f}"))
+                using (RegistryKey cls = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11cd-bfc1-08002be10318}"))
                     if (cls != null)
                         foreach (string sub in cls.GetSubKeyNames())
                             using (RegistryKey k = cls.OpenSubKey(sub))
@@ -195,7 +202,7 @@ namespace SkinDevApp
                 {
                     var o = p.StandardOutput.ReadToEndAsync();
                     var e = p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } stderr = "timed out"; return false; }
+                    if (!p.WaitForExit(timeoutMs)) { KillTree(p.Id); stderr = "timed out"; return false; }
                     stdout = o.Result.Trim(); stderr = e.Result.Trim(); exit = p.ExitCode;
                     return true;
                 }
@@ -297,6 +304,10 @@ namespace SkinDevApp
                 if (env.Python == null)
                 {
                     bool anyPython = env.Candidates.Any(c => c.Exists);
+                    if (!env.PortFree)
+                    {
+                        result.State = GradCamState.PortUnavailable; result.Message = "Port " + env.Port + " is used by another program that is not the Grad-CAM++ service. Close it and press Retry."; return result;
+                    }
                     result.State = anyPython ? GradCamState.DependencyMissing : GradCamState.PythonNotFound;
                     result.Message = anyPython
                         ? "Python was found but TensorFlow is missing. In the project folder run:  py -3.12 -m venv .venv  then  .venv\\Scripts\\python -m pip install -r requirements_gradcam.txt"
@@ -323,11 +334,12 @@ namespace SkinDevApp
                 }
                 catch (Exception ex) { result.State = GradCamState.StartFailed; result.Message = "Could not launch Python: " + ex.Message; return result; }
 
-                var log = new StreamWriter(new FileStream(LogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
-                log.WriteLine("[" + DateTime.Now.ToString("s") + "] " + env.Python.Label + " " + args);
-                log.WriteLine(env.Summary());
-                p.OutputDataReceived += (s, e) => { if (e.Data != null) lock (log) log.WriteLine(e.Data); };
-                p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (log) log.WriteLine(e.Data); };
+                var log = OpenLog();
+                lock (log) { log.WriteLine("[" + DateTime.Now.ToString("s") + "] " + env.Python.Label + " " + args); log.WriteLine(env.Summary()); }
+                p.OutputDataReceived += (s, e) => { if (e.Data != null) lock (log) { try { log.WriteLine(e.Data); } catch { } } };
+                p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (log) { try { log.WriteLine(e.Data); } catch { } } };
+                p.EnableRaisingEvents = true;
+                p.Exited += (s, e) => { System.Threading.Thread.Sleep(300); lock (log) { try { log.Dispose(); } catch { } } };   // release the file when the service ends
                 p.BeginOutputReadLine(); p.BeginErrorReadLine();
                 _started = p;
                 HookExit();
@@ -353,6 +365,17 @@ namespace SkinDevApp
             finally { lock (Gate) _starting = false; }
         }
 
+        /// <summary>Opens logs\gradcam_service.log; if the file is still held by an earlier run, falls back to a timestamped name so a retry never crashes.</summary>
+        private static StreamWriter OpenLog()
+        {
+            try { return new StreamWriter(new FileStream(LogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete)) { AutoFlush = true }; }
+            catch (IOException)
+            {
+                string alt = Path.Combine(LogDirectory, "gradcam_service_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".log");
+                return new StreamWriter(new FileStream(alt, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete)) { AutoFlush = true };
+            }
+        }
+
         public static string TailLog(int lines)
         {
             try
@@ -374,7 +397,18 @@ namespace SkinDevApp
         /// <summary>Stops the service only if this app started it.</summary>
         public static void StopIfStartedByApp()
         {
-            try { if (_started != null && !_started.HasExited) _started.Kill(); } catch { }
+            try { if (_started != null && !_started.HasExited) KillTree(_started.Id); } catch { }
+        }
+
+        /// <summary>Kills a process and its children: "py -3.12" is only a launcher whose child is the real Python process.</summary>
+        private static void KillTree(int pid)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("taskkill", "/PID " + pid + " /T /F") { UseShellExecute = false, CreateNoWindow = true };
+                using (Process k = Process.Start(psi)) k.WaitForExit(5000);
+            }
+            catch { try { Process.GetProcessById(pid).Kill(); } catch { } }
         }
 
         public static string StateTitle(GradCamState s)

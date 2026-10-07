@@ -275,22 +275,13 @@ namespace SkinDevApp.Data
         public string AgreementWithAI { get; set; }
         public string AgreementWithResearcher { get; set; }
         public string Notes { get; set; }
+        public string LocalizationRelevance { get; set; }     // Relevant | Partially relevant | Not relevant | No localization available | Unable to assess
+        public string GradCamUsefulness { get; set; }         // Useful | Partially useful | Not useful | Not interpretable | Not available
+        public string FrontComment { get; set; }
+        public string LeftComment { get; set; }
+        public string RightComment { get; set; }
         public string ValidationDate { get; set; }
         public string ValidationStatus { get; set; }          // Pending | Completed
-    }
-
-    public sealed class FitzpatrickAssessment
-    {
-        public long FitzpatrickAssessmentID { get; set; }
-        public string ParticipantID { get; set; }
-        public string ScanSessionID { get; set; }
-        public string SourceType { get; set; }                // Manual | AI
-        public string ManualType { get; set; }
-        public string PredictedType { get; set; }             // null until a validated model exists
-        public long? ModelVersionID { get; set; }
-        public string ScoreData { get; set; }
-        public string AssessmentDate { get; set; }
-        public string Status { get; set; }
     }
 
     public sealed class AuditEntry

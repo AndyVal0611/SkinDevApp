@@ -263,6 +263,11 @@ namespace SkinDevApp.Views
             {
                 Add("Comparison Gallery (original + 4 CAMs per view)", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
                 Add("Researcher Verification", (s, e) => OpenVerification(), "PrimaryButton");
+                Add("Dermatologist Review (clinical summary)", (s, e) =>
+                {
+                    new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
+                    Render();
+                }, "SecondaryButton");
             }
             Add("Generate Research Report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))

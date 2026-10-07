@@ -59,7 +59,6 @@ namespace SkinDevApp
                 Chart("View completion rate", "Views captured per scan session", StudyRepository.ViewCompletion());
                 Chart("Age distribution", "Participants by age group", StudyRepository.AgeDistribution(), sortByCount: false);
                 Chart("Sex distribution", "Participants", StudyRepository.SexDistribution());
-                Chart("Fitzpatrick distribution (manual / self-reported)", "Collected at registration", StudyRepository.FitzpatrickManualDistribution(), sortByCount: false);
                 Chart("Model-version distribution", "Scan sessions per model (run / ONNX hash)", StudyRepository.ModelVersionDistribution());
             }
             catch (Exception ex)

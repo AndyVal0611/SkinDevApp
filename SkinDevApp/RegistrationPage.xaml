@@ -128,41 +128,6 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
-
-                    <!-- Fitzpatrick -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Fitzpatrick skin type" Style="{StaticResource H2}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Manual / self-reported type" Style="{StaticResource FieldLabel}"/>
-                                    <ComboBox x:Name="FitzCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
-                                        <ComboBoxItem Content="Not collected" IsSelected="True"/>
-                                        <ComboBoxItem Content="Type I"/>
-                                        <ComboBoxItem Content="Type II"/>
-                                        <ComboBoxItem Content="Type III"/>
-                                        <ComboBoxItem Content="Type IV"/>
-                                        <ComboBoxItem Content="Type V"/>
-                                        <ComboBoxItem Content="Type VI"/>
-                                    </ComboBox>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Source of this value" Style="{StaticResource FieldLabel}"/>
-                                    <ComboBox x:Name="FitzSourceCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
-                                        <ComboBoxItem Content="Self-reported" IsSelected="True"/>
-                                        <ComboBoxItem Content="Researcher-assessed"/>
-                                    </ComboBox>
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,12,0,0"
-                                       Text="Recorded by the researcher or reported by the participant. It is not estimated by the software."/>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
 
                 <!-- Skin profile -->
