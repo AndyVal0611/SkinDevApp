@@ -676,6 +676,7 @@ namespace SkinDevApp.Explainability
 
                             if (!r.Ok)
                             {
+                                Debug.WriteLine("[LIVE] Grad-CAM++ request failed: " + r.Error);
                                 SetStatus(false, r.Error);
                                 await Task.Delay(500, ct).ConfigureAwait(false);
                                 continue;

@@ -1239,6 +1239,11 @@ def run_fastapi(host: str, port: int) -> bool:
         heatmap_max_side: Optional[int] = None
         include_raw_cam: Optional[bool] = False
 
+    # This file uses "from __future__ import annotations", so FastAPI looks the annotation "GradCamRequest"
+    # up in the MODULE namespace. The class is defined inside this function, so publish it there; otherwise
+    # newer FastAPI treats the body as a missing query field and answers every request with HTTP 422.
+    globals()["GradCamRequest"] = GradCamRequest
+
     app = FastAPI(title="PrecisionSkin Grad-CAM++ Service", version=SERVICE_VERSION)
 
     @app.get("/health")
