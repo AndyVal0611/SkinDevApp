@@ -28,6 +28,10 @@ namespace SkinDevApp.Data
             "Grad-CAM++ maps show model attribution (which image areas influenced each class score). " +
             "They are not lesion segmentation.";
 
+        public const string ComparisonNote =
+            "The heatmap is shown for the detected (top) class only: the four class maps are about 90% alike, because one image-level classifier " +
+            "scores all four classes from the same image features, so showing all four adds no information. The lesion boxes, not the heatmap, show where individual lesions are.";
+
         public static readonly string[] Classes = { "Acne", "Hyperpigmentation", "Eczema", "Normal" };
         public static readonly string[] Views = { "Front", "Left", "Right" };
     }

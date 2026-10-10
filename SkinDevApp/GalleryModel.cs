@@ -164,16 +164,26 @@ namespace SkinDevApp.Scanning
                 Note = "Full-resolution capture: original.png"
             });
 
+            // The four class maps are ~90% alike (one image-level classifier), so the gallery shows ONE Grad-CAM++ map: the detected
+            // (top) class. All four stay saved in the capture folder for research.
+            string shownClass = topClass;
+            if (string.IsNullOrEmpty(shownClass) && scores != null && scores.Count > 0)
+                shownClass = scores.OrderByDescending(kv => kv.Value).First().Key;
+            if (string.IsNullOrEmpty(shownClass) && rec.ClassMaps != null && rec.ClassMaps.Count > 0)
+                shownClass = rec.ClassMaps[0].Class;
+
             for (int k = 0; k < ClassPalette.ClassCount; k++)
             {
                 string name = ClassPalette.Names[k];
+                if (!string.IsNullOrEmpty(shownClass) && !string.Equals(name, shownClass, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 MapSection ms = (rec.ClassMaps ?? new List<MapSection>())
                     .FirstOrDefault(x => string.Equals(x.Class, name, StringComparison.OrdinalIgnoreCase));
 
                 var card = new GalleryCard
                 {
                     ClassIndex = k,
-                    Title = name + " CAM",
+                    Title = "Grad-CAM++ (detected: " + name + ")",
                     ColorHex = ClassPalette.Hex[k],
                     IsPredicted = string.Equals(name, topClass, StringComparison.OrdinalIgnoreCase)
                 };

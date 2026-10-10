@@ -179,8 +179,8 @@ namespace SkinDevApp.Views
                     col.Children.Add(Ui.ScoreBars(v.Scores.AsArray(), 6, compact: true));
                     col.Children.Add(Ui.Text("Capture quality: " + (v.QualityStatus ?? "—"), 10.5, false,
                         v.QualityStatus == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
-                    col.Children.Add(Ui.Text(v.Maps.Count == 4 ? "4 class-specific Grad-CAM++ maps saved" : "Grad-CAM++ unavailable for this view",
-                        10.5, false, v.Maps.Count == 4 ? Ui.Muted : Ui.Warn, new Thickness(0)));
+                    col.Children.Add(Ui.Text(v.Maps.Count > 0 ? "Grad-CAM++ heatmap saved (shown for the detected class)" : "Grad-CAM++ unavailable for this view",
+                        10.5, false, v.Maps.Count > 0 ? Ui.Muted : Ui.Warn, new Thickness(0)));
                     bool locWarn;
                     col.Children.Add(Ui.Text(LocalizationLine(v, out locWarn), 10.5, false, locWarn ? Ui.Warn : Ui.Muted, new Thickness(0, 2, 0, 0)));
                 }
@@ -191,7 +191,7 @@ namespace SkinDevApp.Views
                 grid.Children.Add(col);
             }
             sp.Children.Add(grid);
-            sp.Children.Add(Ui.Text(StudyText.AttributionNote, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
+            sp.Children.Add(Ui.Text(StudyText.AttributionNote + " " + StudyText.ComparisonNote, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
             sp.Children.Add(Ui.Text("Localization boxes are candidate lesion locations from a separate research detector (acne red, hyperpigmentation blue, eczema orange). " +
                                     "They are not lesion segmentation, not a diagnosis and not a lesion count: lesions can be missed and boxes can be wrong. " +
                                     "Eczema is a pilot class. The detector does not change the Grad-CAM++ maps or the class scores.",

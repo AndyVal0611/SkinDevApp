@@ -117,7 +117,7 @@ namespace SkinDevApp.Imaging
         /// Composite the given class indices (draw order = list order) into one
         /// layer. Returns null if nothing can be drawn.
         /// </summary>
-        public static ClassOverlayLayer BuildLayer(ClassHeatmapSet set, IList<int> classIndices, bool useRelativeStrength = true)
+        public static ClassOverlayLayer BuildLayer(ClassHeatmapSet set, IList<int> classIndices, bool useRelativeStrength = true, bool scaleByScore = false)
         {
             if (set == null || classIndices == null || classIndices.Count == 0)
                 return null;
@@ -146,8 +146,11 @@ namespace SkinDevApp.Imaging
 
                     // useRelativeStrength=false: every class is drawn at the same opacity scale. The relative
                     // strength is a raw-peak ratio between classes, not evidence, so comparison images do not use it.
+                    // scaleByScore: opacity follows the class's softmax score (a 1% class is faint, a 90% class is strong), used for the
+                    // per-class comparison images so four classes are not all drawn at the same strength.
                     double scale = ClassPalette.AlphaMax *
-                        (useRelativeStrength ? ClassPalette.StrengthFactor(map.RelativeStrength) : 1.0);
+                        (useRelativeStrength ? ClassPalette.StrengthFactor(map.RelativeStrength) : 1.0) *
+                        (scaleByScore ? ClassPalette.ProbabilityFactor(map.Probability) : 1.0);
 
                     using (Mat heatF = new Mat())
                     using (Mat a = new Mat())
@@ -206,7 +209,7 @@ namespace SkinDevApp.Imaging
         /// <summary>Overlay of ONE class, for the per-class files in the capture archive.</summary>
         public static Mat RenderSingleClass(Mat frameBgr, ClassHeatmapSet set, int classIndex)
         {
-            using (ClassOverlayLayer layer = BuildLayer(set, new List<int> { classIndex }, useRelativeStrength: false))
+            using (ClassOverlayLayer layer = BuildLayer(set, new List<int> { classIndex }, useRelativeStrength: false, scaleByScore: true))
             {
                 if (layer == null) return frameBgr.Clone();
                 return layer.Blend(frameBgr, 1.0);

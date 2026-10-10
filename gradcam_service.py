@@ -90,6 +90,18 @@ ALL_CLASS_MAX_SIDE = 320
 # reported as "diffuse" (attribution is spread out, not focal).
 DIFFUSE_TOP10_MASS = 0.28
 
+# How the per-class heat is built for the all-class response (explain_all):
+#   "attribution" (default)   the plain per-class Grad-CAM++ map, each class normalised separately.
+#   "differential" (EXPERIMENTAL, opt-in)  heat_c = relu(CAM_c - mean of the OTHER classes' CAMs), all four on ONE common scale.
+#                             On the 167 hand-boxed acne test photos the acne map put 1.76x chance of its heat inside the boxes
+#                             (plain map 1.30x, photo-independent average map 1.18x; gradcam_enrichment.py). BUT on real kiosk captures it is
+#                             unstable: the raw CAM scale differs per class, so a class scored 1% can get the strongest map while the 90%
+#                             class gets a faint one. Therefore it is NOT the default. Request it with map_mode=differential or the
+#                             environment variable PRECISIONSKIN_MAP_MODE=differential, for research only.
+DEFAULT_MAP_MODE = os.environ.get("PRECISIONSKIN_MAP_MODE", "attribution").strip().lower()
+if DEFAULT_MAP_MODE not in ("differential", "attribution"):
+    DEFAULT_MAP_MODE = "attribution"
+
 # Set PRECISIONSKIN_COMPILE=0 to force eager execution (debug).
 USE_COMPILED = os.environ.get("PRECISIONSKIN_COMPILE", "1") != "0"
 
@@ -615,6 +627,31 @@ def postprocess_heatmap(
     return np.nan_to_num(heat, nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32)
 
 
+def differential_heats(cams: List[np.ndarray], out_w: int, out_h: int, blur_sigma: float = BLUR_SIGMA) -> List[np.ndarray]:
+    """
+    heat_c = relu(CAM_c - mean(CAM_j, j != c)) on the upsampled raw maps, then ONE common scale for all classes
+    (the 99th percentile of the strongest class), so a class with no distinctive evidence stays dark instead of being
+    stretched to full colour. Returns four float32 maps in [0, 1].
+    """
+    n = len(cams)
+    ups = []
+    for c in cams:
+        a = np.nan_to_num(np.squeeze(np.asarray(c, dtype=np.float32)), nan=0.0, posinf=0.0, neginf=0.0)
+        ups.append(np.maximum(cv2.resize(a, (int(out_w), int(out_h)), interpolation=cv2.INTER_CUBIC), 0.0))
+    diffs = [np.maximum(ups[i] - np.mean([ups[j] for j in range(n) if j != i], axis=0), 0.0) for i in range(n)]
+    hi = max(float(np.percentile(d, 99.0)) for d in diffs)
+    if hi <= 1e-9:
+        return [np.zeros_like(d, dtype=np.float32) for d in diffs]
+    out = []
+    for d in diffs:
+        h = np.clip(d / hi, 0.0, 1.0)
+        if blur_sigma and blur_sigma > 0:
+            k = int(2 * round(3 * blur_sigma) + 1)
+            h = np.clip(cv2.GaussianBlur(h, (k, k), blur_sigma), 0.0, 1.0)
+        out.append(np.nan_to_num(h, nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32))
+    return out
+
+
 def make_overlay(
     img_bgr: np.ndarray,
     heat: np.ndarray,
@@ -851,7 +888,9 @@ class GradCamEngine:
             for i in range(2)
         ])
         diff = float(np.abs(ref - got).max())
-        if diff > 1e-4:
+        # 1e-4 was too strict: float32 softmax outputs differ by ~3e-4 between CPUs / oneDNN builds (seen on the WSL CPU), which would
+        # make the service refuse to start on the mini PC. A genuinely different function differs by orders of magnitude more.
+        if diff > 5e-3:
             raise RuntimeError(
                 f"Grad-CAM forward path differs from model output (max diff "
                 f"{diff:.2e}). Maps would explain a different function. "
@@ -991,9 +1030,12 @@ class GradCamEngine:
         frame_id: Optional[str] = None,
         drop_if_stale: bool = False,
         include_raw_cam: bool = False,
+        map_mode: Optional[str] = None,
     ) -> dict:
         """
         Four class-specific Grad-CAM++ maps from ONE pass.
+
+        map_mode: "differential" (default, see DEFAULT_MAP_MODE) or "attribution" (each plain map normalised separately).
 
         v2.1: include_raw_cam=True also returns each class's RAW CAM (float32,
         little-endian, row-major, shape raw_cam_shape) so the research team can
@@ -1040,10 +1082,15 @@ class GradCamEngine:
         raw_peaks = [float(c.max()) for c in cams]
         global_peak = max(raw_peaks) if raw_peaks else 0.0
 
+        mode = (map_mode or DEFAULT_MAP_MODE).strip().lower()
+        if mode not in ("differential", "attribution"):
+            mode = DEFAULT_MAP_MODE
+        diff_maps = differential_heats(cams, out_w, out_h, blur_sigma=sigma) if mode == "differential" else None
+
         classes = []
         heats: List[np.ndarray] = []
         for i, name in enumerate(CLASS_NAMES):
-            heat = postprocess_heatmap(cams[i], out_w, out_h, blur_sigma=sigma)
+            heat = diff_maps[i] if diff_maps is not None else postprocess_heatmap(cams[i], out_w, out_h, blur_sigma=sigma)
             heats.append(heat)
             conc = heat_concentration(heat)
             rel = (raw_peaks[i] / global_peak) if global_peak > 1e-12 else 0.0
@@ -1081,6 +1128,7 @@ class GradCamEngine:
             "classes": classes,
             "class_map_similarity": similarity,
             "method": method_used,
+            "map_mode": mode,
             "target_layer": self.default_layer,
             "exec_mode": cam_engine._all_fn_mode,
             "frame_id": frame_id,
@@ -1094,7 +1142,10 @@ class GradCamEngine:
                 "render_encode": round((t_end - t_cam) * 1000, 1),
             },
             "normalization_note": (
-                "Each class heatmap is normalised separately; compare shape, not brightness. "
+                ("Differential maps: each class map shows where that class's evidence is stronger than the average of the other classes "
+                 "(shared face attention removed), all four on ONE common scale; a class with no distinctive evidence stays dark. "
+                 if mode == "differential" else
+                 "Each class heatmap is normalised separately; compare shape, not brightness. ") +
                 "relative_strength compares raw CAM peaks across classes and is not a probability."
             ),
         }
@@ -1165,6 +1216,7 @@ def handle_gradcam(payload: dict) -> dict:
                 frame_id=frame_id,
                 drop_if_stale=drop_if_stale,
                 include_raw_cam=bool(payload.get("include_raw_cam", False)),
+                map_mode=payload.get("map_mode") or None,
             )
 
         return ENGINE.explain(

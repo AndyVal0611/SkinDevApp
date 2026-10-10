@@ -68,6 +68,18 @@ namespace SkinDevApp.Imaging
             return StrengthFloor + (1.0 - StrengthFloor) * r;
         }
 
+        public const double ProbabilityFloor = 0.15;   // opacity multiplier of a class whose score is ~0
+
+        /// <summary>
+        /// Class score (softmax, 0..1) -> opacity multiplier for the saved per-class overlays, so a class the model scored 1% is
+        /// drawn faint and one it scored 90% is drawn strong. The map shape is untouched; only the overlay strength follows the score.
+        /// </summary>
+        public static double ProbabilityFactor(double probability)
+        {
+            double p = probability < 0.0 ? 0.0 : (probability > 1.0 ? 1.0 : probability);
+            return ProbabilityFloor + (1.0 - ProbabilityFloor) * p;
+        }
+
         public static int IndexOf(string className)
         {
             for (int i = 0; i < Names.Length; i++)

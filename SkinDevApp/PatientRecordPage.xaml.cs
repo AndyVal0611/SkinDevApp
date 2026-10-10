@@ -398,29 +398,34 @@ namespace SkinDevApp
             DockPanel.SetDock(gallery, Dock.Right);
             head.Children.Add(gallery);
 
-            int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + v.Maps.Count(m => m.OverlayPath != null));
-            head.Children.Add(Ui.Text("Analysis Images and CAM Comparison (" + images + " images)", 16, true));
+            // One Grad-CAM++ map per view: the detected (top) class. The four class maps are ~90% alike, so showing all four added nothing;
+            // all four are still saved in the capture folder.
+            Func<CaptureViewRow, AttributionMapRow> shownMap = v =>
+            {
+                string cls = v.Scores != null ? v.Scores.PredictedClass : null;
+                AttributionMapRow m = string.IsNullOrEmpty(cls) ? null : v.Maps.FirstOrDefault(x => x.TargetClass == cls && x.OverlayPath != null);
+                return m ?? v.Maps.FirstOrDefault(x => x.OverlayPath != null);
+            };
+            int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + (shownMap(v) != null ? 1 : 0));
+            head.Children.Add(Ui.Text("Analysis Images and Grad-CAM++ (" + images + " images)", 16, true));
             sp.Children.Add(head);
 
             var tabs = new TabControl { Margin = new Thickness(0, 6, 0, 0), BorderThickness = new Thickness(0) };
-            string[] order = { "Acne", "Eczema", "Hyperpigmentation", "Normal" };       // gallery order requested by the spec
             foreach (CaptureViewRow v in d.Views)
             {
-                var row = new UniformGrid { Columns = 5, Margin = new Thickness(0, 8, 0, 0) };
+                var row = new UniformGrid { Columns = 2, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = 340 };
                 row.Children.Add(EvidenceCell("Original", v.AnalysedImagePath ?? v.OriginalImagePath, "#9CA3AF", null, v.OriginalImagePath));
-                foreach (string cls in order)
-                {
-                    AttributionMapRow m = v.Maps.FirstOrDefault(x => x.TargetClass == cls);
-                    double? score = v.Scores == null ? (double?)null : v.Scores.AsArray()[Array.IndexOf(StudyText.Classes, cls)];
-                    string label = (cls == "Normal" ? "Normal Skin" : cls) + " CAM" + (score.HasValue ? "  " + Ui.Pct(score.Value) : "");
-                    row.Children.Add(EvidenceCell(label, m?.OverlayPath, Ui.ClassColor(cls), m == null ? "Grad-CAM++ unavailable" : (m.Diffuse ? "diffuse attribution" : m.TopZone), m?.OverlayPath));
-                }
+                AttributionMapRow m = shownMap(v);
+                string cls = m != null ? m.TargetClass : (v.Scores != null ? v.Scores.PredictedClass : null);
+                double? score = v.Scores == null || cls == null ? (double?)null : v.Scores.AsArray()[Array.IndexOf(StudyText.Classes, cls)];
+                string label = "Grad-CAM++" + (cls != null ? " - " + (cls == "Normal" ? "Normal Skin" : cls) : "") + (score.HasValue ? "  " + Ui.Pct(score.Value) : "");
+                row.Children.Add(EvidenceCell(label, m?.OverlayPath, cls != null ? Ui.ClassColor(cls) : "#9CA3AF", m == null ? "Grad-CAM++ unavailable" : (m.Diffuse ? "diffuse attribution" : m.TopZone), m?.OverlayPath));
                 tabs.Items.Add(new TabItem { Header = "  " + v.ViewType.ToUpperInvariant() + "  ", Content = row });
             }
             if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No images saved for this scan.", 12, false, Ui.Muted));
             else sp.Children.Add(tabs);
 
-            sp.Children.Add(Ui.Text("The original image is unmodified and always available. " + StudyText.AttributionNote, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+            sp.Children.Add(Ui.Text("The original image is unmodified and always available. " + StudyText.AttributionNote + " " + StudyText.ComparisonNote, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }
 

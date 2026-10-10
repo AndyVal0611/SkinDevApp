@@ -315,16 +315,19 @@ namespace SkinDevApp.AI
             Mat o = frameBgr.Clone();
             if (set == null) return o;
 
-            int th = Math.Max(2, Math.Max(o.Width, o.Height) / 320);
-            double fs = Math.Max(0.4, Math.Max(o.Width, o.Height) / 1100.0);
+            int longSide = Math.Max(o.Width, o.Height);
+            int th = Math.Max(2, longSide / 600);                         // thin, exact outline: the box edge is the detector's edge, not a fat marker
+            double fs = Math.Max(0.4, longSide / 1100.0);
             bool writeLabels = labels && set.Boxes.Count <= 12;
 
-            foreach (LesionBox b in set.Boxes)
+            // weakest first, so the most confident boxes are never hidden under weaker ones
+            foreach (LesionBox b in set.Boxes.OrderBy(x => x.Confidence))
             {
                 Scalar col = ClassPalette.ColorsBgr[b.ClassIndex];
-                var p0 = new Point((int)b.X0, (int)b.Y0);
-                var p1 = new Point((int)b.X1, (int)b.Y1);
-                Cv2.Rectangle(o, p0, p1, col, th);
+                var p0 = new Point((int)Math.Round(b.X0), (int)Math.Round(b.Y0));
+                var p1 = new Point((int)Math.Round(b.X1), (int)Math.Round(b.Y1));
+                Cv2.Rectangle(o, p0, p1, Scalar.White, th + 2, LineTypes.AntiAlias);     // thin white halo: readable on any skin tone
+                Cv2.Rectangle(o, p0, p1, col, th, LineTypes.AntiAlias);
                 if (writeLabels)
                 {
                     string txt = b.ClassName + " " + b.Confidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
@@ -332,6 +335,19 @@ namespace SkinDevApp.AI
                     int ty = Math.Max(sz.Height + 2, p0.Y - 3);
                     Cv2.Rectangle(o, new Point(p0.X, ty - sz.Height - 3), new Point(p0.X + sz.Width + 4, ty + 2), col, -1);
                     Cv2.PutText(o, txt, new Point(p0.X + 2, ty - 1), HersheyFonts.HersheySimplex, fs, Scalar.White, 1, LineTypes.AntiAlias);
+                }
+            }
+
+            if (labels && set.Boxes.Count > 0)                           // count legend (the per-box labels are skipped when there are many boxes)
+            {
+                int y = 6;
+                foreach (var grp in set.Boxes.GroupBy(x => x.ClassIndex).OrderBy(g => g.Key))
+                {
+                    string txt = ClassPalette.Names[grp.Key] + " " + grp.Count() + (grp.Count() == 1 ? " box" : " boxes");
+                    var sz = Cv2.GetTextSize(txt, HersheyFonts.HersheySimplex, fs, 1, out int bl);
+                    Cv2.Rectangle(o, new Point(6, y), new Point(6 + sz.Width + 8, y + sz.Height + 8), ClassPalette.ColorsBgr[grp.Key], -1);
+                    Cv2.PutText(o, txt, new Point(10, y + sz.Height + 3), HersheyFonts.HersheySimplex, fs, Scalar.White, 1, LineTypes.AntiAlias);
+                    y += sz.Height + 12;
                 }
             }
             return o;
