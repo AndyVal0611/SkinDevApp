@@ -191,11 +191,10 @@ namespace SkinDevApp.Views
                 grid.Children.Add(col);
             }
             sp.Children.Add(grid);
-            sp.Children.Add(Ui.Text(StudyText.AttributionNote + " " + StudyText.ComparisonNote, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
-            sp.Children.Add(Ui.Text("Localization boxes are candidate lesion locations from a separate research detector (acne red, hyperpigmentation blue, eczema orange). " +
-                                    "They are not lesion segmentation, not a diagnosis and not a lesion count: lesions can be missed and boxes can be wrong. " +
-                                    "Eczema is a pilot class. The detector does not change the Grad-CAM++ maps or the class scores.",
-                                    10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            sp.Children.Add(Ui.Text(StudyText.ShortAttribution, 10.5, false, Ui.Muted, new Thickness(0, 12, 0, 0)));
+            sp.Children.Add(Ui.Text("Boxes: candidate lesions from a separate research detector (acne red, hyperpigmentation blue, eczema orange). " +
+                                    "They can miss or mislabel lesions, eczema is a pilot class, and they are not a diagnosis or a lesion count.",
+                                    10.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             return Ui.Card(sp);
         }
 

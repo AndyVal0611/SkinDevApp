@@ -93,6 +93,8 @@ namespace SkinDevApp.AI
         public string ModelSha256 { get; }
         public string ModelTag { get; }
         public int ImageSize => _imageSize;
+        /// <summary>Palette indices (0 acne, 1 hyperpigmentation, 2 eczema) this model detects.</summary>
+        public int[] PaletteClasses => (int[])_paletteOf.Clone();
 
         public LesionDetector(string onnxPath, string metaJsonPath, int intraOpThreads = 2)
         {
@@ -117,7 +119,8 @@ namespace SkinDevApp.AI
             }
 
             _paletteOf = classes.Select(ClassPalette.IndexOf).ToArray();
-            if (_paletteOf.Length != NumClasses || _paletteOf.Any(i => i < 0 || i >= NumClasses))
+            // 1..3 classes: the 3-class detector (v1) or a single-class specialist (e.g. acne only)
+            if (_paletteOf.Length < 1 || _paletteOf.Length > NumClasses || _paletteOf.Any(i => i < 0 || i >= NumClasses) || _paletteOf.Distinct().Count() != _paletteOf.Length)
                 throw new InvalidOperationException("Unexpected detector classes: " + string.Join(",", classes));
 
             _imageSize = size;
@@ -188,8 +191,8 @@ namespace SkinDevApp.AI
                 n = t.Dimensions[2];
                 o = t.ToArray();
             }
-            if (rows != 4 + NumClasses)
-                throw new InvalidOperationException("Unexpected detector output: " + rows + " rows (expected " + (4 + NumClasses) + ").");
+            if (rows != 4 + _paletteOf.Length)
+                throw new InvalidOperationException("Unexpected detector output: " + rows + " rows (expected " + (4 + _paletteOf.Length) + ").");
 
             double[] thr = thresholds ?? new[] { 0.20, 0.25, 0.25 };
             var perClass = new List<LesionBox>[NumClasses];
@@ -199,7 +202,7 @@ namespace SkinDevApp.AI
             {
                 int best = 0;
                 float bs = o[(4) * n + i];
-                for (int c = 1; c < NumClasses; c++)
+                for (int c = 1; c < _paletteOf.Length; c++)
                 {
                     float sc = o[(4 + c) * n + i];
                     if (sc > bs) { bs = sc; best = c; }
@@ -282,8 +285,31 @@ namespace SkinDevApp.AI
         private static LesionDetector _detector;
         private static Exception _loadError;
 
+        // Specialist detectors (one class each), optional: Model\lesion_detector_<class>.onnx + .json (classes: ["acne"], imgsz, nms_iou).
+        // A specialist REPLACES the 3-class model's boxes for its class; every class without a specialist keeps using the 3-class model.
+        private static readonly List<LesionDetector> _specialists = new List<LesionDetector>();
+        private static readonly List<string> _specialistErrors = new List<string>();
+        private static readonly string[] SpecialistClasses = { "acne", "hyperpigmentation", "eczema" };
+
         public static bool IsAvailable { get { lock (_lock) { return _detector != null; } } }
         public static string LoadErrorMessage { get { lock (_lock) { return _loadError?.Message; } } }
+
+        /// <summary>One line for settings / reports: which model produces the boxes of which class.</summary>
+        public static string ActiveModelsSummary
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    if (_detector == null) return "Lesion detector not loaded";
+                    string s = "3-class detector (" + _detector.ModelTag + ")";
+                    foreach (LesionDetector sp in _specialists)
+                        s += "; " + string.Join("/", sp.PaletteClasses.Select(i => ClassPalette.Names[i])) + " specialist (" + sp.ModelTag + ")";
+                    if (_specialistErrors.Count > 0) s += "; specialist load problems: " + string.Join(" | ", _specialistErrors);
+                    return s;
+                }
+            }
+        }
 
         /// <summary>Safe to call repeatedly and from a background thread.</summary>
         public static void EnsureLoaded()
@@ -292,7 +318,16 @@ namespace SkinDevApp.AI
             {
                 if (_detector != null || _loadError != null) return;
                 try { _detector = new LesionDetector(ModelPath, MetaPath); }
-                catch (Exception ex) { _loadError = ex; }
+                catch (Exception ex) { _loadError = ex; return; }
+
+                string dir = Path.GetDirectoryName(ModelPath);
+                foreach (string cls in SpecialistClasses)
+                {
+                    string onnx = Path.Combine(dir, "lesion_detector_" + cls + ".onnx");
+                    if (!File.Exists(onnx)) continue;
+                    try { _specialists.Add(new LesionDetector(onnx, Path.Combine(dir, "lesion_detector_" + cls + ".json"))); }
+                    catch (Exception ex) { _specialistErrors.Add(cls + ": " + ex.Message); }       // a broken specialist never breaks a scan: the 3-class model covers that class
+                }
             }
         }
 
@@ -300,10 +335,34 @@ namespace SkinDevApp.AI
         public static LesionDetectionSet Detect(Mat bgr, double[] thresholds)
         {
             EnsureLoaded();
-            LesionDetector d;
-            lock (_lock) { d = _detector; }
+            LesionDetector d; LesionDetector[] spec;
+            lock (_lock) { d = _detector; spec = _specialists.ToArray(); }
             if (d == null) throw new InvalidOperationException(_loadError != null ? _loadError.Message : "Lesion detector not loaded.");
-            return d.Detect(bgr, thresholds);
+            LesionDetectionSet set = d.Detect(bgr, thresholds);
+            if (spec.Length == 0) return set;
+
+            var tags = new List<string>(); var files = new List<string>(); var shas = new List<string>();
+            var covered = new HashSet<int>();
+            foreach (LesionDetector sp in spec)
+            {
+                LesionDetectionSet ss;
+                try { ss = sp.Detect(bgr, thresholds); }
+                catch { continue; }                                                     // specialist failed on this frame: keep the 3-class boxes for its classes
+                foreach (int pal in sp.PaletteClasses) covered.Add(pal);
+                set.Boxes.RemoveAll(b => sp.PaletteClasses.Contains(b.ClassIndex));
+                set.Boxes.AddRange(ss.Boxes);
+                set.LatencyMs += ss.LatencyMs;
+                tags.Add(sp.ModelTag + " [" + string.Join("/", sp.PaletteClasses.Select(i => ClassPalette.Names[i])) + ", " + sp.ImageSize + " px]");
+                files.Add(sp.ModelFile); shas.Add(sp.ModelFile + ":" + sp.ModelSha256);
+            }
+            if (covered.Count > 0)
+            {
+                set.ModelTag = d.ModelTag + " + " + string.Join(" + ", tags);
+                set.ModelFile = d.ModelFile + " + " + string.Join(" + ", files);
+                set.ModelSha256 = d.ModelFile + ":" + d.ModelSha256 + ";" + string.Join(";", shas);
+                set.Boxes = set.Boxes.OrderBy(b => b.ClassIndex).ThenByDescending(b => b.Confidence).ToList();
+            }
+            return set;
         }
     }
 

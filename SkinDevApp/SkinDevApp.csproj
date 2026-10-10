@@ -335,6 +335,25 @@
 		<None Include="Model\lesion_detector_v1.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<!-- optional single-class specialist detectors (installed by install_specialist_detector.py); copied only when present -->
+		<None Include="Model\lesion_detector_acne.onnx" Condition="Exists('Model\lesion_detector_acne.onnx')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_acne.json" Condition="Exists('Model\lesion_detector_acne.json')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_hyperpigmentation.onnx" Condition="Exists('Model\lesion_detector_hyperpigmentation.onnx')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_hyperpigmentation.json" Condition="Exists('Model\lesion_detector_hyperpigmentation.json')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_eczema.onnx" Condition="Exists('Model\lesion_detector_eczema.onnx')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Model\lesion_detector_eczema.json" Condition="Exists('Model\lesion_detector_eczema.json')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Include="packages.config" />
 		<None Include="Properties\Settings.settings">
 			<Generator>SettingsSingleFileGenerator</Generator>

@@ -426,7 +426,7 @@ namespace SkinDevApp
             if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No images saved for this scan.", 12, false, Ui.Muted));
             else sp.Children.Add(tabs);
 
-            sp.Children.Add(Ui.Text("The original image is unmodified and always available. " + StudyText.AttributionNote + " " + StudyText.ComparisonNote, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+            sp.Children.Add(Ui.Text("The original image is unmodified. " + StudyText.ShortAttribution, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }
 
