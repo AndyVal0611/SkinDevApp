@@ -138,6 +138,9 @@ namespace SkinDevApp.Data
                     // Additive, non-destructive upgrade: new dermatologist-review answers are extra nullable columns, so existing rows stay valid.
                     foreach (string col in new[] { "LocalizationRelevance", "GradCamUsefulness", "FrontComment", "LeftComment", "RightComment" })
                         EnsureColumn(c, tx, "DermatologistValidations", col, "TEXT");
+                    // Monk Skin Tone (rated by a person against the MST card; independent of every AI result)
+                    foreach (string col in new[] { "MonkSkinTone", "MonkSource" })
+                        EnsureColumn(c, tx, "SkinProfiles", col, "TEXT");
                     Exec(c, tx, "INSERT OR IGNORE INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('schema_version', '" +
                                 SchemaVersion + "', datetime('now','localtime'), 'system');");
                     tx.Commit();

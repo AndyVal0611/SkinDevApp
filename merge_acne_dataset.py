@@ -128,7 +128,7 @@ def main():
     names = sorted(tr.stem); rng.shuffle(names)
     nval = max(10, int(a.val_frac * len(names)))
     if a.scratch_val:                                            # validation only from photos you boxed from scratch (same way as the test photos)
-        scratch = set(tr[tr.source.isin(["main", "fix46", "more"])].stem)
+        scratch = set(tr[tr.source.isin(["main", "fix46"])].stem)       # photos you boxed from scratch ('more' started from helper drafts)
         names = [s for s in names if s in scratch]
         print("scratch-boxed photos available for validation: %d (need %d)" % (len(names), nval))
     val_set = set(names[:nval])

@@ -162,6 +162,8 @@ namespace SkinDevApp.Data
                 if (before == null || before.FitzpatrickManual != sp.FitzpatrickManual || before.FitzpatrickSource != sp.FitzpatrickSource)
                     RecordManualFitzpatrick(c, tx, p.ParticipantID, sp);
 
+                if (before != null && (before.MonkSkinTone != sp.MonkSkinTone || before.MonkSource != sp.MonkSource))
+                    Audit(c, tx, "Edit", "Participant", p.ParticipantID, "Monk Skin Tone changed: " + (before.MonkSkinTone ?? "Not collected") + " (" + (before.MonkSource ?? "-") + ") -> " + (sp.MonkSkinTone ?? "Not collected") + " (" + (sp.MonkSource ?? "-") + ")");
                 Audit(c, tx, "Edit", "Participant", p.ParticipantID, string.IsNullOrWhiteSpace(reason) ? "Registration edited" : reason);
                 tx.Commit();
             }
@@ -171,12 +173,13 @@ namespace SkinDevApp.Data
         {
             sp.UpdatedAt = Now();
             using (var cmd = Cmd(c, @"INSERT INTO SkinProfiles
-                (ParticipantID, GeneralSkinType, FitzpatrickManual, FitzpatrickSource, Sensitivity, Concerns, ConcernOther, Regions, RegionOther,
+                (ParticipantID, GeneralSkinType, FitzpatrickManual, FitzpatrickSource, MonkSkinTone, MonkSource, Sensitivity, Concerns, ConcernOther, Regions, RegionOther,
                  ConcernDuration, Cleanser, Moisturizer, Sunscreen, AcneTreatment, EczemaTreatment, PigmentationTreatment, OtherProducts,
                  RecentProcedures, OtherResponses, UpdatedAt)
-                VALUES (@id,@gst,@fz,@fzs,@sen,@con,@cono,@reg,@rego,@dur,@cl,@mo,@su,@at,@et,@pt,@op,@rp,@or,@up)
+                VALUES (@id,@gst,@fz,@fzs,@mst,@msts,@sen,@con,@cono,@reg,@rego,@dur,@cl,@mo,@su,@at,@et,@pt,@op,@rp,@or,@up)
                 ON CONFLICT(ParticipantID) DO UPDATE SET
                  GeneralSkinType=excluded.GeneralSkinType, FitzpatrickManual=excluded.FitzpatrickManual, FitzpatrickSource=excluded.FitzpatrickSource,
+                 MonkSkinTone=excluded.MonkSkinTone, MonkSource=excluded.MonkSource,
                  Sensitivity=excluded.Sensitivity, Concerns=excluded.Concerns, ConcernOther=excluded.ConcernOther, Regions=excluded.Regions,
                  RegionOther=excluded.RegionOther, ConcernDuration=excluded.ConcernDuration, Cleanser=excluded.Cleanser,
                  Moisturizer=excluded.Moisturizer, Sunscreen=excluded.Sunscreen, AcneTreatment=excluded.AcneTreatment,
@@ -184,6 +187,7 @@ namespace SkinDevApp.Data
                  OtherProducts=excluded.OtherProducts, RecentProcedures=excluded.RecentProcedures,
                  OtherResponses=excluded.OtherResponses, UpdatedAt=excluded.UpdatedAt;", tx,
                 "@id", sp.ParticipantID, "@gst", sp.GeneralSkinType, "@fz", sp.FitzpatrickManual, "@fzs", sp.FitzpatrickSource,
+                "@mst", sp.MonkSkinTone, "@msts", sp.MonkSource,
                 "@sen", sp.Sensitivity, "@con", sp.Concerns, "@cono", sp.ConcernOther, "@reg", sp.Regions, "@rego", sp.RegionOther,
                 "@dur", sp.ConcernDuration, "@cl", sp.Cleanser, "@mo", sp.Moisturizer, "@su", sp.Sunscreen, "@at", sp.AcneTreatment,
                 "@et", sp.EczemaTreatment, "@pt", sp.PigmentationTreatment, "@op", sp.OtherProducts, "@rp", sp.RecentProcedures,
@@ -302,6 +306,8 @@ namespace SkinDevApp.Data
                     GeneralSkinType = S(r, "GeneralSkinType"),
                     FitzpatrickManual = S(r, "FitzpatrickManual"),
                     FitzpatrickSource = S(r, "FitzpatrickSource"),
+                    MonkSkinTone = S(r, "MonkSkinTone"),
+                    MonkSource = S(r, "MonkSource"),
                     Sensitivity = S(r, "Sensitivity"),
                     Concerns = S(r, "Concerns"),
                     ConcernOther = S(r, "ConcernOther"),

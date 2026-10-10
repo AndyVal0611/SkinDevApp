@@ -163,6 +163,39 @@
                                 </StackPanel>
                             </Grid>
 
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Monk Skin Tone (MST 1 lightest - 10 darkest)" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="MonkToneCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed" ToolTip="Optional. Rate against the MST card in daylight, not from the camera image.">
+                                        <ComboBoxItem Content="Not collected"/>
+                                        <ComboBoxItem Content="1"/>
+                                        <ComboBoxItem Content="2"/>
+                                        <ComboBoxItem Content="3"/>
+                                        <ComboBoxItem Content="4"/>
+                                        <ComboBoxItem Content="5"/>
+                                        <ComboBoxItem Content="6"/>
+                                        <ComboBoxItem Content="7"/>
+                                        <ComboBoxItem Content="8"/>
+                                        <ComboBoxItem Content="9"/>
+                                        <ComboBoxItem Content="10"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Who rated the Monk Skin Tone" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="MonkSourceCombo" Style="{StaticResource Combo}" SelectionChanged="AnyCombo_Changed">
+                                        <ComboBoxItem Content="Not collected"/>
+                                        <ComboBoxItem Content="Researcher-assessed (MST card)"/>
+                                        <ComboBoxItem Content="Dermatologist-assessed"/>
+                                        <ComboBoxItem Content="Self-reported"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
                             <TextBlock Text="Current visible / reported concern(s) *" Style="{StaticResource FieldLabel}"/>
                             <WrapPanel x:Name="ConcernPanel">
                                 <CheckBox Content="Acne" Margin="0,4,16,4" Checked="AnyCheck_Changed" Unchecked="AnyCheck_Changed"/>

@@ -185,6 +185,16 @@ Full table: `06_training_runs/v1_vs_v2_test_comparison.csv`. **Decision: v1 stay
 - Decision: the AI Fitzpatrick module was removed from the system. It was not connected to the disease classifier or the lesion detector, so their results are unaffected. Skin phototype in the app is recorded only as a participant/researcher-entered value (screening, Types III–V) and a dermatologist-assigned value; the software does not estimate it.
 - Consequence for claims: the classifier was not evaluated per skin tone (the classifier data has no Fitzpatrick labels). Do not state that it was validated across Fitzpatrick types; stratified results can only come from the dermatologist-assigned types of the participant pilot.
 
+### 6.2 Monk Skin Tone (MST) model – separate research model (planned, not trained yet)
+
+**Datasets.** *MST-E* (Monk Skin Tone Examples, Google Research): reference images of 19 people across the 10 MST shades (1,515 images and 31 videos according to the NeurIPS 2023 paper), released to help practitioners understand the scale and train annotators; the shade of each person was approved by the scale's creator. Because it holds many photos of few people it is a **reference / supplementary** set, not the sole training set. *SCIN* (Skin Condition Image Network, Google Research / Stanford Medicine): crowd-contributed photos of skin, nail and hair conditions with layperson-**estimated** MST labels (and dermatologist-estimated Fitzpatrick labels). Many photos show body parts, so the set is filtered (head/neck cases only, one photo per case) before use. Verify the exact column names and the licence of both datasets against the downloaded files; the SCIN repository lists a few duplicate images and a few cases without a condition label.
+
+**Independence.** The MST model is separate from the MobileNetV2 condition classifier and the lesion detector. Its output never changes a condition result or a box. It provides supplementary research information only. Skin-tone labels used to *evaluate* the condition classifier per tone group must come from rater / dermatologist assessments (the app's Monk Skin Tone field in registration), not from this model, until the model is validated.
+
+**Method safeguards (lessons from 6.1).** Group split (all photos of one person / SCIN case in one split); labels only from raters; no hue / saturation augmentation; results reported as exact shade, within one shade (rater disagreement is about one step), and three bands (1-3, 4-6, 7-10), with a 95 % range obtained by resampling people, a brightness stress test (±25 %), and per-source results. Code: `mst_skintone.py`, notebook `PrecisionSkin_SkinTone_MST_Training.ipynb`.
+
+**Known limits to state.** SCIN tone labels are layperson estimates; MST-E has few people; both are phone / studio images, not ring-light kiosk captures, so a small set of kiosk captures rated by two raters against the MST card is needed before any claim about the deployed system; shades at the dark end are rare in SCIN.
+
 ## 7. Ethics / data handling
 
 - Training data are public CC BY 4.0 Roboflow datasets: keep attributions (project, author, URL) in the paper's references.

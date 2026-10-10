@@ -270,6 +270,7 @@ namespace SkinDevApp
             sp.Children.Add(Ui.KeyValues(new[]
             {
                 Ui.KV("Skin type", s.GeneralSkinType),
+                Ui.KV("Monk Skin Tone", string.IsNullOrWhiteSpace(s.MonkSkinTone) || s.MonkSkinTone == "Not collected" ? "Not collected" : "MST " + s.MonkSkinTone + " (" + (s.MonkSource ?? "source not recorded") + ")"),
                 Ui.KV("Sensitivity", s.Sensitivity),
                 Ui.KV("Reported concerns", concerns),
                 Ui.KV("Regions", regions),

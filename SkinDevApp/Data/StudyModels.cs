@@ -69,7 +69,9 @@ namespace SkinDevApp.Data
     {
         public string ParticipantID { get; set; }
         public string GeneralSkinType { get; set; }
-        public string FitzpatrickManual { get; set; }        // I..VI or "Not collected"
+        public string MonkSkinTone { get; set; }             // "1".."10" (Monk Skin Tone scale) or "Not collected"; rated against the MST card, NOT by the AI
+        public string MonkSource { get; set; }               // Researcher-assessed (MST card) | Dermatologist-assessed | Self-reported | Not collected
+        public string FitzpatrickManual { get; set; }        // legacy (retired UI): I..VI or "Not collected"
         public string FitzpatrickSource { get; set; }        // Self-reported | Researcher-assessed | Not collected
         public string Sensitivity { get; set; }
         public string Concerns { get; set; }                 // comma-separated

@@ -37,6 +37,8 @@ namespace SkinDevApp.Views
                 OperatorTxt.Text = AppSession.ActorId;
                 SensitivityCombo.SelectedIndex = 0;
                 DurationCombo.SelectedIndex = 0;
+                MonkToneCombo.SelectedIndex = 0;
+                MonkSourceCombo.SelectedIndex = 0;
             }
 
             _loading = false;
@@ -70,6 +72,8 @@ namespace SkinDevApp.Views
 
             Select(SkinTypeCombo, sp.GeneralSkinType);
             Select(SensitivityCombo, sp.Sensitivity);
+            MonkToneCombo.SelectedIndex = 0; MonkSourceCombo.SelectedIndex = 0;
+            Select(MonkToneCombo, sp.MonkSkinTone); Select(MonkSourceCombo, sp.MonkSource);
             _legacyFitz = sp.FitzpatrickManual; _legacyFitzSource = sp.FitzpatrickSource;      // retired feature: kept as-is in the database, never shown or edited
             SetChecks(ConcernPanel, sp.Concerns);
             ConcernOtherTxt.Text = sp.ConcernOther;
@@ -140,6 +144,9 @@ namespace SkinDevApp.Views
             if (Selected(SexCombo) == null) errors.Add("sex");
             if (string.IsNullOrWhiteSpace(OperatorTxt.Text)) errors.Add("researcher / operator ID");
             if (Selected(SkinTypeCombo) == null) errors.Add("general skin type");
+            bool monkTone = (Selected(MonkToneCombo) ?? "Not collected") != "Not collected", monkSource = (Selected(MonkSourceCombo) ?? "Not collected") != "Not collected";
+            if (monkTone && !monkSource) errors.Add("who rated the Monk Skin Tone");
+            if (monkSource && !monkTone) errors.Add("the Monk Skin Tone value (or set who rated it to 'Not collected')");
 
             string concerns = Checked(ConcernPanel);
             if (concerns.Length == 0) errors.Add("at least one reported concern");
@@ -172,6 +179,8 @@ namespace SkinDevApp.Views
             sp = new SkinProfile
             {
                 GeneralSkinType = Selected(SkinTypeCombo),
+                MonkSkinTone = Selected(MonkToneCombo) ?? "Not collected",
+                MonkSource = Selected(MonkSourceCombo) ?? "Not collected",
                 FitzpatrickManual = _legacyFitz,                 // legacy column carried through unchanged
                 FitzpatrickSource = _legacyFitzSource,
                 Sensitivity = Selected(SensitivityCombo),
