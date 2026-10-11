@@ -121,12 +121,15 @@ namespace SkinDevApp
             _layer.ToolTip = "Leave empty to use the service's default layer.";
             cam2.Children.Add(_layer);
 
+            string activeDetectors = "Active detectors: ";
+            try { AI.LesionEngine.EnsureLoaded(); activeDetectors += AI.LesionEngine.ActiveModelsSummary; } catch (Exception ex) { activeDetectors += "unavailable (" + ex.Message + ")"; }
             StackPanel det = Section(RightColumn, "Lesion localization (detector)",
                 "A separate research model that proposes candidate lesion boxes on the same frame. It never changes Grad-CAM++ or the class scores. " +
-                "The default thresholds were chosen on validation images (best F1); document any change.");
+                "The default thresholds were chosen on validation images (best F1); document any change. " + activeDetectors + ". " +
+                "Saved settings keep their old values: set acne 0.26 and hyperpigmentation 0.175 here once.");
             Bool(det, "detector.enabled", "Lesion localization enabled");
-            Num(det, "detector.thr_acne", "Acne confidence threshold", "0.01-0.99 (default 0.20)");
-            Num(det, "detector.thr_hyper", "Hyperpigmentation confidence threshold", "0.01-0.99 (default 0.25)");
+            Num(det, "detector.thr_acne", "Acne confidence threshold", "0.01-0.99 (default 0.26, chosen on validation photos)");
+            Num(det, "detector.thr_hyper", "Hyperpigmentation confidence threshold", "0.01-0.99 (default 0.175)");
             Num(det, "detector.thr_eczema", "Eczema confidence threshold (pilot class)", "0.01-0.99 (default 0.25)");
 
             StackPanel audit = Section(RightColumn, "Recent changes (audit log)", null);

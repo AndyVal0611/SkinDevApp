@@ -12,7 +12,7 @@ Run in WSL with ultralytics, from the SkinDevApp repo folder.
 import argparse, datetime, hashlib, json, shutil
 from pathlib import Path
 
-MODEL_DIR = Path(__file__).resolve().parent / "SkinDevApp" / "Model"
+MODEL_DIR = Path(__file__).resolve().parent.parent / "SkinDevApp" / "Model"
 
 
 def main():

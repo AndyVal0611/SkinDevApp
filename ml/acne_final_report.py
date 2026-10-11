@@ -7,15 +7,16 @@ acne_final_report.py - the FINAL acne detector numbers: 3 seeds on the clean dat
   * a bootstrap (1,000 resamples of the test PHOTOS) gives a 95% range for the mean mAP@0.5 and for the gain over v1, so a difference that is only noise is not reported as an improvement
 Writes FINAL_ACNE_RESULTS.md and .csv into Acne_Boxing.     python acne_final_report.py [--seeds 42 7 123]
 """
-import argparse, sys
+import argparse, os, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 
-sys.path.insert(0, "/mnt/c/Users/Bautista/Downloads")
+sys.path.insert(0, "/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml")
 import hyperpig_autolabel as H
 
 HOME = Path.home() / "PrecisionSkinV1"
-O4 = HOME / "acne_detector_v4"
+O4 = HOME / os.environ.get("ACNE_RUN_DIR", "acne_detector_v4")          # e.g. ACNE_RUN_DIR=acne_detector_v5 ACNE_REPORT_TAG=_v5 python acne_final_report.py
+TAG = os.environ.get("ACNE_REPORT_TAG", "")
 V1 = HOME / "detector_work/runs/detector_v1_yolov8n_seed42/weights/best.pt"
 REPORT = Path("/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing")
 IMGSZ = 800
@@ -74,7 +75,7 @@ def main():
         rows.append(dict(model=name, val_mAP50=round(sv["AP50"], 3), test_mAP50=round(st["AP50"], 3), test_mAP50_95=round(st["AP50_95"], 3), conf=round(conf, 2), precision=round(p, 3), recall=round(r, 3), F1=round(f, 3)))
         pp[name] = per_photo(w, sz, test, cid); confs[name] = conf
         print(rows[-1], flush=True)
-    df = pd.DataFrame(rows); df.to_csv(REPORT / "FINAL_ACNE_RESULTS.csv", index=False)
+    df = pd.DataFrame(rows); df.to_csv(REPORT / "FINAL_ACNE_RESULTS%s.csv" % TAG, index=False)
     seeds = df[df.model.str.startswith("v4")]
     out = ["# Acne detector: final results (clean dataset v4, three seeds)", "",
            "Test = the same %d hand-boxed photos for every row, never trained on. Confidence chosen on validation photos boxed from scratch (v1: its app threshold 0.20)." % len(pp[models[0][0]]), "",
@@ -94,7 +95,7 @@ def main():
                 "- mean mAP@0.5 of the v4 seeds: **%.3f** (95%% range %.3f to %.3f)" % (seeds.test_mAP50.mean(), lo, hi),
                 "- gain over v1: **%+.3f** mAP@0.5 (95%% range %+.3f to %+.3f)%s" % (seeds.test_mAP50.mean() - float(df.test_mAP50.iloc[0]), dl, dh, "  -> the gain is real, not noise" if dl > 0 else "  -> the range includes 0: not proven"),
                 "", "The range reflects the small test set (resampling photos). It does not include differences in how photos were boxed; report both the mean and this range."]
-    (REPORT / "FINAL_ACNE_RESULTS.md").write_text("\n".join(out), encoding="utf-8")
+    (REPORT / "FINAL_ACNE_RESULTS%s.md" % TAG).write_text("\n".join(out), encoding="utf-8")
     print("\n".join(out))
 
 

@@ -92,7 +92,8 @@ def main():
             ("test_folder", R / "Test_Acne/Elaiza__acne_TEST/images", R / "Test_Acne/Elaiza__acne_TEST/labels", R / "Test_Acne/_drafts/meta.json"),
             ("fix6", R / "Fix_6_Test_Photos/Elaiza__acne_fix/images", R / "Fix_6_Test_Photos/Elaiza__acne_fix/labels", R / "Fix_6_Test_Photos/_drafts/meta.json"),
             ("fix46", R / "Fix_46_Doubled_Boxes/Elaiza__acne_fix/images", R / "Fix_46_Doubled_Boxes/Elaiza__acne_fix/labels", R / "Fix_46_Doubled_Boxes/_drafts/meta.json"),
-            ("more", R / "More_Faces/Elaiza__acne_more/images", R / "More_Faces/Elaiza__acne_more/labels", R / "More_Faces/_drafts/meta.json")]      # real faces from the non_facial pool, boxed from scratch
+            ("more", R / "More_Faces/Elaiza__acne_more/images", R / "More_Faces/Elaiza__acne_more/labels", R / "More_Faces/_drafts/meta.json"),
+            ("second_look", R / "Fix_Acne_Missed_Spots/Elaiza__acne_fix/images", R / "Fix_Acne_Missed_Spots/Elaiza__acne_fix/labels", R / "Fix_Acne_Missed_Spots/_drafts/meta.json")]   # training photos: your boxes + missed spots you confirmed      # real faces from the non_facial pool, boxed from scratch
     versions = {}          # stem -> list of (mtime, source, nboxes, label path, image path)
     for name, idir, ldir, mf in srcs:
         if not ldir.exists() or not mf.exists():

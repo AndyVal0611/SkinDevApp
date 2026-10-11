@@ -308,7 +308,7 @@ def main():
     ap.add_argument("step", choices=["train", "draft", "stats"])
     ap.add_argument("--root", default="/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing")
     ap.add_argument("--work", default=str(Path.home() / "PrecisionSkinV1" / "acne_predraft_v2"))
-    ap.add_argument("--tool", default="/mnt/c/Users/Bautista/Downloads/lesion_box_tool.py")
+    ap.add_argument("--tool", default="/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml/lesion_box_tool.py")
     ap.add_argument("--model", default="yolov8s.pt")
     ap.add_argument("--imgsz", type=int, default=800)
     ap.add_argument("--epochs", type=int, default=60)

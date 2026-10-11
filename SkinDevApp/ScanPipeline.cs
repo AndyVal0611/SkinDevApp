@@ -68,6 +68,9 @@ namespace SkinDevApp.Scanning
                     {
                         double[] thr = cfg.DetectorThresholds();
                         det = await Task.Run(() => LesionEngine.Detect(req.Working, thr)).ConfigureAwait(false);
+                        // boxes on hair / background / clothing are false by definition: keep only boxes whose centre is on the face (+25% margin)
+                        if (req.Quality != null && req.Quality.FaceBox.HasValue)
+                            LesionEngine.KeepInsideFace(det, req.Quality.FaceBox.Value);
                     }
                     catch (Exception dex)
                     {

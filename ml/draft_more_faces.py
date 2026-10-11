@@ -10,7 +10,7 @@ import argparse, os, sys, json, shutil
 from pathlib import Path
 import numpy as np
 
-sys.path.insert(0, "/mnt/c/Users/Bautista/Downloads")
+sys.path.insert(0, "/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml")
 import acne_predraft as P
 
 R = Path("/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing")

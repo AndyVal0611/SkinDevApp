@@ -8,7 +8,7 @@ import argparse, sys, time
 from pathlib import Path
 import numpy as np, pandas as pd
 
-sys.path.insert(0, "/mnt/c/Users/Bautista/Downloads")
+sys.path.insert(0, "/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml")
 import hyperpig_autolabel as H                                   # the scoring functions (own AP50 / AP50-95 scorer)
 
 HOME = Path.home() / "PrecisionSkinV1"

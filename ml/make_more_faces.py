@@ -63,7 +63,7 @@ def main():
         (S / "labels" / (Path(n).stem + ".txt")).write_text("")                               # empty = not boxed yet
     (S / "classes.txt").write_text("acne\n")
     json.dump({"drafted_at": time.time() + 2, "note": "More_Faces: box from scratch (no drafts); a photo counts as reviewed once you save it"}, open(D / "_drafts" / "meta.json", "w"))
-    shutil.copy2("/mnt/c/Users/Bautista/Downloads/lesion_box_tool.py", D / "lesion_box_tool.py")
+    shutil.copy2("/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml/lesion_box_tool.py", D / "lesion_box_tool.py")
     (D / "START_BOXING_MORE_FACES.bat").write_text(
         '@echo off\r\ncd /d "%~dp0"\r\necho Box every acne spot on FACES from scratch. Press X on photos with no acne, or that are not a face / skin of a face. S = save.\r\n'
         'py -3.13 lesion_box_tool.py "Elaiza__acne_more" --label acne --annotator Elaiza --port ' + str(a.port) + ' --export "boxed_Acne_more"\r\npause\r\n')

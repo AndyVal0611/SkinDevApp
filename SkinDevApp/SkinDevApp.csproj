@@ -329,10 +329,10 @@
 		<None Include="Model\precisionskin.onnx">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Include="Model\lesion_detector_v1.onnx">
+		<None Include="Model\lesion_detector_v1.onnx" Condition="Exists('Model\lesion_detector_v1.onnx')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Include="Model\lesion_detector_v1.json">
+		<None Include="Model\lesion_detector_v1.json" Condition="Exists('Model\lesion_detector_v1.json')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<!-- optional single-class specialist detectors (installed by install_specialist_detector.py); copied only when present -->
