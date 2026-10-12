@@ -31,9 +31,6 @@
 
             <!-- Camera / Photo View Card -->
             <Border x:Name="ImageCard" Background="#2B2C26" CornerRadius="16" Padding="0" Margin="8" ClipToBounds="True">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.04" Direction="270"/>
-                </Border.Effect>
                 <Grid x:Name="CameraViewportGrid" ClipToBounds="True" SizeChanged="CameraViewportGrid_SizeChanged">
                     <Image x:Name="UploadedImageViewer"
                            Stretch="Uniform"
@@ -111,10 +108,7 @@
             </Border>
 
             <!-- Results Panel -->
-            <Border x:Name="ControlsCard" Background="White" CornerRadius="16" Padding="25" Margin="8">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.03" Direction="270"/>
-                </Border.Effect>
+            <Border x:Name="ControlsCard" Background="White" BorderBrush="#E9DFD1" BorderThickness="1" CornerRadius="16" Padding="25" Margin="8">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 

@@ -24,26 +24,10 @@ namespace SkinDevApp.Views
             RefreshMode();
         }
 
-        private void PortalModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            RefreshMode();
-        }
-
-        /// <summary>Shows the fields that belong to the chosen mode (and the first-run setup when no account exists).</summary>
+        /// <summary>Shows the first-run setup when no account exists yet, otherwise the normal sign-in.</summary>
         private void RefreshMode()
         {
-            if (AdminCredentialsPanel == null || ClientRegisterPanel == null || EnterPortalBtn == null || FirstRunPanel == null) return;
-
-            if (PortalModeCombo.SelectedIndex == 0) // Operator / kiosk
-            {
-                AdminCredentialsPanel.Visibility = Visibility.Collapsed;
-                ClientRegisterPanel.Visibility = Visibility.Visible;
-                EnterPortalBtn.Content = "Enter operator mode";
-                return;
-            }
-
-            ClientRegisterPanel.Visibility = Visibility.Collapsed;
-            AdminCredentialsPanel.Visibility = Visibility.Visible;
+            if (EnterPortalBtn == null || FirstRunPanel == null) return;
 
             try { _firstRun = !AuthService.HasAccounts(); }
             catch (Exception ex)
@@ -55,26 +39,20 @@ namespace SkinDevApp.Views
             FirstRunPanel.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
             if (_firstRun)
             {
-                LoginHintTxt.Text = "No researcher account exists yet. Create the first account now (password at least " +
-                                    AuthService.MinPasswordLength + " characters). Keep it safe: it protects participant records and settings.";
+                LoginHintTxt.Text = "No account exists yet. Create the first account now (password of at least " +
+                                    AuthService.MinPasswordLength + " characters) and keep it safe: it protects patient records and settings. " +
+                                    "More accounts can be added later in Settings.";
                 EnterPortalBtn.Content = "Create account and sign in";
             }
             else
             {
-                if (string.IsNullOrEmpty(LoginHintTxt.Text) || LoginHintTxt.Text.StartsWith("No researcher account")) LoginHintTxt.Text = "";
+                if (string.IsNullOrEmpty(LoginHintTxt.Text) || LoginHintTxt.Text.StartsWith("No account exists")) LoginHintTxt.Text = "";
                 EnterPortalBtn.Content = "Sign in";
             }
         }
 
         private void EnterPortalBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (PortalModeCombo.SelectedIndex == 0) // Operator / kiosk mode
-            {
-                AppSession.SignIn(UserRole.Operator, OperatorIdTxt.Text);
-                Nav.Home();
-                return;
-            }
-
             string user = UsernameTxt.Text.Trim();
             try
             {
@@ -83,7 +61,7 @@ namespace SkinDevApp.Views
                 switch (AuthService.SignIn(user, PasswordTxt.Password))
                 {
                     case SignInResult.Ok:
-                        AppSession.SignIn(UserRole.Researcher, user);
+                        AppSession.SignIn(UserRole.Researcher, user);      // everyone who signs in can use every screen
                         Nav.Home();
                         break;
 
@@ -95,7 +73,7 @@ namespace SkinDevApp.Views
 
                     default:
                         PasswordTxt.Clear();
-                        MessageBox.Show("Incorrect username or password.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show("The username or password is incorrect.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
                         break;
                 }
             }

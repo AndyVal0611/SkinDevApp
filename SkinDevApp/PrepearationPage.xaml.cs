@@ -34,7 +34,7 @@ namespace SkinDevApp
             Participant p = string.IsNullOrEmpty(id) ? null : StudyRepository.GetParticipant(id);
             ParticipantLine.Text = p == null
                 ? "No participant selected. Register or select a participant before scanning."
-                : "Participant " + p.ParticipantID + "  ·  " + p.FullName + ".  Complete each step, then press START SCAN.";
+                : "Patient " + p.ParticipantID + "  ·  " + p.FullName + ".  Complete each step, then press Start scan.";
         }
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -63,7 +63,7 @@ namespace SkinDevApp
             SetStatus(GradCamStatusDot, GradCamStatusText, h.GradCamOk ? ReadyBrush : WarningBrush, h.GradCamOk ? "Ready" : GradCamEnvironment.StateTitle(GradCamState.Unavailable));
             GradCamDetailText.Text = h.GradCamOk
                 ? h.GradCamText
-                : "Grad-CAM++ unavailable. The scan still runs and saves the class scores; heatmaps will be missing. Press Start / Retry to start the service.";
+                : "The heat-map service is not running yet. The scan still works and saves its results, but no heat maps will be created. The service starts automatically; press Try again if it does not.";
             StartServiceBtn.Visibility = h.GradCamOk ? Visibility.Collapsed : Visibility.Visible;
 
             RefreshOverallStatus();
@@ -164,14 +164,13 @@ namespace SkinDevApp
                     return;
                 }
                 SetStatus(GradCamStatusDot, GradCamStatusText, WarningBrush, GradCamEnvironment.StateTitle(r.State));
-                GradCamDetailText.Text = r.Message + "\nThe scan still works without heatmaps." +
-                                         (r.State == GradCamState.StartFailed || r.State == GradCamState.Unavailable ? "\nLog: " + r.LogPath : "");
+                GradCamDetailText.Text = r.Message + "\nThe scan still works without heat maps.";
                 StartServiceBtn.Visibility = Visibility.Visible;
             }
             catch (Exception ex)
             {
                 SetStatus(GradCamStatusDot, GradCamStatusText, WarningBrush, GradCamEnvironment.StateTitle(GradCamState.StartFailed));
-                GradCamDetailText.Text = "Could not start the service: " + ex.Message;
+                GradCamDetailText.Text = "The heat-map service could not be started: " + ex.Message;
                 StartServiceBtn.Visibility = Visibility.Visible;
             }
             finally { StartServiceBtn.IsEnabled = true; }
@@ -219,30 +218,30 @@ namespace SkinDevApp
             if (_distanceConfirmed) complete++;
             if (_faceConfirmed) complete++;
 
-            OverallStatusDetail.Text = $"{complete} of 4 checks complete";
+            OverallStatusDetail.Text = $"{complete} of 4 checks done";
 
             if (complete == 4 && !_modelReady)
             {
                 SetStatus(OverallStatusDot, null, FailedBrush, null);
-                OverallStatusTitle.Text = "AI classifier not loaded — scanning is not possible";
+                OverallStatusTitle.Text = "The skin model is not ready, so scanning is not possible";
                 NextBtn.IsEnabled = false;
             }
             else if (complete == 4)
             {
                 SetStatus(OverallStatusDot, null, ReadyBrush, null);
-                OverallStatusTitle.Text = "Ready for analysis";
+                OverallStatusTitle.Text = "Ready to scan";
                 NextBtn.IsEnabled = true;
             }
             else if (!_cameraReady)
             {
                 SetStatus(OverallStatusDot, null, FailedBrush, null);
-                OverallStatusTitle.Text = "Camera required before continuing";
+                OverallStatusTitle.Text = "A camera is needed to continue";
                 NextBtn.IsEnabled = false;
             }
             else
             {
                 SetStatus(OverallStatusDot, null, PendingBrush, null);
-                OverallStatusTitle.Text = "Preparation in progress";
+                OverallStatusTitle.Text = "Getting ready";
                 NextBtn.IsEnabled = false;
             }
         }

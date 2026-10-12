@@ -77,19 +77,11 @@
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="400" Margin="20,30">
 
                 <TextBlock Text="Sign in" Style="{StaticResource H1}"/>
-                <TextBlock Text="Choose how you are working today." Style="{StaticResource Muted}" FontSize="13.5" Margin="0,6,0,24"/>
+                <TextBlock Text="Welcome. Please sign in to continue." Style="{StaticResource Muted}" FontSize="13.5" Margin="0,6,0,22"/>
 
-                <!-- Mode Selection Dropdown -->
-                <TextBlock Text="Portal mode" Style="{StaticResource FieldLabel}" Margin="0,0,0,6"/>
-                <ComboBox x:Name="PortalModeCombo" Style="{StaticResource Combo}" Height="44"
-                          SelectionChanged="PortalModeCombo_SelectionChanged" Margin="0,0,0,10">
-                    <ComboBoxItem Content="Operator / Kiosk (registration, consent, scanning)"/>
-                    <ComboBoxItem Content="Researcher / Admin (records, verification, settings)" IsSelected="True"/>
-                </ComboBox>
-
-                <!-- Panel 1: Admin Specialist Login Fields -->
+                <!-- Sign-in fields -->
                 <StackPanel x:Name="AdminCredentialsPanel">
-                    <TextBlock Text="Username" Style="{StaticResource FieldLabel}" Margin="0,8,0,6"/>
+                    <TextBlock Text="Username" Style="{StaticResource FieldLabel}" Margin="0,0,0,6"/>
                     <TextBox x:Name="UsernameTxt" Style="{StaticResource Field}" Height="44"/>
 
                     <TextBlock Text="Password" Style="{StaticResource FieldLabel}" Margin="0,14,0,6"/>
@@ -102,14 +94,6 @@
                     </StackPanel>
 
                     <TextBlock x:Name="LoginHintTxt" FontSize="12" Foreground="#6B6658" TextWrapping="Wrap" Margin="0,12,0,0"/>
-                </StackPanel>
-
-                <!-- Panel 2: Operator / kiosk mode. Participants are registered on the Registration screen. -->
-                <StackPanel x:Name="ClientRegisterPanel" Visibility="Collapsed">
-                    <TextBlock Text="Operator ID" Style="{StaticResource FieldLabel}" Margin="0,8,0,6"/>
-                    <TextBox x:Name="OperatorIdTxt" Style="{StaticResource Field}" Height="44"/>
-                    <TextBlock Text="Participant details are entered on the Registration screen, where a PatientID is generated."
-                               Style="{StaticResource Muted}" Margin="0,10,0,0"/>
                 </StackPanel>
 
                 <!-- Dynamic Action Button -->

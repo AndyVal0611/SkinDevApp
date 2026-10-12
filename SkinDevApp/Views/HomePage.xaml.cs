@@ -17,9 +17,7 @@ namespace SkinDevApp.Views
         {
             InitializeComponent();
             HeaderHost.Content = Ui.Header("Dashboard", showHome: false, showBack: false);
-            WelcomeTxt.Text = AppSession.IsResearcher
-                ? "Signed in as researcher / admin. All screens are available."
-                : "Operator mode. Register participants, record consent and run scans. Sign in as a researcher for records and settings.";
+            WelcomeTxt.Text = "Welcome. Register a patient, run a scan, or open the records.";
             BuildNav();
             ShowCurrentParticipant();
         }
@@ -68,19 +66,19 @@ namespace SkinDevApp.Views
             NavGrid.Children.Clear();
             bool r = AppSession.IsResearcher;
 
-            AddTile("PARTICIPANTS / RECORDS", "Search by PatientID, profiles, scan history", r, () => Nav.Go(new PatientRecordPage()));
-            AddTile("RESEARCH DASHBOARD", "Summaries from stored data only", r, () => Nav.Go(new ResearchDashboardPage()));
+            AddTile("PARTICIPANTS / RECORDS", "Find a patient, see their scans and results", r, () => Nav.Go(new PatientRecordPage()));
+            AddTile("RESEARCH DASHBOARD", "Totals and charts from the saved scans", r, () => Nav.Go(new ResearchDashboardPage()));
             AddTile("PENDING VERIFICATION", PendingText(), r, () => Nav.Go(new PatientRecordPage(pendingOnly: true)));
-            AddTile("MODEL INFORMATION", "Model identity, version and hashes", r, () => Nav.Go(new ModelInfoPage()));
-            AddTile("SETTINGS", "Camera, capture, AI and Grad-CAM++ (audited)", r, () => Nav.Go(new SettingsPage()));
+            AddTile("MODEL INFORMATION", "Which AI model is in use", r, () => Nav.Go(new ModelInfoPage()));
+            AddTile("SETTINGS", "Camera, capture and accounts", r, () => Nav.Go(new SettingsPage()));
             AddTile("ABOUT", "What this system is and is not", true, ShowAbout);
-            if (r) AddTile("LEGACY REPORT LOG", "Old PatientLogs table (read-only console)", true, () => Nav.Go(new UserDashboardForm()));
+            if (r) AddTile("OLD REPORT LOG", "Reports saved by earlier versions (read only)", true, () => Nav.Go(new UserDashboardForm()));
         }
 
         private static string PendingText()
         {
-            try { return StudyRepository.PendingVerificationCount() + " scan(s) awaiting researcher assessment"; }
-            catch { return "Scans awaiting researcher assessment"; }
+            try { int n = StudyRepository.PendingVerificationCount(); return n == 1 ? "1 scan is waiting for review" : n + " scans are waiting for review"; }
+            catch { return "Scans waiting for review"; }
         }
 
         private void AddTile(string title, string subtitle, bool enabled, Action go)
@@ -95,15 +93,7 @@ namespace SkinDevApp.Views
 
         private static void ShowAbout()
         {
-            MessageBox.Show(
-                "PrecisionSkin / LUMYVUE\n\n" +
-                "A research prototype that captures standardised Front, Left and Right facial images, scores each with a " +
-                "four-class skin-image classifier (Acne, Hyperpigmentation, Eczema, Normal) and shows class-specific " +
-                "Grad-CAM++ attribution maps.\n\n" +
-                "• Model Class Scores are softmax outputs, not independent disease probabilities.\n" +
-                "• Grad-CAM++ maps show model attribution, not lesion segmentation.\n\n" +
-                StudyText.PrototypeNotice,
-                "About PrecisionSkin", MessageBoxButton.OK, MessageBoxImage.Information);
+            new AboutWindow { Owner = Application.Current.MainWindow }.ShowDialog();
         }
 
         private void NewRegistrationBtn_Click(object sender, RoutedEventArgs e)
@@ -132,7 +122,7 @@ namespace SkinDevApp.Views
             Participant p = StudyRepository.GetParticipant(participantId);
             if (p == null)
             {
-                MessageBox.Show("Participant " + participantId + " was not found.", "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Patient " + participantId + " was not found.", "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

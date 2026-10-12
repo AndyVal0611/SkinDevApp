@@ -49,11 +49,11 @@ namespace SkinDevApp.Views
             }
 
             ScanSessionRow s = _d.Session;
-            TitleTxt.Text = "Results — " + s.DisplayId;
-            SubtitleTxt.Text = (s.ParticipantID ?? "Unlinked scan" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")")) +
+            TitleTxt.Text = "Results · " + s.DisplayId;
+            SubtitleTxt.Text = (s.ParticipantID ?? "Scan without a patient" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")")) +
                                (_d.Participant != null ? "  ·  " + _d.Participant.FullName : "") +
-                               "  ·  " + s.StartedAt + "  ·  Model " + (_d.Model != null ? _d.Model.ShortLabel : "unknown") +
-                               "  ·  Status: " + s.ScanStatus + (s.Finalized ? "" : " (not finalised)");
+                               "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (_d.Model != null ? _d.Model.ShortLabel : "Unknown model") +
+                               "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalised)");
 
             MainColumn.Children.Add(OverallCard());
             MainColumn.Children.Add(PerViewCard());
@@ -75,29 +75,28 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(s.ScanMode == "Single" ? "Single-Image Result" : "Overall Multi-View Result", 16, true));
+            sp.Children.Add(Ui.Text(s.ScanMode == "Single" ? "Result for the photograph" : "Overall result of the three photographs", 16, true));
 
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
-                sp.Children.Add(Ui.Text("No view produced a usable result. Retake the scan.", 13, false, Ui.Bad));
+                sp.Children.Add(Ui.Text("None of the photographs could be analysed. Please retake the scan.", 13, false, Ui.Bad));
                 return Ui.Card(sp);
             }
 
             var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 8) };
-            top.Children.Add(Ui.Text("Primary AI classification:  ", 14, false, Ui.Muted, new Thickness(0)));
-            top.Children.Add(Ui.Text(s.OverallPredictedClass, 22, true, Ui.Brush(Ui.ClassColor(s.OverallPredictedClass)), new Thickness(0)));
-            top.Children.Add(Ui.Text("   " + s.ScoreText + (s.ScanMode == "Single" ? " model class score" : " pooled model class score"), 13, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            top.Children.Add(Ui.Text("The scan most resembles:  ", 14, false, Ui.Muted, new Thickness(0)));
+            top.Children.Add(Ui.Text(ClinicalText.Name(s.OverallPredictedClass), 22, true, Ui.Brush(Ui.ClassColor(s.OverallPredictedClass)), new Thickness(0)));
+            top.Children.Add(Ui.Text("   " + (s.OverallScore.HasValue ? char.ToUpper(ClinicalText.Strength(s.OverallScore.Value)[0]) + ClinicalText.Strength(s.OverallScore.Value).Substring(1) + " match (" + s.ScoreText + ")" : s.ScoreText), 13, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             sp.Children.Add(top);
 
-            sp.Children.Add(Ui.Text("Overall Model Class Scores", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
+            sp.Children.Add(Ui.Text("How closely the photographs resemble each category", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
             sp.Children.Add(Ui.ScoreBars(OverallPercents()));
-            sp.Children.Add(Ui.Text(StudyText.ScoresNote, 11, false, Ui.Muted));
 
             // completeness
             if (s.ScanMode != "Single")
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 4) };
-                chips.Children.Add(Ui.Text("Scan completeness:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
+                chips.Children.Add(Ui.Text("Photographs analysed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
                 foreach (string v in StudyText.Views)
                 {
                     bool ok = _d.View(v)?.Scores != null;
@@ -105,27 +104,11 @@ namespace SkinDevApp.Views
                 }
                 sp.Children.Add(chips);
 
-                // consistency / disagreement
-                if (s.ViewDisagreement)
-                {
-                    var warn = new Border { Style = (Style)FindResource("NoticeBox"), Margin = new Thickness(0, 6, 0, 0) };
-                    var w = new StackPanel();
-                    w.Children.Add(Ui.Text("⚠ View disagreement detected — review individual angles", 13, true, Ui.Warn));
-                    if (_d.Fusion != null)
-                        foreach (string n in _d.Fusion.Notes) w.Children.Add(Ui.Text("• " + n, 11.5, false, Ui.Ink, new Thickness(0, 1, 0, 1)));
-                    warn.Child = w;
-                    sp.Children.Add(warn);
-                }
-                else
-                {
-                    sp.Children.Add(Ui.Pill("Views consistent: every captured angle has the same top class", Ui.Good, "#EEF6EC"));
-                    if (_d.Fusion != null)
-                        foreach (string n in _d.Fusion.Notes) sp.Children.Add(Ui.Text("• " + n, 11.5, false, Ui.Warn, new Thickness(0, 1, 0, 1)));
-                }
-
-                if (!string.IsNullOrEmpty(s.FusionMethod))
-                    sp.Children.Add(Ui.Text("Fusion method: " + s.FusionMethod + " Rigorous validation of this fusion is limited until paired multi-view labelled data are available.",
-                        10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+                // do the photographs agree with each other?
+                string ah, ad; int al;
+                ClinicalText.Agreement(ClinicalText.Readings(_d), false, out ah, out ad, out al);
+                sp.Children.Add(Ui.Callout(ah, ad, al));
+                sp.Children.Add(Ui.Text(ClinicalText.HowToReadScores, 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             }
 
             return Ui.Card(sp);
@@ -136,7 +119,7 @@ namespace SkinDevApp.Views
         private Border PerViewCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "Captured image" : "Per-view summary", 16, true));
+            sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "The photograph" : "Reading of each photograph", 16, true));
 
             // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
@@ -144,7 +127,7 @@ namespace SkinDevApp.Views
             {
                 var rb = new RadioButton
                 {
-                    Content = mode,
+                    Content = mode == "Grad-CAM++" ? "Heat map" : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
                     GroupName = "viewmode",
                     IsChecked = mode == "Original",
                     Margin = new Thickness(0, 0, 18, 0),
@@ -166,34 +149,36 @@ namespace SkinDevApp.Views
             {
                 CaptureViewRow v = _d.View(name);
                 var col = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
-                col.Children.Add(Ui.Text(name.ToUpperInvariant(), 13, true));
+                col.Children.Add(Ui.Text(name == "Single" ? "Photograph" : name + " view", 13, true));
                 Border thumb = Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB",
-                    v == null ? "not captured" : null);
+                    v == null ? "Not captured" : null);
                 col.Children.Add(thumb);
                 if (v != null) _viewThumbs.Add(new KeyValuePair<CaptureViewRow, Border>(v, thumb));
 
                 if (v?.Scores != null)
                 {
-                    col.Children.Add(Ui.Text(v.Scores.PredictedClass + "  " + Ui.Pct(v.Scores.Confidence), 13.5, true,
-                        Ui.Brush(Ui.ClassColor(v.Scores.PredictedClass)), new Thickness(0, 6, 0, 4)));
+                    ViewReading rd = ClinicalText.Readings(_d).First(x => x.View == v.ViewType);
+                    col.Children.Add(Ui.Text(ClinicalText.Top(rd), 13, true,
+                        Ui.Brush(Ui.ClassColor(v.Scores.PredictedClass)), new Thickness(0, 6, 0, 3)));
+                    col.Children.Add(Ui.Text(ClinicalText.Meaning(rd), 11.5, false, Ui.Ink, new Thickness(0, 0, 0, 3)));
+                    col.Children.Add(Ui.Text(ClinicalText.NextClosest(rd), 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
                     col.Children.Add(Ui.ScoreBars(v.Scores.AsArray(), 6, compact: true));
-                    col.Children.Add(Ui.Text("Capture quality: " + (v.QualityStatus ?? "—"), 10.5, false,
+                    col.Children.Add(Ui.Text("Photo quality: " + ClinicalText.PlainQuality(v.QualityStatus), 10.5, false,
                         v.QualityStatus == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
-                    col.Children.Add(Ui.Text(v.Maps.Count > 0 ? "Grad-CAM++ heatmap saved (shown for the detected class)" : "Grad-CAM++ unavailable for this view",
+                    col.Children.Add(Ui.Text(v.Maps.Count > 0 ? "Heat map saved (shows what the computer looked at)" : "Heat map not available for this photograph",
                         10.5, false, v.Maps.Count > 0 ? Ui.Muted : Ui.Warn, new Thickness(0)));
                     bool locWarn;
                     col.Children.Add(Ui.Text(LocalizationLine(v, out locWarn), 10.5, false, locWarn ? Ui.Warn : Ui.Muted, new Thickness(0, 2, 0, 0)));
                 }
                 else
                 {
-                    col.Children.Add(Ui.Text(v == null ? "This view was not captured." : "This view could not be analysed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
+                    col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "This photograph could not be analysed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
                 }
                 grid.Children.Add(col);
             }
             sp.Children.Add(grid);
-            sp.Children.Add(Ui.Text(StudyText.ShortAttribution, 10.5, false, Ui.Muted, new Thickness(0, 12, 0, 0)));
-            sp.Children.Add(Ui.Text("Boxes: candidate lesions from a separate research detector (acne red, hyperpigmentation blue, eczema orange). " +
-                                    "They can miss or mislabel lesions, eczema is a pilot class, and they are not a diagnosis or a lesion count.",
+                        sp.Children.Add(Ui.Text("Marked areas are places that may contain lesions (acne red, hyperpigmentation blue, eczema orange). " +
+                                    "Some lesions may be missed or mislabelled, so the boxes are not a lesion count and not a diagnosis.",
                                     10.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             return Ui.Card(sp);
         }
@@ -236,9 +221,9 @@ namespace SkinDevApp.Views
             if (r == null) return "Localization: not available (scan saved before this feature)";
             if (r.Status == "Failed") { warn = true; return "Localization failed: " + (r.ErrorText ?? "unknown error") + " (scan and Grad-CAM++ are unaffected)"; }
             if (r.Status != "OK") return "Localization was not run for this view";
-            if (v.Lesions.Count == 0) return "Localization: no candidate boxes above the thresholds";
+            if (v.Lesions.Count == 0) return "Marked areas: none found";
             var parts = v.Lesions.GroupBy(x => x.ClassName).Select(g => g.Key + " " + g.Count());
-            return "Localization: " + v.Lesions.Count + " candidate box" + (v.Lesions.Count == 1 ? "" : "es") + " (" + string.Join(", ", parts) + ")";
+            return "Marked areas: " + v.Lesions.Count + " (" + string.Join(", ", parts) + ")";
         }
 
         // --------------------------------------------------------------- side --
@@ -247,7 +232,7 @@ namespace SkinDevApp.Views
         {
             bool r = AppSession.IsResearcher;
             var actions = new StackPanel();
-            actions.Children.Add(Ui.Text("Next steps", 15, true));
+            actions.Children.Add(Ui.Text("What would you like to do next?", 15, true));
 
             void Add(string text, RoutedEventHandler h, string style = "SecondaryButton", bool enabled = true)
             {
@@ -260,39 +245,39 @@ namespace SkinDevApp.Views
             bool hasFolder = !string.IsNullOrEmpty(_d.Session.SessionFolder) && System.IO.Directory.Exists(_d.Session.SessionFolder);
             if (r)
             {
-                Add("Comparison Gallery (original + 4 CAMs per view)", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
-                Add("Researcher Verification", (s, e) => OpenVerification(), "PrimaryButton");
-                Add("Dermatologist Review (clinical summary)", (s, e) =>
+                Add("Compare photographs and heat maps", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
+                Add("Add researcher notes", (s, e) => OpenVerification(), "PrimaryButton");
+                Add("Dermatologist review", (s, e) =>
                 {
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
                 }, "SecondaryButton");
             }
-            Add("Generate Research Report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
+            Add("Create report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))
-                Add("Participant Record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)));
+                Add("Patient record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)));
             if (!string.IsNullOrEmpty(_d.Session.ParticipantID))
-                Add("New scan for this participant", (s, e) => Workflow.ContinueToScan(_d.Session.ParticipantID));
-            Add("Dashboard", (s, e) => Nav.Home());
+                Add("New scan for this patient", (s, e) => Workflow.ContinueToScan(_d.Session.ParticipantID));
+            Add("Back to home", (s, e) => Nav.Home());
             SideColumn.Children.Add(Ui.Card(actions));
 
             // Human assessments (kept separate from the AI output)
             var human = new StackPanel();
-            human.Children.Add(Ui.Text("Human assessment", 15, true));
+            human.Children.Add(Ui.Text("Clinical review", 15, true));
             ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
-            human.Children.Add(Ui.KeyValues(new[]
+            human.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Researcher", ev == null ? "Pending" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
-                Ui.KV("Dermatologist", dv == null ? "Pending" : dv.DermatologistAssessment + " — " + dv.ValidationStatus)
-            }, 110));
-            human.Children.Add(Ui.Text("Human assessments are stored separately and never overwrite the AI prediction.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+                Ui.KV("Researcher", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
+                Ui.KV("Dermatologist", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + dv.ValidationStatus.ToLowerInvariant())
+            }, 110, 12.5));
+            human.Children.Add(Ui.Text("Reviews are saved separately and never change the computer's result.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
 
             // Notice
             var notice = new Border { Style = (Style)FindResource("NoticeBox"), Margin = new Thickness(8) };
             var n = new StackPanel();
-            n.Children.Add(Ui.Text("Research Prototype Notice", 13, true));
+            n.Children.Add(Ui.Text("Research prototype", 13, true));
             n.Children.Add(Ui.Text(StudyText.PrototypeNotice, 11.5, false, Ui.Ink));
             notice.Child = n;
             SideColumn.Children.Add(notice);
@@ -307,7 +292,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open the comparison gallery: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

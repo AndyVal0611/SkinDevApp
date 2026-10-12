@@ -28,7 +28,7 @@ namespace SkinDevApp
                 return;
             }
 
-            ParticipantTxt.Text = "Participant " + p.ParticipantID + "  ·  " + p.FullName;
+            ParticipantTxt.Text = "Patient " + p.ParticipantID + "  ·  " + p.FullName;
 
             if (p.Status == "Withdrawn")
             {

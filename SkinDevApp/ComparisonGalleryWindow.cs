@@ -149,15 +149,15 @@ namespace SkinDevApp.Views
 
             // tabs
             var tabs = new TabControl();
-            if (_model.IsSession) tabs.Items.Add(new TabItem { Header = "Overall", Content = BuildOverallTab() });
+            if (_model.IsSession) tabs.Items.Add(new TabItem { Header = "Summary", Content = BuildOverallTab() });
             foreach (GalleryView v in _model.Views)
-                tabs.Items.Add(new TabItem { Header = v.TabTitle + (v.Available ? "" : " (not captured)"), Content = BuildViewTab(v) });
+                tabs.Items.Add(new TabItem { Header = v.TabTitle + (v.Available ? "" : " (not taken)"), Content = BuildViewTab(v) });
             Grid.SetRow(tabs, 1);
             root.Children.Add(tabs);
 
             // footer
             var footer = new DockPanel { Margin = new Thickness(0, 10, 0, 0), LastChildFill = false };
-            var openBtn = new Button { Content = "Open folder", Width = 110, Height = 32 };
+            var openBtn = new Button { Content = "Open folder", Width = 120, Height = 32 };
             openBtn.Click += (s, e) =>
             {
                 try { Process.Start("explorer.exe", _openFolder); } catch { }
@@ -193,13 +193,13 @@ namespace SkinDevApp.Views
 
             if (!string.IsNullOrEmpty(v.LocalizationText))
             {
-                sp.Children.Add(GalleryUi.Text("Lesion localization (separate detector, independent of Grad-CAM++)", 13, true, "#34362E", new Thickness(0, 6, 0, 4)));
+                sp.Children.Add(GalleryUi.Text("Marked areas (places that may contain lesions)", 13, true, "#34362E", new Thickness(0, 6, 0, 4)));
                 sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#3D3732", new Thickness(0, 0, 0, 6)));
                 var lw = new WrapPanel();
                 if (v.LocalizationCard != null) lw.Children.Add(BuildLocalizationCard(v.LocalizationCard));
                 if (v.CombinedCard != null) lw.Children.Add(BuildLocalizationCard(v.CombinedCard));
                 sp.Children.Add(lw);
-                sp.Children.Add(GalleryUi.Text("Boxes are candidate lesion locations from a research detector: not segmentation, not a diagnosis, not a lesion count; lesions can be missed and boxes can be wrong. Eczema is a pilot class.",
+                sp.Children.Add(GalleryUi.Text("The boxes mark places that may contain lesions. Some lesions may be missed or wrongly marked, so the boxes are not a lesion count and not a diagnosis. Eczema is still being tested.",
                     11, false, "#6B6658", new Thickness(0, 4, 0, 0)));
             }
 
@@ -214,22 +214,26 @@ namespace SkinDevApp.Views
                 });
 
             var details = new StringBuilder();
-            if (!string.IsNullOrEmpty(v.PoseText)) details.AppendLine("Pose: " + v.PoseText);
-            if (!string.IsNullOrEmpty(v.QualityText)) details.AppendLine("Quality: " + v.QualityText);
-            if (!string.IsNullOrEmpty(v.StabilityText)) details.AppendLine("Stability: " + v.StabilityText + "  (steady prediction, not correctness)");
+            if (!string.IsNullOrEmpty(v.PoseText)) details.AppendLine("Head angle: " + v.PoseText);
+            if (!string.IsNullOrEmpty(v.QualityText)) details.AppendLine("Photo quality: " + v.QualityText);
+            if (!string.IsNullOrEmpty(v.StabilityText)) details.AppendLine("Steadiness of the reading: " + v.StabilityText + " (a steady reading is not necessarily a correct one)");
             if (v.Record != null && v.Record.Model != null)
-                details.AppendLine("Model run: " + v.Record.Model.RunName + "   service " + v.Record.Model.ServiceVersionReported);
-            details.AppendLine("Files: " + v.Folder);
-            sp.Children.Add(new TextBox
+                details.AppendLine("Model: " + Fmt.ModelName(v.Record.Model.RunName));
+            details.AppendLine("Saved in: " + v.Folder);
+            sp.Children.Add(new Expander
             {
-                Text = details.ToString().TrimEnd(),
-                IsReadOnly = true,
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
-                FontFamily = new FontFamily("Consolas"),
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 8, 0, 0)
+                Header = "Technical details",
+                Margin = new Thickness(0, 10, 0, 0),
+                Content = new TextBox
+                {
+                    Text = details.ToString().TrimEnd(),
+                    IsReadOnly = true,
+                    BorderThickness = new Thickness(0),
+                    Background = Brushes.Transparent,
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(18, 6, 0, 0)
+                }
             });
 
             return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -274,7 +278,7 @@ namespace SkinDevApp.Views
                 Stretch = Stretch.Uniform,
                 Height = 236,
                 Cursor = Cursors.Hand,
-                ToolTip = "Click to enlarge / compare with the original"
+                ToolTip = "Click to enlarge and compare with the original"
             };
             int startClass = c.IsOriginal ? -1 : c.ClassIndex;
             img.MouseLeftButtonUp += (s, e) =>
@@ -311,88 +315,78 @@ namespace SkinDevApp.Views
             FusedResult f = _model.Fusion;
             SessionIndex s = _model.Session;
 
-            sp.Children.Add(GalleryUi.Text("Overall multi-view result", 16, true));
+            sp.Children.Add(GalleryUi.Text("Summary of the three photographs", 16, true));
             sp.Children.Add(GalleryUi.Text(
-                "Each angle keeps its own scores and class maps (see the Front / Left / Right tabs). " +
-                "The three photographs are never merged into one heatmap.", 12, false, "#5A524B", new Thickness(0, 2, 0, 10)));
+                "Each photograph is read on its own (see the Front, Left and Right tabs). The three photographs are never merged into one heat map.",
+                12, false, "#5A524B", new Thickness(0, 2, 0, 10)));
 
             if (f == null || f.ViewsUsed == 0)
             {
-                sp.Children.Add(GalleryUi.Text(
-                    "The overall result is not available yet" + (s != null ? " (scan status: " + s.Status + ")" : "") + ".", 13, true, "#8A5A00"));
+                sp.Children.Add(GalleryUi.Text("The overall result is not available yet.", 13, true, "#8A5A00"));
             }
             else
             {
-                sp.Children.Add(GalleryUi.Text(
-                    "Overall top class: " + f.TopClass + " (" + f.TopClassPercent.ToString("0.0") + "% pooled score, " +
-                    f.ViewsUsed + " of " + f.ViewsExpected + " views)", 15, true));
-
-                if (f.Disagreement || f.SideSpecific.Count > 0 || f.Notes.Count > 0)
-                {
-                    var notes = new StringBuilder();
-                    foreach (string n in f.Notes) notes.AppendLine("• " + n);
-                    sp.Children.Add(new Border
-                    {
-                        Background = GalleryUi.Brush(f.Disagreement ? "#FFF1F0" : "#FFF7E0"),
-                        BorderBrush = GalleryUi.Brush(f.Disagreement ? "#E57373" : "#E0B84A"),
-                        BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(6),
-                        Padding = new Thickness(10, 6, 10, 6),
-                        Margin = new Thickness(0, 8, 0, 0),
-                        Child = GalleryUi.Text(notes.ToString().TrimEnd(), 12, false, "#5B2B00")
-                    });
-                }
-
-                var tbl = new StringBuilder();
-                tbl.AppendLine("Class".PadRight(20) + "Pooled".PadLeft(9) + "Mean".PadLeft(9) + "Max".PadLeft(9) + "  from");
-                foreach (string cls in ClassPalette.Names)
-                {
-                    tbl.AppendLine(cls.PadRight(20)
-                        + (f.PooledPercent.ContainsKey(cls) ? f.PooledPercent[cls].ToString("0.0") : "-").PadLeft(8) + "%"
-                        + (f.MeanPercent.ContainsKey(cls) ? f.MeanPercent[cls].ToString("0.0") : "-").PadLeft(8) + "%"
-                        + (f.MaxPercent.ContainsKey(cls) ? f.MaxPercent[cls].ToString("0.0") : "-").PadLeft(8) + "%"
-                        + "  " + (f.MaxFromView.ContainsKey(cls) ? f.MaxFromView[cls] : ""));
-                }
-                sp.Children.Add(new TextBox
-                {
-                    Text = tbl.ToString().TrimEnd(),
-                    IsReadOnly = true,
-                    BorderThickness = new Thickness(0),
-                    Background = Brushes.Transparent,
-                    FontFamily = new FontFamily("Consolas"),
-                    FontSize = 12,
-                    Margin = new Thickness(0, 10, 0, 0)
-                });
-                sp.Children.Add(GalleryUi.Text(
-                    "Pooled = quality-weighted average over views. Mean = unweighted average. Max = highest single-view score " +
-                    "(a one-sided finding shows here even when the pooled score is low).", 11, false, "#6B6658", new Thickness(0, 2, 0, 0)));
+                sp.Children.Add(GalleryUi.Text(ClinicalText.Name(f.TopClass) + " — " + ClinicalText.Strength(f.TopClassPercent) + " match (" +
+                    f.TopClassPercent.ToString("0") + "%), from " + f.ViewsUsed + " of " + f.ViewsExpected + " photographs", 15, true));
             }
 
-            // per-view table (always shown)
-            sp.Children.Add(GalleryUi.Text("Per view", 14, true, "#34362E", new Thickness(0, 14, 0, 4)));
-            var pv = new StringBuilder();
-            pv.AppendLine("View".PadRight(8) + "Top class".PadRight(20) + "Score".PadLeft(8) + "  Weight".PadRight(10) + "Pose");
+            var seen = s == null ? new List<ViewOutcome>() : s.Views.Where(o => o.PredictedClass != null).ToList();
+            if (seen.Count > 1)
+            {
+                int distinct = seen.Select(o => o.PredictedClass).Distinct().Count();
+                double spread = seen.Max(o => o.ConfidencePercent) - seen.Min(o => o.ConfidencePercent);
+                if (distinct > 1)
+                    sp.Children.Add(Ui.Callout("The photographs do not agree", "The photographs point to different categories. Please compare each photograph before relying on the overall result.", 2));
+                else if (spread >= 25)
+                    sp.Children.Add(Ui.Callout("Same category, different strength", "All photographs point to " + ClinicalText.Name(seen[0].PredictedClass) + ", but the match varies from " +
+                        seen.Min(o => o.ConfidencePercent).ToString("0") + "% to " + seen.Max(o => o.ConfidencePercent).ToString("0") + "%.", 1));
+                else
+                    sp.Children.Add(Ui.Callout("The photographs agree", "Every photograph points to " + ClinicalText.Name(seen[0].PredictedClass) + " with a similar strength.", 0));
+            }
+
+            sp.Children.Add(GalleryUi.Text("Reading of each photograph", 14, true, "#34362E", new Thickness(0, 12, 0, 4)));
             if (s != null)
                 foreach (ViewOutcome o in s.Views)
-                    pv.AppendLine(o.View.PadRight(8)
-                        + (o.PredictedClass ?? "-").PadRight(20)
-                        + (o.ConfidencePercent.ToString("0.0") + "%").PadLeft(8)
-                        + ("  " + o.QualityWeight.ToString("0.00")).PadRight(10)
-                        + (o.PoseGateVerified ? "verified" : "not verified"));
+                    sp.Children.Add(GalleryUi.Text(o.View + " view:  " + (o.PredictedClass == null ? "no result"
+                        : ClinicalText.Name(o.PredictedClass) + " — " + ClinicalText.Strength(o.ConfidencePercent) + " match (" + o.ConfidencePercent.ToString("0") + "%)"),
+                        13, false, "#34362E", new Thickness(8, 2, 0, 2)));
             foreach (GalleryView gv in _model.Views.Where(x => !x.Available))
-                pv.AppendLine(gv.TabTitle.PadRight(8) + "not captured");
-            sp.Children.Add(new TextBox
-            {
-                Text = pv.ToString().TrimEnd(),
-                IsReadOnly = true,
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
-                FontFamily = new FontFamily("Consolas"),
-                FontSize = 12
-            });
+                sp.Children.Add(GalleryUi.Text(gv.TabTitle + ":  not taken", 13, false, "#8A5A00", new Thickness(8, 2, 0, 2)));
+            sp.Children.Add(GalleryUi.Text(ClinicalText.HowToReadScores, 11, false, "#6B6658", new Thickness(0, 10, 0, 0)));
 
-            if (f != null)
-                sp.Children.Add(GalleryUi.Text("Method: " + f.Method, 11, false, "#6B6658", new Thickness(0, 10, 0, 0)));
+            var tech = new StringBuilder();
+            if (f != null && f.ViewsUsed > 0)
+            {
+                tech.AppendLine("Category".PadRight(20) + "Weighted".PadLeft(10) + "Average".PadLeft(10) + "Highest".PadLeft(10) + "  from");
+                foreach (string cls in ClassPalette.Names)
+                    tech.AppendLine(ClinicalText.Name(cls).PadRight(20)
+                        + ((f.PooledPercent.ContainsKey(cls) ? f.PooledPercent[cls].ToString("0.0") : "-") + "%").PadLeft(10)
+                        + ((f.MeanPercent.ContainsKey(cls) ? f.MeanPercent[cls].ToString("0.0") : "-") + "%").PadLeft(10)
+                        + ((f.MaxPercent.ContainsKey(cls) ? f.MaxPercent[cls].ToString("0.0") : "-") + "%").PadLeft(10)
+                        + "  " + (f.MaxFromView.ContainsKey(cls) ? f.MaxFromView[cls] : ""));
+                tech.AppendLine();
+                tech.AppendLine("Weighted = average of the photographs, counting clearer photographs more.");
+                tech.AppendLine("Average = plain average.  Highest = the strongest single photograph.");
+                tech.AppendLine("A finding seen in only one photograph shows under Highest even when the weighted figure is low.");
+                tech.AppendLine("Method: " + f.Method);
+                foreach (string n in f.Notes) tech.AppendLine("Note: " + n);
+            }
+            if (tech.Length > 0)
+                sp.Children.Add(new Expander
+                {
+                    Header = "Technical details",
+                    Margin = new Thickness(0, 12, 0, 0),
+                    Content = new TextBox
+                    {
+                        Text = tech.ToString().TrimEnd(),
+                        IsReadOnly = true,
+                        BorderThickness = new Thickness(0),
+                        Background = Brushes.Transparent,
+                        FontFamily = new FontFamily("Consolas"),
+                        FontSize = 11.5,
+                        Margin = new Thickness(18, 6, 0, 0)
+                    }
+                });
 
             return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }

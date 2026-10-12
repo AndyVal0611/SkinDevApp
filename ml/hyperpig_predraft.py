@@ -21,7 +21,7 @@ HOME = Path.home() / "PrecisionSkinV1"
 OWN = Path("/mnt/c/Users/Bautista/Downloads/own_hyperpigmentation.yolov8")                      # your boxed photos (images/ + labels/)
 W1 = HOME / "hyperpig_autolabel" / "hyperpig_only_v1"                                           # earlier pipeline: hand_test list + unlabeled index
 OUT = Path("/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Hyperpigmentation_Boxing")
-TOOL = Path("/mnt/c/Users/Bautista/Downloads/lesion_box_tool.py")
+TOOL = Path("/mnt/c/Users/Bautista/source/repos/SkinDevApp/ml/lesion_box_tool.py")
 WORK = HOME / "hyperpig_predraft"
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
@@ -73,6 +73,7 @@ def own_photos(exclude_test=True):
 
 
 def weights():
+    if os.environ.get("DRAFT_WEIGHTS"): return Path(os.environ["DRAFT_WEIGHTS"])
     return WORK / "runs" / "hyp_predraft" / "weights" / "best.pt"
 
 

@@ -28,12 +28,12 @@
 
             <!-- Human assessments -->
             <TabControl Grid.Column="1" Margin="8" Background="White" BorderThickness="0">
-                <TabItem Header="  Researcher Assessment  " FontSize="13">
+                <TabItem Header="  Researcher assessment  " FontSize="13">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="ResearcherForm" Margin="16"/>
                     </ScrollViewer>
                 </TabItem>
-                <TabItem Header="  Licensed Dermatologist Validation  " FontSize="13">
+                <TabItem Header="  Dermatologist validation  " FontSize="13">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="DermForm" Margin="16"/>
                     </ScrollViewer>
@@ -49,7 +49,7 @@
         <DockPanel Grid.Row="2" Margin="8,10,8,0">
             <Button Content="Close" Style="{StaticResource SecondaryButton}" Width="120" DockPanel.Dock="Right" Click="CloseBtn_Click"/>
             <TextBlock Style="{StaticResource Muted}" VerticalAlignment="Center" FontSize="11.5"
-                       Text="AI output, researcher assessment and dermatologist validation are three separate records. Saving a human assessment never overwrites the AI prediction; a new save adds a new record."/>
+                       Text="The computer's result, the researcher's assessment and the dermatologist's validation are saved as three separate records. Saving an assessment never changes the computer's result; each save adds a new record."/>
         </DockPanel>
     </Grid>
 </Window>

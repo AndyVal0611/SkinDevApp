@@ -1,0 +1,19 @@
+{
+  "model": "PrecisionSkin hyperpigmentation specialist detector",
+  "source_weights": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H10_v2_lowlr/weights/best.pt",
+  "classes": [
+    "hyperpigmentation"
+  ],
+  "imgsz": 800,
+  "default_conf": 0.225,
+  "nms_iou": 0.6,
+  "onnx_sha256": "df03a5d5e00f70d53e4e89b1c596545084e54e7749b8a7095f64ececa0b1cbf4",
+  "installed": "2026-10-11T20:53:52",
+  "test_mAP50_single_run": 0.207,
+  "note": "Average (weighted box fusion, IoU 0.5) of three H10 seeds; threshold 0.225 chosen on validation; test mAP50 0.278 (single models 0.207-0.246)",
+  "ensemble": [
+    "lesion_detector_hyperpigmentation.onnx (H10 seed 42)",
+    "lesion_detector_hyperpigmentation_m2.onnx (H10 seed 7)",
+    "lesion_detector_hyperpigmentation_m3.onnx (H10 seed 123)"
+  ]
+}

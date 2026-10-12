@@ -1,4 +1,4 @@
-﻿<Page x:Class="SkinDevApp.SettingsPage"
+<Page x:Class="SkinDevApp.SettingsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Settings" Background="#F8F1E6">
@@ -7,26 +7,29 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         <ContentControl x:Name="HeaderHost"/>
-        <StackPanel Grid.Row="1" Margin="8,0,8,8">
+
+        <StackPanel Grid.Row="1" Margin="8,0,8,14">
             <TextBlock Text="Settings" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
-                       Text="Researcher / admin only. These values change how scans are captured and analysed, so every change is written to the audit log with a timestamp and the current model version. They apply from the next scan."/>
+                       Text="Camera and capture preferences, accounts, and the history of changes. Changes apply from the next scan."/>
         </StackPanel>
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel x:Name="LeftColumn"/>
-                <StackPanel x:Name="RightColumn" Grid.Column="1"/>
-            </Grid>
+
+        <!-- tab strip -->
+        <Border Grid.Row="2" Margin="8,0,8,0" BorderBrush="#E0D9C8" BorderThickness="0,0,0,1">
+            <StackPanel x:Name="TabStrip" Orientation="Horizontal"/>
+        </Border>
+
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+            <ContentControl x:Name="ContentHost" Margin="0,14,0,10"/>
         </ScrollViewer>
-        <Border Grid.Row="3" Background="White" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
+
+        <Border x:Name="FooterBar" Grid.Row="4" Background="White" BorderBrush="#E9DFD1" BorderThickness="1" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
             <DockPanel>
                 <Button Content="Restore defaults" Style="{StaticResource SecondaryButton}" Width="170" Click="DefaultsBtn_Click"/>
                 <Button x:Name="SaveBtn" DockPanel.Dock="Right" HorizontalAlignment="Right" Content="Save settings" Style="{StaticResource PrimaryButton}"

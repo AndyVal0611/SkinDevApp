@@ -54,8 +54,9 @@ RULES = {
 
 
 class Store:
-    def __init__(self, root):
+    def __init__(self, root, export=None):
         self.root = os.path.abspath(root)
+        self.export_dir = os.path.abspath(export) if export else None
         self.images_dir = os.path.join(self.root, "images")
         self.labels_dir = os.path.join(self.root, "labels")
         if not os.path.isdir(self.images_dir):
@@ -120,7 +121,38 @@ class Store:
             os.replace(tmp, p)
             now = time.time()
             os.utime(p, (now, now))
+        self.sync_export(name, len(clean))
         return len(clean)
+
+    def sync_export(self, name, n):
+        """--export: every photo that has boxes is copied (image + label) into the export folder; a photo marked X is removed from it and listed in no_lesion_marked_X.txt."""
+        if not self.export_dir:
+            return
+        import shutil
+        stem = os.path.splitext(name)[0]
+        imgs, labs = os.path.join(self.export_dir, "images"), os.path.join(self.export_dir, "labels")
+        os.makedirs(imgs, exist_ok=True); os.makedirs(labs, exist_ok=True)
+        xfile = os.path.join(self.export_dir, "no_lesion_marked_X.txt")
+        with self.lock:
+            marked = set()
+            if os.path.exists(xfile):
+                with open(xfile, "r", encoding="utf-8") as fh:
+                    marked = set(l.strip() for l in fh if l.strip())
+            if n > 0:
+                shutil.copy2(os.path.join(self.images_dir, name), os.path.join(imgs, name))
+                shutil.copy2(self.label_path(name), os.path.join(labs, stem + ".txt"))
+                marked.discard(name)
+            else:
+                for f in (os.path.join(imgs, name), os.path.join(labs, stem + ".txt")):
+                    if os.path.exists(f):
+                        os.remove(f)
+                marked.add(name)
+            with open(xfile, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("\n".join(sorted(marked)) + ("\n" if marked else ""))
+            yml = os.path.join(self.export_dir, "data.yaml")
+            if not os.path.exists(yml):
+                with open(yml, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write("path: .\ntrain: images\nval: images\ntest: images\nnames:\n  0: " + (LABEL or "lesion") + "\n")
 
     def log(self, row):
         new = not os.path.exists(self.log_path)
@@ -425,12 +457,17 @@ def main():
     ap.add_argument("--rule", default=None, help="your own labelling rule text (default: a rule for the chosen condition)")
     ap.add_argument("--annotator", default="", help="your name (saved in labeling_log.csv and shown on the page)")
     ap.add_argument("--port", type=int, default=8800)
+    ap.add_argument("--export", default=None, help="folder that receives a copy (images + labels) of every photo you save with boxes, e.g. boxed_Acne")
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
     LABEL = a.label.lower()
     ANNOT = a.annotator
     RULE = a.rule or RULES.get(LABEL, "One tight box per visible lesion. If you cannot see any, press X.")
-    STORE = Store(a.folder)
+    STORE = Store(a.folder, a.export)
+    if a.export:                                   # bring photos saved earlier into the export folder too
+        for _n in STORE.names():
+            if STORE.is_reviewed(_n):
+                STORE.sync_export(_n, len(STORE.read_boxes(_n)))
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     url = "http://127.0.0.1:%d" % a.port
     n = len(STORE.names())
@@ -440,6 +477,8 @@ def main():
     print("Rule    : %s" % RULE)
     print("Open    : %s   (this computer only; nothing is uploaded)" % url)
     print("Log     : %s" % STORE.log_path)
+    if a.export:
+        print("Export  : %s   (every photo saved with boxes is copied here)" % STORE.export_dir)
     print("Stop    : press Ctrl+C in this window")
     if not a.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

@@ -121,6 +121,32 @@ def recipe(name):
         info = json.loads((d / "info.json").read_text())
         names = [n for n, v in info.items() if name != "hyp_own_drafts_cov" or (v["cover"] <= 0.18 and v["max_side"] <= 0.40)]
         return own_with_reps(s["own_train"], 2) + [d / "images" / n for n in sorted(names)], vals, "your boxes x2 + %d of your %d reviewed drafts%s" % (len(names), len(info), "" if name != "hyp_own_drafts_cov" else " (only photos covering <= 18 % and no box > 40 %)")
+    if name == "hyp_v2auto":
+        # NO new human boxing: old boxes converted to rule v2 by code (touching / closer than 1.0 x the smaller box = one box; boxes under 0.09 dropped);
+        # validation = the 30 validation photos you boxed under rule v2 (pass A). Scored later on pass B as well.
+        d = DATA / "hyp_v2auto"
+        if not (d / "READY").exists():
+            import hyp_v2_transform as TR
+            shutil.rmtree(d, ignore_errors=True); (d / "images").mkdir(parents=True); (d / "labels").mkdir(parents=True); k = 0
+            def put(img, boxes, reps):
+                nonlocal k
+                for r in range(reps):
+                    nm = "%s%s%s" % (img.stem, "" if r == 0 else "_rep%d" % r, img.suffix); shutil.copy2(img, d / "images" / nm)
+                    (d / "labels" / (Path(nm).stem + ".txt")).write_text("".join("0 %.6f %.6f %.6f %.6f\n" % b for b in boxes)); k += 1
+            for n in s["own_train"]:
+                lab = HYP / "train" / "labels" / (Path(n).stem + ".txt"); bx = TR.F.rd(lab)
+                if bx: put(HYP / "train" / "images" / n, TR.to_v2(bx, 1.0, 0.09), 2)
+            dd = DATA / "hyp_drafts_v2"
+            for img in sorted((dd / "images").glob("*")):
+                bx = TR.F.rd(dd / "labels" / (img.stem + ".txt"))
+                if bx: put(img, TR.to_v2(bx, 1.0, 0.09), 1)
+            vd = DATA / "hyp_v2_valA"; shutil.rmtree(vd, ignore_errors=True); (vd / "images").mkdir(parents=True); (vd / "labels").mkdir(parents=True)
+            BA = Path("/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Hyperpigmentation_Boxing/Rebox_V2_PassA"); mp = json.load(open(BA / "name_map.json"))
+            for orig, new in mp.items():
+                src = next(iter((DATA / "hyp_hand_val" / "images").glob(Path(orig).stem + ".*")))
+                shutil.copy2(src, vd / "images" / src.name); shutil.copy2(BA / "Elaiza__hyperpigmentation_v2" / "labels" / (new + ".txt"), vd / "labels" / (Path(orig).stem + ".txt"))
+            (d / "READY").write_text(str(k)); print("hyp_v2auto: %d training images (converted boxes), validation %d photos (pass A)" % (k, len(mp)), flush=True)
+        return imgs(d / "images"), {"v2_valA": DATA / "hyp_v2_valA"}, "old boxes converted to rule v2 by code (no new human boxing); validation = your pass A"
     if name == "hyp_dedup_mix":  return hyp_files(s["public_dedup"]) + own_with_reps(s["own_train"], 2), vals, "public photos de-duplicated + your boxes x2"
     if name == "hyp_balanced":
         rng = random.Random(1); pub = s["public_dedup"][:]; rng.shuffle(pub)
@@ -148,6 +174,9 @@ QUEUE = [
     # round 3: better starting weights (same data and recipe as H10, seed 42)
     spec("H12_init_acne", "hyperpigmentation", "hyp_own_drafts_v2", "FACTOR (vs H10): start from the final acne detector's weights (same skin domain) instead of COCO", model="/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt", lr0=0.0005, optimizer="AdamW"),
     spec("H13_init_mix", "hyperpigmentation", "hyp_own_drafts_v2", "FACTOR (vs H10): start from the public+own model (H0), then fine-tune on your boxes only", model="/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H0_mix/weights/best.pt", lr0=0.0005, optimizer="AdamW"),
+    spec("H20_v2auto", "hyperpigmentation", "hyp_v2auto", "FACTOR: train on old boxes converted to rule v2 by code; validated on your rule-v2 pass A", lr0=0.0005, optimizer="AdamW"),
+    spec("H20_s7", "hyperpigmentation", "hyp_v2auto", "CONFIRM H20 with seed 7", seed=7, lr0=0.0005, optimizer="AdamW"),
+    spec("H20_s123", "hyperpigmentation", "hyp_v2auto", "CONFIRM H20 with seed 123", seed=123, lr0=0.0005, optimizer="AdamW"),
     spec("H11_v2_m800", "hyperpigmentation", "hyp_own_drafts_v2", "FACTOR (vs H8): yolov8m", model="yolov8m.pt", batch=6),
     spec("H2_dedup", "hyperpigmentation", "hyp_dedup_mix", "FACTOR: remove near-duplicate public photos (2,524 of 3,031 had one)"),
     spec("H3_balanced", "hyperpigmentation", "hyp_balanced", "FACTOR: public photos limited to the number of your photos"),

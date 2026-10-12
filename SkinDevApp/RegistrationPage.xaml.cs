@@ -15,6 +15,7 @@ namespace SkinDevApp.Views
     public partial class RegistrationPage : Page
     {
         private string _legacyFitz, _legacyFitzSource;
+        private string _monkTone = "Not collected", _monkSource = "Not collected";   // set later by the detector / dermatologist, never typed at registration
         private readonly bool _editMode;
         private string _participantId;          // set once saved (new) or from the record (edit)
         private bool _loading = true;
@@ -26,19 +27,16 @@ namespace SkinDevApp.Views
         {
             InitializeComponent();
             _editMode = !string.IsNullOrEmpty(editParticipantId);
-            HeaderHost.Content = Ui.Header(_editMode ? "Edit Registration" : "Registration");
+            HeaderHost.Content = Ui.Header(_editMode ? "Edit registration" : "Registration");
 
             if (_editMode) LoadForEdit(editParticipantId);
             else
             {
-                try { PatientIdTxt.Text = StudyRepository.PeekNextParticipantId() + "  (assigned on save)"; }
-                catch (Exception ex) { PatientIdTxt.Text = "database unavailable: " + ex.Message; }
-                RegisteredAtTxt.Text = "set automatically on save";
+                try { PatientIdTxt.Text = StudyRepository.PeekNextParticipantId(); }
+                catch (Exception ex) { PatientIdTxt.Text = "unavailable"; ValidationTxt.Text = "The database could not be read: " + ex.Message; }
                 OperatorTxt.Text = AppSession.ActorId;
                 SensitivityCombo.SelectedIndex = 0;
                 DurationCombo.SelectedIndex = 0;
-                MonkToneCombo.SelectedIndex = 0;
-                MonkSourceCombo.SelectedIndex = 0;
             }
 
             _loading = false;
@@ -49,13 +47,12 @@ namespace SkinDevApp.Views
         private void LoadForEdit(string id)
         {
             Participant p = StudyRepository.GetParticipant(id);
-            if (p == null) throw new InvalidOperationException("Participant " + id + " not found.");
+            if (p == null) throw new InvalidOperationException("Patient " + id + " was not found.");
             SkinProfile sp = StudyRepository.GetSkinProfile(p.ParticipantID) ?? new SkinProfile();
 
             _participantId = p.ParticipantID;
-            PageTitle.Text = "Edit Registration — " + p.ParticipantID;
+            PageTitle.Text = "Edit registration · " + p.ParticipantID;
             PatientIdTxt.Text = p.ParticipantID;
-            RegisteredAtTxt.Text = p.RegisteredAt;
             FirstNameTxt.Text = p.FirstName;
             MiddleNameTxt.Text = p.MiddleName;
             LastNameTxt.Text = p.LastName;
@@ -72,8 +69,8 @@ namespace SkinDevApp.Views
 
             Select(SkinTypeCombo, sp.GeneralSkinType);
             Select(SensitivityCombo, sp.Sensitivity);
-            MonkToneCombo.SelectedIndex = 0; MonkSourceCombo.SelectedIndex = 0;
-            Select(MonkToneCombo, sp.MonkSkinTone); Select(MonkSourceCombo, sp.MonkSource);
+            _monkTone = string.IsNullOrEmpty(sp.MonkSkinTone) ? "Not collected" : sp.MonkSkinTone;      // kept exactly as stored
+            _monkSource = string.IsNullOrEmpty(sp.MonkSource) ? "Not collected" : sp.MonkSource;
             _legacyFitz = sp.FitzpatrickManual; _legacyFitzSource = sp.FitzpatrickSource;      // retired feature: kept as-is in the database, never shown or edited
             SetChecks(ConcernPanel, sp.Concerns);
             ConcernOtherTxt.Text = sp.ConcernOther;
@@ -90,7 +87,7 @@ namespace SkinDevApp.Views
             ProceduresTxt.Text = sp.RecentProcedures;
             OtherResponsesTxt.Text = sp.OtherResponses;
 
-            SaveBtn.Content = "Save Changes";
+            SaveBtn.Content = "Save changes";
             ContinueBtn.Visibility = Visibility.Collapsed;
         }
 
@@ -138,26 +135,23 @@ namespace SkinDevApp.Views
 
             int age = 0;
             bool hasAge = int.TryParse((AgeTxt.Text ?? "").Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out age);
-            if (!hasAge) errors.Add("age (or date of birth)");
-            else if (age < 0 || age > 120) errors.Add("a valid age (0-120)");
+            if (!hasAge) errors.Add("the age (or date of birth)");
+            else if (age < 0 || age > 120) errors.Add("a valid age (0 to 120)");
             if (DobPicker.SelectedDate.HasValue && DobPicker.SelectedDate.Value > DateTime.Today) errors.Add("a date of birth that is not in the future");
-            if (Selected(SexCombo) == null) errors.Add("sex");
-            if (string.IsNullOrWhiteSpace(OperatorTxt.Text)) errors.Add("researcher / operator ID");
-            if (Selected(SkinTypeCombo) == null) errors.Add("general skin type");
-            bool monkTone = (Selected(MonkToneCombo) ?? "Not collected") != "Not collected", monkSource = (Selected(MonkSourceCombo) ?? "Not collected") != "Not collected";
-            if (monkTone && !monkSource) errors.Add("who rated the Monk Skin Tone");
-            if (monkSource && !monkTone) errors.Add("the Monk Skin Tone value (or set who rated it to 'Not collected')");
+            if (Selected(SexCombo) == null) errors.Add("the sex");
+            if (string.IsNullOrWhiteSpace(OperatorTxt.Text)) errors.Add("the staff ID");
+            if (Selected(SkinTypeCombo) == null) errors.Add("the skin type");
 
             string concerns = Checked(ConcernPanel);
-            if (concerns.Length == 0) errors.Add("at least one reported concern");
-            if (concerns.Contains("Other") && string.IsNullOrWhiteSpace(ConcernOtherTxt.Text)) errors.Add("a description of the 'Other' concern");
+            if (concerns.Length == 0) errors.Add("at least one skin concern");
+            if (concerns.Contains("Other") && string.IsNullOrWhiteSpace(ConcernOtherTxt.Text)) errors.Add("a description of the \"Other\" concern");
             string regions = Checked(RegionPanel);
-            if (regions.Contains("Other") && string.IsNullOrWhiteSpace(RegionOtherTxt.Text)) errors.Add("a description of the 'Other' region");
-            if (_editMode && string.IsNullOrWhiteSpace(EditReasonTxt.Text)) errors.Add("a reason for this edit");
+            if (regions.Contains("Other") && string.IsNullOrWhiteSpace(RegionOtherTxt.Text)) errors.Add("a description of the \"Other\" area");
+            if (_editMode && string.IsNullOrWhiteSpace(EditReasonTxt.Text)) errors.Add("the reason for this change");
 
             if (errors.Count > 0)
             {
-                ValidationTxt.Text = "Please provide " + string.Join(", ", errors) + ".";
+                ValidationTxt.Text = "Please complete: " + string.Join(", ", errors) + ".";
                 return false;
             }
             ValidationTxt.Text = "";
@@ -179,8 +173,8 @@ namespace SkinDevApp.Views
             sp = new SkinProfile
             {
                 GeneralSkinType = Selected(SkinTypeCombo),
-                MonkSkinTone = Selected(MonkToneCombo) ?? "Not collected",
-                MonkSource = Selected(MonkSourceCombo) ?? "Not collected",
+                MonkSkinTone = _monkTone,
+                MonkSource = _monkSource,
                 FitzpatrickManual = _legacyFitz,                 // legacy column carried through unchanged
                 FitzpatrickSource = _legacyFitzSource,
                 Sensitivity = Selected(SensitivityCombo),
@@ -221,12 +215,10 @@ namespace SkinDevApp.Views
                 else if (_participantId == null)
                 {
                     _participantId = StudyRepository.RegisterParticipant(p, sp);
-                    Participant saved = StudyRepository.GetParticipant(_participantId);
                     PatientIdTxt.Text = _participantId;
-                    RegisteredAtTxt.Text = saved != null ? saved.RegisteredAt : "";
                     AppSession.CurrentParticipantId = _participantId;
-                    PageTitle.Text = "Participant Registration — " + _participantId;
-                    SaveBtn.Content = "Save Changes";
+                    PageTitle.Text = "Patient registration · " + _participantId;
+                    SaveBtn.Content = "Save changes";
                 }
                 else
                 {
@@ -238,7 +230,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("The registration could not be saved.\n\n" + ex.Message, "LUMYVUE Registration",
+                MessageBox.Show("The registration could not be saved.\n\n" + ex.Message, "LUMYVUE registration",
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
@@ -251,14 +243,14 @@ namespace SkinDevApp.Views
 
             if (_editMode)
             {
-                MessageBox.Show("Registration updated for " + _participantId + ".", "LUMYVUE Registration");
+                MessageBox.Show("The registration of " + _participantId + " was updated.", "LUMYVUE registration");
                 Nav.Back();
             }
             else if (wasNew)
             {
-                MessageBox.Show("Participant registered.\n\nPatientID: " + _participantId +
-                                "\n\nPlease note this ID; it is used to find the participant later.",
-                                "LUMYVUE Registration", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("The patient is registered.\n\nPatient ID: " + _participantId +
+                                "\n\nPlease note this ID. It is used to find the patient later.",
+                                "LUMYVUE registration", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 

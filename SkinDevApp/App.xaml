@@ -124,18 +124,17 @@
         </Style>
 
         <!-- surfaces -->
+        <!-- NOTE: no Effect (drop shadow) here on purpose. An Effect makes WPF draw everything inside the card into a
+             bitmap at 96 dpi, which makes text and thin lines look blurry on high-DPI screens. A crisp warm border gives the
+             same separation. -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#F0EAE3"/>
+            <Setter Property="BorderBrush" Value="#E9DFD1"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="18"/>
             <Setter Property="Padding" Value="24,20"/>
             <Setter Property="Margin" Value="8"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="24" ShadowDepth="3" Color="#5A4636" Opacity="0.07" Direction="270"/>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>
 
         <Style x:Key="NoticeBox" TargetType="Border">
@@ -598,7 +597,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridCell">
-                        <Border Background="Transparent" Padding="12,0" SnapsToDevicePixels="True">
+                        <Border Background="Transparent" Padding="10,0" SnapsToDevicePixels="True">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>

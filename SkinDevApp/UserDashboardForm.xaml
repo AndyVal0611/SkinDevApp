@@ -33,9 +33,6 @@
 
             <!-- Card 1: Total Evaluations (Dynamic Database Count) -->
             <Border Grid.Column="0" Background="White" CornerRadius="18" Padding="22">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
-                </Border.Effect>
                 <StackPanel>
                     <TextBlock Text="Total Evaluations" FontSize="12" Foreground="#8A8574" FontWeight="SemiBold"/>
                     <TextBlock x:Name="TotalEvaluationsTxt" Text="0" FontSize="30" FontFamily="{StaticResource DisplayFont}" Foreground="#34362E" Margin="0,6,0,0"/>
@@ -44,9 +41,6 @@
 
             <!-- Card 2: Unique Clients Logged (Dynamic Database Count) -->
             <Border Grid.Column="2" Background="White" CornerRadius="18" Padding="22">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
-                </Border.Effect>
                 <StackPanel>
                     <TextBlock Text="Unique Clients Logged" FontSize="12" Foreground="#8A8574" FontWeight="SemiBold"/>
                     <TextBlock x:Name="UniquePatientsTxt" Text="0" FontSize="30" FontFamily="{StaticResource DisplayFont}" Foreground="#34362E" Margin="0,6,0,0"/>
@@ -55,9 +49,6 @@
 
             <!-- Card 3: System / ONNX Status -->
             <Border Grid.Column="4" Background="White" CornerRadius="18" Padding="22">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="15" Color="#000000" Opacity="0.03" Direction="270"/>
-                </Border.Effect>
                 <StackPanel>
                     <TextBlock Text="ONNX Engine Status" FontSize="12" Foreground="#8A8574" FontWeight="SemiBold"/>
                     <TextBlock Text="Active (PrecisionSkin)" FontSize="22" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="#588157" Margin="0,10,0,0"/>
@@ -67,9 +58,6 @@
 
         <!-- Main Restricted Database Records Log Card -->
         <Border Grid.Row="2" Background="White" CornerRadius="16" Padding="20">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.03" Direction="270"/>
-            </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

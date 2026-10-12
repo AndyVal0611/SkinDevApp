@@ -1,0 +1,55 @@
+{
+  "model": "PrecisionSkin acne specialist detector",
+  "condition": "acne",
+  "classes": [
+    "acne"
+  ],
+  "imgsz": 800,
+  "default_conf": 0.242,
+  "nms_iou": 0.45,
+  "onnx_sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+  "onnx_file": "lesion_detector_acne.onnx",
+  "source_weights": "/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt",
+  "best_seed": 123,
+  "seeds": [
+    42,
+    7,
+    123
+  ],
+  "run_name": "boxed_only",
+  "use_negatives": false,
+  "base_model": "yolov8s.pt",
+  "epochs_max": 100,
+  "dataset": "/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing/acne_dataset_v4",
+  "dataset_fingerprint": "ae51483a7b72c11348be34ef732bf0d17208ede97f4e935c9a507bb3834843bb",
+  "primary_test": "test",
+  "test_mean": {
+    "mAP50": 0.4130636097629354,
+    "mAP50_95": 0.12251534210106513,
+    "precision": 0.4273683528528563,
+    "recall": 0.5427319211102996,
+    "F1": 0.47804383834513087
+  },
+  "test_std_mAP50": 0.005617897781191888,
+  "bootstrap_ci95_mAP50": [
+    0.3694341691942294,
+    0.462836159376498
+  ],
+  "leakfree": {
+    "n_removed": 2,
+    "test_mAP50": 0.4175671552561873
+  },
+  "v1_comparison": {
+    "test_mAP50": 0.22048661678019568,
+    "test_mAP50_95": 0.06618718655995873,
+    "precision": 0.35914702581369246,
+    "recall": 0.2337472607742878,
+    "F1": 0.2831858407079646
+  },
+  "cpu_latency_ms_this_machine": 131.27267150048283,
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "ultralytics": "8.4.172"
+  },
+  "created": "2026-10-10T22:35:05"
+}

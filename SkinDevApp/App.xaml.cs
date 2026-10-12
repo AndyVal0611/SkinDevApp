@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 
 namespace SkinDevApp
 {
@@ -16,6 +17,20 @@ namespace SkinDevApp
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Crisp rendering on every window (including the ones created in code): snap to whole pixels, ClearType text,
+            // high-quality image scaling. Combined with the DPI-aware manifest this removes the soft, blurry look.
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, args) =>
+            {
+                var w = s as Window;
+                if (w == null) return;
+                w.UseLayoutRounding = true;
+                w.SnapsToDevicePixels = true;
+                TextOptions.SetTextRenderingMode(w, TextRenderingMode.ClearType);
+                TextOptions.SetTextFormattingMode(w, TextFormattingMode.Ideal);
+                RenderOptions.SetClearTypeHint(w, ClearTypeHint.Enabled);
+                RenderOptions.SetBitmapScalingMode(w, BitmapScalingMode.HighQuality);
+            }));
             DatabaseHelper.InitializeDatabase(); // Creates lumyvue_db.sqlite table automatically
             Data.StudyDatabase.Initialize();     // participant / scan / validation tables (same file)
             Data.ScanSettings.Current.ApplyGlobal();

@@ -1,15 +1,15 @@
 ﻿<Page x:Class="SkinDevApp.Views.ModelInfoPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Model Information" Background="#F8F1E6">
+      Title="Model information" Background="#F8F1E6">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="25">
             <ContentControl x:Name="HeaderHost"/>
             <StackPanel Margin="8,0,8,8">
-                <TextBlock Text="Model Information" Style="{StaticResource H1}"/>
+                <TextBlock Text="Model information" Style="{StaticResource H1}"/>
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
-                           Text="Exactly which model produces results. Every saved scan stores the model version and hashes shown here."/>
+                           Text="Which model produced the results, and whether the heat-map service is running."/>
             </StackPanel>
             <Grid>
                 <Grid.ColumnDefinitions>

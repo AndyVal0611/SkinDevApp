@@ -90,7 +90,7 @@ namespace SkinDevApp.Views
 
             right.Children.Add(new TextBlock
             {
-                Text = AppSession.RoleTitle + (string.IsNullOrEmpty(AppSession.UserId) ? "" : " · " + AppSession.UserId),
+                Text = string.IsNullOrEmpty(AppSession.UserId) ? "" : "Signed in as " + AppSession.UserId,
                 Foreground = Brush("#D6CEC6"),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -185,6 +185,55 @@ namespace SkinDevApp.Views
         }
 
         public static KeyValuePair<string, string> KV(string k, string v) => new KeyValuePair<string, string>(k, v);
+
+        /// <summary>Two columns where the LABEL is bold and the information is regular text (easier to scan down a list of facts).</summary>
+        public static Grid InfoRows(IEnumerable<KeyValuePair<string, string>> rows, double labelWidth = 150, double size = 13)
+        {
+            var g = new Grid { Margin = new Thickness(0, 0, 18, 0) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(labelWidth) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            int i = 0;
+            foreach (KeyValuePair<string, string> kv in rows)
+            {
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var k = Text(kv.Key, size, true, Ink, new Thickness(0, 3, 12, 3));
+                var v = Text(string.IsNullOrWhiteSpace(kv.Value) ? "—" : kv.Value, size, false, Ink, new Thickness(0, 3, 0, 3));
+                Grid.SetRow(k, i); Grid.SetRow(v, i); Grid.SetColumn(v, 1);
+                g.Children.Add(k); g.Children.Add(v);
+                i++;
+            }
+            return g;
+        }
+
+        /// <summary>A soft coloured message box. level: 0 = all fine (green), 1 = look closer (amber), 2 = needs attention (red).</summary>
+        public static Border Callout(string headline, string detail, int level)
+        {
+            string bg = level == 0 ? "#EEF3E8" : level == 1 ? "#FFF6E6" : "#FBEDEA";
+            string line = level == 0 ? "#CBDCBF" : level == 1 ? "#F0D49A" : "#EDB9B1";
+            string ink = level == 0 ? "#3E6B3D" : level == 1 ? "#8A5A00" : "#9B2F25";
+            string icon = level == 0 ? "✓" : "!";
+
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.Children.Add(new Border
+            {
+                Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = Brush(ink), VerticalAlignment = VerticalAlignment.Top,
+                HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 1, 0, 0),
+                Child = new TextBlock { Text = icon, Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+            });
+            var text = new StackPanel();
+            text.Children.Add(Text(headline, 13.5, true, Brush(ink), new Thickness(0, 0, 0, 2)));
+            if (!string.IsNullOrEmpty(detail)) text.Children.Add(Text(detail, 12, false, Ink, new Thickness(0)));
+            Grid.SetColumn(text, 1);
+            row.Children.Add(text);
+
+            return new Border
+            {
+                Background = Brush(bg), BorderBrush = Brush(line), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(14, 11, 14, 11), Margin = new Thickness(0, 8, 0, 4), Child = row
+            };
+        }
 
         public static Border Pill(string text, Brush fg, string bgHex = "#F3E4D3")
         {
@@ -332,7 +381,7 @@ namespace SkinDevApp.Views
 
                 try { if (!AiEngine.IsAvailable) AiEngine.EnsureLoaded(); } catch { }
                 h.ModelOk = AiEngine.IsAvailable;
-                h.ModelText = h.ModelOk ? "Loaded (precisionskin.onnx)" : "Unavailable: " + (AiEngine.LoadErrorMessage ?? "not loaded");
+                h.ModelText = h.ModelOk ? "Ready" : "Not ready: " + (AiEngine.LoadErrorMessage ?? "the model is not loaded");
 
                 h.PoseModelOk = File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "face_detection_yunet_2023mar.onnx"));
             }).ConfigureAwait(true);
@@ -340,11 +389,11 @@ namespace SkinDevApp.Views
             h.GradCam = await GradCamService.GetHealthAsync().ConfigureAwait(true);
             h.GradCamOk = h.GradCam != null && h.GradCam.Ok;
             h.GradCamText = h.GradCamOk
-                ? "Available (v" + h.GradCam.ServiceVersion + ", layer " + (h.GradCam.TargetLayer ?? "?") + ")"
-                : "Unavailable — classification still works, heatmaps will be missing";
+                ? "Running"
+                : "Not running. Scans still work, but no heat maps are created";
 
             h.DatabaseOk = StudyDatabase.IsReady;
-            h.DatabaseText = h.DatabaseOk ? "Ready" : "Error: " + (StudyDatabase.LastError ?? "not initialised");
+            h.DatabaseText = h.DatabaseOk ? "Ready" : "Problem: " + (StudyDatabase.LastError ?? "not set up yet");
             return h;
         }
 
@@ -353,8 +402,8 @@ namespace SkinDevApp.Views
         {
             var w = new WrapPanel();
             w.Children.Add(Chip("Camera", h.CameraOk, h.CameraText));
-            w.Children.Add(Chip("AI model", h.ModelOk, h.ModelText));
-            w.Children.Add(Chip("Grad-CAM++ service", h.GradCamOk, h.GradCamText));
+            w.Children.Add(Chip("Skin model", h.ModelOk, h.ModelText));
+            w.Children.Add(Chip("Heat-map service", h.GradCamOk, h.GradCamText));
             w.Children.Add(Chip("Database", h.DatabaseOk, h.DatabaseText));
             return w;
         }

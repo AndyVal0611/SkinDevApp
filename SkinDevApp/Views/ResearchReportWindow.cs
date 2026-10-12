@@ -166,7 +166,7 @@ namespace SkinDevApp.Views
         }
 
         private static string FirstUnlinked(ScanSessionRow s) =>
-            s.ParticipantID ?? "unlinked" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")");
+            s.ParticipantID ?? "not assigned" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")");
 
         // -------------------------------------------------------- page frame --
 
@@ -221,8 +221,8 @@ namespace SkinDevApp.Views
             var page = T("Page " + n + " of " + total, 8, false, Muted, 0);
             DockPanel.SetDock(page, Dock.Right);
             line.Children.Add(page);
-            line.Children.Add(T("PatientID " + FirstUnlinked(_d.Session) + "   ·   ScanSessionID " + _d.Session.DisplayId +
-                                "   ·   Research prototype — not a diagnostic report", 8, false, Muted, 0));
+            line.Children.Add(T("Patient " + FirstUnlinked(_d.Session) + "   ·   Scan " + _d.Session.DisplayId +
+                                "   ·   Research prototype, not a diagnostic report", 8, false, Muted, 0));
             foot.Children.Add(line);
             Grid.SetRow(foot, 2);
             g.Children.Add(foot);
@@ -262,11 +262,11 @@ namespace SkinDevApp.Views
             string completeness = s.ScanMode == "Single" ? "Single capture"
                 : string.Join("  ", StudyText.Views.Select(v => (_d.View(v)?.Scores != null ? "✓ " : "✗ ") + v)) + "   (" + s.CompletionText.Replace(" / ", " of ") + ")";
             var left = new StackPanel();
-            left.Children.Add(Heading("Participant and scan", 0));
+            left.Children.Add(Heading("Patient and scan", 0));
             left.Children.Add(Table(new[]
             {
-                Ui.KV("PatientID", FirstUnlinked(s)),
-                Ui.KV("ScanSessionID", s.DisplayId),
+                Ui.KV("Patient ID", FirstUnlinked(s)),
+                Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Scan date / time", s.StartedAt),
                 Ui.KV("Scan completeness", completeness),
                 Ui.KV("Scan status", s.ScanStatus)
@@ -721,8 +721,8 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(Table(new[]
             {
-                Ui.KV("PatientID", FirstUnlinked(s)),
-                Ui.KV("ScanSessionID", s.DisplayId),
+                Ui.KV("Patient ID", FirstUnlinked(s)),
+                Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Date / time of scan", s.StartedAt),
                 Ui.KV("AI result (for reference)", (s.OverallPredictedClass == null ? "no usable result" : Lbl(s.OverallPredictedClass)) + (s.OverallScore.HasValue ? "  (" + s.ScoreText + ")" : ""))
             }, 130, 9));

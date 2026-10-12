@@ -154,7 +154,7 @@ namespace SkinDevApp.Views
             string problem = null;
             if (string.IsNullOrEmpty(_participantId))
                 problem = AppSession.IsResearcher
-                    ? "No participant selected. Live scanning is filed under a PatientID: register or select a participant first. (Researchers may still analyse an uploaded image; it is saved as an unlinked scan.)"
+                    ? "No patient is selected. A live scan is filed under a Patient ID, so please register or select a patient first. (An uploaded image can still be analysed; it is saved as a scan without a patient.)"
                     : "No participant selected. Register or select a participant from the Dashboard first.";
             else if (IsWithdrawn(_participantId))
                 problem = _participantId + " has withdrawn from the study. Image capture is blocked.";

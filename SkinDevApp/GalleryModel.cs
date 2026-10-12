@@ -76,8 +76,8 @@ namespace SkinDevApp.Scanning
     public sealed class GalleryModel
     {
         public const string AttributionStatement =
-            "Grad-CAM++ attribution maps show which image areas influenced the model's score for each class. " +
-            "They are NOT lesion segmentation and NOT maps of diseased tissue. A weak or diffuse map is shown as it is.";
+            "Heat maps show which parts of the photograph the computer looked at for each category. " +
+            "They do not outline skin lesions and are not a map of affected skin. A faint or spread-out map is shown as it is.";
 
         public string Title { get; set; } = "";
         public string SessionFolder { get; set; }
@@ -106,9 +106,7 @@ namespace SkinDevApp.Scanning
             {
                 m.SessionFolder = sessionFolder;
                 m.Session = MultiViewSession.Load(sessionFolder);
-                m.Title = "Scan " + (m.Session?.SessionId ?? "").Substring(0, Math.Min(8, (m.Session?.SessionId ?? "").Length))
-                          + "  |  patient " + (m.Session?.PatientId ?? "-")
-                          + "  |  " + (m.Session?.StartedUtc ?? "");
+                m.Title = "Patient " + (m.Session?.PatientId ?? "—") + "  ·  " + SkinDevApp.Views.Fmt.When(m.Session?.StartedUtc);
 
                 foreach (ScanView v in ScanViews.Sequence)
                     m.Views.Add(LoadView(Path.Combine(sessionFolder, ScanViews.Name(v)), v));
@@ -117,10 +115,9 @@ namespace SkinDevApp.Scanning
             {
                 CaptureRecord rec = ReviewStore.LoadRecord(folder);
                 if (rec == null) throw new InvalidOperationException("record.json not found in " + folder);
-                m.Title = "Capture " + (rec.CaptureId ?? "").Substring(0, Math.Min(8, (rec.CaptureId ?? "").Length))
-                          + "  |  " + rec.TimestampUtc + "  |  single view (no angle information)";
+                m.Title = "Single photograph  ·  " + SkinDevApp.Views.Fmt.When(rec.TimestampUtc);
                 GalleryView gv = LoadView(folder, ScanView.Any);
-                gv.TabTitle = "Capture";
+                gv.TabTitle = "Photograph";
                 m.Views.Add(gv);
             }
 
@@ -132,7 +129,7 @@ namespace SkinDevApp.Scanning
             var gv = new GalleryView
             {
                 View = view,
-                TabTitle = view == ScanView.Any ? "Capture" : ScanViews.Title(view),
+                TabTitle = view == ScanView.Any ? "Photograph" : ScanViews.Title(view).Replace(" side", " view"),
                 Folder = folder
             };
 
@@ -140,7 +137,7 @@ namespace SkinDevApp.Scanning
             if (rec == null)
             {
                 gv.Available = false;
-                gv.SummaryLine = "This view was not captured.";
+                gv.SummaryLine = "This photograph was not taken.";
                 return gv;
             }
 
@@ -183,7 +180,7 @@ namespace SkinDevApp.Scanning
                 var card = new GalleryCard
                 {
                     ClassIndex = k,
-                    Title = "Grad-CAM++ (detected: " + name + ")",
+                    Title = "Heat map (detected: " + name + ")",
                     ColorHex = ClassPalette.Hex[k],
                     IsPredicted = string.Equals(name, topClass, StringComparison.OrdinalIgnoreCase)
                 };
@@ -234,7 +231,7 @@ namespace SkinDevApp.Scanning
                 if (!string.IsNullOrEmpty(lz.OverlayFile))
                     gv.LocalizationCard = new GalleryCard
                     {
-                        Title = "Localization (candidate boxes)",
+                        Title = "Marked areas",
                         ColorHex = "#6B7280",
                         ImagePath = Path.Combine(folder, lz.OverlayFile),
                         ScoreText = summary,
@@ -243,7 +240,7 @@ namespace SkinDevApp.Scanning
                 if (!string.IsNullOrEmpty(lz.CombinedFile))
                     gv.CombinedCard = new GalleryCard
                     {
-                        Title = "Combined",
+                        Title = "Heat map and marked areas",
                         ColorHex = "#6B7280",
                         ImagePath = Path.Combine(folder, lz.CombinedFile),
                         ScoreText = "Predicted-class Grad-CAM++ + boxes",
@@ -257,8 +254,8 @@ namespace SkinDevApp.Scanning
 
             // header texts
             gv.SummaryLine = rec.Primary != null
-                ? "Top class: " + rec.Primary.OnnxTopClass + " (" + rec.Primary.OnnxConfidencePercent.ToString("0.0") + "% model score)"
-                : "No prediction recorded";
+                ? SkinDevApp.Views.ClinicalText.Name(rec.Primary.OnnxTopClass) + " — " + SkinDevApp.Views.ClinicalText.Strength(rec.Primary.OnnxConfidencePercent) + " match (" + rec.Primary.OnnxConfidencePercent.ToString("0") + "%)"
+                : "No result was saved for this photograph";
 
             if (rec.Quality != null)
                 gv.QualityText = "Sharpness " + rec.Quality.Sharpness.ToString("0.0")

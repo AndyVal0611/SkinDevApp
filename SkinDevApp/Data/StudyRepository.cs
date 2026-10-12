@@ -466,7 +466,7 @@ namespace SkinDevApp.Data
             SessionFolder = DataLocation.Rebase(S(r, "SessionFolder")),
             OperatorID = S(r, "OperatorID"),
             FusionJson = S(r, "FusionJson"),
-            ModelLabel = S(r, "ModelLabel"),
+            ModelLabel = SkinDevApp.Views.Fmt.ModelName((S(r, "ModelLabel") ?? "").Split(new[] { " / " }, StringSplitOptions.None)[0]),
             ValidationStatus = S(r, "ValidationStatus")
         };
 

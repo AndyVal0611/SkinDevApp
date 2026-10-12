@@ -144,11 +144,73 @@ namespace SkinDevApp.AI
 
             // First inference is slow (allocations): burn it now, not on the user's capture.
             using (var blank = new Mat(_imageSize, _imageSize, MatType.CV_8UC3, new Scalar(114, 114, 114)))
-                Detect(blank, new[] { 0.99, 0.99, 0.99 });
+                DetectSingle(blank, new[] { 0.99, 0.99, 0.99 });
         }
+
+        /// <summary>Extra models of the same class (a seed ensemble). When present, Detect() runs all of them and averages the boxes (weighted box fusion).</summary>
+        public List<LesionDetector> Peers { get; } = new List<LesionDetector>();
+        public int EnsembleSize => 1 + Peers.Count;
+
+        private const double EnsembleFloor = 0.02;            // every member reports boxes down to this confidence; the class threshold is applied to the averaged confidence
+        private const float FusionIou = 0.5f;
 
         /// <param name="thresholds">Confidence thresholds by PALETTE class index (Acne, Hyperpigmentation, Eczema).</param>
         public LesionDetectionSet Detect(Mat bgr, double[] thresholds)
+        {
+            if (Peers.Count == 0) return DetectSingle(bgr, thresholds);
+
+            double[] thr = thresholds ?? new[] { 0.20, 0.25, 0.25 };
+            double[] low = { EnsembleFloor, EnsembleFloor, EnsembleFloor };
+            var members = new List<LesionDetector> { this }; members.AddRange(Peers);
+            var sets = members.Select(m => m.DetectSingle(bgr, low)).ToList();
+            var fused = new List<LesionBox>();
+            foreach (int pal in _paletteOf)
+            {
+                var clusters = new List<List<LesionBox>>();
+                foreach (LesionBox b in sets.SelectMany(x => x.Boxes).Where(b => b.ClassIndex == pal).OrderByDescending(b => b.Confidence))
+                {
+                    List<LesionBox> hit = null;
+                    foreach (var cl in clusters)
+                    {
+                        LesionBox cur = Average(cl);
+                        if (Iou(cur, b) >= FusionIou) { hit = cl; break; }
+                    }
+                    if (hit == null) clusters.Add(new List<LesionBox> { b }); else hit.Add(b);
+                }
+                foreach (var cl in clusters)
+                {
+                    LesionBox a = Average(cl);
+                    a.Confidence = Math.Min(1f, cl.Sum(x => x.Confidence) / members.Count);   // a patch only some members see gets a lower score
+                    if (a.Confidence >= thr[pal]) fused.Add(a);
+                }
+            }
+            var first = sets[0];
+            var set = new LesionDetectionSet
+            {
+                FrameWidth = first.FrameWidth, FrameHeight = first.FrameHeight, ImageSize = first.ImageSize,
+                ModelFile = string.Join(" + ", members.Select(m => m.ModelFile)),
+                ModelSha256 = string.Join(";", members.Select(m => m.ModelFile + ":" + m.ModelSha256)),
+                ModelTag = first.ModelTag + " x" + members.Count + " ensemble",
+                Thresholds = new[] { thr[0], thr[1], thr[2] },
+                LatencyMs = sets.Sum(x => x.LatencyMs)
+            };
+            set.Boxes = fused.OrderBy(b => b.ClassIndex).ThenByDescending(b => b.Confidence).Take(MaxBoxesPerClass * NumClasses).ToList();
+            return set;
+        }
+
+        private static LesionBox Average(List<LesionBox> cl)
+        {
+            float w = cl.Sum(x => x.Confidence); if (w <= 0) w = 1f;
+            LesionBox f = cl[0];
+            return new LesionBox
+            {
+                ClassIndex = f.ClassIndex, ClassName = f.ClassName, Confidence = f.Confidence,
+                X0 = cl.Sum(x => x.X0 * x.Confidence) / w, Y0 = cl.Sum(x => x.Y0 * x.Confidence) / w,
+                X1 = cl.Sum(x => x.X1 * x.Confidence) / w, Y1 = cl.Sum(x => x.Y1 * x.Confidence) / w
+            };
+        }
+
+        private LesionDetectionSet DetectSingle(Mat bgr, double[] thresholds)
         {
             if (bgr == null || bgr.Empty()) throw new ArgumentException("Empty frame.", nameof(bgr));
             var sw = Stopwatch.StartNew();
@@ -305,7 +367,7 @@ namespace SkinDevApp.AI
                     if (_detector == null && _specialists.Count == 0) return "Lesion detector not loaded";
                     string s = _detector != null ? "3-class detector (" + _detector.ModelTag + ")" : "no 3-class detector";
                     foreach (LesionDetector sp in _specialists)
-                        s += "; " + string.Join("/", sp.PaletteClasses.Select(i => ClassPalette.Names[i])) + " specialist (" + sp.ModelTag + ")";
+                        s += "; " + string.Join("/", sp.PaletteClasses.Select(i => ClassPalette.Names[i])) + " specialist (" + sp.ModelTag + (sp.EnsembleSize > 1 ? ", ensemble of " + sp.EnsembleSize : "") + ")";
                     if (_specialistErrors.Count > 0) s += "; specialist load problems: " + string.Join(" | ", _specialistErrors);
                     return s;
                 }
@@ -331,7 +393,17 @@ namespace SkinDevApp.AI
                 {
                     string onnx = Path.Combine(dir, "lesion_detector_" + cls + ".onnx");
                     if (!File.Exists(onnx)) continue;
-                    try { _specialists.Add(new LesionDetector(onnx, Path.Combine(dir, "lesion_detector_" + cls + ".json"))); }
+                    try
+                    {
+                        string meta = Path.Combine(dir, "lesion_detector_" + cls + ".json");
+                        var sp = new LesionDetector(onnx, meta);
+                        for (int k = 2; k <= 6; k++)                                            // optional extra seeds: lesion_detector_<class>_m2.onnx, _m3.onnx ...
+                        {
+                            string extra = Path.Combine(dir, "lesion_detector_" + cls + "_m" + k + ".onnx");
+                            if (File.Exists(extra)) sp.Peers.Add(new LesionDetector(extra, meta));
+                        }
+                        _specialists.Add(sp);
+                    }
                     catch (Exception ex) { _specialistErrors.Add(cls + ": " + ex.Message); }       // a broken specialist never breaks a scan: the 3-class model (if present) covers that class
                 }
                 if (_detector == null && _specialists.Count == 0 && _loadError == null)

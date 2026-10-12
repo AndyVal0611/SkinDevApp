@@ -16,11 +16,8 @@
             <Setter Property="CornerRadius" Value="16"/>
             <Setter Property="Padding" Value="22,20"/>
             <Setter Property="Margin" Value="8"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="20" Color="#000000" Opacity="0.04" Direction="270"/>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="BorderBrush" Value="#E9DFD1"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
@@ -56,8 +53,8 @@
 
         <StackPanel Grid.Row="0" Margin="8,0,8,18">
             <ContentControl x:Name="HeaderHost" Margin="-8,0,-8,0"/>
-            <TextBlock Text="Pre-Analysis Preparation" FontSize="26" FontWeight="Bold" Foreground="#34362E"/>
-            <TextBlock x:Name="ParticipantLine" Text="Complete each step below before starting the Front / Left / Right scan."
+            <TextBlock Text="Get ready to scan" FontSize="26" FontWeight="Bold" Foreground="#34362E"/>
+            <TextBlock x:Name="ParticipantLine" Text="Complete each step below before starting the front, left and right scan."
                        FontSize="14" Foreground="#8A8574" Margin="0,6,0,0"/>
         </StackPanel>
 
@@ -70,10 +67,10 @@
                 </Grid.ColumnDefinitions>
                 <Ellipse x:Name="OverallStatusDot" Width="14" Height="14" Fill="#A39689" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock x:Name="OverallStatusTitle" Text="Preparation in progress" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                    <TextBlock x:Name="OverallStatusDetail" Text="0 of 4 checks complete" FontSize="12" Foreground="#D09F7C" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="OverallStatusTitle" Text="Getting ready" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock x:Name="OverallStatusDetail" Text="0 of 4 checks done" FontSize="12" Foreground="#D09F7C" Margin="0,2,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="2" Content="Re-check camera" Height="36" Padding="14,0"
+                <Button Grid.Column="2" Content="Check the camera again" Height="36" Padding="14,0"
                         Background="#D09F7C" Foreground="#34362E" FontWeight="SemiBold" FontSize="12"
                         BorderThickness="0" VerticalAlignment="Center" Click="RecheckCameraBtn_Click"/>
             </Grid>
@@ -100,10 +97,10 @@
                             </StackPanel>
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
-                                   Text="Ensure your webcam is connected and not in use by another application."/>
+                                   Text="Make sure the camera is connected and is not being used by another program."/>
                         <StackPanel Grid.Row="2">
                             <TextBlock x:Name="CameraDetailText" Style="{StaticResource CardBody}" Margin="0,8,0,0"
-                                       Text="Scanning for video input devices..."/>
+                                       Text="Looking for cameras..."/>
                             <ComboBox x:Name="CameraPicker" Visibility="Collapsed" Margin="0,8,0,0" Height="32" HorizontalAlignment="Left" MinWidth="280"
                                       ToolTip="Choose another physical camera, then it is re-checked" SelectionChanged="CameraPicker_SelectionChanged"/>
                         </StackPanel>
@@ -120,7 +117,7 @@
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                                 <TextBlock Text="💡" FontSize="22" Margin="0,0,10,0"/>
-                                <TextBlock Text="White illumination" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                                <TextBlock Text="White light" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <Ellipse x:Name="LightingStatusDot" Width="10" Height="10" Fill="#A39689" Margin="0,0,8,0"/>
@@ -128,9 +125,9 @@
                             </StackPanel>
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
-                                   Text="Switch on the study's white illumination. Light should be even and front-facing, with no strong backlight or harsh shadows on the face."/>
+                                   Text="Switch on the white light. The light should be even and come from the front, with no strong backlight or harsh shadows on the face."/>
                         <Button Grid.Row="2" x:Name="LightingConfirmBtn" Style="{StaticResource ConfirmLinkButton}"
-                                Content="Confirm lighting looks good"
+                                Content="The lighting looks good"
                                 Click="LightingConfirmBtn_Click"/>
                     </Grid>
                 </Border>
@@ -153,9 +150,9 @@
                             </StackPanel>
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
-                                   Text="Sit comfortably in front of the device with the chin / head aligned to the physical positioning guide (about 40-60 cm from the camera)."/>
+                                   Text="Sit comfortably in front of the device, with the chin and head lined up with the positioning guide (about 40 to 60 cm from the camera)."/>
                         <Button Grid.Row="2" x:Name="DistanceConfirmBtn" Style="{StaticResource ConfirmLinkButton}"
-                                Content="Confirm distance is correct"
+                                Content="The distance is correct"
                                 Click="DistanceConfirmBtn_Click"/>
                     </Grid>
                 </Border>
@@ -170,7 +167,7 @@
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                                 <TextBlock Text="🙂" FontSize="22" Margin="0,0,10,0"/>
-                                <TextBlock Text="Facial position" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Face position" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <Ellipse x:Name="FaceStatusDot" Width="10" Height="10" Fill="#A39689" Margin="0,0,8,0"/>
@@ -178,9 +175,9 @@
                             </StackPanel>
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
-                                   Text="Remove glasses, mask or other items covering the face (when the protocol requires it). Keep hair away from the forehead and cheeks. Avoid touching the face. You will be asked for a Front, Left and Right view; remain still when the screen says Hold Still."/>
+                                   Text="Remove glasses, a mask or anything else covering the face. Keep hair away from the forehead and cheeks, and avoid touching the face. You will be asked for a front, left and right photograph. Stay still when the screen says &quot;Hold still&quot;."/>
                         <Button Grid.Row="2" x:Name="FaceConfirmBtn" Style="{StaticResource ConfirmLinkButton}"
-                                Content="Confirm position is ready"
+                                Content="The position is ready"
                                 Click="FaceConfirmBtn_Click"/>
                     </Grid>
                 </Border>
@@ -189,11 +186,11 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBlock Text="🧠" FontSize="22" Margin="0,0,10,0"/>
-                            <TextBlock Text="AI classifier" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Skin model" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             <Ellipse x:Name="ModelStatusDot" Width="10" Height="10" Fill="#A39689" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="ModelStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#A39689" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock x:Name="ModelDetailText" Style="{StaticResource CardBody}" Text="Loading the ONNX classifier..."/>
+                        <TextBlock x:Name="ModelDetailText" Style="{StaticResource CardBody}" Text="Loading the skin model..."/>
                     </StackPanel>
                 </Border>
 
@@ -201,14 +198,14 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBlock Text="🔥" FontSize="22" Margin="0,0,10,0"/>
-                            <TextBlock Text="Grad-CAM++ service" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Heat-map service" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             <Ellipse x:Name="GradCamStatusDot" Width="10" Height="10" Fill="#A39689" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="GradCamStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#A39689" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <Button x:Name="StartServiceBtn" Content="Start / Retry Grad-CAM++ service" Visibility="Collapsed" HorizontalAlignment="Left"
+                        <Button x:Name="StartServiceBtn" Content="Try again" Visibility="Collapsed" HorizontalAlignment="Left"
                                 Style="{StaticResource SmallButton}" Margin="0,0,0,8" Click="StartServiceBtn_Click"/>
                         <TextBlock x:Name="GradCamDetailText" Style="{StaticResource CardBody}"
-                                   Text="If the service is unavailable the scan still runs and saves the class scores; heatmaps will be missing."/>
+                                   Text="If the heat-map service is not running, the scan still works and saves its results, but no heat maps are created."/>
                     </StackPanel>
                 </Border>
 
@@ -225,7 +222,7 @@
             <Button Grid.Column="1" x:Name="BackBtn" Content="Back" Width="120" Height="46"
                     Background="White" Foreground="#34362E" FontWeight="SemiBold" FontSize="13"
                     BorderBrush="#D09F7C" BorderThickness="1" Click="BackBtn_Click"/>
-            <Button Grid.Column="3" x:Name="NextBtn" Content="START SCAN" Width="160" Height="46"
+            <Button Grid.Column="3" x:Name="NextBtn" Content="Start scan" Width="160" Height="46"
                     Background="#34362E" Foreground="White" FontWeight="Bold" FontSize="13"
                     BorderThickness="0" IsEnabled="False" Click="NextBtn_Click"/>
         </Grid>

@@ -88,6 +88,10 @@ namespace SkinDevApp
         private static PythonCandidate _cachedPython;
         private static bool _starting;
 
+        /// <summary>The environment this app builds for itself on first use (per user, so it works without admin rights and survives rebuilds).</summary>
+        public static string AutoEnvDir => Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? AppDomain.CurrentDomain.BaseDirectory, "LUMYVUE", "gradcam-env");
+        public static string AutoEnvPython => Path.Combine(AutoEnvDir, "Scripts", "python.exe");
+
         public static string LogDirectory => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
         public static string LogPath => Path.Combine(LogDirectory, "gradcam_service.log");
 
@@ -177,15 +181,17 @@ namespace SkinDevApp
         private static IEnumerable<PythonCandidate> CandidateList(string projectDir)
         {
             string local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            yield return new PythonCandidate { File = AutoEnvPython };
             if (projectDir != null) yield return new PythonCandidate { File = Path.Combine(projectDir, ".venv", "Scripts", "python.exe") };
             string envPy = Environment.GetEnvironmentVariable("PRECISIONSKIN_PYTHON");
             if (!string.IsNullOrEmpty(envPy)) yield return new PythonCandidate { File = envPy };
+            yield return new PythonCandidate { File = "py", PrefixArgs = "-3.13" };
             yield return new PythonCandidate { File = "py", PrefixArgs = "-3.12" };
             yield return new PythonCandidate { File = "py", PrefixArgs = "-3.11" };
             yield return new PythonCandidate { File = "py", PrefixArgs = "-3.10" };
             yield return new PythonCandidate { File = "python" };
             if (!string.IsNullOrEmpty(local))
-                foreach (string v in new[] { "312", "311", "310" })
+                foreach (string v in new[] { "313", "312", "311", "310" })
                     yield return new PythonCandidate { File = Path.Combine(local, "Programs", "Python", "Python" + v, "python.exe") };
         }
 
@@ -277,6 +283,77 @@ namespace SkinDevApp
             return info;
         }
 
+        // --------------------------------------------------------------- setup --
+
+        /// <summary>A Python that TensorFlow 2.20 supports (3.10 to 3.13), found on this PC; null when there is none.</summary>
+        private static PythonCandidate FindBasePython()
+        {
+            var tries = new[]
+            {
+                new PythonCandidate { File = "py", PrefixArgs = "-3.13" }, new PythonCandidate { File = "py", PrefixArgs = "-3.12" },
+                new PythonCandidate { File = "py", PrefixArgs = "-3.11" }, new PythonCandidate { File = "py", PrefixArgs = "-3.10" },
+                new PythonCandidate { File = "python" }
+            };
+            foreach (PythonCandidate c in tries)
+            {
+                string so, se; int ec;
+                if (!Run(c.File, (c.PrefixArgs + " -c \"import sys; print(sys.version_info[0]*100+sys.version_info[1])\"").Trim(), 30000, out so, out se, out ec) || ec != 0) continue;
+                int v;
+                if (int.TryParse(so.Trim(), out v) && v >= 310 && v <= 313) return c;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// First-time setup: builds a private Python environment for the heat-map service and installs what it needs (needs internet, several minutes, once per computer).
+        /// Returns null on success, otherwise a short explanation in plain words.
+        /// </summary>
+        private static async Task<string> SetUpEnvironmentAsync(string projectDir, IProgress<string> progress)
+        {
+            string req = FirstExisting(Path.Combine(projectDir, "requirements_gradcam.txt"), Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "requirements_gradcam.txt"));
+            if (req == null) return "The list of required components (requirements_gradcam.txt) is missing from the project folder.";
+
+            PythonCandidate basePy = await Task.Run(() => FindBasePython()).ConfigureAwait(false);
+            if (basePy == null) return null;   // handled by the caller (no suitable Python)
+
+            Directory.CreateDirectory(LogDirectory);
+            if (progress != null) progress.Report("First-time setup: preparing the heat-map service (this takes a few minutes and needs internet)...");
+            string so, se; int ec;
+            if (!File.Exists(AutoEnvPython))
+            {
+                bool ran = await Task.Run(() => Run(basePy.File, (basePy.PrefixArgs + " -m venv \"" + AutoEnvDir + "\"").Trim(), 300000, out so, out se, out ec)).ConfigureAwait(false);
+                if (!File.Exists(AutoEnvPython)) return "The private Python environment could not be created.";
+            }
+
+            string last = "";
+            var psi = new ProcessStartInfo(AutoEnvPython, "-m pip install --disable-pip-version-check -r \"" + req + "\"")
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = projectDir
+            };
+            string tail = "";
+            using (Process p = Process.Start(psi))
+            {
+                DataReceivedEventHandler onLine = (s, e) =>
+                {
+                    if (string.IsNullOrWhiteSpace(e.Data)) return;
+                    last = e.Data.Trim();
+                    tail = last;
+                    if (progress != null)
+                    {
+                        string shown = last.StartsWith("Downloading") ? "Downloading components..." : last.StartsWith("Installing") ? "Installing components..." : null;
+                        if (shown != null) progress.Report("First-time setup: " + shown + " (this takes a few minutes)");
+                    }
+                };
+                p.OutputDataReceived += onLine; p.ErrorDataReceived += onLine;
+                p.BeginOutputReadLine(); p.BeginErrorReadLine();
+                bool done = await Task.Run(() => p.WaitForExit(1800000)).ConfigureAwait(false);   // 30 minutes
+                if (!done) { KillTree(p.Id); return "The download took too long. Please check your internet connection and try again."; }
+                if (p.ExitCode != 0) return "The components could not be installed. Please check your internet connection and try again.";
+            }
+            _cachedPython = null;
+            return null;
+        }
+
         // --------------------------------------------------------------- start --
 
         public static bool IsStartedByApp => _started != null && !_started.HasExited;
@@ -290,36 +367,42 @@ namespace SkinDevApp
             var result = new GradCamStartResult { LogPath = LogPath };
 
             GradCamHealth h0 = await GradCamService.GetHealthAsync().ConfigureAwait(false);
-            if (h0 != null && h0.Ok) { result.State = GradCamState.Ready; result.Message = "Service already running (v" + h0.ServiceVersion + ")."; return result; }
+            if (h0 != null && h0.Ok) { result.State = GradCamState.Ready; result.Message = "The heat-map service is running."; return result; }
 
             lock (Gate) { if (_starting) { result.State = GradCamState.Starting; result.Message = "A start is already in progress."; return result; } _starting = true; }
             try
             {
-                if (progress != null) progress.Report("Checking this PC and the Python environment...");
+                if (progress != null) progress.Report("Checking this computer...");
                 GradCamEnvInfo env = await Task.Run(() => Detect()).ConfigureAwait(false);
                 result.Env = env;
 
-                if (env.ProjectDir == null || !File.Exists(env.ServiceScript)) { result.State = GradCamState.ScriptMissing; result.Message = "gradcam_service.py was not found next to the app or in a parent folder. Set PRECISIONSKIN_HOME to the project folder."; return result; }
-                if (env.ModelPath == null) { result.State = GradCamState.ModelMissing; result.Message = "precisionskin_best.keras was not found in the project folder."; return result; }
+                if (env.ProjectDir == null || !File.Exists(env.ServiceScript)) { result.State = GradCamState.ScriptMissing; result.Message = "The heat-map service files were not found next to the app. Please keep the app inside its project folder."; return result; }
+                if (env.ModelPath == null) { result.State = GradCamState.ModelMissing; result.Message = "The heat-map model file (precisionskin_best.keras) was not found in the project folder."; return result; }
+                if (env.Python == null && env.PortFree)
+                {
+                    string setupError = await SetUpEnvironmentAsync(env.ProjectDir, progress).ConfigureAwait(false);
+                    if (setupError != null) { result.State = GradCamState.DependencyMissing; result.Message = setupError; return result; }
+                    env = await Task.Run(() => Detect()).ConfigureAwait(false);
+                    result.Env = env;
+                }
                 if (env.Python == null)
                 {
                     bool anyPython = env.Candidates.Any(c => c.Exists);
                     if (!env.PortFree)
                     {
-                        result.State = GradCamState.PortUnavailable; result.Message = "Port " + env.Port + " is used by another program that is not the Grad-CAM++ service. Close it and press Retry."; return result;
+                        result.State = GradCamState.PortUnavailable; result.Message = "Another program is using port " + env.Port + ". Please close it and press Try again."; return result;
                     }
-                    result.State = anyPython ? GradCamState.DependencyMissing : GradCamState.PythonNotFound;
-                    result.Message = anyPython
-                        ? "Python was found but TensorFlow is missing. In the project folder run:  py -3.12 -m venv .venv  then  .venv\\Scripts\\python -m pip install -r requirements_gradcam.txt"
-                        : "No Python 3.10-3.12 was found. Install Python 3.12 (tick 'Add python to PATH'), then press Retry.";
+                    result.State = GradCamState.PythonNotFound;
+                    result.Message = "The heat-map service needs Python, and no suitable version (3.10 to 3.13) is installed on this computer. " +
+                                     "Please install Python 3.12 from python.org (tick \"Add python to PATH\"), then press Try again. After that, the rest is set up automatically.";
                     return result;
                 }
-                if (!env.PortFree) { result.State = GradCamState.PortUnavailable; result.Message = "Port " + env.Port + " is used by another program that is not the Grad-CAM++ service. Close it and press Retry."; return result; }
+                if (!env.PortFree) { result.State = GradCamState.PortUnavailable; result.Message = "Another program is using port " + env.Port + ". Please close it and press Try again."; return result; }
 
                 Directory.CreateDirectory(LogDirectory);
                 string args = (env.Python.PrefixArgs + " \"" + env.ServiceScript + "\" --model \"" + env.ModelPath + "\"" +
                                (env.LabelsPath != null ? " --labels \"" + env.LabelsPath + "\"" : "") + " --host " + env.Host + " --port " + env.Port).Trim();
-                if (progress != null) progress.Report("Starting the service (loading the model can take up to a minute)...");
+                if (progress != null) progress.Report("Starting the heat-map service (this can take up to a minute)...");
 
                 Process p;
                 try
@@ -332,7 +415,7 @@ namespace SkinDevApp
                     psi.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";
                     p = Process.Start(psi);
                 }
-                catch (Exception ex) { result.State = GradCamState.StartFailed; result.Message = "Could not launch Python: " + ex.Message; return result; }
+                catch (Exception ex) { result.State = GradCamState.StartFailed; result.Message = "Python could not be started: " + ex.Message; return result; }
 
                 var log = OpenLog();
                 lock (log) { log.WriteLine("[" + DateTime.Now.ToString("s") + "] " + env.Python.Label + " " + args); log.WriteLine(env.Summary()); }
@@ -351,15 +434,15 @@ namespace SkinDevApp
                     if (p.HasExited)
                     {
                         result.State = GradCamState.StartFailed;
-                        result.Message = "The service stopped right after starting (exit code " + p.ExitCode + "). Last log lines:\n" + TailLog(8);
+                        result.Message = "The service stopped right after starting (code " + p.ExitCode + "). Details:\n" + TailLog(8);
                         return result;
                     }
                     GradCamHealth h = await GradCamService.GetHealthAsync().ConfigureAwait(false);
-                    if (h != null && h.Ok) { result.State = GradCamState.Ready; result.Message = "Service ready (v" + h.ServiceVersion + ")."; return result; }
-                    if (progress != null) progress.Report("Starting the service... " + (int)(until - DateTime.UtcNow).TotalSeconds + " s left");
+                    if (h != null && h.Ok) { result.State = GradCamState.Ready; result.Message = "The heat-map service is running."; return result; }
+                    if (progress != null) progress.Report("Starting the heat-map service...");
                 }
                 result.State = GradCamState.Unavailable;
-                result.Message = "The service did not answer within " + timeoutSeconds + " s. See the log: " + LogPath;
+                result.Message = "The service did not respond within " + timeoutSeconds + " seconds. Details are saved in " + LogPath;
                 return result;
             }
             finally { lock (Gate) _starting = false; }
@@ -416,14 +499,14 @@ namespace SkinDevApp
             switch (s)
             {
                 case GradCamState.Ready: return "Ready";
-                case GradCamState.Starting: return "Starting service...";
-                case GradCamState.PythonNotFound: return "Python environment not found";
-                case GradCamState.DependencyMissing: return "Required dependency missing";
+                case GradCamState.Starting: return "Starting...";
+                case GradCamState.PythonNotFound: return "Python is needed";
+                case GradCamState.DependencyMissing: return "Setup did not finish";
                 case GradCamState.ModelMissing: return "Model file missing";
                 case GradCamState.ScriptMissing: return "Service files missing";
-                case GradCamState.PortUnavailable: return "Port unavailable";
-                case GradCamState.StartFailed: return "Service failed to start";
-                default: return "Service unavailable";
+                case GradCamState.PortUnavailable: return "Port in use";
+                case GradCamState.StartFailed: return "Could not start";
+                default: return "Not available";
             }
         }
     }

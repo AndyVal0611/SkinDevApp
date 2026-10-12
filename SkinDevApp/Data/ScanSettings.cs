@@ -51,7 +51,7 @@ namespace SkinDevApp.Data
         // Lesion localization (separate detector model; never changes Grad-CAM++ or the class scores)
         public bool DetectorEnabled { get; set; } = true;
         public double DetectorThresholdAcne { get; set; } = 0.26;               // acne specialist (v4): chosen on VALIDATION photos (best F1 at 0.25; precision = recall at 0.26). 0.35 was test-informed and is only a documented precision-leaning option
-        public double DetectorThresholdHyperpigmentation { get; set; } = 0.20;  // hyperpigmentation specialist (H10, seed 42): best F1 on the hand-boxed validation photos
+        public double DetectorThresholdHyperpigmentation { get; set; } = 0.225; // hyperpigmentation 3-seed ensemble: best F1 on the hand-boxed validation photos
         public double DetectorThresholdEczema { get; set; } = 0.25;             // pilot class
 
         /// <summary>Confidence thresholds by palette class index (Acne, Hyperpigmentation, Eczema).</summary>
@@ -90,21 +90,9 @@ namespace SkinDevApp.Data
                 s.SideMinAbsYaw = Dbl(d, "pose.side_min_yaw", s.SideMinAbsYaw);
                 s.ReviewBeforeFinish = Bool(d, "capture.review_before_finish", s.ReviewBeforeFinish);
 
-                s.MinConfidence = Dbl(d, "ai.min_confidence", s.MinConfidence);
-                s.MinMargin = Dbl(d, "ai.min_margin", s.MinMargin);
-                s.MinConsistency = Dbl(d, "ai.min_consistency", s.MinConsistency);
-
-                s.LiveGradCam = Bool(d, "gradcam.live", s.LiveGradCam);
-                s.GradCamIntervalMs = Int(d, "gradcam.interval_ms", s.GradCamIntervalMs);
-                s.MaxHeatmapAgeSeconds = Dbl(d, "gradcam.max_age_s", s.MaxHeatmapAgeSeconds);
-                s.OverlayOpacity = Dbl(d, "gradcam.overlay_opacity", s.OverlayOpacity);
-                s.GradCamTimeoutSeconds = Int(d, "gradcam.timeout_s", s.GradCamTimeoutSeconds);
-                s.GradCamTargetLayer = Str(d, "gradcam.target_layer", s.GradCamTargetLayer);
-
-                s.DetectorEnabled = Bool(d, "detector.enabled", s.DetectorEnabled);
-                s.DetectorThresholdAcne = Dbl(d, "detector.thr_acne", s.DetectorThresholdAcne);
-                s.DetectorThresholdHyperpigmentation = Dbl(d, "detector.thr_hyper", s.DetectorThresholdHyperpigmentation);
-                s.DetectorThresholdEczema = Dbl(d, "detector.thr_eczema", s.DetectorThresholdEczema);
+                // The AI / stability thresholds, Grad-CAM++ settings and lesion-detector thresholds are FIXED for this study.
+                // They keep the values written in this class (the validated defaults) and are deliberately NOT read from the
+                // settings table, so a value saved by an older version can never silently change them.
             }
             catch (Exception ex)
             {
@@ -129,20 +117,7 @@ namespace SkinDevApp.Data
                 { "capture.max_brightness", F(MaxBrightness) },
                 { "pose.front_max_yaw", F(FrontMaxAbsYaw) },
                 { "pose.side_min_yaw", F(SideMinAbsYaw) },
-                { "capture.review_before_finish", F(ReviewBeforeFinish) },
-                { "ai.min_confidence", F(MinConfidence) },
-                { "ai.min_margin", F(MinMargin) },
-                { "ai.min_consistency", F(MinConsistency) },
-                { "gradcam.live", F(LiveGradCam) },
-                { "gradcam.interval_ms", F(GradCamIntervalMs) },
-                { "gradcam.max_age_s", F(MaxHeatmapAgeSeconds) },
-                { "gradcam.overlay_opacity", F(OverlayOpacity) },
-                { "gradcam.timeout_s", F(GradCamTimeoutSeconds) },
-                { "gradcam.target_layer", GradCamTargetLayer ?? "" },
-                { "detector.enabled", F(DetectorEnabled) },
-                { "detector.thr_acne", F(DetectorThresholdAcne) },
-                { "detector.thr_hyper", F(DetectorThresholdHyperpigmentation) },
-                { "detector.thr_eczema", F(DetectorThresholdEczema) }
+                { "capture.review_before_finish", F(ReviewBeforeFinish) }
             };
         }
 

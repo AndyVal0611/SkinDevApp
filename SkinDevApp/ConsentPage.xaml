@@ -22,9 +22,9 @@
             <StackPanel MaxWidth="900" HorizontalAlignment="Stretch">
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="A. Research participation consent" Style="{StaticResource H2}"/>
+                        <TextBlock Text="A. Agreement to take part in the research" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Body}" Margin="0,0,0,10"
-                                   Text="PrecisionSkin is a research prototype that photographs the face and uses an AI model to score skin images. It does not provide a diagnosis and does not replace professional medical evaluation. Participation is voluntary and you may stop at any time without any consequence."/>
+                                   Text="PrecisionSkin is a research prototype that photographs the face and uses a computer model to score skin images. It does not provide a diagnosis and does not replace professional medical evaluation. Participation is voluntary and you may stop at any time without any consequence."/>
                         <CheckBox x:Name="UnderstoodChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I have read (or had read to me) and understood the research information, and my questions were answered. *"/>
                         </CheckBox>
@@ -36,25 +36,25 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="B. Facial image capture consent" Style="{StaticResource H2}"/>
+                        <TextBlock Text="B. Agreement to photograph the face" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Body}" Margin="0,0,0,10"
-                                   Text="Three photographs (front, left side, right side) will be taken with the study camera. Images are stored under your PatientID, not your name."/>
+                                   Text="Three photographs (front, left side and right side) will be taken with the study camera. The images are saved under your Patient ID, not your name."/>
                         <CheckBox x:Name="CaptureChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for images of my face to be captured. *"/>
                         </CheckBox>
                         <CheckBox x:Name="ProcessingChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be processed by the PrecisionSkin research system (AI scores and attribution maps). *"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be processed by the PrecisionSkin research system (scores and heat maps). *"/>
                         </CheckBox>
                         <Separator Margin="0,10"/>
                         <CheckBox x:Name="FutureUseChk" Margin="0,4">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="Optional: I agree that my images may be used for future model improvement, if this is part of the approved protocol. (Not required to take part.)"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="Optional: I agree that my images may be used to improve the model in future. (This is not required to take part.)"/>
                         </CheckBox>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource NoticeBox}" Margin="8">
                     <TextBlock x:Name="PreviousConsentTxt" Style="{StaticResource Body}" FontSize="12"
-                               Text="Required items are marked *. Nothing is pre-selected. Consent status and time are stored with the participant record."/>
+                               Text="Items marked * are required. Nothing is ticked for you. Your answer and the time are saved in the patient record."/>
                 </Border>
             </StackPanel>
         </ScrollViewer>
@@ -62,10 +62,10 @@
         <Border Grid.Row="3" Background="White" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
             <DockPanel>
                 <Button Content="Decline" Style="{StaticResource SecondaryButton}" Width="130" Click="DeclineBtn_Click"/>
-                <Button x:Name="AgreeBtn" DockPanel.Dock="Right" HorizontalAlignment="Right" Content="Agree and Continue  ›"
+                <Button x:Name="AgreeBtn" DockPanel.Dock="Right" HorizontalAlignment="Right" Content="Agree and continue  ›"
                         Style="{StaticResource PrimaryButton}" Width="220" IsEnabled="False" Click="AgreeBtn_Click"/>
                 <TextBlock x:Name="HintTxt" Foreground="#6B6658" FontSize="12" VerticalAlignment="Center" Margin="14,0"
-                           Text="Tick all required items to continue."/>
+                           Text="Tick every required item to continue."/>
             </DockPanel>
         </Border>
     </Grid>

@@ -1,4 +1,6 @@
-// SettingsPage.xaml.cs - researcher/admin settings for camera, capture, AI and Grad-CAM++.
+// SettingsPage.xaml.cs - camera and capture preferences, accounts, and the change history.
+// Layout follows a "settings" pattern: tabs on top, then rows with the name and a short explanation on the left and the control on the right.
+// The image-analysis, heatmap and lesion-marking values are fixed for the study (see ScanSettings) and are not shown here.
 // Saved to SystemSettings; StudyRepository.SaveSettings audits every changed value.
 using System;
 using System.Collections.Generic;
@@ -14,13 +16,25 @@ namespace SkinDevApp
 {
     public partial class SettingsPage : Page
     {
-        private const string AutoCamera = "Automatic (prefer Logitech BRIO)";
+        private const string AutoCamera = "Automatic (prefers the Logitech BRIO)";
+
+        // friendly names for the settings audit log
+        private static readonly Dictionary<string, string> Friendly = new Dictionary<string, string>
+        {
+            { "camera.name", "Camera" }, { "camera.width", "Camera width" }, { "camera.height", "Camera height" },
+            { "capture.auto", "Automatic capture" }, { "capture.review_before_finish", "Review photographs before results" },
+            { "capture.stable_frames", "Steady frames needed" }, { "capture.hold_ms", "Hold-still time" },
+            { "capture.cooldown_s", "Pause between photographs" }, { "capture.min_sharpness", "Minimum sharpness" },
+            { "capture.min_brightness", "Minimum brightness" }, { "capture.max_brightness", "Maximum brightness" },
+            { "pose.front_max_yaw", "Front view: largest head turn" }, { "pose.side_min_yaw", "Side views: smallest head turn" }
+        };
 
         private readonly Dictionary<string, TextBox> _num = new Dictionary<string, TextBox>();
         private readonly Dictionary<string, CheckBox> _bool = new Dictionary<string, CheckBox>();
+        private readonly Dictionary<string, string> _label = new Dictionary<string, string>();
+        private readonly List<Tuple<string, UIElement, bool>> _tabs = new List<Tuple<string, UIElement, bool>>();   // title, content, shows Save bar
         private ComboBox _camera;
-        private TextBox _layer;
-        private StackPanel _audit;
+        private StackPanel _historyHost;
 
         public SettingsPage()
         {
@@ -28,53 +42,119 @@ namespace SkinDevApp
             HeaderHost.Content = Ui.Header("Settings");
             if (!AppSession.IsResearcher)
             {
-                LeftColumn.Children.Add(Ui.Card(Ui.Text("Settings are available to signed-in researchers / administrators only.", 14, false, Ui.Bad)));
-                SaveBtn.IsEnabled = false;
+                ContentHost.Content = Ui.Card(Ui.Text("Please sign in to open the settings.", 14, false, Ui.Bad));
+                FooterBar.Visibility = Visibility.Collapsed;
                 return;
             }
-            Build();
+
+            _tabs.Add(Tuple.Create("Camera", BuildCameraTab(), true));
+            _tabs.Add(Tuple.Create("Capture", BuildCaptureTab(), true));
+            _tabs.Add(Tuple.Create("Accounts", BuildAccountsTab(), false));
+            _tabs.Add(Tuple.Create("Change history", BuildHistoryTab(), false));
+
             Fill(ScanSettings.Load());
+            ShowTab(0);
         }
 
-        // --------------------------------------------------------------- build --
+        // ------------------------------------------------------------------ tabs --
 
-        private StackPanel Section(StackPanel column, string title, string note)
+        private void ShowTab(int index)
+        {
+            TabStrip.Children.Clear();
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                int idx = i;
+                bool on = i == index;
+                var label = new TextBlock
+                {
+                    Text = _tabs[i].Item1,
+                    FontSize = 14,
+                    FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = on ? Ui.Ink : Ui.Muted,
+                    Margin = new Thickness(2, 6, 2, 10)
+                };
+                var tab = new Border
+                {
+                    Child = label,
+                    Margin = new Thickness(0, 0, 28, -1),
+                    BorderBrush = on ? Ui.Brush("#6E7560") : System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(0, 0, 0, 2),
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Background = System.Windows.Media.Brushes.Transparent
+                };
+                tab.MouseLeftButtonUp += (s, e) => ShowTab(idx);
+                TabStrip.Children.Add(tab);
+            }
+
+            ContentHost.Content = _tabs[index].Item2;
+            FooterBar.Visibility = _tabs[index].Item3 ? Visibility.Visible : Visibility.Collapsed;
+            if (_tabs[index].Item1 == "Change history") RefreshHistory();
+        }
+
+        // ------------------------------------------------------------------ rows --
+
+        /// <summary>A white card holding rows separated by thin lines.</summary>
+        private Border RowCard(IEnumerable<UIElement> rows)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(title, 16, true));
-            if (note != null) sp.Children.Add(Ui.Text(note, 11, false, Ui.Muted));
-            column.Children.Add(Ui.Card(sp));
-            return sp;
+            foreach (UIElement r in rows) sp.Children.Add(r);
+            var card = Ui.Card(sp, new Thickness(8, 0, 8, 12));
+            card.Padding = new Thickness(26, 6, 26, 6);
+            card.VerticalAlignment = VerticalAlignment.Top;
+            return card;
         }
 
-        private void Num(StackPanel sp, string key, string label, string hint)
+        /// <summary>Name and explanation on the left, the control on the right.</summary>
+        private UIElement Row(string title, string description, UIElement control)
         {
-            var g = new Grid { Margin = new Thickness(0, 6, 0, 0) };
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-            var text = new StackPanel();
-            text.Children.Add(Ui.Text(label, 12.5, true, Ui.Ink, new Thickness(0)));
-            if (hint != null) text.Children.Add(Ui.Text(hint, 10.5, false, Ui.Muted, new Thickness(0)));
-            g.Children.Add(text);
-            var box = new TextBox { Style = (Style)FindResource("Field"), Height = 32 };
-            Grid.SetColumn(box, 1);
-            g.Children.Add(box);
-            sp.Children.Add(g);
+            var g = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4, GridUnitType.Star), MinWidth = 230 });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) });
+
+            var left = new StackPanel { Margin = new Thickness(0, 0, 24, 0), VerticalAlignment = VerticalAlignment.Center };
+            left.Children.Add(Ui.Text(title, 13.5, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
+            if (!string.IsNullOrEmpty(description)) left.Children.Add(Ui.Text(description, 11.5, false, Ui.Muted, new Thickness(0)));
+            g.Children.Add(left);
+
+            var host = new ContentControl { Content = control, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(host, 1);
+            g.Children.Add(host);
+
+            return new Border
+            {
+                Child = g,
+                Padding = new Thickness(0, 16, 0, 16),
+                BorderBrush = Ui.Brush("#EFE7DA"),
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+        }
+
+        private UIElement NumRow(string key, string title, string description, double width = 130)
+        {
+            var box = new TextBox { Style = (Style)FindResource("Field"), Height = 36, Width = width };
             _num[key] = box;
+            _label[key] = title;
+            return Row(title, description, box);
         }
 
-        private void Bool(StackPanel sp, string key, string label)
+        private UIElement BoolRow(string key, string title, string description)
         {
-            var c = new CheckBox { Content = label, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 0) };
-            sp.Children.Add(c);
-            _bool[key] = c;
+            var box = new CheckBox { Content = "On", FontSize = 13, VerticalContentAlignment = VerticalAlignment.Center };
+            _bool[key] = box;
+            _label[key] = title;
+            return Row(title, description, box);
         }
 
-        private void Build()
+        private UIElement Note(string text)
         {
-            StackPanel cam = Section(LeftColumn, "Camera", "The Logitech BRIO is chosen automatically when present. Change only if the study uses another camera.");
-            cam.Children.Add(Ui.Text("Selected camera", 12.5, true, Ui.Ink, new Thickness(0, 8, 0, 4)));
-            _camera = new ComboBox { Style = (Style)FindResource("Combo") };
+            return new Border { Padding = new Thickness(0, 14, 0, 12), Child = Ui.Text(text, 11.5, false, Ui.Muted, new Thickness(0)) };
+        }
+
+        // ------------------------------------------------------------ camera tab --
+
+        private UIElement BuildCameraTab()
+        {
+            _camera = new ComboBox { Style = (Style)FindResource("Combo"), Height = 38, Width = 340 };
             var names = new List<string> { AutoCamera };
             try
             {
@@ -83,106 +163,91 @@ namespace SkinDevApp
             }
             catch { }
             _camera.ItemsSource = names;
-            cam.Children.Add(_camera);
-            Num(cam, "camera.width", "Resolution width (px)", "closest supported mode is used; default 640");
-            Num(cam, "camera.height", "Resolution height (px)", "default 480");
-            cam.Children.Add(Ui.Text("FPS follows the camera mode. Exposure / brightness controls are left to the camera driver so acquisition stays consistent.",
-                10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            _label["camera.name"] = "Camera";
 
-            StackPanel cap = Section(LeftColumn, "Capture", "Stability-based auto-capture of Front, Left and Right.");
-            Bool(cap, "capture.auto", "Auto-capture ON (manual Snap stays available as a fallback)");
-            Bool(cap, "capture.review_before_finish", "Show Image Review (accept / retake per view) before results");
-            Num(cap, "capture.stable_frames", "Required stable frames", "consecutive stable readings before capture (default 8)");
-            Num(cap, "capture.hold_ms", "Hold-still duration (ms)", "all gates green this long (default 1200)");
-            Num(cap, "capture.cooldown_s", "Cooldown between captures (s)", "prevents duplicate captures (default 4)");
-            Num(cap, "capture.min_sharpness", "Minimum sharpness", "Laplacian variance (default 25)");
-            Num(cap, "capture.min_brightness", "Minimum brightness", "mean grey 0-255 (default 45)");
-            Num(cap, "capture.max_brightness", "Maximum brightness", "mean grey 0-255 (default 215)");
-            Num(cap, "pose.front_max_yaw", "Pose tolerance: Front max |yaw|", "yaw ratio (default 0.12)");
-            Num(cap, "pose.side_min_yaw", "Pose tolerance: Left/Right min |yaw|", "yaw ratio (default 0.20)");
-
-            StackPanel ai = Section(RightColumn, "AI / stability thresholds", "Changing these changes scientific behaviour. Do not alter during a data-collection phase without documenting it.");
-            Num(ai, "ai.min_confidence", "Minimum smoothed confidence", "0-1 (default 0.65)");
-            Num(ai, "ai.min_margin", "Minimum margin over runner-up", "0-1 (default 0.15)");
-            Num(ai, "ai.min_consistency", "Minimum per-frame consistency", "share of the window, 0-1 (default 0.75)");
-            Button info = Ui.Btn("Model information", (s, e) => Nav.Go(new ModelInfoPage()), "SmallButton");
-            info.HorizontalAlignment = HorizontalAlignment.Left;
-            info.Margin = new Thickness(0, 10, 0, 0);
-            ai.Children.Add(info);
-
-            StackPanel cam2 = Section(RightColumn, "Grad-CAM++", null);
-            Bool(cam2, "gradcam.live", "Live Grad-CAM++ enabled (final per-view maps are always generated)");
-            Num(cam2, "gradcam.interval_ms", "Live refresh interval (ms)", "minimum gap between live requests (default 80)");
-            Num(cam2, "gradcam.max_age_s", "Max live heatmap age (s)", "older maps are hidden (default 6)");
-            Num(cam2, "gradcam.overlay_opacity", "Overlay opacity", "peak opacity 0.05-1 (default 0.60)");
-            Num(cam2, "gradcam.timeout_s", "Request timeout (s)", "applies after restarting the app (default 60)");
-            cam2.Children.Add(Ui.Text("Target layer (research / debug only)", 12.5, true, Ui.Ink, new Thickness(0, 8, 0, 4)));
-            _layer = new TextBox { Style = (Style)FindResource("Field") };
-            _layer.ToolTip = "Leave empty to use the service's default layer.";
-            cam2.Children.Add(_layer);
-
-            string activeDetectors = "Active detectors: ";
-            try { AI.LesionEngine.EnsureLoaded(); activeDetectors += AI.LesionEngine.ActiveModelsSummary; } catch (Exception ex) { activeDetectors += "unavailable (" + ex.Message + ")"; }
-            StackPanel det = Section(RightColumn, "Lesion localization (detector)",
-                "A separate research model that proposes candidate lesion boxes on the same frame. It never changes Grad-CAM++ or the class scores. " +
-                "The default thresholds were chosen on validation images (best F1); document any change. " + activeDetectors + ". " +
-                "Saved settings keep their old values: set acne 0.26 and hyperpigmentation 0.175 here once.");
-            Bool(det, "detector.enabled", "Lesion localization enabled");
-            Num(det, "detector.thr_acne", "Acne confidence threshold", "0.01-0.99 (default 0.26, chosen on validation photos)");
-            Num(det, "detector.thr_hyper", "Hyperpigmentation confidence threshold", "0.01-0.99 (default 0.175)");
-            Num(det, "detector.thr_eczema", "Eczema confidence threshold (pilot class)", "0.01-0.99 (default 0.25)");
-
-            StackPanel audit = Section(RightColumn, "Recent changes (audit log)", null);
-            _audit = new StackPanel();
-            audit.Children.Add(_audit);
-            RefreshAudit();
-
-            BuildAccounts();
+            return RowCard(new[]
+            {
+                Row("Camera", "The Logitech BRIO is chosen automatically when it is connected. Change this only if the study uses another camera.", _camera),
+                NumRow("camera.width", "Picture width (pixels)", "The closest supported camera mode is used. Default 640."),
+                NumRow("camera.height", "Picture height (pixels)", "Default 480."),
+                Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent.")
+            });
         }
 
-        // ------------------------------------------------------ researcher accounts --
+        // ----------------------------------------------------------- capture tab --
 
-        private TextBlock _acctMsg;
-        private TextBlock _acctList;
+        private UIElement BuildCaptureTab()
+        {
+            return RowCard(new[]
+            {
+                BoolRow("capture.auto", "Automatic capture", "Take each photograph automatically once the face is steady. The manual button always stays available."),
+                BoolRow("capture.review_before_finish", "Review photographs before the results", "Show each photograph so it can be accepted or retaken before the results appear."),
+                NumRow("capture.stable_frames", "Steady frames needed", "How many steady readings in a row are needed before a photograph is taken. Default 8."),
+                NumRow("capture.hold_ms", "Hold-still time (milliseconds)", "How long the face must stay still before capture. Default 1200."),
+                NumRow("capture.cooldown_s", "Pause between photographs (seconds)", "Prevents duplicate photographs. Default 4."),
+                NumRow("capture.min_sharpness", "Minimum sharpness", "A photograph must be at least this sharp to be accepted. Default 25."),
+                NumRow("capture.min_brightness", "Minimum brightness", "Average brightness from 0 (black) to 255 (white). Default 45."),
+                NumRow("capture.max_brightness", "Maximum brightness", "Average brightness from 0 (black) to 255 (white). Default 215."),
+                NumRow("pose.front_max_yaw", "Front view: largest head turn", "How far the head may turn and still count as facing the camera. Default 0.12."),
+                NumRow("pose.side_min_yaw", "Side views: smallest head turn", "How far the head must turn for a left or right photograph. Default 0.20."),
+                Note("Image analysis, heatmap and lesion-marking settings are fixed for this study and cannot be changed here.")
+            });
+        }
+
+        // ---------------------------------------------------------- accounts tab --
+
+        private TextBlock _acctMsg, _acctList;
         private PasswordBox _curPw, _newPw, _newPw2, _addPw, _addPw2;
         private TextBox _addUser;
 
-        private static PasswordBox Pw() => new PasswordBox { Height = 32, FontSize = 13, Padding = new Thickness(8, 0, 8, 0), VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
+        private static PasswordBox Pw() => new PasswordBox { Style = (Style)Application.Current.FindResource("FieldPassword"), Height = 36, Width = 300, Margin = new Thickness(0, 0, 0, 8) };
 
-        private void BuildAccounts()
+        private static StackPanel Labeled(params Tuple<string, UIElement>[] items)
         {
-            StackPanel sp = Section(RightColumn, "Researcher accounts", "Local sign-in for the researcher / admin screens. Passwords are stored only as salted hashes.");
-            _acctList = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 6));
-            sp.Children.Add(_acctList);
+            var sp = new StackPanel();
+            foreach (var it in items)
+            {
+                sp.Children.Add(Ui.Text(it.Item1, 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 3)));
+                sp.Children.Add(it.Item2);
+            }
+            return sp;
+        }
 
-            sp.Children.Add(Ui.Text("Change my password (" + (string.IsNullOrEmpty(AppSession.UserId) ? "not signed in" : AppSession.UserId) + ")", 12.5, true, Ui.Ink, new Thickness(0, 6, 0, 4)));
+        private UIElement BuildAccountsTab()
+        {
+            _acctList = Ui.Text("", 13, false, Ui.Ink, new Thickness(0));
+
             _curPw = Pw(); _newPw = Pw(); _newPw2 = Pw();
-            sp.Children.Add(Ui.Text("Current password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_curPw);
-            sp.Children.Add(Ui.Text("New password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_newPw);
-            sp.Children.Add(Ui.Text("Confirm new password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_newPw2);
-            Button change = Ui.Btn("Change password", (s, e) => ChangeMyPassword(), "SmallButton");
-            change.HorizontalAlignment = HorizontalAlignment.Left;
-            sp.Children.Add(change);
+            var change = Labeled(Tuple.Create("Current password", (UIElement)_curPw), Tuple.Create("New password", (UIElement)_newPw), Tuple.Create("Confirm new password", (UIElement)_newPw2));
+            Button changeBtn = Ui.Btn("Change password", (s, e) => ChangeMyPassword(), "SecondaryButton", 190);
+            changeBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            change.Children.Add(changeBtn);
 
-            sp.Children.Add(Ui.Text("Add a researcher account", 12.5, true, Ui.Ink, new Thickness(0, 14, 0, 4)));
-            _addUser = new TextBox { Style = (Style)FindResource("Field"), Height = 32, Margin = new Thickness(0, 0, 0, 6) };
+            _addUser = new TextBox { Style = (Style)FindResource("Field"), Height = 36, Width = 300, Margin = new Thickness(0, 0, 0, 8) };
             _addPw = Pw(); _addPw2 = Pw();
-            sp.Children.Add(Ui.Text("Username", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addUser);
-            sp.Children.Add(Ui.Text("Password (at least " + AuthService.MinPasswordLength + " characters)", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addPw);
-            sp.Children.Add(Ui.Text("Confirm password", 11, false, Ui.Muted, new Thickness(0))); sp.Children.Add(_addPw2);
-            Button add = Ui.Btn("Add account", (s, e) => AddAccount(), "SmallButton");
-            add.HorizontalAlignment = HorizontalAlignment.Left;
-            sp.Children.Add(add);
+            var add = Labeled(Tuple.Create("Username", (UIElement)_addUser),
+                              Tuple.Create("Password (at least " + AuthService.MinPasswordLength + " characters)", (UIElement)_addPw),
+                              Tuple.Create("Confirm password", (UIElement)_addPw2));
+            Button addBtn = Ui.Btn("Add account", (s, e) => AddAccount(), "SecondaryButton", 190);
+            addBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            add.Children.Add(addBtn);
 
-            _acctMsg = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(0, 8, 0, 0));
-            sp.Children.Add(_acctMsg);
+            _acctMsg = Ui.Text("", 12, false, Ui.Muted, new Thickness(0, 12, 0, 6));
+
             RefreshAccounts();
+            return RowCard(new UIElement[]
+            {
+                Row("Accounts", "Everyone listed here can sign in and use every screen.", _acctList),
+                Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change),
+                Row("Add an account", "Create an account for another dermatologist or assistant. Passwords are stored only as salted hashes.", add),
+                new Border { Child = _acctMsg }
+            });
         }
 
         private void RefreshAccounts()
         {
-            try { _acctList.Text = "Accounts: " + string.Join(", ", AuthService.Usernames()); }
-            catch (Exception ex) { _acctList.Text = "Could not read accounts: " + ex.Message; }
+            try { _acctList.Text = string.Join(",  ", AuthService.Usernames()); }
+            catch (Exception ex) { _acctList.Text = "The accounts could not be read: " + ex.Message; }
         }
 
         private void AcctMessage(string text, bool ok)
@@ -193,13 +258,13 @@ namespace SkinDevApp
 
         private void ChangeMyPassword()
         {
-            if (string.IsNullOrEmpty(AppSession.UserId)) { AcctMessage("Sign in with a researcher account first.", false); return; }
+            if (string.IsNullOrEmpty(AppSession.UserId)) { AcctMessage("Please sign in first.", false); return; }
             if (_newPw.Password != _newPw2.Password) { AcctMessage("The two new passwords do not match.", false); return; }
             try
             {
                 AuthService.ChangePassword(AppSession.UserId, _curPw.Password, _newPw.Password);
                 _curPw.Clear(); _newPw.Clear(); _newPw2.Clear();
-                AcctMessage("Password changed.", true);
+                AcctMessage("Your password was changed.", true);
             }
             catch (Exception ex) { AcctMessage(ex.Message, false); }
         }
@@ -210,24 +275,55 @@ namespace SkinDevApp
             try
             {
                 AuthService.CreateAccount(_addUser.Text, _addPw.Password, AppSession.ActorId);
-                AcctMessage("Account '" + _addUser.Text.Trim() + "' created.", true);
+                AcctMessage("The account \"" + _addUser.Text.Trim() + "\" was created.", true);
                 _addUser.Clear(); _addPw.Clear(); _addPw2.Clear();
                 RefreshAccounts();
             }
             catch (Exception ex) { AcctMessage(ex.Message, false); }
         }
 
-        private void RefreshAudit()
+        // ----------------------------------------------------------- history tab --
+
+        private UIElement BuildHistoryTab()
         {
-            _audit.Children.Clear();
+            _historyHost = new StackPanel();
+            return RowCard(new UIElement[]
+            {
+                Row("Recent changes", "Every change to the camera and capture settings is recorded here with the date, time and person.", _historyHost)
+            });
+        }
+
+        private static string Describe(AuditEntry a)
+        {
+            // details look like "old -> new | model facial_only"
+            string d = a.Details ?? "";
+            int bar = d.IndexOf(" | ", StringComparison.Ordinal);
+            if (bar > 0) d = d.Substring(0, bar);
+            string[] parts = d.Split(new[] { " -> " }, StringSplitOptions.None);
+            string name;
+            if (!Friendly.TryGetValue(a.EntityID ?? "", out name)) name = a.EntityID;
+            string from = parts.Length > 1 ? parts[0] : "", to = parts.Length > 1 ? parts[1] : d;
+            if (from == "(default)") from = "the default";
+            return name + ": " + (parts.Length > 1 ? "changed from " + from + " to " + to : to);
+        }
+
+        private void RefreshHistory()
+        {
+            _historyHost.Children.Clear();
             try
             {
-                List<AuditEntry> rows = StudyRepository.RecentAudit(40).Where(a => a.Entity == "SystemSettings").Take(15).ToList();
-                if (rows.Count == 0) _audit.Children.Add(Ui.Text("No settings have been changed yet.", 11.5, false, Ui.Muted));
+                List<AuditEntry> rows = StudyRepository.RecentAudit(200)
+                    .Where(a => a.Entity == "SystemSettings" && Friendly.ContainsKey(a.EntityID ?? "")).Take(25).ToList();
+                if (rows.Count == 0) _historyHost.Children.Add(Ui.Text("No settings have been changed yet.", 12.5, false, Ui.Muted, new Thickness(0)));
                 foreach (AuditEntry a in rows)
-                    _audit.Children.Add(Ui.Text(a.At + "  ·  " + a.Actor + "  ·  " + a.EntityID + ": " + a.Details, 11, false, Ui.Ink, new Thickness(0, 1, 0, 1)));
+                {
+                    var line = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                    line.Children.Add(Ui.Text(Describe(a), 12.5, true, Ui.Ink, new Thickness(0)));
+                    line.Children.Add(Ui.Text(Fmt.When(a.At) + "  ·  " + a.Actor, 11, false, Ui.Muted, new Thickness(0)));
+                    _historyHost.Children.Add(line);
+                }
             }
-            catch (Exception ex) { _audit.Children.Add(Ui.Text("Could not read the audit log: " + ex.Message, 11.5, false, Ui.Bad)); }
+            catch (Exception ex) { _historyHost.Children.Add(Ui.Text("The history could not be read: " + ex.Message, 12, false, Ui.Bad, new Thickness(0))); }
         }
 
         // ---------------------------------------------------------------- data --
@@ -251,24 +347,11 @@ namespace SkinDevApp
             _num["capture.max_brightness"].Text = F(s.MaxBrightness);
             _num["pose.front_max_yaw"].Text = F(s.FrontMaxAbsYaw);
             _num["pose.side_min_yaw"].Text = F(s.SideMinAbsYaw);
-            _num["ai.min_confidence"].Text = F(s.MinConfidence);
-            _num["ai.min_margin"].Text = F(s.MinMargin);
-            _num["ai.min_consistency"].Text = F(s.MinConsistency);
-            _bool["gradcam.live"].IsChecked = s.LiveGradCam;
-            _num["gradcam.interval_ms"].Text = s.GradCamIntervalMs.ToString(CultureInfo.InvariantCulture);
-            _num["gradcam.max_age_s"].Text = F(s.MaxHeatmapAgeSeconds);
-            _num["gradcam.overlay_opacity"].Text = F(s.OverlayOpacity);
-            _num["gradcam.timeout_s"].Text = s.GradCamTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
-            _layer.Text = s.GradCamTargetLayer;
-            _bool["detector.enabled"].IsChecked = s.DetectorEnabled;
-            _num["detector.thr_acne"].Text = F(s.DetectorThresholdAcne);
-            _num["detector.thr_hyper"].Text = F(s.DetectorThresholdHyperpigmentation);
-            _num["detector.thr_eczema"].Text = F(s.DetectorThresholdEczema);
         }
 
         private bool Read(out ScanSettings s, out string error)
         {
-            s = new ScanSettings();
+            s = new ScanSettings();          // the fixed (AI / heatmap / detector) values keep their built-in defaults
             error = null;
             var bad = new List<string>();
 
@@ -276,14 +359,14 @@ namespace SkinDevApp
             {
                 int v;
                 if (!int.TryParse(_num[k].Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v) || v < lo || v > hi)
-                { bad.Add(k + " (" + lo + "-" + hi + ")"); return lo; }
+                { bad.Add(_label[k] + " must be a whole number from " + lo + " to " + hi); return lo; }
                 return v;
             }
             double D(string k, double lo, double hi)
             {
                 double v;
                 if (!double.TryParse(_num[k].Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v) || v < lo || v > hi)
-                { bad.Add(k + " (" + F(lo) + "-" + F(hi) + ")"); return lo; }
+                { bad.Add(_label[k] + " must be a number from " + F(lo) + " to " + F(hi)); return lo; }
                 return v;
             }
 
@@ -301,24 +384,11 @@ namespace SkinDevApp
             s.MaxBrightness = D("capture.max_brightness", 0, 255);
             s.FrontMaxAbsYaw = D("pose.front_max_yaw", 0.02, 0.5);
             s.SideMinAbsYaw = D("pose.side_min_yaw", 0.05, 0.8);
-            s.MinConfidence = D("ai.min_confidence", 0.25, 0.99);
-            s.MinMargin = D("ai.min_margin", 0, 0.9);
-            s.MinConsistency = D("ai.min_consistency", 0, 1);
-            s.LiveGradCam = _bool["gradcam.live"].IsChecked == true;
-            s.GradCamIntervalMs = I("gradcam.interval_ms", 0, 10000);
-            s.MaxHeatmapAgeSeconds = D("gradcam.max_age_s", 1, 60);
-            s.OverlayOpacity = D("gradcam.overlay_opacity", 0.05, 1);
-            s.GradCamTimeoutSeconds = I("gradcam.timeout_s", 5, 600);
-            s.GradCamTargetLayer = (_layer.Text ?? "").Trim();
-            s.DetectorEnabled = _bool["detector.enabled"].IsChecked == true;
-            s.DetectorThresholdAcne = D("detector.thr_acne", 0.01, 0.99);
-            s.DetectorThresholdHyperpigmentation = D("detector.thr_hyper", 0.01, 0.99);
-            s.DetectorThresholdEczema = D("detector.thr_eczema", 0.01, 0.99);
 
-            if (s.MinBrightness >= s.MaxBrightness) bad.Add("minimum brightness must be below maximum brightness");
-            if (s.FrontMaxAbsYaw >= s.SideMinAbsYaw) bad.Add("Front max yaw must be below Left/Right min yaw");
+            if (s.MinBrightness >= s.MaxBrightness) bad.Add("The minimum brightness must be lower than the maximum brightness");
+            if (s.FrontMaxAbsYaw >= s.SideMinAbsYaw) bad.Add("The front-view head turn must be smaller than the side-view head turn");
 
-            if (bad.Count > 0) { error = "Check: " + string.Join("; ", bad); return false; }
+            if (bad.Count > 0) { error = string.Join(". ", bad) + "."; return false; }
             return true;
         }
 
@@ -330,13 +400,12 @@ namespace SkinDevApp
             {
                 int n = s.Save();
                 StatusTxt.Foreground = Ui.Good;
-                StatusTxt.Text = n == 0 ? "No changes." : n + " setting(s) saved and logged at " + DateTime.Now.ToString("HH:mm:ss") + ".";
-                RefreshAudit();
+                StatusTxt.Text = n == 0 ? "Nothing changed." : (n == 1 ? "1 setting was" : n + " settings were") + " saved at " + DateTime.Now.ToString("h:mm tt", CultureInfo.GetCultureInfo("en-US")) + ".";
             }
             catch (Exception ex)
             {
                 StatusTxt.Foreground = Ui.Bad;
-                StatusTxt.Text = "Could not save: " + ex.Message;
+                StatusTxt.Text = "The settings could not be saved: " + ex.Message;
             }
         }
 
@@ -344,7 +413,7 @@ namespace SkinDevApp
         {
             Fill(new ScanSettings());
             StatusTxt.Foreground = Ui.Muted;
-            StatusTxt.Text = "Defaults loaded into the form. Press Save settings to apply them.";
+            StatusTxt.Text = "The default values are shown. Press Save settings to apply them.";
         }
     }
 }

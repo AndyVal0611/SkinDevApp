@@ -46,7 +46,7 @@ namespace SkinDevApp.Views
         public DermatologistReviewWindow(string scanSessionId)
         {
             _sessionId = scanSessionId;
-            Title = "LUMYVUE - Dermatologist Review";
+            Title = "LUMYVUE · Dermatologist review";
             Width = 1180;
             Height = 900;
             MinWidth = 900;
@@ -68,12 +68,12 @@ namespace SkinDevApp.Views
 
             if (_d == null)
             {
-                root.Children.Add(Ui.Text("Scan not found", 20, true, Ui.Bad));
+                root.Children.Add(Ui.Text("This scan could not be found.", 20, true, Ui.Bad));
                 return;
             }
 
-            root.Children.Add(Ui.Text("Dermatologist Review", 24, true));
-            root.Children.Add(Ui.Text("Clinical Review Summary  ·  AI-assisted research output (not a diagnosis)", 13, false, Ui.Muted, new Thickness(0, 2, 0, 12)));
+            root.Children.Add(Ui.Text("Dermatologist review", 24, true));
+            root.Children.Add(Ui.Text("The computer's reading of this scan, for your review. It is a decision aid and not a diagnosis.", 13, false, Ui.Muted, new Thickness(0, 2, 0, 12)));
 
             root.Children.Add(IdentityCard());
             root.Children.Add(SummaryCard());
@@ -96,15 +96,15 @@ namespace SkinDevApp.Views
             ScanSessionRow s = _d.Session;
             Participant p = _d.Participant;
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Patient / Participant Information", 15, true));
-            sp.Children.Add(Ui.KeyValues(new[]
+            sp.Children.Add(Ui.Text("Patient information", 15, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
+            sp.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("PatientID", s.ParticipantID ?? "unlinked"),
-                Ui.KV("Participant name", p != null ? p.FullName : "—"),
-                Ui.KV("Age / Sex", p == null ? "—" : (p.Age.HasValue ? p.Age + " years" : "age not recorded") + (string.IsNullOrEmpty(p.Sex) ? "" : "  ·  " + p.Sex)),
-                Ui.KV("ScanSessionID", s.ScanSessionID),
-                Ui.KV("Scan date / time", s.StartedAt ?? "—"),
-                Ui.KV("Scan completeness", ViewsText())
+                Ui.KV("Patient ID", s.ParticipantID ?? "Not assigned to a patient"),
+                Ui.KV("Name", p != null ? p.FullName : "—"),
+                Ui.KV("Age and sex", p == null ? "—" : (p.Age.HasValue ? p.Age + " years" : "Age not recorded") + (string.IsNullOrEmpty(p.Sex) ? "" : ", " + p.Sex)),
+                Ui.KV("Scan", s.DisplayId),
+                Ui.KV("Date and time", Fmt.When(s.StartedAt)),
+                Ui.KV("Photographs", ViewsText())
             }, 150));
             return Ui.Card(sp, new Thickness(0, 0, 0, 12));
         }
@@ -113,8 +113,8 @@ namespace SkinDevApp.Views
         {
             string[] order = { "Front", "Left", "Right" };
             var have = new HashSet<string>(_d.Views.Select(v => v.ViewType), StringComparer.OrdinalIgnoreCase);
-            if (_d.Session.ScanMode == "Single") return "Single image";
-            return string.Join("  ·  ", order.Select(o => o + (have.Contains(o) ? " ✓" : " — missing")));
+            if (_d.Session.ScanMode == "Single") return "1 (single image)";
+            return string.Join(",  ", order.Select(o => o + (have.Contains(o) ? " ✓" : " (missing)")));
         }
 
         // -------------------------------------------------------------- summary --
@@ -123,37 +123,50 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("AI-Assisted Scan Summary", 16, true));
+            sp.Children.Add(Ui.Text("Summary of the scan", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
 
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
-                sp.Children.Add(Ui.Text("No usable AI result for this scan.", 15, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
-                sp.Children.Add(Ui.Text("The scan did not produce a usable classification. Review the original images and record your own assessment below.", 12.5, false, Ui.Muted));
+                sp.Children.Add(Ui.Text("No usable result for this scan.", 15, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
+                sp.Children.Add(Ui.Text("The photographs could not be classified. Please look at the original images and record your own assessment below.", 12.5, false, Ui.Muted));
                 return Ui.Card(sp, new Thickness(0, 0, 0, 12));
             }
 
-            string cls = Shown(s.OverallPredictedClass);
-            var head = new TextBlock { Margin = new Thickness(0, 8, 0, 4) };
-            head.Inlines.Add(new System.Windows.Documents.Run("Primary AI Classification: ") { FontSize = 15, Foreground = Ui.Muted });
-            head.Inlines.Add(new System.Windows.Documents.Run(cls) { FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Ui.Brush(Ui.ClassColor(s.OverallPredictedClass)) });
-            sp.Children.Add(head);
-
             bool single = s.ScanMode == "Single";
-            sp.Children.Add(Ui.Text("Among the condition categories evaluated by the model, " + cls + " received the strongest overall classification response " +
-                                    (single ? "in the captured image." : "across the completed scan views."), 13, false, Ui.Ink));
+            List<ViewReading> readings = ClinicalText.Readings(_d);
+            string cls = ClinicalText.Name(s.OverallPredictedClass);
+            double pct = s.OverallScore ?? 0;
 
-            var analysed = _d.Views.Where(v => v.Scores != null).Select(v => v.ViewType).ToList();
-            sp.Children.Add(Ui.KeyValues(new[]
+            // headline: the overall category, big, with its strength
+            var top = new Grid { Margin = new Thickness(0, 6, 0, 2) };
+            top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var left = new StackPanel();
+            left.Children.Add(Ui.Text("The scan most resembles", 12, false, Ui.Muted));
+            left.Children.Add(Ui.Text(cls, 30, true, Ui.Brush(Ui.ClassColor(s.OverallPredictedClass)), new Thickness(0, 0, 0, 0)));
+            top.Children.Add(left);
+            var badge = new Border
             {
-                Ui.KV("Model Class Score", s.ScoreText),
-                Ui.KV("Views analyzed", analysed.Count == 0 ? "none" : string.Join(", ", analysed))
-            }, 150));
+                Background = Ui.Brush("#F4EEE2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(18, 10, 18, 10), VerticalAlignment = VerticalAlignment.Center,
+                Child = new StackPanel { Children = {
+                    Ui.Text(char.ToUpper(ClinicalText.Strength(pct)[0]) + ClinicalText.Strength(pct).Substring(1) + " match", 15, true, Ui.Ink, new Thickness(0)),
+                    Ui.Text(pct.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "% on average", 11.5, false, Ui.Muted, new Thickness(0)) } }
+            };
+            Grid.SetColumn(badge, 1); top.Children.Add(badge);
+            sp.Children.Add(top);
 
-            bool differ = _d.Views.Where(v => v.Scores != null).Select(v => v.Scores.PredictedClass).Distinct().Count() > 1;
-            if (!single && (s.ViewDisagreement || differ))
-                sp.Children.Add(Ui.Pill("View disagreement detected — individual scan views should be reviewed.", Ui.Warn, "#FEF3C7"));
+            string headline, detail; int level;
+            ClinicalText.Agreement(readings, single, out headline, out detail, out level);
+            if (!single) sp.Children.Add(Ui.Callout(headline, detail, level));
 
-            sp.Children.Add(Ui.Text("Model Class Score is the classifier's output for this category. It is not a clinical probability.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            var find = ClinicalText.Findings(readings, s.OverallPredictedClass);
+            if (find.Count > 0)
+            {
+                sp.Children.Add(Ui.Text("What this means for your review", 13, true, Ui.Ink, new Thickness(0, 10, 0, 4)));
+                foreach (string f in find)
+                    sp.Children.Add(Ui.Text("•  " + f, 12.5, false, Ui.Ink, new Thickness(8, 1, 0, 1)));
+            }
+            sp.Children.Add(Ui.Text(ClinicalText.HowToReadScores, 11, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
             return Ui.Card(sp, new Thickness(0, 0, 0, 12));
         }
 
@@ -162,12 +175,12 @@ namespace SkinDevApp.Views
         private UIElement PerViewTable()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Per-view summary", 15, true));
+            sp.Children.Add(Ui.Text("Reading of each photograph", 15, true));
             var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             double[] w = { 1, 2, 1.4, 1.6, 1 };
             foreach (double x in w) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(x, GridUnitType.Star) });
 
-            string[] heads = { "View", "AI Classification", "Model Class Score", "Image Quality", "Review" };
+            string[] heads = { "Photograph", "Most resembles", "Match strength", "Photo quality", "" };
             for (int c = 0; c < heads.Length; c++)
             {
                 TextBlock t = Ui.Text(heads[c], 11.5, true, Ui.Muted, new Thickness(0, 0, 0, 6));
@@ -182,17 +195,17 @@ namespace SkinDevApp.Views
                 string view = v.ViewType;
                 string[] cells =
                 {
-                    view,
-                    v.Scores == null ? "no result" : Shown(v.Scores.PredictedClass),
-                    v.Scores == null ? "—" : Ui.Pct(v.Scores.Confidence),
-                    string.IsNullOrEmpty(v.QualityStatus) ? "not recorded" : v.QualityStatus
+                    view == "Single" ? "Photograph" : view + " view",
+                    v.Scores == null ? "No result" : Shown(v.Scores.PredictedClass),
+                    v.Scores == null ? "—" : ClinicalText.Strength(v.Scores.Confidence) + " (" + Ui.Pct(v.Scores.Confidence) + ")",
+                    string.IsNullOrEmpty(v.QualityStatus) ? "Not recorded" : ClinicalText.PlainQuality(v.QualityStatus)
                 };
                 for (int c = 0; c < cells.Length; c++)
                 {
                     TextBlock t = Ui.Text(cells[c], 13, c == 1, c == 1 && v.Scores != null ? Ui.Brush(Ui.ClassColor(v.Scores.PredictedClass)) : Ui.Ink, new Thickness(0, 4, 0, 4));
                     Grid.SetColumn(t, c); Grid.SetRow(t, row); g.Children.Add(t);
                 }
-                Button open = Ui.Btn("View", (o, e) => { _viewName = view; RenderViewer(); }, "SmallButton");
+                Button open = Ui.Btn("Show photo", (o, e) => { _viewName = view; RenderViewer(); }, "SmallButton");
                 open.HorizontalAlignment = HorizontalAlignment.Left;
                 Grid.SetColumn(open, 4); Grid.SetRow(open, row); g.Children.Add(open);
                 row++;

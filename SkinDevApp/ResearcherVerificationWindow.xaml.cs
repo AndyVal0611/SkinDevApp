@@ -48,9 +48,8 @@ namespace SkinDevApp
             }
 
             ScanSessionRow s = _d.Session;
-            TitleTxt.Text = "Researcher Verification — " + s.DisplayId;
-            SubtitleTxt.Text = "PatientID " + (s.ParticipantID ?? "unlinked") + "  ·  ScanSessionID " + s.ScanSessionID +
-                               "  ·  " + s.StartedAt + "  ·  Model " + (_d.Model != null ? _d.Model.ShortLabel : "unknown");
+            TitleTxt.Text = "Researcher notes · " + s.DisplayId;
+            SubtitleTxt.Text = "Patient " + (s.ParticipantID ?? "not assigned") + "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (_d.Model != null ? _d.Model.ShortLabel : "Unknown model");
 
             BuildAiColumn();
             BuildResearcherForm();
@@ -66,13 +65,13 @@ namespace SkinDevApp
             ScanSessionRow s = _d.Session;
 
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("AI Prediction (read-only)", 16, true));
-            sp.Children.Add(Ui.KeyValues(new[]
+            sp.Children.Add(Ui.Text("What the computer found (read-only)", 16, true));
+            sp.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Overall AI result", s.OverallPredictedClass == null ? "no usable result" : s.OverallPredictedClass + "  " + s.ScoreText),
-                Ui.KV("Views", s.ScanMode == "Single" ? "single capture" : s.CompletionText + " captured"),
-                Ui.KV("View agreement", s.ScanMode == "Single" ? "n/a" : (s.ViewDisagreement ? "Disagreement — review each angle" : "Consistent"))
-            }, 140));
+                Ui.KV("Overall result", s.OverallPredictedClass == null ? "No usable result" : ClinicalText.Name(s.OverallPredictedClass) + " — " + ClinicalText.Strength(s.OverallScore ?? 0) + " match (" + s.ScoreText + ")"),
+                Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.CompletionText.Replace(" / ", " of ") + " analysed"),
+                Ui.KV("Photos agree?", s.ScanMode == "Single" ? "Not applicable" : (s.ViewDisagreement ? "No — please compare each photograph" : "Yes — all photographs point the same way"))
+            }, 140, 12.5));
 
             var row = new UniformGrid { Columns = Math.Max(1, _d.Views.Count), Margin = new Thickness(0, 10, 0, 0) };
             foreach (CaptureViewRow v in _d.Views)
@@ -98,7 +97,7 @@ namespace SkinDevApp
 
             var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
             bool hasFolder = !string.IsNullOrEmpty(s.SessionFolder) && System.IO.Directory.Exists(s.SessionFolder);
-            Button gallery = Ui.Btn("Original images + 4 CAMs per view", (o, e) => OpenGallery(), "SmallButton");
+            Button gallery = Ui.Btn("Compare photographs and heat maps", (o, e) => OpenGallery(), "SmallButton");
             gallery.IsEnabled = hasFolder;
             buttons.Children.Add(gallery);
             Button folder = Ui.Btn("Open scan folder", (o, e) => OpenFile(s.SessionFolder), "SmallButton");
@@ -106,7 +105,7 @@ namespace SkinDevApp
             buttons.Children.Add(folder);
             sp.Children.Add(buttons);
 
-            sp.Children.Add(Ui.Text(StudyText.ScoresNote + " " + StudyText.AttributionNote, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
+            sp.Children.Add(Ui.Text(ClinicalText.HowToReadScores, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
             AiColumn.Children.Add(Ui.Card(sp));
         }
 
@@ -182,15 +181,15 @@ namespace SkinDevApp
         private void BuildResearcherForm()
         {
             ResearcherForm.Children.Clear();
-            ResearcherForm.Children.Add(Ui.Text("Researcher reference assessment", 16, true));
-            ResearcherForm.Children.Add(Ui.Text("Select the reference label(s) you assign to this scan. More than one label may be selected if the protocol allows it.",
+            ResearcherForm.Children.Add(Ui.Text("Researcher assessment", 16, true));
+            ResearcherForm.Children.Add(Ui.Text("Choose the label or labels you give to this scan. You may choose more than one.",
                 11.5, false, Ui.Muted));
 
             ResearcherForm.Children.Add(Label("Reference assessment *"));
             _rLabels = LabelChecks();
             ResearcherForm.Children.Add(_rLabels);
 
-            ResearcherForm.Children.Add(Label("Agreement with AI *"));
+            ResearcherForm.Children.Add(Label("Do you agree with the computer? *"));
             _rAgree = Combo(Agreement);
             ResearcherForm.Children.Add(_rAgree);
             HookSuggestion(_rLabels, _rAgree);
@@ -201,7 +200,7 @@ namespace SkinDevApp
 
             if (_d.Session.ScanMode != "Single")
             {
-                ResearcherForm.Children.Add(Label("Per-view Comments (if any)"));
+                ResearcherForm.Children.Add(Label("Comments on each photograph (optional)"));
                 var g = new Grid();
                 for (int i = 0; i < 3; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 _rFront = Field(); _rLeft = Field(); _rRight = Field();
@@ -299,7 +298,7 @@ namespace SkinDevApp
             var l2 = new StackPanel(); var r2 = new StackPanel();
             Grid.SetColumn(r2, 2);
             g2.Children.Add(l2); g2.Children.Add(r2);
-            l2.Children.Add(Label("Agreement with AI *"));
+            l2.Children.Add(Label("Do you agree with the computer? *"));
             _dAgreeAi = Combo(Agreement); l2.Children.Add(_dAgreeAi);
             r2.Children.Add(Label("Agreement with Researcher (if applicable)"));
             var resOptions = new List<string>(Agreement) { "No researcher assessment yet" };
@@ -368,7 +367,7 @@ namespace SkinDevApp
                 var rows = new List<KeyValuePair<string, string>>
                 {
                     Ui.KV("Date", e.EvaluationDate), Ui.KV("Researcher", e.ResearcherID),
-                    Ui.KV("Assessment", e.ResearcherClassification), Ui.KV("Agreement with AI", e.AgreementWithAI),
+                    Ui.KV("Assessment", e.ResearcherClassification), Ui.KV("Agreement with the computer", e.AgreementWithAI),
                     Ui.KV("Notes", e.Notes)
                 };
                 if (!string.IsNullOrWhiteSpace(e.FrontComment)) rows.Add(Ui.KV("Front", e.FrontComment));
@@ -392,7 +391,7 @@ namespace SkinDevApp
                     {
                         Ui.KV("Date", v.ValidationDate), Ui.KV("Validator", v.DermatologistID + (v.ValidatorName != null ? " (" + v.ValidatorName + ")" : "")),
                         Ui.KV("Role", v.ProfessionalRole), Ui.KV("Credential ref.", v.CredentialReference),
-                        Ui.KV("Assessment", v.DermatologistAssessment), Ui.KV("Agreement with AI", v.AgreementWithAI),
+                        Ui.KV("Assessment", v.DermatologistAssessment), Ui.KV("Agreement with the computer", v.AgreementWithAI),
                         Ui.KV("Agreement w/ researcher", v.AgreementWithResearcher), Ui.KV("Status", v.ValidationStatus), Ui.KV("Notes", v.Notes)
                     }, 160)
                 });

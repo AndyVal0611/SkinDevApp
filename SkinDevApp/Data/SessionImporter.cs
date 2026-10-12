@@ -246,7 +246,7 @@ namespace SkinDevApp.Data
         private static string NewLabel(SQLiteConnection c, SQLiteTransaction tx, ScanSessionRow head)
         {
             if (string.IsNullOrEmpty(head.ParticipantID))
-                return "UNLINKED-" + head.ScanSessionID.Replace("single-", "").Substring(0, 8).ToUpperInvariant();
+                return "UNASSIGNED-" + head.ScanSessionID.Replace("single-", "").Substring(0, 8).ToUpperInvariant();
 
             using (var cmd = StudyRepository.Cmd(c, "SELECT COUNT(*) FROM ScanSessions WHERE ParticipantID=@p;", tx, "@p", head.ParticipantID))
             {

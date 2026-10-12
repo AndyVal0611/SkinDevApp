@@ -127,8 +127,11 @@ namespace SkinDevApp.Data
         public string CreatedUtc { get; set; }
         public string FirstSeenAt { get; set; }
 
-        public string ShortLabel =>
-            (string.IsNullOrEmpty(RunName) ? "unknown" : RunName) + " / " + Short(OnnxSha256);
+        /// <summary>The name people see (for example "PrecisionSkinV1"). Hashes are on the Model Information screen.</summary>
+        public string ShortLabel => SkinDevApp.Views.Fmt.ModelName(RunName);
+
+        /// <summary>Run name plus hash, for the technical Model Information screen only.</summary>
+        public string HashLabel => (string.IsNullOrEmpty(RunName) ? "unknown" : RunName) + " / " + Short(OnnxSha256);
 
         public static string Short(string h) =>
             string.IsNullOrEmpty(h) ? "unknown" : (h.Length > 12 ? h.Substring(0, 12) : h);
@@ -159,12 +162,26 @@ namespace SkinDevApp.Data
         // filled by queries that join
         public string ModelLabel { get; set; }
         public string ValidationStatus { get; set; }
+        public string ReviewText => ValidationStatus == "Dermatologist Validated" ? "Reviewed by dermatologist"
+            : (ValidationStatus ?? "").StartsWith("Researcher Verified") ? "Awaiting dermatologist"
+            : "Awaiting review";
 
         public string DateText => StartedAt != null && StartedAt.Length >= 10 ? StartedAt.Substring(0, 10) : StartedAt;
         public string TimeText => StartedAt != null && StartedAt.Length >= 16 ? StartedAt.Substring(11, 5) : "";
         public string ScoreText => OverallScore.HasValue ? OverallScore.Value.ToString("0.0") + "%" : "-";
         public string CompletionText => ViewsCompleted + " / " + ViewsExpected;
-        public string DisplayId => string.IsNullOrEmpty(SessionLabel) ? ScanSessionID : SessionLabel;
+        /// <summary>The short scan name shown to people, e.g. PS-0004-S03 (never the long internal ID).</summary>
+        public string DisplayId
+        {
+            get
+            {
+                string id = string.IsNullOrEmpty(SessionLabel) ? ScanSessionID : SessionLabel;
+                return id != null && id.StartsWith("UNLINKED-") ? "UNASSIGNED-" + id.Substring(9) : id;   // older scans saved without a patient
+            }
+        }
+
+        /// <summary>"Oct 4, 2026 · 10:19 AM"</summary>
+        public string WhenText => SkinDevApp.Views.Fmt.When(StartedAt);
     }
 
     public sealed class CaptureViewRow
