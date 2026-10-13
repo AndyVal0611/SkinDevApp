@@ -5,8 +5,8 @@
     "acne"
   ],
   "imgsz": 800,
-  "default_conf": 0.242,
-  "nms_iou": 0.45,
+  "default_conf": 0.275,
+  "nms_iou": 0.6,
   "onnx_sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
   "onnx_file": "lesion_detector_acne.onnx",
   "source_weights": "/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt",
@@ -51,5 +51,12 @@
     "torch": "2.14.1+cu130",
     "ultralytics": "8.4.172"
   },
-  "created": "2026-10-10T22:35:05"
+  "created": "2026-10-10T22:35:05",
+  "ensemble": [
+    "lesion_detector_acne.onnx (seed 123)",
+    "lesion_detector_acne_m2.onnx (seed 42)",
+    "lesion_detector_acne_m3.onnx (seed 7)"
+  ],
+  "note": "Average (weighted box fusion, IoU 0.5) of the three final seeds; threshold 0.275 chosen on validation; development test mAP50 0.439, F1 0.507 (single seed 123: 0.419 / 0.482)",
+  "test_mAP50_single_run": 0.439
 }

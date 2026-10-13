@@ -3,7 +3,8 @@
 mst_skintone.py - the SEPARATE Monk Skin Tone (MST) classifier for PrecisionSkin (research only).
 
 It is independent of the MobileNetV2 condition classifier and the lesion detector: its predictions never change a condition result.
-Training data: MST-E (reference examples, few people) + SCIN (supplementary, tone labels are layperson ESTIMATES), after filtering.
+Training data: SCIN only (tone labels are layperson ESTIMATES), after filtering.
+MST-E is EVALUATION ONLY: its terms of use forbid training ML models on it (research / annotator training only). All MST-E people go to the test split.
 
 Why it is built the way it is (lessons from the retired Fitzpatrick model, where the "labels" were folders that encoded ethnicity):
   * every split keeps ALL photos of one person / case together (group split) - otherwise the model memorises people;
@@ -142,8 +143,10 @@ def build_manifest(scin_dir=None, mste_dir=None, face_only=True, use_scin=True, 
 
 # ------------------------------------------------------------------------------------------------ split (people / cases never shared)
 def group_split(df, seed=42, fractions=(0.70, 0.15, 0.15)):
-    """returns df with a 'split' column; every group (person / SCIN case) lands in exactly ONE split; stratified by the group's majority band."""
-    rng = random.Random(seed); g = df.groupby("group")
+    """returns df with a 'split' column; every group (person / SCIN case) lands in exactly ONE split; stratified by the group's majority band.
+    MST-E is never used for training (licence): all its people are forced into 'test'. Only SCIN is split 70/15/15."""
+    rng = random.Random(seed); mste = df.source == "MST-E"; full = df; df = df[~mste]
+    g = df.groupby("group")
     band = g.band.agg(lambda s: s.value_counts().index[0]); size = g.size()
     split = {}
     for b in sorted(band.unique()):
@@ -153,7 +156,7 @@ def group_split(df, seed=42, fractions=(0.70, 0.15, 0.15)):
             n_tr = min(n_tr, n - 2); n_va = max(1, min(n_va, n - n_tr - 1))
         for k, gid in enumerate(ids):
             split[gid] = "train" if k < n_tr else ("val" if k < n_tr + n_va else "test")
-    out = df.copy(); out["split"] = out.group.map(split)
+    out = full.copy(); out["split"] = out.group.map(split); out.loc[out.source == "MST-E", "split"] = "test"
     sets = {s: set(out[out.split == s].group) for s in ("train", "val", "test")}
     assert not (sets["train"] & sets["val"] or sets["train"] & sets["test"] or sets["val"] & sets["test"]), "a person / case is in two splits"
     return out
