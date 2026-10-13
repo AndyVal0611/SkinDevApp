@@ -97,6 +97,28 @@ def recipe(name):
                 if f.stat().st_mtime > ref + 1 and (d / "labels" / f.name).exists(): shutil.copy2(f, d / "labels" / f.name); n += 1
             (d / "READY").write_text(str(n)); print("acne_fixed: %d labels replaced" % n, flush=True)
         return imgs(d / "images"), {"val": ACNE / "val"}, "acne v4 train with %s relabelled photos (second look)" % (d / "READY").read_text()
+    if name in ("acne_c1", "acne_c2", "acne_c3"):
+        # round 2 of the acne data (boxed by you):  c1 = v4 train + the 250 new photos;  c2 = c1 + the 111 reviewed training photos (labels replaced);  c3 = c2 + 115 healthy-skin negatives.  Val labels untouched.
+        d = DATA / name / "train"
+        if not (d / "READY").exists():
+            shutil.rmtree(d, ignore_errors=True); (d / "images").mkdir(parents=True); (d / "labels").mkdir(parents=True)
+            for p in imgs(ACNE / "train" / "images"):
+                os.symlink(p, d / "images" / p.name); shutil.copy2(ACNE / "train" / "labels" / (p.stem + ".txt"), d / "labels" / (p.stem + ".txt"))
+            AB = Path("/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing"); n_new = n_rev = 0
+            def saved(folder):
+                D = AB / folder; ref = json.load(open(D / "_drafts" / "meta.json"))["drafted_at"]; S = D / "Elaiza__acne_review"; mp = json.load(open(D / "name_map.json"))
+                for orig, new in mp.items():
+                    lab = S / "labels" / (new + ".txt")
+                    if lab.exists() and lab.stat().st_mtime > ref + 1: yield Path(orig), next(iter((S / "images").glob(new + ".*"))), lab
+            for orig, img, lab in saved("Acne_New_Photos"):
+                nm = "new_%s%s" % (img.stem, img.suffix); shutil.copy2(img, d / "images" / nm); shutil.copy2(lab, d / "labels" / ("new_%s.txt" % img.stem)); n_new += 1
+            if name in ("acne_c2", "acne_c3"):
+                for orig, img, lab in saved("Acne_Review_Missing"):
+                    if (d / "labels" / (orig.stem + ".txt")).exists(): shutil.copy2(lab, d / "labels" / (orig.stem + ".txt")); n_rev += 1
+            if name == "acne_c3":
+                for p in sorted(NEG_SRC.glob("neg_*")): os.symlink(p, d / "images" / p.name)
+            (d / "READY").write_text("%d new, %d reviewed" % (n_new, n_rev)); print("%s: %d new photos, %d reviewed labels replaced" % (name, n_new, n_rev), flush=True)
+        return imgs(d / "images"), {"val": ACNE / "val"}, "acne v4 train + new photos (%s)" % (d / "READY").read_text()
     if name == "acne_neg":
         return imgs(ACNE / "train" / "images") + sorted(NEG_SRC.glob("neg_*")), {"val": ACNE / "val"}, "acne v4 + 115 healthy-skin negatives (no boxes)"
     s = prep_hyp(); vals = {"hand_val": DATA / "hyp_hand_val", "public_val": HYP / "val"}
@@ -208,6 +230,9 @@ QUEUE = [
     spec("H25_v2human_all_pub", "hyperpigmentation", "hyp_v2human_pub", "FACTOR (vs H24): + de-duplicated public photos", lr0=0.0005, optimizer="AdamW"),
     spec("H25_s7", "hyperpigmentation", "hyp_v2human_pub", "CONFIRM H25 with seed 7", seed=7, lr0=0.0005, optimizer="AdamW"),
     spec("H25_s123", "hyperpigmentation", "hyp_v2human_pub", "CONFIRM H25 with seed 123", seed=123, lr0=0.0005, optimizer="AdamW"),
+    spec("C1_acne_new", "acne", "acne_c1", "FACTOR: v4 + 250 new acne photos you boxed", ),
+    spec("C2_acne_new_review", "acne", "acne_c2", "FACTOR (vs C1): + the 111 training photos you reviewed (missed spots added)"),
+    spec("C3_acne_new_review_neg", "acne", "acne_c3", "FACTOR (vs C2): + 115 healthy-skin negatives"),
     spec("H11_v2_m800", "hyperpigmentation", "hyp_own_drafts_v2", "FACTOR (vs H8): yolov8m", model="yolov8m.pt", batch=6),
     spec("H2_dedup", "hyperpigmentation", "hyp_dedup_mix", "FACTOR: remove near-duplicate public photos (2,524 of 3,031 had one)"),
     spec("H3_balanced", "hyperpigmentation", "hyp_balanced", "FACTOR: public photos limited to the number of your photos"),
