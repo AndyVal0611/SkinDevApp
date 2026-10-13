@@ -51,7 +51,7 @@ namespace SkinDevApp.Data
         // Lesion localization (separate detector model; never changes Grad-CAM++ or the class scores)
         public bool DetectorEnabled { get; set; } = true;
         public double DetectorThresholdAcne { get; set; } = 0.26;               // acne specialist (v4): chosen on VALIDATION photos (best F1 at 0.25; precision = recall at 0.26). 0.35 was test-informed and is only a documented precision-leaning option
-        public double DetectorThresholdHyperpigmentation { get; set; } = 0.225; // hyperpigmentation 3-seed ensemble: best F1 on the hand-boxed validation photos
+        public double DetectorThresholdHyperpigmentation { get; set; } = 0.175; // hyperpigmentation rule-v2 3-seed ensemble: best F1 on the 60 rule-v2 validation photos (0.125 = more sensitive, F1 equal)
         public double DetectorThresholdEczema { get; set; } = 0.25;             // pilot class
 
         /// <summary>Confidence thresholds by palette class index (Acne, Hyperpigmentation, Eczema).</summary>
