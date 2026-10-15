@@ -30,7 +30,7 @@ Hyperpigmentation scores under rule v2 are not comparable with scores under the 
 - **Is it a diagnosis?** No. The detectors propose candidate lesions. Grad-CAM++ shows where the classifier looked; it is not a localization map.
 - **What are the limits?** One annotator; tiny spots are often missed (acne); box-level agreement limited by label ambiguity (hyperpigmentation); few acne-negative photos in the independent set; no skin-tone breakdown yet; no real kiosk scans evaluated; speed on the mini PC not measured.
 - **Why can't old and new hyperpigmentation numbers be compared?** The box definition changed, so the two sets of numbers measure different targets.
-- **Where are the results and code?** `docs/RESULTS_FOR_PAPER.md`, `docs/HYPERPIGMENTATION_FULL_RESULTS.md`, the two `*_Training_and_Results.ipynb` notebooks, `ml/lesion_exp.py`, `lesion_experiments/EXPERIMENTS.csv`.
+- **Where are the results and code?** `docs/RESULTS_FOR_PAPER.md`, `hyperpigmentation/docs/HYPERPIGMENTATION_FULL_RESULTS.md`, the two `*_Training_and_Results.ipynb` notebooks, `shared/lesion_exp.py`, `lesion_experiments/EXPERIMENTS.csv`.
 
 ## Be ready for
 - Stating how the pipeline was built, including use of an AI coding assistant, in the way your school's policy requires. Be able to explain every step above in your own words.

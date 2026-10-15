@@ -367,3 +367,7 @@ FodyWeavers.xsd
 *.sqlite-journal
 Captures/
 data_folder.txt
+
+# stray files that Ultralytics downloads into a notebook folder
+**/notebooks/*.pt
+**/notebooks/weights/
