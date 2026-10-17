@@ -11,7 +11,7 @@
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
                            Text="Which model produced the results, and whether the heat-map service is running."/>
             </StackPanel>
-            <Grid>
+            <Grid x:Name="SplitGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>

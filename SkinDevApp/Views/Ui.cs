@@ -88,14 +88,15 @@ namespace SkinDevApp.Views
             var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             DockPanel.SetDock(right, Dock.Right);
 
-            right.Children.Add(new TextBlock
+            var signedIn = new TextBlock
             {
                 Text = string.IsNullOrEmpty(AppSession.UserId) ? "" : "Signed in as " + AppSession.UserId,
                 Foreground = Brush("#D6CEC6"),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
-            });
+            };
+            right.Children.Add(signedIn);
 
             if (showBack) right.Children.Add(HeaderButton("Back", (s, e) => Nav.Back()));
             if (showHome) right.Children.Add(HeaderButton("Dashboard", (s, e) => Nav.Home()));
@@ -114,7 +115,7 @@ namespace SkinDevApp.Views
             });
             dock.Children.Add(left);
 
-            return new Border
+            var bar = new Border
             {
                 Background = Bar,
                 CornerRadius = new CornerRadius(16),
@@ -122,6 +123,65 @@ namespace SkinDevApp.Views
                 Margin = new Thickness(8, 0, 8, 16),
                 Child = BuildHeaderBody(dock)
             };
+            bar.SizeChanged += (s, e) => signedIn.Visibility = bar.ActualWidth < 980 ? Visibility.Collapsed : Visibility.Visible;
+            return bar;
+        }
+
+        /// <summary>
+        /// Makes a multi-column Grid responsive: below the given width every child moves under the previous one in a single column
+        /// (portrait monitors, narrow windows); above it the original columns come back. lastRowStar lets the last child fill the remaining height.
+        /// </summary>
+        public static void StackWhenNarrow(Grid g, double breakpoint, bool lastRowStar = false, Action<bool> onChange = null)
+        {
+            var cols = g.ColumnDefinitions.Select(c => new ColumnDefinition { Width = c.Width, MinWidth = c.MinWidth, MaxWidth = c.MaxWidth }).ToList();
+            var rows = g.RowDefinitions.Select(r => new RowDefinition { Height = r.Height, MinHeight = r.MinHeight, MaxHeight = r.MaxHeight }).ToList();
+            var kids = g.Children.Cast<UIElement>().ToList();
+            var home = kids.Select(k => new[] { Grid.GetRow(k), Grid.GetColumn(k), Grid.GetColumnSpan(k), Grid.GetRowSpan(k) }).ToList();
+            bool? narrow = null;
+
+            g.SizeChanged += (s, e) =>
+            {
+                bool n = g.ActualWidth > 0 && g.ActualWidth < breakpoint;
+                if (narrow == n) return;
+                narrow = n;
+                g.ColumnDefinitions.Clear();
+                g.RowDefinitions.Clear();
+                if (n)
+                {
+                    g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    for (int i = 0; i < kids.Count; i++)
+                    {
+                        bool last = i == kids.Count - 1;
+                        g.RowDefinitions.Add(new RowDefinition { Height = last && lastRowStar ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+                        Grid.SetRow(kids[i], i); Grid.SetColumn(kids[i], 0); Grid.SetColumnSpan(kids[i], 1); Grid.SetRowSpan(kids[i], 1);
+                    }
+                }
+                else
+                {
+                    foreach (ColumnDefinition c in cols) g.ColumnDefinitions.Add(new ColumnDefinition { Width = c.Width, MinWidth = c.MinWidth, MaxWidth = c.MaxWidth });
+                    foreach (RowDefinition r in rows) g.RowDefinitions.Add(new RowDefinition { Height = r.Height, MinHeight = r.MinHeight, MaxHeight = r.MaxHeight });
+                    for (int i = 0; i < kids.Count; i++)
+                    {
+                        Grid.SetRow(kids[i], home[i][0]); Grid.SetColumn(kids[i], home[i][1]);
+                        Grid.SetColumnSpan(kids[i], home[i][2]); Grid.SetRowSpan(kids[i], home[i][3]);
+                    }
+                }
+                if (onChange != null) onChange(n);
+            };
+        }
+
+        /// <summary>A Grid with n equal columns holding the given items (collapses to one column on narrow screens).</summary>
+        public static Grid Cols(double stackBelow, params UIElement[] items)
+        {
+            var g = new Grid();
+            for (int i = 0; i < items.Length; i++)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetColumn(items[i], i);
+                g.Children.Add(items[i]);
+            }
+            StackWhenNarrow(g, stackBelow);
+            return g;
         }
 
         // Skin-tone ribbon: the app's one signature detail, six Fitzpatrick-inspired swatches.

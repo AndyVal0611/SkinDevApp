@@ -13,6 +13,10 @@ namespace SkinDevApp
         {
             InitializeComponent();
 
+            // A portrait touch monitor: use the whole screen (the layouts adapt to the real resolution and Windows scaling)
+            if (SystemParameters.PrimaryScreenHeight > SystemParameters.PrimaryScreenWidth)
+                WindowState = WindowState.Maximized;
+
             // Kusa nitong ikakarga ang LoginForm sa Startup
             MainFrame.Navigate(new LoginForm());
         }

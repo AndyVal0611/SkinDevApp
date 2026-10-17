@@ -24,6 +24,7 @@ namespace SkinDevApp.Views
         public ResultsPage(string scanSessionId)
         {
             InitializeComponent();
+            Ui.StackWhenNarrow(SplitGrid, 950);
             HeaderHost.Content = Ui.Header("Results");
             _sessionId = scanSessionId;
             Loaded += (s, e) => Render();

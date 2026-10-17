@@ -20,7 +20,7 @@
         </StackPanel>
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <Grid>
+            <Grid x:Name="SplitGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>

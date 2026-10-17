@@ -170,7 +170,10 @@ namespace SkinDevApp
                 Row("Camera", "The Logitech BRIO is chosen automatically when it is connected. Change this only if the study uses another camera.", _camera),
                 NumRow("camera.width", "Picture width (pixels)", "The closest supported camera mode is used. Default 640."),
                 NumRow("camera.height", "Picture height (pixels)", "Default 480."),
-                Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent.")
+                Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent."),
+                NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the photograph that is taken. Default 1."),
+                NumRow("preview.zoom_max", "Largest zoom of the live picture", "How far the picture can be enlarged by pinching with two fingers or using the + button. Default 4."),
+                BoolRow("preview.zoom_buttons", "Show the zoom buttons", "Show + and − buttons on the live picture. Pinching with two fingers always works.")
             });
         }
 
@@ -337,6 +340,9 @@ namespace SkinDevApp
 
             _num["camera.width"].Text = s.CameraWidth.ToString(CultureInfo.InvariantCulture);
             _num["camera.height"].Text = s.CameraHeight.ToString(CultureInfo.InvariantCulture);
+            _num["preview.zoom_min"].Text = F(s.PreviewZoomMin);
+            _num["preview.zoom_max"].Text = F(s.PreviewZoomMax);
+            _bool["preview.zoom_buttons"].IsChecked = s.PreviewZoomButtons;
             _bool["capture.auto"].IsChecked = s.AutoCapture;
             _bool["capture.review_before_finish"].IsChecked = s.ReviewBeforeFinish;
             _num["capture.stable_frames"].Text = s.StableFramesRequired.ToString(CultureInfo.InvariantCulture);
@@ -374,6 +380,9 @@ namespace SkinDevApp
             s.CameraName = cam == null || cam == AutoCamera ? "" : cam;
             s.CameraWidth = I("camera.width", 160, 4096);
             s.CameraHeight = I("camera.height", 120, 2160);
+            s.PreviewZoomMin = D("preview.zoom_min", 0.5, 1);
+            s.PreviewZoomMax = D("preview.zoom_max", 1.5, 8);
+            s.PreviewZoomButtons = _bool["preview.zoom_buttons"].IsChecked == true;
             s.AutoCapture = _bool["capture.auto"].IsChecked == true;
             s.ReviewBeforeFinish = _bool["capture.review_before_finish"].IsChecked == true;
             s.StableFramesRequired = I("capture.stable_frames", 1, 60);

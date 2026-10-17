@@ -31,7 +31,8 @@
 
             <!-- Camera / Photo View Card -->
             <Border x:Name="ImageCard" Background="#2B2C26" CornerRadius="16" Padding="0" Margin="8" ClipToBounds="True">
-                <Grid x:Name="CameraViewportGrid" ClipToBounds="True" SizeChanged="CameraViewportGrid_SizeChanged">
+                <Grid x:Name="CameraViewportGrid" ClipToBounds="True" Background="Transparent" SizeChanged="CameraViewportGrid_SizeChanged">
+                    <Grid x:Name="ZoomLayer">
                     <Image x:Name="UploadedImageViewer"
                            Stretch="Uniform"
                            HorizontalAlignment="Center"
@@ -46,6 +47,7 @@
                         <Ellipse x:Name="GuideOval" Stroke="#99FFFFFF" StrokeThickness="3"
                                  StrokeDashArray="4,3" Fill="Transparent"/>
                     </Canvas>
+                    </Grid>
 
                     <!-- Top: scan state banner -->
                     <Border x:Name="StateBanner" Visibility="Collapsed"
@@ -95,6 +97,26 @@
                                 <TextBlock Text="Normal" FontSize="11" Foreground="White"/>
                             </StackPanel>
                             <TextBlock Text="Colour = class&#x0a;Opacity = strength" FontSize="9" Foreground="#CCFFFFFF"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Zoom buttons (touch-sized). The picture can also be pinched with two fingers, or zoomed with the mouse wheel. -->
+                    <Border x:Name="ZoomControls" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14,14,14,56"
+                            Background="#99000000" CornerRadius="32" Padding="4,6">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=PlaceholderPanel}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <Button x:Name="ZoomInBtn" Content="+" Style="{StaticResource ZoomButton}" ToolTip="Zoom in" Click="ZoomInBtn_Click"/>
+                            <TextBlock x:Name="ZoomLevelTxt" Text="1.0×" FontSize="12" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,2"/>
+                            <Button x:Name="ZoomOutBtn" Content="−" Style="{StaticResource ZoomButton}" ToolTip="Zoom out" Click="ZoomOutBtn_Click"/>
+                            <Button x:Name="ZoomResetBtn" Content="⟲" FontSize="22" Style="{StaticResource ZoomButton}" ToolTip="Back to the original view" Click="ZoomResetBtn_Click"/>
                         </StackPanel>
                     </Border>
 
@@ -154,26 +176,27 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button x:Name="StartCamBtn" Grid.Column="0" Content="&#x1F4F7; Live Cam" Height="46" FontSize="12"
+                            <Button x:Name="StartCamBtn" Grid.Column="0" Content="&#x1F4F7; Live Cam" Height="62" FontSize="14"
                                     Background="#E3E3D2" Foreground="#34362E" FontWeight="SemiBold" BorderThickness="0" Click="StartCamBtn_Click"/>
 
-                            <Button x:Name="SnapBtn" Grid.Column="2" Content="&#x1F4F8; Snap Now" Height="46" FontSize="12"
+                            <Button x:Name="SnapBtn" Grid.Column="2" Content="&#x1F4F8; Snap Now" Height="62" FontSize="14"
                                     Background="#D09F7C" Foreground="#34362E" FontWeight="Bold" BorderThickness="0" IsEnabled="False" Click="SnapBtn_Click"/>
 
-                            <Button x:Name="UploadBtn" Grid.Column="4" Content="&#x1F4C1; File Upload" Height="46" FontSize="12"
+                            <Button x:Name="UploadBtn" Grid.Column="4" Content="&#x1F4C1; File Upload" Height="62" FontSize="14"
                                     Background="#E3E3D2" Foreground="#34362E" FontWeight="SemiBold" BorderThickness="0" Click="UploadBtn_Click"/>
                         </Grid>
 
-                        <CheckBox x:Name="AutoCaptureChk" Content="Auto-capture when the reading is stable" IsChecked="True"
-                                  FontSize="12" Foreground="#34362E" Margin="0,0,0,10"
+                        <CheckBox x:Name="AutoCaptureChk" Content="Take the photo automatically when the reading is steady" IsChecked="True"
+                                  FontSize="14" Foreground="#34362E" Margin="0,0,0,10"
                                   Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
-                        <CheckBox x:Name="MultiViewChk" Content="3-view scan: Front, Left side, Right side" IsChecked="True"
-                                  FontSize="12" Foreground="#34362E" Margin="0,0,0,6"
+                        <CheckBox x:Name="MultiViewChk" Content="Three photographs: front, left side and right side" IsChecked="True"
+                                  FontSize="14" Foreground="#34362E" Margin="0,0,0,6"
                                   Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
 
-                        <TextBlock x:Name="ViewStepTxt" Text="" FontSize="12" FontWeight="SemiBold" Foreground="#2563EB"
-                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <UniformGrid x:Name="StepperGrid" Columns="3" Margin="0,2,0,6" Visibility="Collapsed"/>
+                        <TextBlock x:Name="ViewStepTxt" Text="" FontSize="14" FontWeight="SemiBold" Foreground="#5F6652"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                         <!-- Live capture status (face, pose, sharpness, exposure, motion, stability, camera) -->
                         <Border x:Name="StatusPanel" Background="#F3E4D3" CornerRadius="10" Padding="12,10" Margin="0,0,0,12" Visibility="Collapsed">
@@ -187,11 +210,11 @@
                             </StackPanel>
                         </Border>
 
-                        <Button x:Name="NewScanBtn" Content="&#x1F501; New Scan" Height="42" FontSize="13"
+                        <Button x:Name="NewScanBtn" Content="&#x1F501; New Scan" Height="56" FontSize="14"
                                 Background="#34362E" Foreground="White" FontWeight="Bold" IsEnabled="False"
                                 Margin="0,0,0,10" Click="NewScanBtn_Click"/>
 
-                        <Button x:Name="AnalyzeBtn" Content="&#x1F33F; Analyse uploaded image (researcher)" Height="46" FontSize="13"
+                        <Button x:Name="AnalyzeBtn" Content="&#x1F33F; Analyse uploaded image (researcher)" Height="56" FontSize="14"
                                 Background="#34362E" Foreground="White" FontWeight="Bold" IsEnabled="False" Margin="0,0,0,14" Click="AnalyzeBtn_Click"/>
 
                         <Separator Margin="0,0,0,14" Background="#F1F5F9"/>
@@ -227,6 +250,20 @@
                             <ProgressBar x:Name="NormalBar" Height="8" Foreground="#00C83C" Background="#F8F1E6" Minimum="0" Maximum="100" Margin="0,0,0,14"/>
                         </StackPanel>
 
+                        <!-- Primary Result Callout -->
+                        <Border Background="#F8F1E6" BorderBrush="#E3E3D2" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="VerdictTxt" Text="Status: Awaiting camera / image" FontSize="14" FontWeight="Bold" Foreground="#34362E" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="RegionTxt" Text="" FontSize="12" FontStyle="Italic" Foreground="#5A524B" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock x:Name="DisclaimerTxt"
+                                   Text="Screening aid only. Not a medical diagnosis. Heatmaps show regions that influenced the model, not lesion outlines. Results are pending review."
+                                   FontSize="10.5" Foreground="#6B6658" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                        <Expander x:Name="MoreOptions" Header="More options" FontSize="14" FontWeight="SemiBold" Foreground="#34362E" Margin="0,0,0,14">
+                            <StackPanel Margin="0,10,0,0">
                         <!-- Which heatmap is drawn on the image (researcher CAM target class) -->
                         <StackPanel x:Name="HeatmapChoicePanel">
                         <TextBlock Text="CAM target class" FontSize="12" FontWeight="SemiBold" Foreground="#34362E" Margin="0,0,0,4"/>
@@ -239,18 +276,6 @@
                             <RadioButton x:Name="ViewNormalRb" GroupName="OverlayView" Content="Normal" Foreground="#008A28" Margin="0,0,12,4" FontSize="12" Checked="OverlayViewRb_Checked"/>
                         </WrapPanel>
                         </StackPanel>
-
-                        <!-- Primary Result Callout -->
-                        <Border Background="#F8F1E6" BorderBrush="#E3E3D2" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,10">
-                            <StackPanel>
-                                <TextBlock x:Name="VerdictTxt" Text="Status: Awaiting camera / image" FontSize="14" FontWeight="Bold" Foreground="#34362E" TextWrapping="Wrap"/>
-                                <TextBlock x:Name="RegionTxt" Text="" FontSize="12" FontStyle="Italic" Foreground="#5A524B" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock x:Name="DisclaimerTxt"
-                                   Text="Screening aid only. Not a medical diagnosis. Heatmaps show regions that influenced the model, not lesion outlines. Results are pending review."
-                                   FontSize="10.5" Foreground="#6B6658" TextWrapping="Wrap" Margin="0,0,0,14"/>
 
                         <!-- Researcher view -->
                         <CheckBox x:Name="ResearcherChk" Content="Researcher view" FontSize="12" Foreground="#34362E"
@@ -278,10 +303,13 @@
                             </StackPanel>
                         </Border>
 
+                            </StackPanel>
+                        </Expander>
+
                         <!-- Results / report (enabled once the scan is saved) -->
-                        <Button x:Name="ViewResultsBtn" Content="View Results  ›" Style="{StaticResource PrimaryButton}" Height="46"
+                        <Button x:Name="ViewResultsBtn" Content="View results  ›" Style="{StaticResource PrimaryButton}" Height="58"
                                 IsEnabled="False" Margin="0,0,0,8" Click="ViewResultsBtn_Click"/>
-                        <Button x:Name="PrintBtn" Content="&#x1F5A8;&#xFE0F; Research Analysis Report" Height="46" FontSize="13"
+                        <Button x:Name="PrintBtn" Content="&#x1F5A8;&#xFE0F; Create report" Height="56" FontSize="14"
                                 Background="#D09F7C" Foreground="#34362E" FontWeight="Bold" BorderThickness="0"
                                 IsEnabled="False" Click="PrintBtn_Click"/>
 

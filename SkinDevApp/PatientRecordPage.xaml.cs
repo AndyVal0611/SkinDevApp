@@ -30,6 +30,7 @@ namespace SkinDevApp
         private PatientRecordPage(string participantId, bool pendingOnly)
         {
             InitializeComponent();
+            Ui.StackWhenNarrow(SplitGrid, 900, true, narrow => { if (narrow) SidebarCard.Height = 580; else SidebarCard.ClearValue(FrameworkElement.HeightProperty); });
             HeaderHost.Content = Ui.Header("Patient records");
 
             if (!AppSession.IsResearcher)
@@ -167,15 +168,7 @@ namespace SkinDevApp
 
             RecordPanel.Children.Add(LatestCard(sessions.FirstOrDefault()));
 
-            var two = new Grid();
-            two.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            two.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Border info = InfoCard(p, consent);
-            Border skin = SkinCard(sp);
-            Grid.SetColumn(skin, 1);
-            two.Children.Add(info);
-            two.Children.Add(skin);
-            RecordPanel.Children.Add(two);
+            RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent), SkinCard(sp)));
 
             RecordPanel.Children.Add(HistoryCard(sessions));
 
@@ -210,13 +203,12 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            var g = new UniformGrid { Columns = 3 };
             string overall = string.IsNullOrEmpty(s.OverallPredictedClass) ? "No result"
                 : ClinicalText.Name(s.OverallPredictedClass) + (s.OverallScore.HasValue ? " — " + ClinicalText.Strength(s.OverallScore.Value) + " match" : "");
-            g.Children.Add(Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5));
-            g.Children.Add(Ui.InfoRows(new[] { Ui.KV("Overall result", overall), Ui.KV("Match strength", s.OverallScore.HasValue ? s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%" : "—") }, 120, 12.5));
-            g.Children.Add(Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", s.ModelLabel) }, 100, 12.5));
-            sp.Children.Add(g);
+            sp.Children.Add(Ui.Cols(760,
+                Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
+                Ui.InfoRows(new[] { Ui.KV("Overall result", overall), Ui.KV("Match strength", s.OverallScore.HasValue ? s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%" : "—") }, 120, 12.5),
+                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", s.ModelLabel) }, 100, 12.5)));
             return Ui.Card(sp);
         }
 

@@ -40,13 +40,13 @@ namespace SkinDevApp.Imaging
     public static class FaceGuideLayout
     {
         public const double CenterX = 0.50;
-        public const double CenterY = 0.46;
-        public const double RadiusX = 0.24;     // of frame width
-        public const double RadiusY = 0.33;     // of frame height
+        public const double CenterY = 0.50;
+        public const double RadiusX = 0.36;     // of frame width
+        public const double RadiusY = 0.46;     // of frame height
 
         // Face-box width as a fraction of the frame width.
-        public const double MinFaceWidth = 0.34;   // below -> "Move closer"
-        public const double MaxFaceWidth = 0.66;   // above -> "Move back"
+        public const double MinFaceWidth = 0.49;   // below -> "Move closer"
+        public const double MaxFaceWidth = 0.90;   // above -> "Move back"
 
         public const double MaxOffsetX = 0.11;
         public const double MaxOffsetY = 0.13;

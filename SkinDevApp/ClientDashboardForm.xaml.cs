@@ -119,6 +119,7 @@ namespace SkinDevApp.Views
             _participantId = AppSession.CurrentParticipantId;
             ApplyRoleAndSettings();
             BuildStatusPanel();
+            InitTouch();
 
             ResetKioskState();
             CheckGate();
@@ -191,24 +192,17 @@ namespace SkinDevApp.Views
         private void UpdateScanInfo()
         {
             var sb = new StringBuilder();
-            sb.Append("PatientID: ").Append(string.IsNullOrEmpty(_participantId) ? "none selected" : _participantId);
+            sb.Append("Patient ").Append(string.IsNullOrEmpty(_participantId) ? "not selected" : _participantId);
 
-            if (_session != null)
+            if (_session != null && !_session.IsComplete)
             {
-                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel ?? _session.SessionId.Substring(0, 8) + "…");
-                sb.Append("   ·   ");
-                foreach (ScanView v in ScanViews.Sequence)
-                {
-                    bool done = _session.HasView(v);
-                    bool now = !_session.IsComplete && _session.Current == v;
-                    sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Name(v)).Append("  ");
-                }
-                if (!_session.IsComplete)
-                    sb.Append("  ·   Required pose: ").Append(ScanViews.Instruction(_session.Current));
+                int n = 1;
+                foreach (ScanView v in ScanViews.Sequence) { if (v == _session.Current) break; n++; }
+                sb.Append("   ·   Photograph ").Append(n).Append(" of ").Append(ScanViews.Sequence.Length).Append(": ").Append(ScanViews.Title(_session.Current));
             }
-            else if (!string.IsNullOrEmpty(_resultSessionLabel))
+            else if (_session != null)
             {
-                sb.Append("   ·   ScanSessionID: ").Append(_resultSessionLabel);
+                sb.Append("   ·   All photographs taken");
             }
             ScanInfoTxt.Text = sb.ToString();
         }
@@ -475,35 +469,7 @@ namespace SkinDevApp.Views
 
         private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (ContentGrid == null) return;
-
-            ContentGrid.ColumnDefinitions.Clear();
-            ContentGrid.RowDefinitions.Clear();
-
-            bool portrait = e.NewSize.Height > e.NewSize.Width;
-            if (e.NewSize.Width > 850 && !portrait)
-            {
-                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
-                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-                Grid.SetRow(ImageCard, 0);
-                Grid.SetColumn(ImageCard, 0);
-
-                Grid.SetRow(ControlsCard, 0);
-                Grid.SetColumn(ControlsCard, 1);
-            }
-            else
-            {
-                // Portrait / narrow: the camera takes the larger share of the screen, controls scroll below it.
-                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = portrait ? new GridLength(1.5, GridUnitType.Star) : new GridLength(320) });
-                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-                Grid.SetRow(ImageCard, 0);
-                Grid.SetColumn(ImageCard, 0);
-
-                Grid.SetRow(ControlsCard, 1);
-                Grid.SetColumn(ControlsCard, 0);
-            }
+            ApplyAdaptiveLayout(e.NewSize);
         }
 
         private void CameraViewportGrid_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -559,6 +525,7 @@ namespace SkinDevApp.Views
         private void ResetKioskState()
         {
             StopCamera();
+            ResetZoomNow();
 
             DetectionDotsCanvas.Children.Clear();
             currentCapturedImage = null;
@@ -1249,17 +1216,9 @@ namespace SkinDevApp.Views
         {
             if (_session == null || _live == null) { ViewStepTxt.Text = ""; return; }
 
-            var sb = new StringBuilder();
-            foreach (ScanView v in ScanViews.Sequence)
-            {
-                bool done = _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
-                bool now = !_session.IsComplete && _session.Current == v;
-                sb.Append(done ? "✓ " : (now ? "▶ " : "○ ")).Append(ScanViews.Title(v));
-                if (v != ScanViews.Sequence[ScanViews.Sequence.Length - 1]) sb.Append("   ");
-            }
-            if (!_session.IsComplete)
-                sb.Append("\n").Append(ScanViews.Instruction(_session.Current));
-            ViewStepTxt.Text = sb.ToString();
+            // the Front / Left / Right indicator above shows progress; this line gives the instruction for the current photograph
+            ViewStepTxt.Text = _session.IsComplete ? "All three photographs are done." : ScanViews.Instruction(_session.Current);
+            RefreshStepper();
         }
 
         /// <summary>A view finished (ONNX + Grad-CAM++ + saved): file it, then guide the patient to the next one.</summary>
@@ -1469,6 +1428,7 @@ namespace SkinDevApp.Views
 
         private void NewScanBtn_Click(object sender, RoutedEventArgs e)
         {
+            ResetZoomNow();
             _lastResult?.Dispose();
             _lastResult = null;
 

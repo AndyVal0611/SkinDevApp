@@ -181,8 +181,8 @@
 
         <!-- text boxes -->
         <Style x:Key="Field" TargetType="TextBox">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Padding" Value="10,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -259,8 +259,8 @@
 
         <!-- drop-down -->
         <Style x:Key="Combo" TargetType="ComboBox">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Foreground" Value="#34362E"/>
             <Setter Property="Background" Value="#FFFDFB"/>
             <Setter Property="BorderBrush" Value="#D8D3C0"/>
@@ -344,6 +344,7 @@
 
         <!-- check box -->
         <Style TargetType="CheckBox">
+            <Setter Property="MinHeight" Value="40"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Foreground" Value="#34362E"/>
@@ -355,13 +356,14 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border x:Name="Box" Width="20" Height="20" CornerRadius="6" Background="White"
-                                    BorderBrush="#CFC4BA" BorderThickness="1.5" VerticalAlignment="Top" Margin="0,0,10,0">
-                                <Path x:Name="Tick" Data="M3.5,8.5 L7,12 L13,4.5" Stroke="White" StrokeThickness="2"
+                            <Border x:Name="Box" Width="28" Height="28" CornerRadius="8" Background="White"
+                                    BorderBrush="#CFC4BA" BorderThickness="1.5" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <Path x:Name="Tick" Data="M3.5,8.5 L7,12 L13,4.5" Stroke="White" StrokeThickness="2.2"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
                                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
                             </Border>
-                            <ContentPresenter Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Left"
-                                              Margin="0,1,0,0" RecognizesAccessKey="True"/>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                              Margin="0,0,0,0" RecognizesAccessKey="True"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -393,7 +395,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd" CornerRadius="16" BorderThickness="1" BorderBrush="#E3D9CF" Background="White" Padding="13,6" SnapsToDevicePixels="True">
+                        <Border x:Name="Bd" CornerRadius="20" BorderThickness="1" BorderBrush="#E3D9CF" Background="White" Padding="16,9" SnapsToDevicePixels="True" MinHeight="40">
                             <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -513,8 +515,8 @@
             <Setter Property="Background" Value="#6E7560"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="52"/>
             <Setter Property="Padding" Value="22,0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -525,13 +527,44 @@
             <Setter Property="Background" Value="#E3E3D2"/>
             <Setter Property="Foreground" Value="#34362E"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="52"/>
             <Setter Property="Padding" Value="20,0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template" Value="{StaticResource PillButtonTemplate}"/>
+        </Style>
+        <Style x:Key="ZoomButton" TargetType="Button">
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="Height" Value="56"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Disc" Fill="#33FFFFFF"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-3,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Disc" Property="Fill" Value="#55FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Disc" Property="Fill" Value="#99D09F7C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Background" Value="#D09F7C"/>
@@ -542,9 +575,9 @@
             <Setter Property="Foreground" Value="#34362E"/>
             <Setter Property="BorderBrush" Value="#E8DFD6"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -558,8 +591,8 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="18,0"/>
             <Setter Property="Margin" Value="8,0,0,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>

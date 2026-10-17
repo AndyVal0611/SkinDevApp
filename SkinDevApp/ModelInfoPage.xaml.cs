@@ -17,6 +17,7 @@ namespace SkinDevApp.Views
         public ModelInfoPage()
         {
             InitializeComponent();
+            Ui.StackWhenNarrow(SplitGrid, 950);
             HeaderHost.Content = Ui.Header("Model information");
             if (!AppSession.IsResearcher)
             {

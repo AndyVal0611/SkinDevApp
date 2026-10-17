@@ -26,6 +26,7 @@ namespace SkinDevApp.Views
         public RegistrationPage(string editParticipantId)
         {
             InitializeComponent();
+            Ui.StackWhenNarrow(SplitGrid, 950);
             _editMode = !string.IsNullOrEmpty(editParticipantId);
             HeaderHost.Content = Ui.Header(_editMode ? "Edit registration" : "Registration");
 

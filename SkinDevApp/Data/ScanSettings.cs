@@ -23,6 +23,11 @@ namespace SkinDevApp.Data
         public int CameraWidth { get; set; } = 640;
         public int CameraHeight { get; set; } = 480;
 
+        // touch screen: zoom of the live preview (display only; never changes the captured picture)
+        public double PreviewZoomMin { get; set; } = 1.0;
+        public double PreviewZoomMax { get; set; } = 4.0;
+        public bool PreviewZoomButtons { get; set; } = true;
+
         // capture
         public bool AutoCapture { get; set; } = true;
         public int StableFramesRequired { get; set; } = 8;
@@ -79,6 +84,9 @@ namespace SkinDevApp.Data
                 s.CameraWidth = Int(d, "camera.width", s.CameraWidth);
                 s.CameraHeight = Int(d, "camera.height", s.CameraHeight);
 
+                s.PreviewZoomMin = Dbl(d, "preview.zoom_min", s.PreviewZoomMin);
+                s.PreviewZoomMax = Dbl(d, "preview.zoom_max", s.PreviewZoomMax);
+                s.PreviewZoomButtons = Bool(d, "preview.zoom_buttons", s.PreviewZoomButtons);
                 s.AutoCapture = Bool(d, "capture.auto", s.AutoCapture);
                 s.StableFramesRequired = Int(d, "capture.stable_frames", s.StableFramesRequired);
                 s.HoldStillMs = Int(d, "capture.hold_ms", s.HoldStillMs);
@@ -108,6 +116,9 @@ namespace SkinDevApp.Data
                 { "camera.name", CameraName ?? "" },
                 { "camera.width", F(CameraWidth) },
                 { "camera.height", F(CameraHeight) },
+                { "preview.zoom_min", F(PreviewZoomMin) },
+                { "preview.zoom_max", F(PreviewZoomMax) },
+                { "preview.zoom_buttons", F(PreviewZoomButtons) },
                 { "capture.auto", F(AutoCapture) },
                 { "capture.stable_frames", F(StableFramesRequired) },
                 { "capture.hold_ms", F(HoldStillMs) },
