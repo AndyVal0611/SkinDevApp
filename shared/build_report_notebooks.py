@@ -29,8 +29,9 @@ def raw_preds(weights, d, imgsz=800):
     from ultralytics import YOLO
     import torch
     m = YOLO(str(weights)); dev = 0 if torch.cuda.is_available() else "cpu"; out = {}; ims = images_of(d)
-    for s in range(0, len(ims), 8):
-        ch = ims[s:s + 8]
+    bs = 1 if str(weights).lower().endswith(".onnx") else 8          # exported ONNX files have a fixed batch of 1
+    for s in range(0, len(ims), bs):
+        ch = ims[s:s + bs]
         for p, r in zip(ch, m.predict([str(x) for x in ch], imgsz=imgsz, conf=0.001, iou=0.6, max_det=300, verbose=False, device=dev)):
             out[p.name] = [(tuple(map(float, b)), float(c)) for b, c in zip(r.boxes.xywhn.cpu().numpy(), r.boxes.conf.cpu().numpy())] if len(r.boxes) else []
     return out
