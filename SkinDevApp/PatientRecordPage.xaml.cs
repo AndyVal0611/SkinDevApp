@@ -387,10 +387,10 @@ namespace SkinDevApp
             var sp = new StackPanel();
             var head = new DockPanel();
             bool hasFolder = !string.IsNullOrEmpty(d.Session.SessionFolder) && System.IO.Directory.Exists(d.Session.SessionFolder);
-            Button gallery = Ui.Btn("Open comparison gallery", (o, e) =>
+            Button gallery = Ui.Btn("Compare photographs and heat maps", (o, e) =>
             {
                 try { new ComparisonGalleryWindow(d.Session.SessionFolder) { Owner = Application.Current.MainWindow }.Show(); }
-                catch (Exception ex) { MessageBox.Show("Could not open the gallery: " + ex.Message, "LUMYVUE"); }
+                catch (Exception ex) { MessageBox.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE"); }
             }, "SmallButton");
             gallery.IsEnabled = hasFolder;
             DockPanel.SetDock(gallery, Dock.Right);
@@ -404,26 +404,40 @@ namespace SkinDevApp
                 AttributionMapRow m = string.IsNullOrEmpty(cls) ? null : v.Maps.FirstOrDefault(x => x.TargetClass == cls && x.OverlayPath != null);
                 return m ?? v.Maps.FirstOrDefault(x => x.OverlayPath != null);
             };
-            int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + (shownMap(v) != null ? 1 : 0));
-            head.Children.Add(Ui.Text("Analysis Images and Grad-CAM++ (" + images + " images)", 16, true));
+            Func<CaptureViewRow, bool> hasMarks = v => v.Localization != null && v.Localization.Status == "OK" && !string.IsNullOrEmpty(v.Localization.OverlayPath);
+            int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + (shownMap(v) != null ? 1 : 0)
+                                          + (hasMarks(v) ? 1 : 0) + (hasMarks(v) && !string.IsNullOrEmpty(v.Localization.CombinedPath) ? 1 : 0));
+            head.Children.Add(Ui.Text("Photographs, heat maps and marked areas (" + images + " images)", 16, true));
             sp.Children.Add(head);
 
             var tabs = new TabControl { Margin = new Thickness(0, 6, 0, 0), BorderThickness = new Thickness(0) };
             foreach (CaptureViewRow v in d.Views)
             {
-                var row = new UniformGrid { Columns = 2, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = 340 };
+                var row = new UniformGrid { Columns = 4, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = 700 };
                 row.Children.Add(EvidenceCell("Original", v.AnalysedImagePath ?? v.OriginalImagePath, "#9CA3AF", null, v.OriginalImagePath));
                 AttributionMapRow m = shownMap(v);
                 string cls = m != null ? m.TargetClass : (v.Scores != null ? v.Scores.PredictedClass : null);
                 double? score = v.Scores == null || cls == null ? (double?)null : v.Scores.AsArray()[Array.IndexOf(StudyText.Classes, cls)];
-                string label = "Grad-CAM++" + (cls != null ? " - " + (cls == "Normal" ? "Normal Skin" : cls) : "") + (score.HasValue ? "  " + Ui.Pct(score.Value) : "");
-                row.Children.Add(EvidenceCell(label, m?.OverlayPath, cls != null ? Ui.ClassColor(cls) : "#9CA3AF", m == null ? "Grad-CAM++ unavailable" : (m.Diffuse ? "diffuse attribution" : m.TopZone), m?.OverlayPath));
+                string label = "Heat map" + (cls != null ? " - " + (cls == "Normal" ? "Normal Skin" : cls) : "") + (score.HasValue ? "  " + Ui.Pct(score.Value) : "");
+                row.Children.Add(EvidenceCell(label, m?.OverlayPath, cls != null ? Ui.ClassColor(cls) : "#9CA3AF", m == null ? "Heat map not available" : (m.Diffuse ? "spread over the face" : m.TopZone), m?.OverlayPath));
+
+                // the places that may contain lesions (a separate detector), alone and on top of the heat map
+                string marksNote;
+                if (v.Localization == null) marksNote = "Not available (scan saved before this feature)";
+                else if (v.Localization.Status == "Failed") marksNote = "The detector could not run";
+                else if (v.Localization.Status != "OK") marksNote = "Not run for this photograph";
+                else if (v.Lesions.Count == 0) marksNote = "None found";
+                else marksNote = v.Lesions.Count + (v.Lesions.Count == 1 ? " area" : " areas") + ": " + string.Join(", ", v.Lesions.GroupBy(x => x.ClassName).Select(g => g.Key + " " + g.Count()));
+                bool marks = hasMarks(v);
+                row.Children.Add(EvidenceCell("Marked areas", marks ? v.Localization.OverlayPath : null, "#F59E0B", marksNote, marks ? v.Localization.OverlayPath : null));
+                bool both = marks && !string.IsNullOrEmpty(v.Localization.CombinedPath);
+                row.Children.Add(EvidenceCell("Heat map and marked areas", both ? v.Localization.CombinedPath : null, "#9CA3AF", both ? null : "Not available", both ? v.Localization.CombinedPath : null));
                 tabs.Items.Add(new TabItem { Header = "  " + v.ViewType.ToUpperInvariant() + "  ", Content = row });
             }
-            if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No images saved for this scan.", 12, false, Ui.Muted));
+            if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No photographs were saved for this scan.", 12, false, Ui.Muted));
             else sp.Children.Add(tabs);
 
-            sp.Children.Add(Ui.Text("The original image is unmodified. " + StudyText.ShortAttribution, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+            sp.Children.Add(Ui.Text("The original photograph is not changed. The heat map shows where the computer looked. The marked areas are places that may contain lesions: some may be missed or wrongly marked, so they are not a lesion count and not a diagnosis.", 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }
 
