@@ -162,19 +162,19 @@ namespace SkinDevApp.Views
                 bool done = _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
                 bool now = !done && !_session.IsComplete && _session.Current == v;
 
-                string bg = done ? "#DDF2EE" : now ? "#1F7B94" : "#FFFFFF";
-                string line = done ? "#86CDC4" : now ? "#1F7B94" : "#C6DEDC";
-                string ink = done ? "#1F6E64" : now ? "#FFFFFF" : "#7C97A3";
+                string bg = done ? "#E3E4C4" : now ? "#6E6F52" : "#FFFFFF";
+                string line = done ? "#A9AA7E" : now ? "#6E6F52" : "#DCD4C1";
+                string ink = done ? "#5B5C42" : now ? "#FFFFFF" : "#8D8D76";
                 string mark = done ? "✓" : n.ToString();
 
                 var disc = new Border
                 {
                     Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 8, 0),
-                    Background = Ui.Brush(done ? "#1F7B94" : now ? "#FFFFFF" : "#E4F0EE"),
+                    Background = Ui.Brush(done ? "#6E6F52" : now ? "#FFFFFF" : "#EDE8DA"),
                     Child = new TextBlock
                     {
                         Text = mark, FontSize = 13, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                        Foreground = Ui.Brush(done ? "#FFFFFF" : now ? "#1F7B94" : "#7C97A3")
+                        Foreground = Ui.Brush(done ? "#FFFFFF" : now ? "#6E6F52" : "#8D8D76")
                     }
                 };
                 var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };

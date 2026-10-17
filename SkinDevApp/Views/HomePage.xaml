@@ -5,7 +5,7 @@
 
     <Page.Resources>
         <Style x:Key="BigAction" TargetType="Button">
-            <Setter Property="Background" Value="#1F7B94"/>
+            <Setter Property="Background" Value="#6E6F52"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -17,13 +17,51 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="22" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="22" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="Sc" ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="1.018" Duration="0:0:0.18"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="1.018" Duration="0:0:0.18"/>
+                                            <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity" To="0.93" Duration="0:0:0.18"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="0.985" Duration="0:0:0.07"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="0.985" Duration="0:0:0.07"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="1.018" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="1.018" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -35,8 +73,8 @@
         </Style>
         <Style x:Key="NavTile" TargetType="Button" BasedOn="{StaticResource BigAction}">
             <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="#1F3A45"/>
-            <Setter Property="BorderBrush" Value="#D3E8E7"/>
+            <Setter Property="Foreground" Value="#3A3B2C"/>
+            <Setter Property="BorderBrush" Value="#E3DDCB"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Height" Value="96"/>
             <Setter Property="Padding" Value="20,0"/>
@@ -67,7 +105,7 @@
             <Border x:Name="CurrentParticipantBox" Style="{StaticResource NoticeBox}" Margin="8,4,8,4" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}" Margin="0" Click="ClearParticipantBtn_Click"/>
-                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13" Foreground="#1F3A45" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13" Foreground="#3A3B2C" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </DockPanel>
             </Border>
 
@@ -81,14 +119,14 @@
                     <StackPanel>
                         <TextBlock Text="New registration" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                         <TextBlock Text="Register a participant. A PatientID is generated automatically, then consent is recorded."
-                                   FontSize="13" Foreground="#B2F7EF" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                   FontSize="13" Foreground="#F0EFD8" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="#2B8DA6" Click="SkinAnalysisBtn_Click">
+                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="#75765A" Click="SkinAnalysisBtn_Click">
                     <StackPanel>
                         <TextBlock Text="Skin analysis" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                         <TextBlock Text="Select an existing participant (or continue with the current one) and run the Front / Left / Right scan."
-                                   FontSize="13" Foreground="#D3F2EE" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                   FontSize="13" Foreground="#F0EFD8" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Button>
             </Grid>

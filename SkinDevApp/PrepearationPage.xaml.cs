@@ -22,7 +22,7 @@ namespace SkinDevApp
 
         private static readonly SolidColorBrush PendingBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9CA3AF"));
         private static readonly SolidColorBrush ReadyBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#588157"));
-        private static readonly SolidColorBrush WarningBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E58DB6"));
+        private static readonly SolidColorBrush WarningBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C99C8E"));
         private static readonly SolidColorBrush FailedBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B91C1C"));
 
         public PreparationPage()

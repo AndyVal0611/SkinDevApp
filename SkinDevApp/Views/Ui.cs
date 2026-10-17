@@ -61,14 +61,14 @@ namespace SkinDevApp.Views
             return b;
         }
 
-        public static readonly SolidColorBrush Ink = Brush("#1F3A45");
-        public static readonly SolidColorBrush Bar = Brush("#1F7B94");
-        public static readonly SolidColorBrush Muted = Brush("#5B7783");
+        public static readonly SolidColorBrush Ink = Brush("#3A3B2C");
+        public static readonly SolidColorBrush Bar = Brush("#6E6F52");
+        public static readonly SolidColorBrush Muted = Brush("#6F6F58");
         public static readonly SolidColorBrush Good = Brush("#588157");
         public static readonly SolidColorBrush Warn = Brush("#B7791F");
         public static readonly SolidColorBrush Bad = Brush("#B91C1C");
-        public static readonly SolidColorBrush Info = Brush("#4FA8BD");
-        public static readonly SolidColorBrush Line = Brush("#D3E8E7");
+        public static readonly SolidColorBrush Info = Brush("#818263");
+        public static readonly SolidColorBrush Line = Brush("#E3DDCB");
 
         public static readonly string[] ClassHex = { "#E11D1D", "#1D4ED8", "#E8A200", "#16A34A" };   // Acne, Hyper, Eczema, Normal
 
@@ -91,7 +91,7 @@ namespace SkinDevApp.Views
             var signedIn = new TextBlock
             {
                 Text = string.IsNullOrEmpty(AppSession.UserId) ? "" : "Signed in as " + AppSession.UserId,
-                Foreground = Brush("#D3F2EE"),
+                Foreground = Brush("#F0EFD8"),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
@@ -108,7 +108,7 @@ namespace SkinDevApp.Views
             left.Children.Add(new TextBlock
             {
                 Text = "   PrecisionSkin  ·  " + title,
-                Foreground = Brush("#B2F7EF"),
+                Foreground = Brush("#F0EFD8"),
                 FontSize = 14,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 0, 0)
@@ -295,7 +295,7 @@ namespace SkinDevApp.Views
             };
         }
 
-        public static Border Pill(string text, Brush fg, string bgHex = "#FBE7EF")
+        public static Border Pill(string text, Brush fg, string bgHex = "#EFD7CF")
         {
             return new Border
             {
@@ -321,12 +321,20 @@ namespace SkinDevApp.Views
                 head.Children.Add(val);
                 head.Children.Add(Text(StudyText.Classes[i], compact ? 11 : 12.5, false, Ink, new Thickness(0)));
                 sp.Children.Add(head);
-                sp.Children.Add(new ProgressBar
+                var bar = new ProgressBar
                 {
-                    Minimum = 0, Maximum = 100, Value = v, Height = barHeight,
-                    Foreground = Brush(ClassHex[i]), Background = Brush("#EEF6F5"), BorderThickness = new Thickness(0),
+                    Minimum = 0, Maximum = 100, Value = 0, Height = barHeight,
+                    Foreground = Brush(ClassHex[i]), Background = Brush("#F4F0E5"), BorderThickness = new Thickness(0),
                     Margin = new Thickness(0, 0, 0, compact ? 5 : 9)
-                });
+                };
+                double target = v; int index = i;
+                bar.Loaded += (s, e) => bar.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty,
+                    new System.Windows.Media.Animation.DoubleAnimation(0, target, TimeSpan.FromMilliseconds(650))
+                    {
+                        BeginTime = TimeSpan.FromMilliseconds(index * 70),
+                        EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+                    });
+                sp.Children.Add(bar);
             }
             return sp;
         }
@@ -357,7 +365,7 @@ namespace SkinDevApp.Views
             catch { return null; }
         }
 
-        public static Border Thumb(string path, double height, string borderHex = "#D3E8E7", string caption = null)
+        public static Border Thumb(string path, double height, string borderHex = "#E3DDCB", string caption = null)
         {
             var src = LoadImage(path, 480);
             UIElement content = src != null
@@ -366,7 +374,7 @@ namespace SkinDevApp.Views
             return new Border
             {
                 Height = height,
-                Background = Brush("#14262E"),
+                Background = Brush("#2D2E22"),
                 BorderBrush = Brush(borderHex),
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(6),
@@ -396,7 +404,7 @@ namespace SkinDevApp.Views
                 Height = 860,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = Application.Current.MainWindow,
-                Background = Ui.Brush("#14262E"),
+                Background = Ui.Brush("#2D2E22"),
                 Content = new Image { Source = src, Stretch = Stretch.Uniform, Margin = new Thickness(10) }
             };
             w.Show();

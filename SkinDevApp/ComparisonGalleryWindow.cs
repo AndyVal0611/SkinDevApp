@@ -91,7 +91,7 @@ namespace SkinDevApp.Views
             return bs;
         }
 
-        public static TextBlock Text(string text, double size = 12, bool bold = false, string color = "#1F3A45", Thickness? margin = null)
+        public static TextBlock Text(string text, double size = 12, bool bold = false, string color = "#3A3B2C", Thickness? margin = null)
         {
             return new TextBlock
             {
@@ -119,7 +119,7 @@ namespace SkinDevApp.Views
             Width = 1380;
             Height = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = GalleryUi.Brush("#EFF7F6");
+            Background = GalleryUi.Brush("#F6F3EA");
 
             Content = BuildRoot();
         }
@@ -136,13 +136,13 @@ namespace SkinDevApp.Views
             header.Children.Add(GalleryUi.Text(_model.Title, 17, true));
             header.Children.Add(new Border
             {
-                Background = GalleryUi.Brush("#FDF0F6"),
-                BorderBrush = GalleryUi.Brush("#F0B3CF"),
+                Background = GalleryUi.Brush("#F8EBE6"),
+                BorderBrush = GalleryUi.Brush("#DDBAAE"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(10, 6, 10, 6),
                 Margin = new Thickness(0, 6, 0, 0),
-                Child = GalleryUi.Text(GalleryModel.AttributionStatement, 12, false, "#7A3355")
+                Child = GalleryUi.Text(GalleryModel.AttributionStatement, 12, false, "#7A4A3C")
             });
             Grid.SetRow(header, 0);
             root.Children.Add(header);
@@ -181,11 +181,11 @@ namespace SkinDevApp.Views
 
             if (!v.Available)
             {
-                sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#5B7783"));
+                sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#6F6F58"));
                 return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             }
 
-            sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#1F3A45", new Thickness(0, 0, 0, 8)));
+            sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#3A3B2C", new Thickness(0, 0, 0, 8)));
 
             var wrap = new WrapPanel();
             foreach (GalleryCard c in v.Cards) wrap.Children.Add(BuildCard(v, c));
@@ -193,24 +193,24 @@ namespace SkinDevApp.Views
 
             if (!string.IsNullOrEmpty(v.LocalizationText))
             {
-                sp.Children.Add(GalleryUi.Text("Marked areas (places that may contain lesions)", 13, true, "#1F3A45", new Thickness(0, 6, 0, 4)));
-                sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#2E4A55", new Thickness(0, 0, 0, 6)));
+                sp.Children.Add(GalleryUi.Text("Marked areas (places that may contain lesions)", 13, true, "#3A3B2C", new Thickness(0, 6, 0, 4)));
+                sp.Children.Add(GalleryUi.Text(v.LocalizationText, 12, false, "#4A4B38", new Thickness(0, 0, 0, 6)));
                 var lw = new WrapPanel();
                 if (v.LocalizationCard != null) lw.Children.Add(BuildLocalizationCard(v.LocalizationCard));
                 if (v.CombinedCard != null) lw.Children.Add(BuildLocalizationCard(v.CombinedCard));
                 sp.Children.Add(lw);
                 sp.Children.Add(GalleryUi.Text("The boxes mark places that may contain lesions. Some lesions may be missed or wrongly marked, so the boxes are not a lesion count and not a diagnosis. Eczema is still being tested.",
-                    11, false, "#5B7783", new Thickness(0, 4, 0, 0)));
+                    11, false, "#6F6F58", new Thickness(0, 4, 0, 0)));
             }
 
             if (!string.IsNullOrEmpty(v.SimilarityText))
                 sp.Children.Add(new Border
                 {
-                    Background = GalleryUi.Brush(v.SimilarityHigh ? "#FFF7E0" : "#FBE7EF"),
+                    Background = GalleryUi.Brush(v.SimilarityHigh ? "#FFF7E0" : "#EFD7CF"),
                     CornerRadius = new CornerRadius(6),
                     Padding = new Thickness(10, 6, 10, 6),
                     Margin = new Thickness(0, 8, 0, 0),
-                    Child = GalleryUi.Text(v.SimilarityText, 12, false, v.SimilarityHigh ? "#6B4A00" : "#2E4A55")
+                    Child = GalleryUi.Text(v.SimilarityText, 12, false, v.SimilarityHigh ? "#6B4A00" : "#4A4B38")
                 });
 
             var details = new StringBuilder();
@@ -251,11 +251,11 @@ namespace SkinDevApp.Views
                 ToolTip = "Click to enlarge"
             };
             img.MouseLeftButtonUp += (s, e) => SkinDevApp.Views.ImagePopup.Show(c.ImagePath, c.Title);
-            stack.Children.Add(new Border { Background = GalleryUi.Brush("#14262E"), CornerRadius = new CornerRadius(4), Child = img });
-            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#1F3A45", new Thickness(0, 6, 0, 0)));
-            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, false, "#1F3A45", new Thickness(0, 2, 0, 0)));
+            stack.Children.Add(new Border { Background = GalleryUi.Brush("#2D2E22"), CornerRadius = new CornerRadius(4), Child = img });
+            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#3A3B2C", new Thickness(0, 6, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, false, "#3A3B2C", new Thickness(0, 2, 0, 0)));
             if (!string.IsNullOrEmpty(c.Note))
-                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, "#496873", new Thickness(0, 2, 0, 0)));
+                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, "#5A5A45", new Thickness(0, 2, 0, 0)));
             return new Border
             {
                 BorderBrush = GalleryUi.Brush(c.ColorHex),
@@ -287,13 +287,13 @@ namespace SkinDevApp.Views
                 w.Show();
             };
 
-            var imgHost = new Border { Background = GalleryUi.Brush("#14262E"), CornerRadius = new CornerRadius(4), Child = img };
+            var imgHost = new Border { Background = GalleryUi.Brush("#2D2E22"), CornerRadius = new CornerRadius(4), Child = img };
             stack.Children.Add(imgHost);
 
-            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#1F3A45", new Thickness(0, 6, 0, 0)));
-            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, c.IsPredicted, "#1F3A45", new Thickness(0, 2, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.Title, 13, true, "#3A3B2C", new Thickness(0, 6, 0, 0)));
+            stack.Children.Add(GalleryUi.Text(c.ScoreText, 12, c.IsPredicted, "#3A3B2C", new Thickness(0, 2, 0, 0)));
             if (!string.IsNullOrEmpty(c.Note))
-                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, c.Diffuse ? "#8A5A00" : "#496873", new Thickness(0, 2, 0, 0)));
+                stack.Children.Add(GalleryUi.Text(c.Note, 11, false, c.Diffuse ? "#8A5A00" : "#5A5A45", new Thickness(0, 2, 0, 0)));
 
             return new Border
             {
@@ -318,7 +318,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(GalleryUi.Text("Summary of the three photographs", 16, true));
             sp.Children.Add(GalleryUi.Text(
                 "Each photograph is read on its own (see the Front, Left and Right tabs). The three photographs are never merged into one heat map.",
-                12, false, "#496873", new Thickness(0, 2, 0, 10)));
+                12, false, "#5A5A45", new Thickness(0, 2, 0, 10)));
 
             if (f == null || f.ViewsUsed == 0)
             {
@@ -344,15 +344,15 @@ namespace SkinDevApp.Views
                     sp.Children.Add(Ui.Callout("The photographs agree", "Every photograph points to " + ClinicalText.Name(seen[0].PredictedClass) + " with a similar strength.", 0));
             }
 
-            sp.Children.Add(GalleryUi.Text("Reading of each photograph", 14, true, "#1F3A45", new Thickness(0, 12, 0, 4)));
+            sp.Children.Add(GalleryUi.Text("Reading of each photograph", 14, true, "#3A3B2C", new Thickness(0, 12, 0, 4)));
             if (s != null)
                 foreach (ViewOutcome o in s.Views)
                     sp.Children.Add(GalleryUi.Text(o.View + " view:  " + (o.PredictedClass == null ? "no result"
                         : ClinicalText.Name(o.PredictedClass) + " — " + ClinicalText.Strength(o.ConfidencePercent) + " match (" + o.ConfidencePercent.ToString("0") + "%)"),
-                        13, false, "#1F3A45", new Thickness(8, 2, 0, 2)));
+                        13, false, "#3A3B2C", new Thickness(8, 2, 0, 2)));
             foreach (GalleryView gv in _model.Views.Where(x => !x.Available))
                 sp.Children.Add(GalleryUi.Text(gv.TabTitle + ":  not taken", 13, false, "#8A5A00", new Thickness(8, 2, 0, 2)));
-            sp.Children.Add(GalleryUi.Text(ClinicalText.HowToReadScores, 11, false, "#5B7783", new Thickness(0, 10, 0, 0)));
+            sp.Children.Add(GalleryUi.Text(ClinicalText.HowToReadScores, 11, false, "#6F6F58", new Thickness(0, 10, 0, 0)));
 
             var tech = new StringBuilder();
             if (f != null && f.ViewsUsed > 0)
@@ -411,7 +411,7 @@ namespace SkinDevApp.Views
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Background = GalleryUi.Brush("#14262E")
+            Background = GalleryUi.Brush("#2D2E22")
         };
         private readonly TextBlock _info = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
         private bool _ready;
@@ -428,7 +428,7 @@ namespace SkinDevApp.Views
             Title = "LUMYVUE - " + view.TabTitle + ": original vs Grad-CAM++ attribution";
             Width = 1100;
             Height = 900;
-            Background = GalleryUi.Brush("#EFF7F6");
+            Background = GalleryUi.Brush("#F6F3EA");
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             foreach (GalleryCard c in _classCards) _classBox.Items.Add(c.Title);
@@ -445,13 +445,13 @@ namespace SkinDevApp.Views
             _modeBox.SelectedIndex = startClassIndex >= 0 ? 0 : 1;      // opened from the Original card: show side by side
 
             var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-            bar.Children.Add(GalleryUi.Text("Class ", 12, true, "#1F3A45", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Class ", 12, true, "#3A3B2C", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_classBox);
-            bar.Children.Add(GalleryUi.Text("Mode ", 12, true, "#1F3A45", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Mode ", 12, true, "#3A3B2C", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_modeBox);
-            bar.Children.Add(GalleryUi.Text("Heatmap opacity ", 12, true, "#1F3A45", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("Heatmap opacity ", 12, true, "#3A3B2C", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_opacity);
-            bar.Children.Add(GalleryUi.Text("   Zoom ", 12, true, "#1F3A45", new Thickness(0, 4, 4, 0)));
+            bar.Children.Add(GalleryUi.Text("   Zoom ", 12, true, "#3A3B2C", new Thickness(0, 4, 4, 0)));
             bar.Children.Add(_zoom);
 
             var banner = GalleryUi.Text(GalleryModel.AttributionStatement, 11, false, "#6B4A00");

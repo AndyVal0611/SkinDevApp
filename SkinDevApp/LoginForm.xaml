@@ -13,9 +13,9 @@
         <Border x:Name="BrandPanel" Margin="20" CornerRadius="28">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0.7,1">
-                    <GradientStop Color="#D3F2EE" Offset="0"/>
-                    <GradientStop Color="#E4F2F0" Offset="0.5"/>
-                    <GradientStop Color="#F6CBE0" Offset="1"/>
+                    <GradientStop Color="#D0D1A5" Offset="0"/>
+                    <GradientStop Color="#EFEADC" Offset="0.5"/>
+                    <GradientStop Color="#E8CCC2" Offset="1"/>
                 </LinearGradientBrush>
             </Border.Background>
             <Grid>
@@ -31,8 +31,8 @@
             <Border CornerRadius="28" IsHitTestVisible="False">
                 <Border.Background>
                     <RadialGradientBrush Center="0.95,1" GradientOrigin="0.95,1" RadiusX="0.85" RadiusY="0.5">
-                        <GradientStop Color="#66E58DB6" Offset="0"/>
-                        <GradientStop Color="#00E58DB6" Offset="1"/>
+                        <GradientStop Color="#66C99C8E" Offset="0"/>
+                        <GradientStop Color="#00C99C8E" Offset="1"/>
                     </RadialGradientBrush>
                 </Border.Background>
             </Border>
@@ -44,20 +44,20 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel>
-                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="LUMYVUE" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" FontSize="72" Foreground="#17657B"/></Viewbox>
-                    <TextBlock Text="AI skin health monitoring" FontSize="17" Foreground="#4FA8BD" Margin="4,2,0,0"/>
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="LUMYVUE" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" FontSize="72" Foreground="#5B5C42"/></Viewbox>
+                    <TextBlock Text="AI skin health monitoring" FontSize="17" Foreground="#818263" Margin="4,2,0,0"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" VerticalAlignment="Center">
                     <TextBlock FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" FontSize="30" LineHeight="38" TextWrapping="Wrap"
-                               Foreground="#17657B" MaxWidth="380" HorizontalAlignment="Left"
+                               Foreground="#5B5C42" MaxWidth="380" HorizontalAlignment="Left"
                                Text="Three angles, one clear picture of your skin."/>
-                    <TextBlock FontSize="14" LineHeight="23" TextWrapping="Wrap" Foreground="#496873" MaxWidth="380" HorizontalAlignment="Left" Margin="0,14,0,0"
+                    <TextBlock FontSize="14" LineHeight="23" TextWrapping="Wrap" Foreground="#5A5A45" MaxWidth="380" HorizontalAlignment="Left" Margin="0,14,0,0"
                                Text="PrecisionSkin photographs the face from the front, left and right, scores each image with an AI model, and shows where the model looked."/>
 
                     <!-- Skin-tone ribbon: the one signature element -->
                     <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
-                        <Border Width="42" Height="8" CornerRadius="4" Background="#F3DFD0" BorderBrush="#F6CBE0" BorderThickness="1" Margin="0,0,5,0"/>
+                        <Border Width="42" Height="8" CornerRadius="4" Background="#F3DFD0" BorderBrush="#E8CCC2" BorderThickness="1" Margin="0,0,5,0"/>
                         <Border Width="42" Height="8" CornerRadius="4" Background="#E9C6A8" Margin="0,0,5,0"/>
                         <Border Width="42" Height="8" CornerRadius="4" Background="#D9A97F" Margin="0,0,5,0"/>
                         <Border Width="42" Height="8" CornerRadius="4" Background="#BC8559" Margin="0,0,5,0"/>
@@ -66,7 +66,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <TextBlock Grid.Row="2" FontSize="11.5" Foreground="#7C97A3" TextWrapping="Wrap"
+                <TextBlock Grid.Row="2" FontSize="11.5" Foreground="#8D8D76" TextWrapping="Wrap"
                            Text="Research prototype. It is a screening aid, not a diagnosis."/>
             </Grid>
             </Grid>
@@ -93,7 +93,7 @@
                         <PasswordBox x:Name="ConfirmPasswordTxt" Style="{StaticResource FieldPassword}" Height="44"/>
                     </StackPanel>
 
-                    <TextBlock x:Name="LoginHintTxt" FontSize="12" Foreground="#5B7783" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                    <TextBlock x:Name="LoginHintTxt" FontSize="12" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,12,0,0"/>
                 </StackPanel>
 
                 <!-- Dynamic Action Button -->

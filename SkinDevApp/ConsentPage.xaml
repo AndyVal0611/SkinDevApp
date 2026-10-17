@@ -64,7 +64,7 @@
                 <Button Content="Decline" Style="{StaticResource SecondaryButton}" Width="130" Click="DeclineBtn_Click"/>
                 <Button x:Name="AgreeBtn" DockPanel.Dock="Right" HorizontalAlignment="Right" Content="Agree and continue  ›"
                         Style="{StaticResource PrimaryButton}" Width="220" IsEnabled="False" Click="AgreeBtn_Click"/>
-                <TextBlock x:Name="HintTxt" Foreground="#5B7783" FontSize="12" VerticalAlignment="Center" Margin="14,0"
+                <TextBlock x:Name="HintTxt" Foreground="#6F6F58" FontSize="12" VerticalAlignment="Center" Margin="14,0"
                            Text="Tick every required item to continue."/>
             </DockPanel>
         </Border>

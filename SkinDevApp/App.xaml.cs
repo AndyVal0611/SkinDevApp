@@ -30,6 +30,16 @@ namespace SkinDevApp
                 TextOptions.SetTextFormattingMode(w, TextFormattingMode.Ideal);
                 RenderOptions.SetClearTypeHint(w, ClearTypeHint.Enabled);
                 RenderOptions.SetBitmapScalingMode(w, BitmapScalingMode.HighQuality);
+
+                // dialog windows fade in softly (the main window animates its pages instead)
+                var content = w.Content as UIElement;
+                if (content != null && !(w is MainWindow))
+                {
+                    content.Opacity = 0;
+                    var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240));
+                    fade.Completed += (a, b) => { content.BeginAnimation(UIElement.OpacityProperty, null); content.Opacity = 1; };
+                    content.BeginAnimation(UIElement.OpacityProperty, fade);
+                }
             }));
             DatabaseHelper.InitializeDatabase(); // Creates lumyvue_db.sqlite table automatically
             Data.StudyDatabase.Initialize();     // participant / scan / validation tables (same file)

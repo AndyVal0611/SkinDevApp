@@ -77,7 +77,7 @@ namespace SkinDevApp
                 {
                     Child = label,
                     Margin = new Thickness(0, 0, 28, -1),
-                    BorderBrush = on ? Ui.Brush("#2B8DA6") : System.Windows.Media.Brushes.Transparent,
+                    BorderBrush = on ? Ui.Brush("#75765A") : System.Windows.Media.Brushes.Transparent,
                     BorderThickness = new Thickness(0, 0, 0, 2),
                     Cursor = System.Windows.Input.Cursors.Hand,
                     Background = System.Windows.Media.Brushes.Transparent
@@ -124,7 +124,7 @@ namespace SkinDevApp
             {
                 Child = g,
                 Padding = new Thickness(0, 16, 0, 16),
-                BorderBrush = Ui.Brush("#E4F0EE"),
+                BorderBrush = Ui.Brush("#EDE8DA"),
                 BorderThickness = new Thickness(0, 0, 0, 1)
             };
         }

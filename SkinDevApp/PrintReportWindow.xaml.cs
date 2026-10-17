@@ -108,7 +108,7 @@ namespace SkinDevApp.Views
 
             var root = new StackPanel();
             root.Children.Add(Txt("LUMYVUE", 22, true, "#1A2328", new Thickness(0, 0, 0, 2)));
-            root.Children.Add(Txt("Captured views and Grad-CAM++ attribution maps", 11, true, "#7C97A3", new Thickness(0, 0, 0, 6)));
+            root.Children.Add(Txt("Captured views and Grad-CAM++ attribution maps", 11, true, "#8D8D76", new Thickness(0, 0, 0, 6)));
             root.Children.Add(new Border { Height = 2, Background = Hex("#1A2328"), Margin = new Thickness(0, 0, 0, 8) });
 
             string who = model.Session != null ? "Patient: " + model.Session.PatientId + "   |   Scan " +
@@ -156,7 +156,7 @@ namespace SkinDevApp.Views
             FusedResult f = model.Fusion;
             if (f != null && f.ViewsUsed > 0)
             {
-                root.Children.Add(new Border { Height = 1, Background = Hex("#DDF2EE"), Margin = new Thickness(0, 2, 0, 6) });
+                root.Children.Add(new Border { Height = 1, Background = Hex("#E3E4C4"), Margin = new Thickness(0, 2, 0, 6) });
                 root.Children.Add(Txt("Overall (" + f.ViewsUsed + " of " + f.ViewsExpected + " views): " + f.TopClass + " " +
                                       f.TopClassPercent.ToString("0.0") + "% pooled model score" +
                                       (f.Disagreement ? "  -  views differ, see each angle above" : "  -  views agree"),

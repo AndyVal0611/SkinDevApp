@@ -17,8 +17,31 @@ namespace SkinDevApp
             if (SystemParameters.PrimaryScreenHeight > SystemParameters.PrimaryScreenWidth)
                 WindowState = WindowState.Maximized;
 
+            // every page glides in: a short fade and a small upward slide
+            MainFrame.Navigated += (s, e) => AnimateIn(MainFrame.Content as FrameworkElement);
+
             // Kusa nitong ikakarga ang LoginForm sa Startup
             MainFrame.Navigate(new LoginForm());
+        }
+
+        private static void AnimateIn(FrameworkElement page)
+        {
+            if (page == null) return;
+            var slide = new System.Windows.Media.TranslateTransform(0, 18);
+            page.RenderTransform = slide;
+            page.Opacity = 0;
+
+            var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(320)) { EasingFunction = ease };
+            var rise = new System.Windows.Media.Animation.DoubleAnimation(18, 0, TimeSpan.FromMilliseconds(380)) { EasingFunction = ease };
+            rise.Completed += (s, e) =>
+            {
+                page.BeginAnimation(UIElement.OpacityProperty, null);
+                page.Opacity = 1;
+                page.RenderTransform = System.Windows.Media.Transform.Identity;     // no leftover transform: text stays crisp
+            };
+            page.BeginAnimation(UIElement.OpacityProperty, fade);
+            slide.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, rise);
         }
 
         /// <summary>Do not lose a scan that is still being written to the database when the window is closed.</summary>

@@ -17,7 +17,7 @@ namespace SkinDevApp.Views
             MinHeight = 520;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.CanResizeWithGrip;
-            Background = Ui.Brush("#EFF7F6");
+            Background = Ui.Brush("#F6F3EA");
             FontFamily = (FontFamily)Application.Current.FindResource("BodyFont");
 
             var root = new Grid();
@@ -60,8 +60,8 @@ namespace SkinDevApp.Views
                 FontSize = 40,
                 Foreground = Brushes.White
             });
-            sp.Children.Add(new TextBlock { Text = "PrecisionSkin  ·  AI skin health monitoring", FontSize = 14, Foreground = Ui.Brush("#F6CBE0"), Margin = new Thickness(2, 0, 0, 0) });
-            sp.Children.Add(new TextBlock { Text = "Research prototype  ·  Model PrecisionSkinV1", FontSize = 12, Foreground = Ui.Brush("#C6DEDC"), Margin = new Thickness(2, 8, 0, 0) });
+            sp.Children.Add(new TextBlock { Text = "PrecisionSkin  ·  AI skin health monitoring", FontSize = 14, Foreground = Ui.Brush("#E8CCC2"), Margin = new Thickness(2, 0, 0, 0) });
+            sp.Children.Add(new TextBlock { Text = "Research prototype  ·  Model PrecisionSkinV1", FontSize = 12, Foreground = Ui.Brush("#DCD4C1"), Margin = new Thickness(2, 8, 0, 0) });
 
             // the skin-tone ribbon from the login screen
             var ribbon = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 14, 0, 0) };
@@ -115,7 +115,7 @@ namespace SkinDevApp.Views
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 var dot = new Border
                 {
-                    Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Brush("#FBE7EF"),
+                    Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Brush("#EFD7CF"),
                     HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
                     Child = new TextBlock { Text = st[0], FontWeight = FontWeights.Bold, Foreground = Ui.Brush("#8A5A3C"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
                 };
@@ -138,7 +138,7 @@ namespace SkinDevApp.Views
                 var row = new Grid { Margin = new Thickness(0, 0, 0, 9) };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.Children.Add(new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), Background = Ui.Brush("#E58DB6"), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 7, 0, 0) });
+                row.Children.Add(new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), Background = Ui.Brush("#C99C8E"), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 7, 0, 0) });
                 var text = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = Ui.Ink };
                 text.Inlines.Add(new System.Windows.Documents.Run(it[0]) { FontWeight = FontWeights.Bold });
                 text.Inlines.Add(new System.Windows.Documents.Run(" — " + it[1]));
