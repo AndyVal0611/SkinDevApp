@@ -51,7 +51,7 @@ namespace SkinDevApp.Views
             Height = 900;
             MinWidth = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = Ui.Brush("#FBF9F6");
+            Background = Ui.Brush("#F7FCFB");
             Build();
         }
 
@@ -147,7 +147,7 @@ namespace SkinDevApp.Views
             top.Children.Add(left);
             var badge = new Border
             {
-                Background = Ui.Brush("#F4EEE2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(18, 10, 18, 10), VerticalAlignment = VerticalAlignment.Center,
+                Background = Ui.Brush("#E9F5F4"), CornerRadius = new CornerRadius(12), Padding = new Thickness(18, 10, 18, 10), VerticalAlignment = VerticalAlignment.Center,
                 Child = new StackPanel { Children = {
                     Ui.Text(char.ToUpper(ClinicalText.Strength(pct)[0]) + ClinicalText.Strength(pct).Substring(1) + " match", 15, true, Ui.Ink, new Thickness(0)),
                     Ui.Text(pct.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "% on average", 11.5, false, Ui.Muted, new Thickness(0)) } }

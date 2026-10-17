@@ -77,7 +77,7 @@ namespace SkinDevApp
                 {
                     Child = label,
                     Margin = new Thickness(0, 0, 28, -1),
-                    BorderBrush = on ? Ui.Brush("#6E7560") : System.Windows.Media.Brushes.Transparent,
+                    BorderBrush = on ? Ui.Brush("#2B8DA6") : System.Windows.Media.Brushes.Transparent,
                     BorderThickness = new Thickness(0, 0, 0, 2),
                     Cursor = System.Windows.Input.Cursors.Hand,
                     Background = System.Windows.Media.Brushes.Transparent
@@ -124,7 +124,7 @@ namespace SkinDevApp
             {
                 Child = g,
                 Padding = new Thickness(0, 16, 0, 16),
-                BorderBrush = Ui.Brush("#EFE7DA"),
+                BorderBrush = Ui.Brush("#E4F0EE"),
                 BorderThickness = new Thickness(0, 0, 0, 1)
             };
         }
@@ -168,8 +168,9 @@ namespace SkinDevApp
             return RowCard(new[]
             {
                 Row("Camera", "The Logitech BRIO is chosen automatically when it is connected. Change this only if the study uses another camera.", _camera),
-                NumRow("camera.width", "Picture width (pixels)", "The closest supported camera mode is used. Default 640."),
-                NumRow("camera.height", "Picture height (pixels)", "Default 480."),
+                BoolRow("camera.max_resolution", "Sharpest picture", "Use the sharpest picture the camera can give (for example Full HD). Turn this off to use the size below."),
+                NumRow("camera.width", "Picture width (pixels)", "Used only when the sharpest picture is turned off. The closest supported camera mode is used. Default 640."),
+                NumRow("camera.height", "Picture height (pixels)", "Used only when the sharpest picture is turned off. Default 480."),
                 Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent."),
                 NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the photograph that is taken. Default 1."),
                 NumRow("preview.zoom_max", "Largest zoom of the live picture", "How far the picture can be enlarged by pinching with two fingers or using the + button. Default 4."),
@@ -338,6 +339,7 @@ namespace SkinDevApp
             _camera.SelectedItem = string.IsNullOrEmpty(s.CameraName) ? AutoCamera : s.CameraName;
             if (_camera.SelectedItem == null) _camera.SelectedIndex = 0;
 
+            _bool["camera.max_resolution"].IsChecked = s.MaxResolution;
             _num["camera.width"].Text = s.CameraWidth.ToString(CultureInfo.InvariantCulture);
             _num["camera.height"].Text = s.CameraHeight.ToString(CultureInfo.InvariantCulture);
             _num["preview.zoom_min"].Text = F(s.PreviewZoomMin);
@@ -378,6 +380,7 @@ namespace SkinDevApp
 
             string cam = _camera.SelectedItem as string;
             s.CameraName = cam == null || cam == AutoCamera ? "" : cam;
+            s.MaxResolution = _bool["camera.max_resolution"].IsChecked == true;
             s.CameraWidth = I("camera.width", 160, 4096);
             s.CameraHeight = I("camera.height", 120, 2160);
             s.PreviewZoomMin = D("preview.zoom_min", 0.5, 1);

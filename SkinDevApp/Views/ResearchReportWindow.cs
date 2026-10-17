@@ -42,7 +42,7 @@ namespace SkinDevApp.Views
 
         // restrained palette
         private const string Navy = "#1F2A44", TextInk = "#1F2937", Muted = "#6B7280", RuleGray = "#D1D5DB",
-                             PanelBg = "#F3F4F6", ImgBg = "#E5E7EB", WarnInk = "#92400E", WarnBg = "#FFF7ED", WarnLine = "#F5C99A";
+                             PanelBg = "#F3F4F6", ImgBg = "#E5E7EB", WarnInk = "#92400E", WarnBg = "#F5FBFA", WarnLine = "#F5C99A";
 
         private static readonly string[] ResearchTeamMembers =
         {

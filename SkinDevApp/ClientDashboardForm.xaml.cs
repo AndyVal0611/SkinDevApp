@@ -120,6 +120,7 @@ namespace SkinDevApp.Views
             ApplyRoleAndSettings();
             BuildStatusPanel();
             InitTouch();
+            InitCameraBox();
 
             ResetKioskState();
             CheckGate();
@@ -516,6 +517,11 @@ namespace SkinDevApp.Views
             GuideOval.Height = ry * 2.0;
             Canvas.SetLeft(GuideOval, cx - rx);
             Canvas.SetTop(GuideOval, cy - ry);
+
+            // centre lines: horizontal = eye height, vertical = left / right
+            CentreV.X1 = cx; CentreV.X2 = cx; CentreV.Y1 = r.Y; CentreV.Y2 = r.Y + r.Height;
+            CentreH.Y1 = cy; CentreH.Y2 = cy; CentreH.X1 = r.X; CentreH.X2 = r.X + r.Width;
+            CentreV.Visibility = CentreH.Visibility = CentreChk != null && CentreChk.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ============================================================================
@@ -591,7 +597,7 @@ namespace SkinDevApp.Views
                 _resultsFrozen = false;
 
                 _camTried = 0;
-                OpenCamera(PickCameraIndex());
+                OpenCamera(SelectedCameraIndex());
 
                 PlaceholderPanel.Visibility = Visibility.Collapsed;
                 UploadedImageViewer.Visibility = Visibility.Visible;
@@ -658,17 +664,13 @@ namespace SkinDevApp.Views
 
             videoSource = new VideoCaptureDevice(videoDevices[index].MonikerString);
 
-            // Use a common, widely supported mode (about 640x480 or closest) to avoid
-            // drivers that open silently but never deliver frames at their default mode.
+            // The sharpest picture the camera can give (or the size chosen on this screen / in Settings).
+            // The analysis works on a smaller copy, so a sharper picture only improves what is shown and saved.
             try
             {
                 var caps = videoSource.VideoCapabilities;
                 if (caps != null && caps.Length > 0)
-                {
-                    int wantW = ScanSettings.Current.CameraWidth, wantH = ScanSettings.Current.CameraHeight;
-                    var best = caps.OrderBy(c => Math.Abs(c.FrameSize.Width - wantW) + Math.Abs(c.FrameSize.Height - wantH)).First();
-                    videoSource.VideoResolution = best;
-                }
+                    videoSource.VideoResolution = ChooseMode(caps);
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[CAM] caps: " + ex.Message); }
 

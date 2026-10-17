@@ -20,6 +20,7 @@ namespace SkinDevApp.Data
     {
         // camera
         public string CameraName { get; set; } = "";            // "" = auto (prefers Logitech BRIO)
+        public bool MaxResolution { get; set; } = true;          // use the sharpest picture the camera can give (the size below is then only a fallback)
         public int CameraWidth { get; set; } = 640;
         public int CameraHeight { get; set; } = 480;
 
@@ -81,6 +82,7 @@ namespace SkinDevApp.Data
                 Dictionary<string, string> d = StudyRepository.LoadSettings();
 
                 s.CameraName = Str(d, "camera.name", s.CameraName);
+                s.MaxResolution = Bool(d, "camera.max_resolution", s.MaxResolution);
                 s.CameraWidth = Int(d, "camera.width", s.CameraWidth);
                 s.CameraHeight = Int(d, "camera.height", s.CameraHeight);
 
@@ -114,6 +116,7 @@ namespace SkinDevApp.Data
             return new Dictionary<string, string>
             {
                 { "camera.name", CameraName ?? "" },
+                { "camera.max_resolution", F(MaxResolution) },
                 { "camera.width", F(CameraWidth) },
                 { "camera.height", F(CameraHeight) },
                 { "preview.zoom_min", F(PreviewZoomMin) },

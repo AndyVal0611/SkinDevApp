@@ -1,7 +1,7 @@
 <Page x:Class="SkinDevApp.Views.RegistrationPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Registration" Background="#F8F1E6">
+      Title="Registration" Background="Transparent">
 
     <Grid Margin="25">
         <Grid.RowDefinitions>
@@ -33,7 +33,7 @@
                             <TextBlock Text="Patient details" Style="{StaticResource H2}"/>
 
                             <TextBlock Text="Patient ID" Style="{StaticResource FieldLabel}" Margin="0,2,0,5"/>
-                            <TextBox x:Name="PatientIdTxt" Style="{StaticResource Field}" IsReadOnly="True" Background="#F3E4D3" FontWeight="Bold"
+                            <TextBox x:Name="PatientIdTxt" Style="{StaticResource Field}" IsReadOnly="True" Background="#FBE7EF" FontWeight="Bold"
                                      HorizontalAlignment="Left" Width="190"/>
                             <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,5,0,0" Text="Created automatically. It cannot be changed."/>
 
@@ -71,7 +71,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="Date of birth" Style="{StaticResource FieldLabel}"/>
-                                    <Border CornerRadius="12" BorderBrush="#D8D3C0" BorderThickness="1" Background="#FFFDFB" Height="38" ClipToBounds="True">
+                                    <Border CornerRadius="12" BorderBrush="#C6DEDC" BorderThickness="1" Background="#FBFEFE" Height="38" ClipToBounds="True">
                                         <DatePicker x:Name="DobPicker" FontSize="13" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
                                                     Margin="6,0,0,0" SelectedDateChanged="DobPicker_Changed"/>
                                     </Border>
@@ -235,7 +235,7 @@
         </ScrollViewer>
 
         <!-- Actions -->
-        <Border Grid.Row="3" Background="White" BorderBrush="#E9DFD1" BorderThickness="1" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
+        <Border Grid.Row="3" Background="White" BorderBrush="#D9ECEA" BorderThickness="1" CornerRadius="14" Padding="16,12" Margin="8,10,8,0">
             <DockPanel>
                 <Button x:Name="CancelBtn" Content="Cancel" Style="{StaticResource SecondaryButton}" Width="120" Click="CancelBtn_Click"/>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">

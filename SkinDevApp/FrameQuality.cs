@@ -41,12 +41,12 @@ namespace SkinDevApp.Imaging
     {
         public const double CenterX = 0.50;
         public const double CenterY = 0.50;
-        public const double RadiusX = 0.36;     // of frame width
-        public const double RadiusY = 0.46;     // of frame height
+        public const double RadiusX = 0.378;     // of frame width
+        public const double RadiusY = 0.483;     // of frame height
 
         // Face-box width as a fraction of the frame width.
-        public const double MinFaceWidth = 0.49;   // below -> "Move closer"
-        public const double MaxFaceWidth = 0.90;   // above -> "Move back"
+        public const double MinFaceWidth = 0.51;   // below -> "Move closer"
+        public const double MaxFaceWidth = 0.945;   // above -> "Move back"
 
         public const double MaxOffsetX = 0.11;
         public const double MaxOffsetY = 0.13;

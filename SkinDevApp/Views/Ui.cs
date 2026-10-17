@@ -61,14 +61,14 @@ namespace SkinDevApp.Views
             return b;
         }
 
-        public static readonly SolidColorBrush Ink = Brush("#34362E");
-        public static readonly SolidColorBrush Bar = Brush("#5F6652");
-        public static readonly SolidColorBrush Muted = Brush("#6B6658");
+        public static readonly SolidColorBrush Ink = Brush("#1F3A45");
+        public static readonly SolidColorBrush Bar = Brush("#1F7B94");
+        public static readonly SolidColorBrush Muted = Brush("#5B7783");
         public static readonly SolidColorBrush Good = Brush("#588157");
         public static readonly SolidColorBrush Warn = Brush("#B7791F");
         public static readonly SolidColorBrush Bad = Brush("#B91C1C");
-        public static readonly SolidColorBrush Info = Brush("#7A816B");
-        public static readonly SolidColorBrush Line = Brush("#E0D9C8");
+        public static readonly SolidColorBrush Info = Brush("#4FA8BD");
+        public static readonly SolidColorBrush Line = Brush("#D3E8E7");
 
         public static readonly string[] ClassHex = { "#E11D1D", "#1D4ED8", "#E8A200", "#16A34A" };   // Acne, Hyper, Eczema, Normal
 
@@ -91,7 +91,7 @@ namespace SkinDevApp.Views
             var signedIn = new TextBlock
             {
                 Text = string.IsNullOrEmpty(AppSession.UserId) ? "" : "Signed in as " + AppSession.UserId,
-                Foreground = Brush("#D6CEC6"),
+                Foreground = Brush("#D3F2EE"),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
@@ -108,7 +108,7 @@ namespace SkinDevApp.Views
             left.Children.Add(new TextBlock
             {
                 Text = "   PrecisionSkin  ·  " + title,
-                Foreground = Brush("#D09F7C"),
+                Foreground = Brush("#B2F7EF"),
                 FontSize = 14,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 0, 0)
@@ -117,7 +117,7 @@ namespace SkinDevApp.Views
 
             var bar = new Border
             {
-                Background = Bar,
+                Background = (Brush)Application.Current.FindResource("HeaderGradient"),
                 CornerRadius = new CornerRadius(16),
                 Padding = new Thickness(24, 14, 24, 12),
                 Margin = new Thickness(8, 0, 8, 16),
@@ -295,7 +295,7 @@ namespace SkinDevApp.Views
             };
         }
 
-        public static Border Pill(string text, Brush fg, string bgHex = "#F3E4D3")
+        public static Border Pill(string text, Brush fg, string bgHex = "#FBE7EF")
         {
             return new Border
             {
@@ -324,7 +324,7 @@ namespace SkinDevApp.Views
                 sp.Children.Add(new ProgressBar
                 {
                     Minimum = 0, Maximum = 100, Value = v, Height = barHeight,
-                    Foreground = Brush(ClassHex[i]), Background = Brush("#F3F1EE"), BorderThickness = new Thickness(0),
+                    Foreground = Brush(ClassHex[i]), Background = Brush("#EEF6F5"), BorderThickness = new Thickness(0),
                     Margin = new Thickness(0, 0, 0, compact ? 5 : 9)
                 });
             }
@@ -357,7 +357,7 @@ namespace SkinDevApp.Views
             catch { return null; }
         }
 
-        public static Border Thumb(string path, double height, string borderHex = "#E0D9C8", string caption = null)
+        public static Border Thumb(string path, double height, string borderHex = "#D3E8E7", string caption = null)
         {
             var src = LoadImage(path, 480);
             UIElement content = src != null
@@ -366,7 +366,7 @@ namespace SkinDevApp.Views
             return new Border
             {
                 Height = height,
-                Background = Brush("#2B2C26"),
+                Background = Brush("#14262E"),
                 BorderBrush = Brush(borderHex),
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(6),
@@ -396,7 +396,7 @@ namespace SkinDevApp.Views
                 Height = 860,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = Application.Current.MainWindow,
-                Background = Ui.Brush("#2B2C26"),
+                Background = Ui.Brush("#14262E"),
                 Content = new Image { Source = src, Stretch = Stretch.Uniform, Margin = new Thickness(10) }
             };
             w.Show();

@@ -33,6 +33,22 @@ namespace SkinDevApp
 
     public static class CameraDiscovery
     {
+        /// <summary>
+        /// The sharpest mode a camera offers that still runs smoothly: the most pixels among the modes with at least 15 pictures per second
+        /// (up to 4K). When the driver does not report speeds, or no mode is fast enough, the mode with the most pixels is used.
+        /// </summary>
+        public static VideoCapabilities BestMode(VideoCapabilities[] caps)
+        {
+            if (caps == null || caps.Length == 0) return null;
+            const long MaxPixels = 3840L * 2160L;
+            Func<VideoCapabilities, long> px = c => (long)c.FrameSize.Width * c.FrameSize.Height;
+            var usable = caps.Where(c => px(c) <= MaxPixels).ToList();
+            if (usable.Count == 0) usable = caps.ToList();
+            var smooth = usable.Where(c => c.AverageFrameRate <= 0 || c.AverageFrameRate >= 15).ToList();
+            if (smooth.Count == 0) smooth = usable;
+            return smooth.OrderByDescending(px).ThenByDescending(c => c.AverageFrameRate).First();
+        }
+
         private static readonly string[] NotARealWebcam =
             { "virtual", "obs", "ir camera", "infrared", " ir ", "snap camera", "droidcam", "ndi", "manycam", "xsplit", "depth", "camo", "nvidia broadcast", "phone link" };
 

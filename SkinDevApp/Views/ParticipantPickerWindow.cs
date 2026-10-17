@@ -30,7 +30,7 @@ namespace SkinDevApp.Views
             SizeToContent = SizeToContent.Height;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
-            Background = Ui.Brush("#FBF9F6");
+            Background = Ui.Brush("#F7FCFB");
 
             var sp = new StackPanel { Margin = new Thickness(24) };
             sp.Children.Add(Ui.Text("Select an existing participant", 18, true));

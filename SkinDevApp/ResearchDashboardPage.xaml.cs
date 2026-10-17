@@ -13,8 +13,8 @@ namespace SkinDevApp
 {
     public partial class ResearchDashboardPage : Page
     {
-        private static readonly System.Windows.Media.Brush BarBrush = Ui.Brush("#3A5A4C");
-        private static readonly System.Windows.Media.Brush TrackBrush = Ui.Brush("#F1EFEC");
+        private static readonly System.Windows.Media.Brush BarBrush = Ui.Brush("#1F6E64");
+        private static readonly System.Windows.Media.Brush TrackBrush = Ui.Brush("#EEF6F5");
 
         public ResearchDashboardPage()
         {
