@@ -357,6 +357,24 @@ namespace SkinDevApp.AI
         public static bool IsAvailable { get { lock (_lock) { return _detector != null || _specialists.Count > 0; } } }
         public static string LoadErrorMessage { get { lock (_lock) { return _loadError?.Message; } } }
 
+        /// <summary>Read-only list of the lesion detectors that are loaded (shown on the Model information page). Nothing is changed.</summary>
+        public static List<LesionDetector> LoadedDetectors()
+        {
+            lock (_lock)
+            {
+                var all = new List<LesionDetector>();
+                if (_detector != null) all.Add(_detector);
+                all.AddRange(_specialists);
+                return all;
+            }
+        }
+
+        /// <summary>Detector files that were found but could not be loaded.</summary>
+        public static string[] LoadProblems
+        {
+            get { lock (_lock) { return _specialistErrors.ToArray(); } }
+        }
+
         /// <summary>One line for settings / reports: which model produces the boxes of which class.</summary>
         public static string ActiveModelsSummary
         {
