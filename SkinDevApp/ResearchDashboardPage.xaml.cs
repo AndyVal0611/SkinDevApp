@@ -69,11 +69,21 @@ namespace SkinDevApp
 
         private void Stat(string label, int value, string note = null)
         {
+            string icon = label.Contains("participant") ? "Icon.Users" : label.Contains("session") || label.Contains("Scans") ? "Icon.ScanFace"
+                        : label.Contains("images") ? "Icon.Image" : label.Contains("Grad-CAM") ? "Icon.Flame" : label.Contains("Completed") ? "Icon.CheckCircle"
+                        : label.Contains("Pending") ? "Icon.Clock" : label.Contains("Model") ? "Icon.Layers" : "Icon.Chart";
+            var dock = new DockPanel();
+            Border badge = Ui.IconBadge(icon, 44, "#E7E8CF", "#5F6048");
+            badge.Margin = new Thickness(0, 0, 14, 0);
+            badge.VerticalAlignment = VerticalAlignment.Top;
+            DockPanel.SetDock(badge, Dock.Left);
+            dock.Children.Add(badge);
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text(label, 12, true, Ui.Muted, new Thickness(0)));
-            sp.Children.Add(Ui.Text(value.ToString("N0"), 28, true, Ui.Ink, new Thickness(0, 4, 0, 0)));
+            sp.Children.Add(Ui.Text(value.ToString("N0"), 28, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
             if (note != null) sp.Children.Add(Ui.Text(note, 10.5, false, Ui.Muted, new Thickness(0)));
-            StatGrid.Children.Add(Ui.Card(sp));
+            dock.Children.Add(sp);
+            StatGrid.Children.Add(Ui.Card(dock));
         }
 
         private void Chart(string title, string subtitle, List<CountRow> rows, bool sortByCount = true)
@@ -109,7 +119,10 @@ namespace SkinDevApp
                 var track = new Grid { Height = 14, VerticalAlignment = VerticalAlignment.Center };
                 track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(r.Count, GridUnitType.Star) });
                 track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0, max - r.Count), GridUnitType.Star) });
-                track.Children.Add(new Border { Background = BarBrush, CornerRadius = new CornerRadius(0, 4, 4, 0) });
+                // skin categories keep their usual colours (acne red, hyperpigmentation blue, eczema amber, normal green); other bars are sage
+                string cls = (r.Label ?? "").Replace(" Skin", "");
+                bool isClass = Array.IndexOf(StudyText.Classes, cls) >= 0;
+                track.Children.Add(new Border { Background = isClass ? Ui.Brush(Ui.ClassColor(cls)) : BarBrush, CornerRadius = new CornerRadius(4) });
                 var rest = new Border { Background = TrackBrush };
                 Grid.SetColumn(rest, 1);
                 track.Children.Add(rest);

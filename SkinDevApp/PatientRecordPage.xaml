@@ -42,6 +42,7 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="Browse patients" Style="{StaticResource H2}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Filter by ID or name" Style="{StaticResource FieldLabel}" Margin="0,0,0,4"/>
                         <TextBox x:Name="FilterTxt" Style="{StaticResource Field}" ToolTip="ID or name" TextChanged="Filter_Changed"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
@@ -60,11 +61,10 @@
                         <TextBlock x:Name="ListCountTxt" Style="{StaticResource Muted}" FontSize="11" Margin="0,6,0,4"/>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                        <Button Content="Scans waiting for review" Style="{StaticResource SmallButton}" Margin="0,0,0,6" Click="PendingBtn_Click"/>
-                        <Button Content="Scans without a patient" Style="{StaticResource SmallButton}" Margin="0,0,0,6" Click="UnlinkedBtn_Click"/>
-                        <Button Content="Find saved scans" Style="{StaticResource SmallButton}" Margin="0,0,0,6" Click="ImportBtn_Click"
-                                ToolTip="Adds older scan folders that are not in the database yet"/>
-                        <Button Content="Register new patient" Style="{StaticResource SmallButton}" Margin="0" Click="RegisterBtn_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Height="46" Margin="0,0,0,6" HorizontalContentAlignment="Left" Click="PendingBtn_Click"><StackPanel Orientation="Horizontal"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Clock}" Width="17" Height="17" Margin="0,0,10,0"/><TextBlock Text="Scans waiting for review" VerticalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource GhostButton}" Height="46" Margin="0,0,0,6" HorizontalContentAlignment="Left" Click="UnlinkedBtn_Click"><StackPanel Orientation="Horizontal"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Folder}" Width="17" Height="17" Margin="0,0,10,0"/><TextBlock Text="Scans without a patient" VerticalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource GhostButton}" Height="46" Margin="0,0,0,6" HorizontalContentAlignment="Left" Click="ImportBtn_Click" ToolTip="Adds older scan folders that are not in the database yet"><StackPanel Orientation="Horizontal"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Search}" Width="17" Height="17" Margin="0,0,10,0"/><TextBlock Text="Find saved scans" VerticalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource PrimaryButton}" Height="46" Margin="0,0,0,6" HorizontalContentAlignment="Left" Click="RegisterBtn_Click"><StackPanel Orientation="Horizontal"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.UserPlus}" Width="17" Height="17" Margin="0,0,10,0"/><TextBlock Text="Register new patient" VerticalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                     <ListBox x:Name="ParticipantList" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              HorizontalContentAlignment="Stretch" SelectionChanged="ParticipantList_SelectionChanged"/>

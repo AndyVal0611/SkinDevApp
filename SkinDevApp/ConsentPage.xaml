@@ -20,6 +20,10 @@
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="900" HorizontalAlignment="Stretch">
+                <Border Style="{StaticResource NoticeBox}" Margin="8">
+                    <TextBlock x:Name="PreviousConsentTxt" Style="{StaticResource Body}" FontSize="12"
+                               Text="Items marked * are required. Nothing is ticked for you. Your answer and the time are saved in the patient record."/>
+                </Border>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="A. Agreement to take part in the research" Style="{StaticResource H2}"/>
@@ -52,10 +56,6 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource NoticeBox}" Margin="8">
-                    <TextBlock x:Name="PreviousConsentTxt" Style="{StaticResource Body}" FontSize="12"
-                               Text="Items marked * are required. Nothing is ticked for you. Your answer and the time are saved in the patient record."/>
-                </Border>
             </StackPanel>
         </ScrollViewer>
 
