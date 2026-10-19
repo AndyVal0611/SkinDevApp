@@ -9,11 +9,11 @@
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Height" Value="150"/>
+            <Setter Property="Height" Value="168"/>
             <Setter Property="Margin" Value="8"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="28,0"/>
+            <Setter Property="Padding" Value="30,0,26,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -74,10 +74,11 @@
         <Style x:Key="NavTile" TargetType="Button" BasedOn="{StaticResource BigAction}">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#3A3B2C"/>
-            <Setter Property="BorderBrush" Value="#E3DDCB"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardEdge}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="96"/>
-            <Setter Property="Padding" Value="20,0"/>
+            <Setter Property="Height" Value="104"/>
+            <Setter Property="Padding" Value="18,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         </Style>
     </Page.Resources>
 
@@ -85,27 +86,36 @@
         <StackPanel Margin="25,25,25,25">
             <ContentControl x:Name="HeaderHost"/>
 
-            <Grid Margin="8,0,8,6">
+            <!-- greeting -->
+            <Grid Margin="8,4,8,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Dashboard" Style="{StaticResource H1}"/>
+                    <TextBlock x:Name="DateTxt" Style="{StaticResource Eyebrow}" Text=""/>
+                    <TextBlock x:Name="GreetingTxt" Text="Dashboard" Style="{StaticResource H1}" FontSize="34"/>
                     <TextBlock x:Name="WelcomeTxt" Style="{StaticResource Muted}" FontSize="14" Margin="0,4,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="1" Content="Re-check system" Style="{StaticResource SmallButton}" Margin="0" VerticalAlignment="Bottom"
-                        Click="RecheckBtn_Click"/>
+                <Button Grid.Column="1" Style="{StaticResource GhostButton}" Height="46" Margin="0" VerticalAlignment="Bottom" Click="RecheckBtn_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Refresh}" Width="18" Height="18" Margin="0,0,8,0"/>
+                        <TextBlock Text="Check system again" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
             </Grid>
 
             <!-- System readiness -->
-            <ContentControl x:Name="HealthHost" Margin="8,8,8,4"/>
+            <ContentControl x:Name="HealthHost" Margin="8,4,8,2"/>
 
             <!-- Participant the workflow is currently on -->
-            <Border x:Name="CurrentParticipantBox" Style="{StaticResource NoticeBox}" Margin="8,4,8,4" Visibility="Collapsed">
+            <Border x:Name="CurrentParticipantBox" Style="{StaticResource NoticeBox}" Margin="8,2,8,4" Padding="12,10,12,10" CornerRadius="18" Visibility="Collapsed">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}" Margin="0" Click="ClearParticipantBtn_Click"/>
-                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13" Foreground="#3A3B2C" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource GhostButton}" Height="42" Margin="0" Click="ClearParticipantBtn_Click"/>
+                    <Border Width="40" Height="40" CornerRadius="20" Background="#DDBAAE" Margin="0,0,12,0" DockPanel.Dock="Left">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.User}" Foreground="#2F3024" Width="19" Height="19" HorizontalAlignment="Center"/>
+                    </Border>
+                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13.5" Foreground="#2F3024" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </DockPanel>
             </Border>
 
@@ -115,28 +125,43 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="NewRegistrationBtn" Style="{StaticResource BigAction}" Click="NewRegistrationBtn_Click">
-                    <StackPanel>
-                        <TextBlock Text="New registration" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
-                        <TextBlock Text="Register a participant. A PatientID is generated automatically, then consent is recorded."
-                                   FontSize="13" Foreground="#F0EFD8" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                    </StackPanel>
+                <Button x:Name="NewRegistrationBtn" Style="{StaticResource BigAction}" Background="{StaticResource HeroSage}" Click="NewRegistrationBtn_Click">
+                    <DockPanel>
+                        <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#F7F5E9" Width="26" Height="26" Margin="16,0,0,0"/>
+                        <Border DockPanel.Dock="Left" Width="64" Height="64" CornerRadius="32" Background="#26FFFFFF" Margin="0,0,20,0" VerticalAlignment="Center">
+                            <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.UserPlus}" Foreground="White" Width="30" Height="30" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="New registration" FontSize="28" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
+                            <TextBlock Text="Register a patient. A Patient ID is created automatically, then consent is recorded."
+                                       FontSize="13.5" Foreground="#EDEBD3" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
                 </Button>
-                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="#75765A" Click="SkinAnalysisBtn_Click">
-                    <StackPanel>
-                        <TextBlock Text="Skin analysis" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
-                        <TextBlock Text="Select an existing participant (or continue with the current one) and run the Front / Left / Right scan."
-                                   FontSize="13" Foreground="#F0EFD8" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                    </StackPanel>
+                <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Background="{StaticResource HeroBlush}" Click="SkinAnalysisBtn_Click">
+                    <DockPanel>
+                        <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#FFF8F4" Width="26" Height="26" Margin="16,0,0,0"/>
+                        <Border DockPanel.Dock="Left" Width="64" Height="64" CornerRadius="32" Background="#2EFFFFFF" Margin="0,0,20,0" VerticalAlignment="Center">
+                            <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ScanFace}" Foreground="White" Width="30" Height="30" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Skin analysis" FontSize="28" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
+                            <TextBlock Text="Choose a patient (or continue with the current one) and take the front, left and right photographs."
+                                       FontSize="13.5" Foreground="#FFF1EB" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
                 </Button>
             </Grid>
 
             <!-- Secondary navigation -->
-            <TextBlock Text="More" Style="{StaticResource H2}" Margin="8,14,8,4"/>
+            <TextBlock Text="WORKSPACE" Style="{StaticResource Eyebrow}" Margin="10,18,8,6"/>
             <UniformGrid x:Name="NavGrid" Columns="3"/>
 
-            <TextBlock Style="{StaticResource Muted}" Margin="8,14,8,0" FontSize="11"
-                       Text="PrecisionSkin is a research prototype intended to assist with automated skin-image classification. It does not replace professional medical evaluation."/>
+            <DockPanel Margin="10,16,8,0">
+                <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Info}" Foreground="#8D8D76" Width="15" Height="15" Margin="0,0,8,0"/>
+                <TextBlock Style="{StaticResource Muted}" FontSize="11.5" VerticalAlignment="Center"
+                           Text="LUMYVUE is a research prototype that assists with automated skin-image classification. It does not replace professional medical evaluation."/>
+            </DockPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

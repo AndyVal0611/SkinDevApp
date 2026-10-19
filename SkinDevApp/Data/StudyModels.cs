@@ -17,7 +17,7 @@ namespace SkinDevApp.Data
     public static class StudyText
     {
         public const string PrototypeNotice =
-            "PrecisionSkin is a research prototype intended to assist with automated skin-image classification. " +
+            "LUMYVUE is a research prototype intended to assist with automated skin-image classification. " +
             "It does not replace professional medical evaluation and does not provide a diagnosis.";
 
         public const string ScoresNote =

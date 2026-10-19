@@ -231,7 +231,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("The registration could not be saved.\n\n" + ex.Message, "LUMYVUE registration",
+                LumyDialog.Show("The registration could not be saved.\n\n" + ex.Message, "LUMYVUE registration",
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
@@ -244,12 +244,12 @@ namespace SkinDevApp.Views
 
             if (_editMode)
             {
-                MessageBox.Show("The registration of " + _participantId + " was updated.", "LUMYVUE registration");
+                LumyDialog.Show("The registration of " + _participantId + " was updated.", "LUMYVUE registration");
                 Nav.Back();
             }
             else if (wasNew)
             {
-                MessageBox.Show("The patient is registered.\n\nPatient ID: " + _participantId +
+                LumyDialog.Show("The patient is registered.\n\nPatient ID: " + _participantId +
                                 "\n\nPlease note this ID. It is used to find the patient later.",
                                 "LUMYVUE registration", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -263,7 +263,7 @@ namespace SkinDevApp.Views
 
         private void CancelBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (_dirty && MessageBox.Show("Discard the unsaved changes on this form?", "LUMYVUE Registration",
+            if (_dirty && LumyDialog.Show("Discard the unsaved changes on this form?", "LUMYVUE Registration",
                     MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
             Nav.Back();

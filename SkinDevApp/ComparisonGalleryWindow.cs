@@ -157,12 +157,12 @@ namespace SkinDevApp.Views
 
             // footer
             var footer = new DockPanel { Margin = new Thickness(0, 10, 0, 0), LastChildFill = false };
-            var openBtn = new Button { Content = "Open folder", Width = 120, Height = 32 };
+            var openBtn = new Button { Content = Ui.IconLabel("Icon.Folder", "Open folder", 18), Height = 48, Style = (Style)Application.Current.FindResource("GhostButton") };
             openBtn.Click += (s, e) =>
             {
                 try { Process.Start("explorer.exe", _openFolder); } catch { }
             };
-            var closeBtn = new Button { Content = "Close", Width = 90, Height = 32 };
+            var closeBtn = new Button { Content = "Close", Width = 130, Height = 48, Style = (Style)Application.Current.FindResource("PrimaryButton") };
             closeBtn.Click += (s, e) => Close();
             DockPanel.SetDock(closeBtn, Dock.Right);
             footer.Children.Add(openBtn);

@@ -36,6 +36,11 @@ namespace SkinDevApp.Views
             // the step indicator follows the instruction line, so every place that clears or sets it keeps the indicator in step
             DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock))
                 .AddValueChanged(ViewStepTxt, (s, e) => RefreshStepper());
+
+            // the stages are shown (as "waiting") whenever the three-photograph scan is switched on
+            MultiViewChk.Checked += (s, e) => RefreshStepper();
+            MultiViewChk.Unchecked += (s, e) => RefreshStepper();
+            RefreshStepper();
         }
 
         private void UpdateZoomUi()
@@ -153,81 +158,114 @@ namespace SkinDevApp.Views
         {
             if (StepperGrid == null) return;
             StepperGrid.Children.Clear();
-            if (_session == null) { StepperGrid.Visibility = Visibility.Collapsed; return; }
+            // before a scan starts the three stages are still shown (all waiting), so the workflow is clear at a glance
+            if (_session == null && MultiViewChk.IsChecked != true) { StepperGrid.Visibility = Visibility.Collapsed; return; }
 
+            string[] captions = { "Straight on", "Left cheek", "Right cheek" };
             int n = 0;
             foreach (ScanView v in ScanViews.Sequence)
             {
                 n++;
-                bool done = _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
-                bool now = !done && !_session.IsComplete && _session.Current == v;
+                bool done = _session != null && _session.Outcomes.Any(o => o.View == ScanViews.Name(v) && o.Ok);
+                bool now = _session != null && !done && !_session.IsComplete && _session.Current == v;
 
-                string bg = done ? "#E3E4C4" : now ? "#6E6F52" : "#FFFFFF";
-                string line = done ? "#A9AA7E" : now ? "#6E6F52" : "#DCD4C1";
-                string ink = done ? "#5B5C42" : now ? "#FFFFFF" : "#8D8D76";
-                string mark = done ? "✓" : n.ToString();
+                Brush bg = now ? (Brush)FindResource("HeaderGradient") : Ui.Brush(done ? "#E7E8CF" : "#FFFEFB");
+                string line = done ? "#C2C395" : now ? "#5F6048" : "#E3DDCB";
+                string ink = done ? "#4F503B" : now ? "#FFFFFF" : "#8D8D76";
 
                 var disc = new Border
                 {
                     Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 8, 0),
-                    Background = Ui.Brush(done ? "#6E6F52" : now ? "#FFFFFF" : "#EDE8DA"),
-                    Child = new TextBlock
-                    {
-                        Text = mark, FontSize = 13, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                        Foreground = Ui.Brush(done ? "#FFFFFF" : now ? "#6E6F52" : "#8D8D76")
-                    }
+                    Background = Ui.Brush(done ? "#818263" : now ? "#FFFFFF" : "#EFEADC")
                 };
-                var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-                row.Children.Add(disc);
-                row.Children.Add(new TextBlock { Text = ScanViews.Name(v), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), VerticalAlignment = VerticalAlignment.Center });
-
-                StepperGrid.Children.Add(new Border
+                if (done) disc.Child = new Grid { Children = { Ui.Icon("Icon.Check", 14, Brushes.White) } };
+                else disc.Child = new TextBlock
                 {
-                    Background = Ui.Brush(bg), BorderBrush = Ui.Brush(line), BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(14),
-                    MinHeight = 54, Margin = new Thickness(0, 0, v == ScanViews.Sequence[ScanViews.Sequence.Length - 1] ? 0 : 8, 0), Child = row
-                });
+                    Text = n.ToString(), FontSize = 13, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = Ui.Brush(now ? "#5F6048" : "#8D8D76")
+                };
+
+                var top = new StackPanel { Orientation = Orientation.Horizontal };
+                top.Children.Add(disc);
+                top.Children.Add(new TextBlock { Text = ScanViews.Name(v), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), VerticalAlignment = VerticalAlignment.Center });
+                var body = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                body.Children.Add(top);
+                var caption = new TextBlock
+                {
+                    Text = done ? "Captured" : now ? "Now: " + captions[n - 1].ToLowerInvariant() : captions[n - 1],
+                    FontSize = 11, Foreground = Ui.Brush(now ? "#E7E6CF" : done ? "#6F6F58" : "#9B9B84"), Margin = new Thickness(34, 2, 0, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                body.Children.Add(caption);
+
+                var pill = new Border
+                {
+                    Background = bg, BorderBrush = Ui.Brush(line), BorderThickness = new Thickness(1.2), CornerRadius = new CornerRadius(16),
+                    MinHeight = 64, Padding = new Thickness(10, 8, 8, 8),
+                    Margin = new Thickness(0, 0, v == ScanViews.Sequence[ScanViews.Sequence.Length - 1] ? 0 : 8, 0), Child = body
+                };
+                // narrow pills keep just the number and the view name (the instruction is shown below them anyway)
+                pill.SizeChanged += (s, e) => caption.Visibility = pill.ActualWidth < 132 ? Visibility.Collapsed : Visibility.Visible;
+                StepperGrid.Children.Add(pill);
             }
             StepperGrid.Visibility = Visibility.Visible;
         }
 
         // ------------------------------------------------------------------ layout --
 
-        /// <summary>Portrait monitors: a large camera picture on top, the controls underneath. Landscape: side by side.</summary>
+        /// <summary>
+        /// Landscape (16:9 workstation): camera | capture | AI analysis, all visible at once.
+        /// Narrower landscape windows: camera | capture above analysis.  Portrait: camera on top, the two panels below.
+        /// </summary>
         private void ApplyAdaptiveLayout(Size size)
         {
             if (ContentGrid == null) return;
 
             ContentGrid.ColumnDefinitions.Clear();
             ContentGrid.RowDefinitions.Clear();
+            foreach (UIElement el in new UIElement[] { ImageCard, ControlsCard, AnalysisCard })
+            {
+                Grid.SetRowSpan(el, 1); Grid.SetColumnSpan(el, 1);
+            }
+            ImageCard.ClearValue(FrameworkElement.HeightProperty);
 
             bool portrait = size.Height > size.Width * 1.05;
-            bool wide = size.Width > 850 && !portrait;
 
-            if (wide)
+            if (!portrait && size.Width >= 1100)
             {
-                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
-                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                ImageCard.ClearValue(FrameworkElement.HeightProperty);
+                // wide screens give the camera more room; on a laptop-sized window the two panels keep a readable width
+                double cam = size.Width >= 1450 ? 1.65 : 1.25;
+                double min = size.Width >= 1450 ? 330 : 290;
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(cam, GridUnitType.Star) });
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = min });
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = min });
                 Grid.SetRow(ImageCard, 0); Grid.SetColumn(ImageCard, 0);
                 Grid.SetRow(ControlsCard, 0); Grid.SetColumn(ControlsCard, 1);
+                Grid.SetRow(AnalysisCard, 0); Grid.SetColumn(AnalysisCard, 2);
                 return;
             }
 
-            if (portrait)
+            if (!portrait && size.Width > 850)
             {
-                // the picture is 4:3 landscape: give it the full width and the height that fits, capped so the controls keep room
-                double h = Math.Max(340, Math.Min(size.Width * 0.78, size.Height * 0.52));
-                ImageCard.Height = h;
-                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
+                ContentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                Grid.SetRow(ImageCard, 0); Grid.SetColumn(ImageCard, 0); Grid.SetRowSpan(ImageCard, 2);
+                Grid.SetRow(ControlsCard, 0); Grid.SetColumn(ControlsCard, 1);
+                Grid.SetRow(AnalysisCard, 1); Grid.SetColumn(AnalysisCard, 1);
+                return;
             }
-            else
-            {
-                ImageCard.Height = 320;
-                ContentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            }
+
+            // portrait / narrow: the picture is landscape, so give it the full width and the height that fits
+            ImageCard.Height = portrait ? Math.Max(340, Math.Min(size.Width * 0.78, size.Height * 0.48)) : 320;
+            ContentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             ContentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             Grid.SetRow(ImageCard, 0); Grid.SetColumn(ImageCard, 0);
             Grid.SetRow(ControlsCard, 1); Grid.SetColumn(ControlsCard, 0);
+            Grid.SetRow(AnalysisCard, 2); Grid.SetColumn(AnalysisCard, 0);
         }
+
     }
 }

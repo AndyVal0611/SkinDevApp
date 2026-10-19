@@ -11,18 +11,13 @@
       Loaded="Page_Loaded">
 
     <Page.Resources>
-        <Style x:Key="PrepCardBorder" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="16"/>
+        <Style x:Key="PrepCardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="Padding" Value="22,20"/>
-            <Setter Property="Margin" Value="8"/>
-            <Setter Property="BorderBrush" Value="#E8E2D3"/>
-            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#3A3B2C"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#2F3024"/>
         </Style>
         <Style x:Key="CardBody" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
@@ -30,16 +25,12 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="LineHeight" Value="20"/>
         </Style>
-        <Style x:Key="ConfirmLinkButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#3A3B2C"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="0"/>
+        <Style x:Key="ConfirmLinkButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Padding" Value="20,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
     </Page.Resources>
 
@@ -53,7 +44,7 @@
 
         <StackPanel Grid.Row="0" Margin="8,0,8,18">
             <ContentControl x:Name="HeaderHost" Margin="-8,0,-8,0"/>
-            <TextBlock Text="Get ready to scan" FontSize="26" FontWeight="Bold" Foreground="#3A3B2C"/>
+            <TextBlock Text="Get ready to scan" Style="{StaticResource H1}"/>
             <TextBlock x:Name="ParticipantLine" Text="Complete each step below before starting the front, left and right scan."
                        FontSize="14" Foreground="#8D8D76" Margin="0,6,0,0"/>
         </StackPanel>
@@ -70,9 +61,13 @@
                     <TextBlock x:Name="OverallStatusTitle" Text="Getting ready" FontSize="15" FontWeight="Bold" Foreground="White"/>
                     <TextBlock x:Name="OverallStatusDetail" Text="0 of 4 checks done" FontSize="12" Foreground="#F0EFD8" Margin="0,2,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="2" Content="Check the camera again" Height="36" Padding="14,0"
-                        Background="#DDBAAE" Foreground="#3A3B2C" FontWeight="SemiBold" FontSize="12"
-                        BorderThickness="0" VerticalAlignment="Center" Click="RecheckCameraBtn_Click"/>
+                <Button Grid.Column="2" Style="{StaticResource AccentButton}" Height="46" Padding="18,0" FontSize="13"
+                        VerticalAlignment="Center" Click="RecheckCameraBtn_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Refresh}" Width="17" Height="17" Margin="0,0,8,0"/>
+                        <TextBlock Text="Check the camera again" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
@@ -88,7 +83,7 @@
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <TextBlock Text="📷" FontSize="22" Margin="0,0,10,0"/>
+                                <Border Width="42" Height="42" CornerRadius="21" Background="#E7E8CF" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Camera}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                                 <TextBlock Text="Camera connection" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -116,7 +111,7 @@
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <TextBlock Text="💡" FontSize="22" Margin="0,0,10,0"/>
+                                <Border Width="42" Height="42" CornerRadius="21" Background="#F8EBE6" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Bulb}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                                 <TextBlock Text="White light" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -141,7 +136,7 @@
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <TextBlock Text="📏" FontSize="22" Margin="0,0,10,0"/>
+                                <Border Width="42" Height="42" CornerRadius="21" Background="#EFEADC" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Ruler}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                                 <TextBlock Text="Distance" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -166,7 +161,7 @@
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <TextBlock Text="🙂" FontSize="22" Margin="0,0,10,0"/>
+                                <Border Width="42" Height="42" CornerRadius="21" Background="#E7E8CF" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Face}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                                 <TextBlock Text="Face position" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -185,7 +180,7 @@
                 <Border Style="{StaticResource PrepCardBorder}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="🧠" FontSize="22" Margin="0,0,10,0"/>
+                            <Border Width="42" Height="42" CornerRadius="21" Background="#F8EBE6" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chip}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                             <TextBlock Text="Skin model" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             <Ellipse x:Name="ModelStatusDot" Width="10" Height="10" Fill="#9B9B84" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="ModelStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#9B9B84" VerticalAlignment="Center"/>
@@ -197,7 +192,7 @@
                 <Border Style="{StaticResource PrepCardBorder}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="🔥" FontSize="22" Margin="0,0,10,0"/>
+                            <Border Width="42" Height="42" CornerRadius="21" Background="#EFEADC" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Flame}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
                             <TextBlock Text="Heat-map service" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                             <Ellipse x:Name="GradCamStatusDot" Width="10" Height="10" Fill="#9B9B84" Margin="16,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="GradCamStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#9B9B84" VerticalAlignment="Center"/>
@@ -219,12 +214,18 @@
                 <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="1" x:Name="BackBtn" Content="Back" Width="120" Height="46"
-                    Background="White" Foreground="#3A3B2C" FontWeight="SemiBold" FontSize="13"
-                    BorderBrush="#C99C8E" BorderThickness="1" Click="BackBtn_Click"/>
-            <Button Grid.Column="3" x:Name="NextBtn" Content="Start scan" Width="160" Height="46"
-                    Background="#3A3B2C" Foreground="White" FontWeight="Bold" FontSize="13"
-                    BorderThickness="0" IsEnabled="False" Click="NextBtn_Click"/>
+            <Button Grid.Column="1" x:Name="BackBtn" Style="{StaticResource GhostButton}" Width="150" Height="54" Click="BackBtn_Click">
+                <StackPanel Orientation="Horizontal">
+                    <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Back}" Width="18" Height="18" Margin="0,0,8,0"/>
+                    <TextBlock Text="Back" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" x:Name="NextBtn" Style="{StaticResource PrimaryButton}" Width="220" Height="54" FontSize="15" IsEnabled="False" Click="NextBtn_Click">
+                <StackPanel Orientation="Horizontal">
+                    <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ScanFace}" Width="20" Height="20" Margin="0,0,10,0"/>
+                    <TextBlock Text="Start scan" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
         </Grid>
     </Grid>
 </Page>

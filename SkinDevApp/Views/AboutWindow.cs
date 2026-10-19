@@ -10,7 +10,7 @@ namespace SkinDevApp.Views
     {
         public AboutWindow()
         {
-            Title = "About PrecisionSkin";
+            Title = "About LUMYVUE";
             Width = 720;
             Height = 780;
             MinWidth = 560;
@@ -26,14 +26,14 @@ namespace SkinDevApp.Views
 
             var page = new StackPanel { Margin = new Thickness(26, 24, 26, 14) };
             page.Children.Add(Banner());
-            page.Children.Add(Section("What PrecisionSkin does", Steps()));
+            page.Children.Add(Section("What LUMYVUE does", Steps()));
             page.Children.Add(Section("How to read the results", Bullets(
                 new[] { "Category match", "how closely a photograph resembles each skin category. The four percentages add up to 100%. They show visual similarity, not the chance that the patient has the condition." },
                 new[] { "Heatmap (Grad-CAM++)", "shows which parts of the photograph the model paid most attention to for one category. It is not an outline of the affected skin." },
                 new[] { "Candidate lesion marks", "small boxes where a second model suggests possible lesions. Some lesions may be missed and some boxes may be wrong. They are not a lesion count." },
                 new[] { "Agreement between views", "whether the front, left and right photographs point to the same category." })));
             page.Children.Add(Section("Important to know", Bullets(
-                new[] { "Research prototype", "PrecisionSkin supports, and never replaces, the judgement of a qualified clinician." },
+                new[] { "Research prototype", "LUMYVUE supports, and never replaces, the judgement of a qualified clinician." },
                 new[] { "Not a diagnosis", "it does not give a diagnosis or treatment advice." },
                 new[] { "Photo quality matters", "use even lighting, remove glasses or a mask, and keep hair away from the face." })));
             page.Children.Add(ModelNote());
@@ -60,7 +60,7 @@ namespace SkinDevApp.Views
                 FontSize = 40,
                 Foreground = Brushes.White
             });
-            sp.Children.Add(new TextBlock { Text = "PrecisionSkin  ·  AI skin health monitoring", FontSize = 14, Foreground = Ui.Brush("#E8CCC2"), Margin = new Thickness(2, 0, 0, 0) });
+            sp.Children.Add(new TextBlock { Text = "AI skin health monitoring", FontSize = 14, Foreground = Ui.Brush("#E8CCC2"), Margin = new Thickness(2, 0, 0, 0) });
             sp.Children.Add(new TextBlock { Text = "Research prototype  ·  Model PrecisionSkinV1", FontSize = 12, Foreground = Ui.Brush("#DCD4C1"), Margin = new Thickness(2, 8, 0, 0) });
 
             // the skin-tone ribbon from the login screen
@@ -98,7 +98,7 @@ namespace SkinDevApp.Views
         private static UIElement Steps()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("PrecisionSkin photographs the face from three angles and uses an artificial-intelligence model to compare each photograph " +
+            sp.Children.Add(Ui.Text("LUMYVUE photographs the face from three angles and uses an artificial-intelligence model to compare each photograph " +
                                     "with four skin categories: acne, hyperpigmentation, eczema and normal skin. It then shows the evidence behind the result so that a clinician can judge it.",
                                     13, false, Ui.Ink, new Thickness(0, 0, 0, 12)));
 

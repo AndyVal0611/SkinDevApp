@@ -88,7 +88,7 @@ namespace SkinDevApp
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Consent could not be saved, so scanning cannot start.\n\n" + ex.Message,
+                LumyDialog.Show("Consent could not be saved, so scanning cannot start.\n\n" + ex.Message,
                     "LUMYVUE Consent", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -96,14 +96,14 @@ namespace SkinDevApp
         private void DeclineBtn_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(_participantId) || IsWithdrawnNow()) { Nav.Home(); return; }
-            if (MessageBox.Show("Record that the participant declined? No images will be captured.", "LUMYVUE Consent",
+            if (LumyDialog.Show("Record that the participant declined? No images will be captured.", "LUMYVUE Consent",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
             try { StudyRepository.SaveConsent(Build("Declined")); }
             catch (Exception ex)
             {
-                MessageBox.Show("The decision could not be saved: " + ex.Message, "LUMYVUE Consent",
+                LumyDialog.Show("The decision could not be saved: " + ex.Message, "LUMYVUE Consent",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             AppSession.CurrentParticipantId = null;

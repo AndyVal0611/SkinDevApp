@@ -63,14 +63,14 @@ namespace SkinDevApp.Views
                 SessionDetail d = StudyRepository.GetSessionDetail(scanSessionId);
                 if (d == null)
                 {
-                    MessageBox.Show("Scan " + scanSessionId + " is not in the database yet.", "LUMYVUE Report");
+                    LumyDialog.Show("Scan " + scanSessionId + " is not in the database yet.", "LUMYVUE Report");
                     return;
                 }
                 new ResearchReportWindow(d) { Owner = Application.Current.MainWindow }.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not build the report: " + ex.Message, "LUMYVUE Report", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not build the report: " + ex.Message, "LUMYVUE Report", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -78,7 +78,7 @@ namespace SkinDevApp.Views
         {
             _d = d;
             _f = ReportFindings.Build(d);
-            Title = "PrecisionSkin Research Analysis Report — " + d.Session.DisplayId;
+            Title = "LUMYVUE Research Analysis Report — " + d.Session.DisplayId;
             Width = 720;
             Height = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -202,7 +202,7 @@ namespace SkinDevApp.Views
             right.VerticalAlignment = VerticalAlignment.Bottom;
             DockPanel.SetDock(right, Dock.Right);
             top.Children.Add(right);
-            top.Children.Add(T("PrecisionSkin / LUMYVUE", 15, true, Navy, 0));
+            top.Children.Add(T("LUMYVUE", 15, true, Navy, 0));
             head.Children.Add(top);
             head.Children.Add(T("Researchers: " + ResearchTeam, 7.5, false, Muted, 3));
             head.Children.Add(new Border { Height = 1.5, Background = C(Navy), Margin = new Thickness(0, 0, 0, 10) });
@@ -840,12 +840,12 @@ namespace SkinDevApp.Views
                 FixedDocument doc = BuildDocument(out size);
 
                 // Job name = default PDF file name: IDs only, never the participant's name.
-                dlg.PrintDocument(doc.DocumentPaginator, "PrecisionSkin_Research_Report_" + _d.Session.DisplayId);
+                dlg.PrintDocument(doc.DocumentPaginator, "LUMYVUE_Research_Report_" + _d.Session.DisplayId);
                 StudyRepository.Audit("Report generated", "ScanSession", _d.Session.ScanSessionID, dlg.PrintQueue != null ? dlg.PrintQueue.Name : "");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not print / save the report: " + ex.Message, "LUMYVUE Report", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not print / save the report: " + ex.Message, "LUMYVUE Report", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

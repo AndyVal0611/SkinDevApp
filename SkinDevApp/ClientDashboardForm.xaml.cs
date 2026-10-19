@@ -138,7 +138,7 @@ namespace SkinDevApp.Views
 
             ResearcherChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
             if (!r) ResearcherChk.IsChecked = false;
-            HeatmapChoicePanel.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            HeatmapChoicePanel.Visibility = Visibility.Collapsed;   // the heat map always shows the predicted category
             UploadBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
             AnalyzeBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
             MultiViewChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;   // operators always run the 3-view scan
@@ -211,18 +211,29 @@ namespace SkinDevApp.Views
         private static readonly string[] StatusKeys =
             { "Face position", "Pose / orientation", "Sharpness", "Brightness / exposure", "Motion", "Stability", "Camera" };
 
+        private static readonly string[] StatusIcons =
+            { "Icon.Face", "Icon.Target", "Icon.Image", "Icon.Sun", "Icon.Move", "Icon.Pulse", "Icon.Camera" };
+
         private void BuildStatusPanel()
         {
             StatusGrid.Children.Clear();
             _status.Clear();
-            foreach (string k in StatusKeys)
+            for (int i = 0; i < StatusKeys.Length; i++)
             {
-                var sp = new StackPanel { Margin = new Thickness(0, 2, 8, 4) };
-                sp.Children.Add(new TextBlock { Text = k, FontSize = 10.5, Foreground = Ui.Muted });
-                var val = new TextBlock { Text = "—", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
+                string k = StatusKeys[i];
+                var row = new DockPanel { Margin = new Thickness(0, 3, 10, 7) };
+                var icon = Ui.Icon(StatusIcons[i], 16, Ui.Brush("#8D8D76"));
+                icon.Margin = new Thickness(0, 1, 8, 0);
+                icon.VerticalAlignment = VerticalAlignment.Top;
+                DockPanel.SetDock(icon, Dock.Left);
+                row.Children.Add(icon);
+                var sp = new StackPanel();
+                sp.Children.Add(new TextBlock { Text = k, FontSize = 11, Foreground = Ui.Muted });
+                var val = new TextBlock { Text = "—", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
                 sp.Children.Add(val);
+                row.Children.Add(sp);
                 _status[k] = val;
-                StatusGrid.Children.Add(sp);
+                StatusGrid.Children.Add(row);
             }
         }
 
@@ -577,7 +588,7 @@ namespace SkinDevApp.Views
 
                 if (videoDevices.Count == 0)
                 {
-                    MessageBox.Show("No camera hardware detected on this machine. Please connect a USB webcam.", "LUMYVUE Camera");
+                    LumyDialog.Show("No camera hardware detected on this machine. Please connect a USB webcam.", "LUMYVUE Camera");
                     return;
                 }
 
@@ -585,7 +596,7 @@ namespace SkinDevApp.Views
 
                 if (!AiEngine.IsAvailable)
                 {
-                    MessageBox.Show(
+                    LumyDialog.Show(
                         "The AI model is not loaded.\n\n" + (AiEngine.LoadErrorMessage ?? "Unknown error."),
                         "LUMYVUE Camera", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -635,7 +646,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Camera Hardware Error: " + ex.Message, "LUMYVUE Camera");
+                LumyDialog.Show("Camera Hardware Error: " + ex.Message, "LUMYVUE Camera");
             }
         }
 
@@ -716,7 +727,7 @@ namespace SkinDevApp.Views
                 _camWatchdog.Stop();
                 var names = string.Join("\n", Enumerable.Range(0, videoDevices.Count)
                     .Select(i => "  " + (i + 1) + ". " + videoDevices[i].Name));
-                MessageBox.Show(
+                LumyDialog.Show(
                     "No camera delivered any video.\n\nDevices found:\n" + names +
                     "\n\nClose other apps that use the camera (Teams, Zoom, Windows Camera, browser tabs) and check " +
                     "Settings > Privacy & security > Camera > 'Let desktop apps access your camera'.",
@@ -1200,7 +1211,7 @@ namespace SkinDevApp.Views
                 _session = null;
                 _live.Session = null;
                 _live.RequiredView = ScanView.Any;
-                MessageBox.Show("Could not create the scan folder, falling back to a single capture.\n\n" + ex.Message,
+                LumyDialog.Show("Could not create the scan folder, falling back to a single capture.\n\n" + ex.Message,
                     "LUMYVUE Scan", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -1234,7 +1245,7 @@ namespace SkinDevApp.Views
             try { next = session.AddResult(r); }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not record this view: " + ex.Message, "LUMYVUE Scan");
+                LumyDialog.Show("Could not record this view: " + ex.Message, "LUMYVUE Scan");
                 return;
             }
 
@@ -1357,7 +1368,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open the comparison gallery: " + ex.Message, "LUMYVUE Review",
+                LumyDialog.Show("Could not open the comparison gallery: " + ex.Message, "LUMYVUE Review",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1503,7 +1514,7 @@ namespace SkinDevApp.Views
         {
             if (currentCapturedImage == null)
             {
-                MessageBox.Show("Please upload an image first.", "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Warning);
+                LumyDialog.Show("Please upload an image first.", "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1511,7 +1522,7 @@ namespace SkinDevApp.Views
 
             if (!AiEngine.IsAvailable)
             {
-                MessageBox.Show(
+                LumyDialog.Show(
                     "The AI model is not loaded.\n\n" + (AiEngine.LoadErrorMessage ?? "Unknown error.") +
                     "\n\nSee the instructions at the top of AiEngine.cs.",
                     "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1537,7 +1548,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Analysis Error: " + ex.Message, "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Analysis Error: " + ex.Message, "LUMYVUE Analysis", MessageBoxButton.OK, MessageBoxImage.Error);
                 VerdictTxt.Text = "Status: Analysis failed. Please try again.";
             }
             finally
@@ -1595,7 +1606,7 @@ namespace SkinDevApp.Views
 
             if (pending.Count == 0)
             {
-                MessageBox.Show("There are no captures waiting for review.", "LUMYVUE Review");
+                LumyDialog.Show("There are no captures waiting for review.", "LUMYVUE Review");
                 return;
             }
 
@@ -1612,7 +1623,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open the capture: " + ex.Message, "LUMYVUE Review",
+                LumyDialog.Show("Could not open the capture: " + ex.Message, "LUMYVUE Review",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1664,7 +1675,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Report Window Error: " + ex.Message, "LUMYVUE Print", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Report Window Error: " + ex.Message, "LUMYVUE Print", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -266,7 +266,7 @@ namespace SkinDevApp
         {
             if (!_cameraReady || !_lightingConfirmed || !_distanceConfirmed || !_faceConfirmed)
             {
-                MessageBox.Show(
+                LumyDialog.Show(
                     "Please complete all preparation steps before continuing.",
                     "LUMYVUE Preparation",
                     MessageBoxButton.OK,
@@ -277,13 +277,13 @@ namespace SkinDevApp
             string id = AppSession.CurrentParticipantId;
             if (string.IsNullOrEmpty(id))
             {
-                MessageBox.Show("Register or select a participant before scanning.", "LUMYVUE Preparation",
+                LumyDialog.Show("Register or select a participant before scanning.", "LUMYVUE Preparation",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (!Workflow.HasScanConsent(id))
             {
-                MessageBox.Show("Required consent has not been recorded for " + id + ". The consent screen will open.",
+                LumyDialog.Show("Required consent has not been recorded for " + id + ". The consent screen will open.",
                     "LUMYVUE Preparation", MessageBoxButton.OK, MessageBoxImage.Information);
                 Nav.Go(new ConsentPage(id));
                 return;

@@ -127,11 +127,9 @@ namespace SkinDevApp
         private void ShowWelcome()
         {
             RecordPanel.Children.Clear();
-            var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Find a patient", 18, true));
-            sp.Children.Add(Ui.Text("Type a Patient ID (for example PS-0001) or part of a name and press Search, or choose a patient from the list. " +
-                                    "The patient's record, consent, latest result and scan history then appear here.", 13, false, Ui.Muted));
-            RecordPanel.Children.Add(Ui.Card(sp));
+            RecordPanel.Children.Add(Ui.Card(Ui.EmptyState("Icon.Users", "Find a patient",
+                "Type a Patient ID (for example PS-0001) or part of a name and press Search, or choose a patient from the list. " +
+                "The patient's record, consent, latest result and scan history then appear here.")));
         }
 
         private void LoadParticipant(string id)
@@ -153,7 +151,7 @@ namespace SkinDevApp
                 nf.Children.Add(Ui.Text("Patient not found", 18, true, Ui.Bad));
                 nf.Children.Add(Ui.Text("No participant has the ID " + id + ". Check the ID, or register a new participant (a new ID is generated; nothing is created from this search).",
                     13, false, Ui.Ink));
-                Button reg = Ui.Btn("REGISTER NEW PARTICIPANT", (s, e) => Nav.Go(new RegistrationPage()), "PrimaryButton");
+                Button reg = Ui.Btn("Register new patient", (s, e) => Nav.Go(new RegistrationPage()), "PrimaryButton");
                 reg.HorizontalAlignment = HorizontalAlignment.Left;
                 reg.Margin = new Thickness(0, 10, 0, 0);
                 nf.Children.Add(reg);
@@ -390,7 +388,7 @@ namespace SkinDevApp
             Button gallery = Ui.Btn("Compare photographs and heat maps", (o, e) =>
             {
                 try { new ComparisonGalleryWindow(d.Session.SessionFolder) { Owner = Application.Current.MainWindow }.Show(); }
-                catch (Exception ex) { MessageBox.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE"); }
+                catch (Exception ex) { LumyDialog.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE"); }
             }, "SmallButton");
             gallery.IsEnabled = hasFolder;
             DockPanel.SetDock(gallery, Dock.Right);
@@ -491,10 +489,10 @@ namespace SkinDevApp
                 string pid = StudyRepository.NormaliseParticipantId(idBox.Text);
                 if (r == null || StudyRepository.GetParticipant(pid) == null)
                 {
-                    MessageBox.Show("Select a scan and enter an existing PatientID.", "LUMYVUE Records");
+                    LumyDialog.Show("Select a scan and enter an existing PatientID.", "LUMYVUE Records");
                     return;
                 }
-                if (MessageBox.Show("File scan " + r.DisplayId + " under " + pid + "? This is recorded in the audit log.", "LUMYVUE Records",
+                if (LumyDialog.Show("File scan " + r.DisplayId + " under " + pid + "? This is recorded in the audit log.", "LUMYVUE Records",
                         MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
                 StudyRepository.LinkSessionToParticipant(r.ScanSessionID, pid);
                 ShowUnlinked();
@@ -536,14 +534,14 @@ namespace SkinDevApp
             {
                 int failed = 0;
                 int n = await Task.Run(() => SessionImporter.ImportArchive(out failed));
-                MessageBox.Show((n == 1 ? "1 saved scan was" : n + " saved scans were") + " added" + (failed > 0 ? ", and " + failed + (failed == 1 ? " folder" : " folders") + " could not be read" : "") +
+                LumyDialog.Show((n == 1 ? "1 saved scan was" : n + " saved scans were") + " added" + (failed > 0 ? ", and " + failed + (failed == 1 ? " folder" : " folders") + " could not be read" : "") +
                                 ".\n\nScans that already belong to a registered patient were filed under that patient. The others are listed under \"Scans without a patient\".",
                                 "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
                 if (_p != null) LoadParticipant(_p.ParticipantID); else ShowUnlinked();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("The saved scans could not be added: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("The saved scans could not be added: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally { b.IsEnabled = true; }
         }

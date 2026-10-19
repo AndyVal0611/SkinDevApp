@@ -116,13 +116,13 @@ namespace SkinDevApp
                 if (!string.IsNullOrEmpty(path) && (System.IO.File.Exists(path) || System.IO.Directory.Exists(path)))
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             }
-            catch (Exception ex) { MessageBox.Show("Could not open: " + ex.Message, "LUMYVUE"); }
+            catch (Exception ex) { LumyDialog.Show("Could not open: " + ex.Message, "LUMYVUE"); }
         }
 
         private void OpenGallery()
         {
             try { new ComparisonGalleryWindow(_d.Session.SessionFolder) { Owner = this }.Show(); }
-            catch (Exception ex) { MessageBox.Show("Could not open the gallery: " + ex.Message, "LUMYVUE"); }
+            catch (Exception ex) { LumyDialog.Show("Could not open the gallery: " + ex.Message, "LUMYVUE"); }
         }
 
         // ------------------------------------------------------- form helpers --
@@ -221,7 +221,7 @@ namespace SkinDevApp
             _rId.Text = AppSession.ActorId;
             ResearcherForm.Children.Add(_rId);
 
-            Button save = Ui.Btn("SAVE EVALUATION", (s, e) => SaveResearcher(), "PrimaryButton");
+            Button save = Ui.Btn("Save evaluation", (s, e) => SaveResearcher(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
             ResearcherForm.Children.Add(save);
         }
@@ -233,7 +233,7 @@ namespace SkinDevApp
             if (labels.Count == 0) missing.Add("a reference assessment");
             if (_rAgree.SelectedItem == null) missing.Add("agreement with AI");
             if (string.IsNullOrWhiteSpace(_rId.Text)) missing.Add("researcher ID");
-            if (missing.Count > 0) { MessageBox.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Verification"); return; }
+            if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Verification"); return; }
 
             try
             {
@@ -249,13 +249,13 @@ namespace SkinDevApp
                     RightComment = _rRight?.Text
                 }, labels);
 
-                MessageBox.Show("Researcher evaluation saved. The AI prediction is unchanged.", "LUMYVUE Verification",
+                LumyDialog.Show("Researcher evaluation saved. The AI prediction is unchanged.", "LUMYVUE Verification",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 Load();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not save the evaluation: " + ex.Message, "LUMYVUE Verification", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not save the evaluation: " + ex.Message, "LUMYVUE Verification", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -314,7 +314,7 @@ namespace SkinDevApp
             _dStatus = Combo(new[] { "Completed", "Pending" }, 0);
             DermForm.Children.Add(_dStatus);
 
-            Button save = Ui.Btn("SAVE VALIDATION", (s, e) => SaveDerm(), "PrimaryButton");
+            Button save = Ui.Btn("Save validation", (s, e) => SaveDerm(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
             DermForm.Children.Add(save);
         }
@@ -327,7 +327,7 @@ namespace SkinDevApp
             if (string.IsNullOrWhiteSpace(_dId.Text)) missing.Add("validator ID");
             if (status == "Completed" && labels.Count == 0) missing.Add("a reference assessment");
             if (status == "Completed" && _dAgreeAi.SelectedItem == null) missing.Add("agreement with AI");
-            if (missing.Count > 0) { MessageBox.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Validation"); return; }
+            if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Validation"); return; }
 
             try
             {
@@ -345,13 +345,13 @@ namespace SkinDevApp
                     ValidationStatus = status
                 }, labels);
 
-                MessageBox.Show("Dermatologist validation saved (" + status + "). The AI prediction is unchanged.", "LUMYVUE Validation",
+                LumyDialog.Show("Dermatologist validation saved (" + status + "). The AI prediction is unchanged.", "LUMYVUE Validation",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 Load();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not save the validation: " + ex.Message, "LUMYVUE Validation", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not save the validation: " + ex.Message, "LUMYVUE Validation", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

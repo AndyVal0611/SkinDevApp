@@ -1,0 +1,106 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- =====================================================================================
+         LUMYVUE design tokens
+         One place for every colour, gradient and font, so all screens share one visual identity.
+
+         Palette (earthy, calm, clinical):
+           Savory Sage      #818263   main colour: headers, primary actions, active states
+           Avocado Smoothie #C2C395   secondary actions, selection, completed steps
+           Blush Beet       #DDBAAE   accents, focus rings, highlight actions
+           Peach Protein    #EFD7CF   soft panels, notices, table headers
+           Oat Latte        #DCD4C1   lines, input borders, the page wash
+         Deeper / lighter tints of these are used where text must stay readable.
+         ===================================================================================== -->
+
+    <!-- type: a refined serif for the wordmark and page titles, a clean modern sans for everything else -->
+    <FontFamily x:Key="BodyFont">Segoe UI Variable Text, Segoe UI, Candara</FontFamily>
+    <FontFamily x:Key="DisplayFont">Constantia, Palatino Linotype, Georgia</FontFamily>
+    <FontFamily x:Key="NumberFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+
+    <!-- brand colours -->
+    <Color x:Key="SageColor">#818263</Color>
+    <Color x:Key="SageDeepColor">#5F6048</Color>
+    <Color x:Key="AvocadoColor">#C2C395</Color>
+    <Color x:Key="BlushColor">#DDBAAE</Color>
+    <Color x:Key="PeachColor">#EFD7CF</Color>
+    <Color x:Key="OatColor">#DCD4C1</Color>
+    <Color x:Key="InkColor">#2F3024</Color>
+
+    <SolidColorBrush x:Key="Lv.Sage" Color="#818263"/>
+    <SolidColorBrush x:Key="Lv.SageDeep" Color="#5F6048"/>
+    <SolidColorBrush x:Key="Lv.Avocado" Color="#C2C395"/>
+    <SolidColorBrush x:Key="Lv.AvocadoSoft" Color="#E7E8CF"/>
+    <SolidColorBrush x:Key="Lv.Blush" Color="#DDBAAE"/>
+    <SolidColorBrush x:Key="Lv.BlushDeep" Color="#B9897A"/>
+    <SolidColorBrush x:Key="Lv.Peach" Color="#EFD7CF"/>
+    <SolidColorBrush x:Key="Lv.PeachSoft" Color="#F8EBE6"/>
+    <SolidColorBrush x:Key="Lv.Oat" Color="#DCD4C1"/>
+    <SolidColorBrush x:Key="Lv.OatSoft" Color="#EFEADC"/>
+    <SolidColorBrush x:Key="Lv.Canvas" Color="#F6F3EA"/>
+    <SolidColorBrush x:Key="Lv.Surface" Color="#FFFEFB"/>
+    <SolidColorBrush x:Key="Lv.Ink" Color="#2F3024"/>
+    <SolidColorBrush x:Key="Lv.InkSoft" Color="#4A4B38"/>
+    <SolidColorBrush x:Key="Lv.Muted" Color="#6F6F58"/>
+    <SolidColorBrush x:Key="Lv.Faint" Color="#9B9B84"/>
+    <SolidColorBrush x:Key="Lv.Line" Color="#E8E2D3"/>
+    <SolidColorBrush x:Key="Lv.OnDark" Color="#F7F5E9"/>
+    <SolidColorBrush x:Key="Lv.OnDarkMuted" Color="#DDDCC2"/>
+
+    <!-- status colours (kept distinct from the brand so they always mean the same thing) -->
+    <SolidColorBrush x:Key="Lv.Good" Color="#4F7A4E"/>
+    <SolidColorBrush x:Key="Lv.GoodSoft" Color="#EAF1E4"/>
+    <SolidColorBrush x:Key="Lv.Warn" Color="#A86A12"/>
+    <SolidColorBrush x:Key="Lv.WarnSoft" Color="#FBF1DE"/>
+    <SolidColorBrush x:Key="Lv.Bad" Color="#A93D33"/>
+    <SolidColorBrush x:Key="Lv.BadSoft" Color="#F8E6E2"/>
+
+    <!-- names used by existing screens (kept so nothing breaks) -->
+    <SolidColorBrush x:Key="InkBrush" Color="#3A3B2C"/>
+    <SolidColorBrush x:Key="CreamBrush" Color="#F6F3EA"/>
+    <SolidColorBrush x:Key="RoseBrush" Color="#C99C8E"/>
+    <SolidColorBrush x:Key="SageBrush" Color="#D0D1A5"/>
+    <SolidColorBrush x:Key="MutedBrush" Color="#6F6F58"/>
+    <SolidColorBrush x:Key="TaupeBrush" Color="#8D8D76"/>
+    <SolidColorBrush x:Key="LineBrush" Color="#E3DDCB"/>
+    <SolidColorBrush x:Key="GoodBrush" Color="#588157"/>
+    <SolidColorBrush x:Key="WarnBrush" Color="#B7791F"/>
+    <SolidColorBrush x:Key="BadBrush" Color="#B4483F"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#818263"/>
+    <SolidColorBrush x:Key="ClayBrush" Color="#C99C8E"/>
+    <SolidColorBrush x:Key="TealBrush" Color="#818263"/>
+    <SolidColorBrush x:Key="PearlBrush" Color="#EFD7CF"/>
+    <SolidColorBrush x:Key="FieldBorderBrush" Color="#DCD4C1"/>
+
+    <!-- gradients -->
+    <!-- the header: deep sage to savory sage, with a faint warm glow on the right -->
+    <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#5F6048" Offset="0"/>
+        <GradientStop Color="#75765A" Offset="0.55"/>
+        <GradientStop Color="#8E8A6C" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- the page behind every screen: oat at the top fading to a hint of peach -->
+    <LinearGradientBrush x:Key="PageWash" StartPoint="0,0" EndPoint="0.35,1">
+        <GradientStop Color="#F2F0E2" Offset="0"/>
+        <GradientStop Color="#F6F3EA" Offset="0.5"/>
+        <GradientStop Color="#F7ECE6" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- a card edge that is a touch darker at the bottom, which reads as soft elevation without a blurry shadow -->
+    <LinearGradientBrush x:Key="CardEdge" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#EFEADF" Offset="0"/>
+        <GradientStop Color="#DDD5C2" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HeroSage" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#6A6B50" Offset="0"/>
+        <GradientStop Color="#848566" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HeroBlush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#9A7466" Offset="0"/>
+        <GradientStop Color="#BE9586" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="SplashWash" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#55563F" Offset="0"/>
+        <GradientStop Color="#717257" Offset="0.6"/>
+        <GradientStop Color="#8F7F6E" Offset="1"/>
+    </LinearGradientBrush>
+</ResourceDictionary>

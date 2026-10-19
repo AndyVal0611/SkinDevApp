@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using SkinDevApp.Data;
 
 namespace SkinDevApp.Views
@@ -22,6 +23,20 @@ namespace SkinDevApp.Views
         {
             InitializeComponent();
             RefreshMode();
+
+            // keyboard: the cursor starts in the username box, Enter moves to the next box and signs in from the last one
+            Loaded += (s, e) => UsernameTxt.Focus();
+            PreviewKeyDown += OnEnterKey;
+        }
+
+        private void OnEnterKey(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter && e.Key != Key.Return) return;
+            e.Handled = true;
+
+            if (UsernameTxt.IsKeyboardFocusWithin && PasswordTxt.Password.Length == 0) { PasswordTxt.Focus(); return; }
+            if (_firstRun && PasswordTxt.IsKeyboardFocusWithin && ConfirmPasswordTxt.Password.Length == 0) { ConfirmPasswordTxt.Focus(); return; }
+            if (EnterPortalBtn.IsEnabled) EnterPortalBtn_Click(EnterPortalBtn, new RoutedEventArgs());
         }
 
         /// <summary>Shows the first-run setup when no account exists yet, otherwise the normal sign-in.</summary>
@@ -67,19 +82,19 @@ namespace SkinDevApp.Views
 
                     case SignInResult.LockedOut:
                         PasswordTxt.Clear();
-                        MessageBox.Show("Too many incorrect attempts for this username. Please wait " + AuthService.LockedSeconds(user) +
+                        LumyDialog.Show("Too many incorrect attempts for this username. Please wait " + AuthService.LockedSeconds(user) +
                                         " seconds and try again.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
                         break;
 
                     default:
                         PasswordTxt.Clear();
-                        MessageBox.Show("The username or password is incorrect.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LumyDialog.Show("The username or password is incorrect.", "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Warning);
                         break;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Sign-in is not available: " + ex.Message, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Sign-in is not available: " + ex.Message, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -90,7 +105,7 @@ namespace SkinDevApp.Views
             if (err == null && pw != ConfirmPasswordTxt.Password) err = "The two passwords do not match.";
             if (err != null)
             {
-                MessageBox.Show(err, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Information);
+                LumyDialog.Show(err, "LUMYVUE Security", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 

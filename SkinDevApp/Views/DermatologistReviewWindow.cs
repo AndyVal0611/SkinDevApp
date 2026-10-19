@@ -26,7 +26,7 @@ namespace SkinDevApp.Views
         private static readonly string[] GradCamOptions = { "Useful", "Partially useful", "Not useful", "Not interpretable", "Not available" };
 
         public const string Disclaimer =
-            "LUMYVUE / PrecisionSkin provides AI-generated classifications and visual evidence based on the condition categories included in its trained models. " +
+            "LUMYVUE provides AI-generated classifications and visual evidence based on the condition categories included in its trained models. " +
             "These outputs are intended to assist research and review and do not constitute a medical diagnosis. " +
             "Clinical interpretation and diagnosis remain the responsibility of a qualified healthcare professional.";
 
@@ -359,7 +359,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(Label("Validation status *"));
             _status = Combo(new[] { "Completed", "Pending" }); _status.SelectedIndex = 0; sp.Children.Add(_status);
 
-            Button save = Ui.Btn("SAVE DERMATOLOGIST ASSESSMENT", (o, e) => Save(), "PrimaryButton");
+            Button save = Ui.Btn("Save dermatologist assessment", (o, e) => Save(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
             save.HorizontalAlignment = HorizontalAlignment.Left;
             sp.Children.Add(save);
@@ -374,7 +374,7 @@ namespace SkinDevApp.Views
             if (string.IsNullOrWhiteSpace(_id.Text)) missing.Add("validator ID");
             if (status == "Completed" && refIdx < 0) missing.Add("a reference assessment");
             if (status == "Completed" && _agree.SelectedIndex < 0) missing.Add("agreement with the AI classification");
-            if (missing.Count > 0) { MessageBox.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Dermatologist Review"); return; }
+            if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Dermatologist Review"); return; }
 
             try
             {
@@ -398,13 +398,13 @@ namespace SkinDevApp.Views
                     ValidationStatus = status
                 }, label == null ? null : new List<string> { label });
 
-                MessageBox.Show("Dermatologist assessment saved (" + status + "). The AI output is unchanged.", "LUMYVUE Dermatologist Review",
+                LumyDialog.Show("Dermatologist assessment saved (" + status + "). The AI output is unchanged.", "LUMYVUE Dermatologist Review",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not save the assessment: " + ex.Message, "LUMYVUE Dermatologist Review", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not save the assessment: " + ex.Message, "LUMYVUE Dermatologist Review", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

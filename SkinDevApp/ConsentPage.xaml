@@ -24,7 +24,7 @@
                     <StackPanel>
                         <TextBlock Text="A. Agreement to take part in the research" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Body}" Margin="0,0,0,10"
-                                   Text="PrecisionSkin is a research prototype that photographs the face and uses a computer model to score skin images. It does not provide a diagnosis and does not replace professional medical evaluation. Participation is voluntary and you may stop at any time without any consequence."/>
+                                   Text="LUMYVUE is a research prototype that photographs the face and uses a computer model to score skin images. It does not provide a diagnosis and does not replace professional medical evaluation. Participation is voluntary and you may stop at any time without any consequence."/>
                         <CheckBox x:Name="UnderstoodChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I have read (or had read to me) and understood the research information, and my questions were answered. *"/>
                         </CheckBox>
@@ -43,7 +43,7 @@
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for images of my face to be captured. *"/>
                         </CheckBox>
                         <CheckBox x:Name="ProcessingChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be processed by the PrecisionSkin research system (scores and heat maps). *"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be processed by the LUMYVUE research system (scores and heat maps). *"/>
                         </CheckBox>
                         <Separator Margin="0,10"/>
                         <CheckBox x:Name="FutureUseChk" Margin="0,4">

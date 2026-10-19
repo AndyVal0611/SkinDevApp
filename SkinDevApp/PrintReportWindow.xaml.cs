@@ -255,13 +255,13 @@ namespace SkinDevApp.Views
                         savedConfidence
                     );
 
-                    MessageBox.Show("Clinical PDF Assessment Report saved successfully and logged to database!", "LUMYVUE PDF Export", MessageBoxButton.OK, MessageBoxImage.Information);
+                    LumyDialog.Show("Clinical PDF Assessment Report saved successfully and logged to database!", "LUMYVUE PDF Export", MessageBoxButton.OK, MessageBoxImage.Information);
                     this.Close();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("PDF Export Error: " + ex.Message, "LUMYVUE PDF Export", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("PDF Export Error: " + ex.Message, "LUMYVUE PDF Export", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {

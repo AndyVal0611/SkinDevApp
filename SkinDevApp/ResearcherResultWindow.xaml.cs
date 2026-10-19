@@ -194,11 +194,11 @@ namespace SkinDevApp.Views
         private void Step(int dir)
         {
             _queue = ReviewStore.ListPending();
-            if (_queue.Count == 0) { MessageBox.Show("No pending captures.", "LUMYVUE Review"); return; }
+            if (_queue.Count == 0) { LumyDialog.Show("No pending captures.", "LUMYVUE Review"); return; }
             int i = _queue.IndexOf(_folder);
             int next = i < 0 ? 0 : Math.Max(0, Math.Min(_queue.Count - 1, i + dir));
             try { Load(_queue[next]); }
-            catch (Exception ex) { MessageBox.Show(ex.Message, "LUMYVUE Review"); }
+            catch (Exception ex) { LumyDialog.Show(ex.Message, "LUMYVUE Review"); }
         }
 
         private void PrevBtn_Click(object sender, RoutedEventArgs e) { Step(-1); }
@@ -208,7 +208,7 @@ namespace SkinDevApp.Views
         {
             if (LabelCombo.SelectedItem == null)
             {
-                MessageBox.Show("Choose a label first.", "LUMYVUE Review");
+                LumyDialog.Show("Choose a label first.", "LUMYVUE Review");
                 return;
             }
             string label = (string)LabelCombo.SelectedItem;
@@ -226,11 +226,11 @@ namespace SkinDevApp.Views
             {
                 ReviewStore.SaveReview(_folder, rv);
                 StatusTxt.Text = "Status: Reviewed by " + rv.Reviewer + " (" + rv.ReviewerLabel + ")";
-                MessageBox.Show("Review saved. This does not add the image to any training set.", "LUMYVUE Review");
+                LumyDialog.Show("Review saved. This does not add the image to any training set.", "LUMYVUE Review");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not save: " + ex.Message, "LUMYVUE Review");
+                LumyDialog.Show("Could not save: " + ex.Message, "LUMYVUE Review");
             }
         }
 
@@ -249,7 +249,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open the gallery: " + ex.Message, "LUMYVUE Review");
+                LumyDialog.Show("Could not open the gallery: " + ex.Message, "LUMYVUE Review");
             }
         }
 

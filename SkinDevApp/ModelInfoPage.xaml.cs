@@ -95,7 +95,10 @@ namespace SkinDevApp.Views
 
             var cam = new StackPanel();
             cam.Children.Add(Ui.Text("Heat-map service", 16, true));
-            cam.Children.Add(Ui.Text("Checking…", 12, false, Ui.Muted));
+            var checking = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+            checking.Children.Add(Ui.Spinner(18));
+            checking.Children.Add(Ui.Text("Checking the heat-map service…", 12.5, false, Ui.Muted, new Thickness(10, 0, 0, 0)));
+            cam.Children.Add(checking);
             RightColumn.Children.Add(Ui.Card(cam));
 
             var hist = new StackPanel();

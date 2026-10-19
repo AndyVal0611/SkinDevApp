@@ -46,7 +46,7 @@ namespace SkinDevApp.Views
         public static bool RequireResearcher(string what)
         {
             if (AppSession.IsResearcher) return true;
-            MessageBox.Show(what + " is available to signed-in researchers / administrators only.",
+            LumyDialog.Show(what + " is available to signed-in researchers / administrators only.",
                 "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }
@@ -80,51 +80,110 @@ namespace SkinDevApp.Views
 
         // ------------------------------------------------------------- header --
 
-        /// <summary>The dark LUMYVUE bar used at the top of every study screen.</summary>
+        /// <summary>
+        /// The LUMYVUE bar at the top of every screen: wordmark and skin-tone ribbon, the page title, the signed-in user and the
+        /// navigation buttons. On narrow screens the buttons shrink to icons and the subtitle is hidden.
+        /// </summary>
         public static Border Header(string title, bool showHome = true, bool showBack = true)
         {
-            var dock = new DockPanel { LastChildFill = true };
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            grid.Children.Add(BrandMark(true));
+
+            var divider = new Border { Width = 1, Height = 34, Background = Brush("#40FFFFFF"), Margin = new Thickness(20, 0, 20, 0), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(divider, 1);
+            grid.Children.Add(divider);
+
+            var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            titles.Children.Add(new TextBlock { Text = title, Foreground = Brush("#F7F5E9"), FontSize = 17, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+            var subtitle = new TextBlock { Text = "AI skin health monitoring", Foreground = Brush("#DDDCC2"), FontSize = 11.5, Margin = new Thickness(0, 1, 0, 0) };
+            titles.Children.Add(subtitle);
+            Grid.SetColumn(titles, 2);
+            grid.Children.Add(titles);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            DockPanel.SetDock(right, Dock.Right);
-
-            var signedIn = new TextBlock
-            {
-                Text = string.IsNullOrEmpty(AppSession.UserId) ? "" : "Signed in as " + AppSession.UserId,
-                Foreground = Brush("#F0EFD8"),
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
-            };
-            right.Children.Add(signedIn);
-
-            if (showBack) right.Children.Add(HeaderButton("Back", (s, e) => Nav.Back()));
-            if (showHome) right.Children.Add(HeaderButton("Dashboard", (s, e) => Nav.Home()));
-            right.Children.Add(HeaderButton("Sign out", (s, e) => Nav.SignOut()));
-            dock.Children.Add(right);
-
-            var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            left.Children.Add(new TextBlock { Text = "LUMYVUE", Foreground = Brushes.White, FontSize = 24, FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont"), FontStyle = FontStyles.Italic });
-            left.Children.Add(new TextBlock
-            {
-                Text = "   PrecisionSkin  ·  " + title,
-                Foreground = Brush("#F0EFD8"),
-                FontSize = 14,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 0, 0)
-            });
-            dock.Children.Add(left);
+            FrameworkElement chip = UserChip();
+            if (chip != null) right.Children.Add(chip);
+            var buttons = new List<Button>();
+            if (showBack) buttons.Add(HeaderButton("Back", "Icon.Back", (s, e) => Nav.Back()));
+            if (showHome) buttons.Add(HeaderButton("Dashboard", "Icon.Home", (s, e) => Nav.Home()));
+            buttons.Add(HeaderButton("Sign out", "Icon.Logout", (s, e) => Nav.SignOut()));
+            foreach (Button b in buttons) right.Children.Add(b);
+            Grid.SetColumn(right, 3);
+            grid.Children.Add(right);
 
             var bar = new Border
             {
                 Background = (Brush)Application.Current.FindResource("HeaderGradient"),
-                CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(24, 14, 24, 12),
+                CornerRadius = new CornerRadius(18),
+                Padding = new Thickness(22, 12, 14, 12),
                 Margin = new Thickness(8, 0, 8, 16),
-                Child = BuildHeaderBody(dock)
+                Child = grid
             };
-            bar.SizeChanged += (s, e) => signedIn.Visibility = bar.ActualWidth < 980 ? Visibility.Collapsed : Visibility.Visible;
+            bar.SizeChanged += (s, e) =>
+            {
+                bool compact = bar.ActualWidth < 1050;
+                subtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+                if (chip != null) SetChipCompact(chip, bar.ActualWidth < 1200);
+                foreach (Button b in buttons) SetHeaderButtonCompact(b, compact);
+            };
             return bar;
+        }
+
+        /// <summary>The LUMYVUE wordmark with the six-tone skin ribbon under it.</summary>
+        public static FrameworkElement BrandMark(bool onDark, double size = 26)
+        {
+            var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            sp.Children.Add(new TextBlock
+            {
+                Text = "LUMYVUE", FontSize = size, FontStyle = FontStyles.Italic,
+                FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont"),
+                Foreground = onDark ? Brushes.White : Brush("#2F3024")
+            });
+            sp.Children.Add(SkinRibbon(size * 0.62, 3, new Thickness(2, 3, 0, 0)));
+            return sp;
+        }
+
+        /// <summary>Six Fitzpatrick-inspired skin tones: the brand's signature detail.</summary>
+        public static StackPanel SkinRibbon(double swatch = 16, double height = 3, Thickness? margin = null)
+        {
+            var ribbon = new StackPanel { Orientation = Orientation.Horizontal, Margin = margin ?? new Thickness(0) };
+            foreach (var hex in new[] { "#F3DFD0", "#E9C6A8", "#D9A97F", "#BC8559", "#8C5A3C", "#5B3A29" })
+                ribbon.Children.Add(new Border { Width = swatch, Height = height, CornerRadius = new CornerRadius(height / 2), Margin = new Thickness(0, 0, 3, 0), Background = Brush(hex) });
+            return ribbon;
+        }
+
+        /// <summary>The signed-in user: initials in a blush circle and the user name.</summary>
+        private static FrameworkElement UserChip()
+        {
+            string user = AppSession.UserId;
+            if (string.IsNullOrEmpty(user)) return null;
+            string initials = new string(user.Where(char.IsLetterOrDigit).Take(2).ToArray()).ToUpperInvariant();
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Children.Add(new Border
+            {
+                Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = Brush("#DDBAAE"),
+                Child = new TextBlock { Text = initials, FontSize = 12, FontWeight = FontWeights.Bold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+            });
+            var name = new TextBlock { Text = user, Foreground = Brush("#F7F5E9"), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 4, 0) };
+            row.Children.Add(name);
+            return new Border
+            {
+                Background = Brush("#1FFFFFFF"), CornerRadius = new CornerRadius(22), Padding = new Thickness(4, 4, 10, 4),
+                Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Child = row,
+                ToolTip = "Signed in as " + user, Tag = name
+            };
+        }
+
+        private static void SetChipCompact(FrameworkElement chip, bool compact)
+        {
+            var name = chip.Tag as TextBlock;
+            if (name != null) name.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            ((Border)chip).Padding = compact ? new Thickness(4) : new Thickness(4, 4, 10, 4);
         }
 
         /// <summary>
@@ -185,21 +244,102 @@ namespace SkinDevApp.Views
         }
 
         // Skin-tone ribbon: the app's one signature detail, six Fitzpatrick-inspired swatches.
-        private static UIElement BuildHeaderBody(UIElement dock)
+        private static Button HeaderButton(string text, string icon, RoutedEventHandler click)
         {
-            var ribbon = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-            foreach (var hex in new[] { "#F3DFD0", "#E9C6A8", "#D9A97F", "#BC8559", "#8C5A3C", "#5B3A29" })
-                ribbon.Children.Add(new Border { Width = 30, Height = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 4, 0), Background = Brush(hex) });
-            var sp = new StackPanel();
-            sp.Children.Add(dock);
-            sp.Children.Add(ribbon);
+            var b = new Button { Content = IconLabel(icon, text, 17), Style = (Style)Application.Current.FindResource("HeaderButton"), ToolTip = text };
+            b.Click += click;
+            return b;
+        }
+
+        /// <summary>Header buttons show only their icon on narrow screens.</summary>
+        private static void SetHeaderButtonCompact(Button b, bool compact)
+        {
+            var sp = b.Content as StackPanel;
+            if (sp == null || sp.Children.Count < 2) return;
+            sp.Children[1].Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            ((FrameworkElement)sp.Children[0]).Margin = compact ? new Thickness(0) : new Thickness(0, 0, 8, 0);
+            b.Padding = compact ? new Thickness(12, 0, 12, 0) : new Thickness(16, 0, 18, 0);
+        }
+
+        // -------------------------------------------------------------- icons --
+
+        /// <summary>A LUMYVUE line icon (see Themes/Lumyvue.Icons.xaml). It takes the surrounding text colour unless a brush is given.</summary>
+        public static ContentControl Icon(string key, double size = 20, Brush brush = null)
+        {
+            var c = new ContentControl
+            {
+                Style = (Style)Application.Current.FindResource("IconBox"),
+                Tag = Application.Current.TryFindResource(key) as Geometry,
+                Width = size, Height = size
+            };
+            if (brush != null) c.Foreground = brush;
+            return c;
+        }
+
+        /// <summary>An icon followed by a label, for button content.</summary>
+        public static StackPanel IconLabel(string iconKey, string text, double iconSize = 18)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            sp.Children.Add(Icon(iconKey, iconSize));
+            ((FrameworkElement)sp.Children[0]).Margin = new Thickness(0, 0, 8, 0);
+            sp.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
             return sp;
         }
 
-        private static Button HeaderButton(string text, RoutedEventHandler click)
+        /// <summary>A round tinted badge holding an icon (used on tiles, empty states and dialogs).</summary>
+        public static Border IconBadge(string key, double size, string background, string foreground)
         {
-            var b = new Button { Content = text, Style = (Style)Application.Current.FindResource("HeaderButton") };
-            b.Click += click;
+            return new Border
+            {
+                Width = size, Height = size, CornerRadius = new CornerRadius(size / 2), Background = Brush(background),
+                Child = new Grid { Children = { Icon(key, size * 0.46, Brush(foreground)) } }
+            };
+        }
+
+        /// <summary>A friendly empty state: an icon, a title and one line of help.</summary>
+        public static StackPanel EmptyState(string iconKey, string title, string text)
+        {
+            var sp = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(24, 28, 24, 28), MaxWidth = 520 };
+            var badge = IconBadge(iconKey, 64, "#EFEADC", "#818263");
+            badge.HorizontalAlignment = HorizontalAlignment.Center;
+            sp.Children.Add(badge);
+            sp.Children.Add(new TextBlock { Text = title, FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 4) });
+            sp.Children.Add(new TextBlock { Text = text, FontSize = 13, Foreground = Muted, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
+            return sp;
+        }
+
+        // ---------------------------------------------------- loading states --
+
+        /// <summary>A small spinning arc for things that are loading.</summary>
+        public static FrameworkElement Spinner(double size = 22, string hex = "#818263")
+        {
+            var track = new System.Windows.Shapes.Ellipse { Width = size, Height = size, Stroke = Brush("#22000000"), StrokeThickness = size / 9 };
+            double r = size / 2 - size / 18;
+            var arc = new System.Windows.Shapes.Path
+            {
+                Stroke = Brush(hex), StrokeThickness = size / 9, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse(string.Format(System.Globalization.CultureInfo.InvariantCulture, "M{0},{1} A{2},{2} 0 0 1 {3},{4}",
+                        size / 2, size / 2 - r, r, size / 2 + r, size / 2)),
+                RenderTransformOrigin = new Point(0.5, 0.5)
+            };
+            var rot = new RotateTransform();
+            arc.RenderTransform = rot;
+            rot.BeginAnimation(RotateTransform.AngleProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(0.9)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+            return new Grid { Width = size, Height = size, Children = { track, arc } };
+        }
+
+        /// <summary>A soft shimmering placeholder bar shown while something loads (a "skeleton").</summary>
+        public static Border Skeleton(double width, double height, double radius = 8)
+        {
+            var brush = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5), MappingMode = BrushMappingMode.RelativeToBoundingBox };
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#EFEADC"), 0));
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#F8F5EC"), 0.5));
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#EFEADC"), 1));
+            var shift = new TranslateTransform();
+            brush.RelativeTransform = shift;
+            shift.BeginAnimation(TranslateTransform.XProperty, new System.Windows.Media.Animation.DoubleAnimation(-1, 1, TimeSpan.FromSeconds(1.4)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+            var b = new Border { Height = height, CornerRadius = new CornerRadius(radius), Background = brush, Margin = new Thickness(0, 0, 0, 8) };
+            if (width > 0) b.Width = width;
             return b;
         }
 
@@ -393,7 +533,7 @@ namespace SkinDevApp.Views
             BitmapSource src = Ui.LoadImage(path);
             if (src == null)
             {
-                MessageBox.Show("This image is not available on disk:\n" + (path ?? "(no file)"), "LUMYVUE");
+                LumyDialog.Show("This image is not available on disk:\n" + (path ?? "(no file)"), "LUMYVUE");
                 return;
             }
 
@@ -478,25 +618,41 @@ namespace SkinDevApp.Views
 
         public static Border Chip(string name, bool ok, string detail)
         {
+            string icon = name.StartsWith("Camera") ? "Icon.Camera" : name.StartsWith("Skin") ? "Icon.Chip"
+                        : name.StartsWith("Heat") ? "Icon.Flame" : name.StartsWith("Data") ? "Icon.Database" : "Icon.Info";
             var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            sp.Children.Add(new System.Windows.Shapes.Ellipse
-            {
-                Width = 10, Height = 10, Fill = ok ? Ui.Good : Ui.Bad,
-                Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
-            });
-            sp.Children.Add(new TextBlock { Text = name + ": ", FontWeight = FontWeights.SemiBold, FontSize = 12, Foreground = Ui.Ink });
-            sp.Children.Add(new TextBlock { Text = ok ? "Ready" : "Check", FontSize = 12, Foreground = ok ? Ui.Good : Ui.Bad, FontWeight = FontWeights.Bold });
+            Border badge = Ui.IconBadge(icon, 30, ok ? "#EAF1E4" : "#F8E6E2", ok ? "#4F7A4E" : "#A93D33");
+            badge.Margin = new Thickness(0, 0, 10, 0);
+            sp.Children.Add(badge);
+            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            words.Children.Add(new TextBlock { Text = name, FontWeight = FontWeights.SemiBold, FontSize = 12.5, Foreground = Ui.Brush("#2F3024") });
+            words.Children.Add(new TextBlock { Text = ok ? "Ready" : "Needs attention", FontSize = 11.5, Foreground = ok ? Ui.Brush("#4F7A4E") : Ui.Brush("#A93D33") });
+            sp.Children.Add(words);
             return new Border
             {
-                Background = Brushes.White,
-                BorderBrush = Ui.Line,
+                Background = Ui.Brush("#FFFEFB"),
+                BorderBrush = Ui.Brush("#E8E2D3"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(12, 7, 12, 7),
-                Margin = new Thickness(0, 0, 8, 8),
+                CornerRadius = new CornerRadius(16),
+                Padding = new Thickness(8, 7, 16, 7),
+                Margin = new Thickness(0, 0, 10, 10),
                 ToolTip = detail,
                 Child = sp
             };
         }
+
+        /// <summary>Four shimmering chip placeholders while the system check runs.</summary>
+        public static WrapPanel StripLoading()
+        {
+            var w = new WrapPanel();
+            for (int i = 0; i < 4; i++)
+            {
+                var s = Ui.Skeleton(176, 46, 16);
+                s.Margin = new Thickness(0, 0, 10, 10);
+                w.Children.Add(s);
+            }
+            return w;
+        }
+
     }
 }

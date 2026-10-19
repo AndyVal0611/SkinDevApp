@@ -413,6 +413,7 @@ namespace SkinDevApp
                 int n = s.Save();
                 StatusTxt.Foreground = Ui.Good;
                 StatusTxt.Text = n == 0 ? "Nothing changed." : (n == 1 ? "1 setting was" : n + " settings were") + " saved at " + DateTime.Now.ToString("h:mm tt", CultureInfo.GetCultureInfo("en-US")) + ".";
+                Toast.Show(n == 0 ? "Nothing changed" : "Settings saved", n == 0 ? ToastKind.Info : ToastKind.Success);
             }
             catch (Exception ex)
             {

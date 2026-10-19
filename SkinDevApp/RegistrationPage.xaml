@@ -71,10 +71,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="Date of birth" Style="{StaticResource FieldLabel}"/>
-                                    <Border CornerRadius="12" BorderBrush="#DCD4C1" BorderThickness="1" Background="#FFFDF9" Height="38" ClipToBounds="True">
-                                        <DatePicker x:Name="DobPicker" FontSize="13" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
-                                                    Margin="6,0,0,0" SelectedDateChanged="DobPicker_Changed"/>
-                                    </Border>
+                                    <DatePicker x:Name="DobPicker" SelectedDateChanged="DobPicker_Changed"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="Age *" Style="{StaticResource FieldLabel}"/>

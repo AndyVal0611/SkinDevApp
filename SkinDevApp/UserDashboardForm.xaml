@@ -3,6 +3,14 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="UserDashboardForm" Background="Transparent">
 
+    <Page.Resources>
+        <Style x:Key="StatLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="#6F6F58"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Page.Resources>
+
     <Grid Margin="25">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,68 +19,118 @@
         </Grid.RowDefinitions>
 
         <!-- Top Clinic Navigation Bar -->
-        <Border Grid.Row="0" Background="{StaticResource HeaderGradient}" CornerRadius="16" Padding="24,14" Margin="0,0,0,20">
-            <DockPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="24" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic"/>
-                    <TextBlock Text="  Legacy report log (PatientLogs)" Foreground="#F0EFD8" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
+        <Border Grid.Row="0" Background="{StaticResource HeaderGradient}" CornerRadius="18" Padding="22,12,14,12" Margin="8,0,8,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic"/>
+                    <ContentControl Style="{StaticResource SkinRibbon}" Margin="2,3,0,0"/>
                 </StackPanel>
-                <Button Content="Dashboard" Style="{StaticResource HeaderButton}" HorizontalAlignment="Right" Click="LogoutBtn_Click"/>
-            </DockPanel>
+                <Border Grid.Column="1" Width="1" Height="34" Background="#40FFFFFF" Margin="20,0" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="Old report log" Foreground="#F7F5E9" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock Text="Reports saved by earlier versions (PatientLogs), read only" Foreground="#DDDCC2" FontSize="11.5" Margin="0,1,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="3" Style="{StaticResource HeaderButton}" VerticalAlignment="Center" Click="LogoutBtn_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Home}" Width="17" Height="17" Margin="0,0,8,0"/>
+                        <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
         </Border>
 
         <!-- Dynamic Summary Metric Cards -->
-        <Grid Grid.Row="1" Margin="0,0,0,20">
+        <Grid Grid.Row="1" Margin="0,0,0,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="15"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="15"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Card 1: Total Evaluations (Dynamic Database Count) -->
-            <Border Grid.Column="0" Background="White" CornerRadius="18" Padding="22">
-                <StackPanel>
-                    <TextBlock Text="Total Evaluations" FontSize="12" Foreground="#8D8D76" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TotalEvaluationsTxt" Text="0" FontSize="30" FontFamily="{StaticResource DisplayFont}" Foreground="#3A3B2C" Margin="0,6,0,0"/>
-                </StackPanel>
+            <Border Grid.Column="0" Style="{StaticResource Card}">
+                <DockPanel>
+                    <Border Width="48" Height="48" CornerRadius="24" Background="#E7E8CF" Margin="0,0,16,0" DockPanel.Dock="Left">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Report}" Foreground="#5F6048" Width="22" Height="22" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Total evaluations" Style="{StaticResource StatLabel}"/>
+                        <TextBlock x:Name="TotalEvaluationsTxt" Text="0" FontSize="30" FontWeight="SemiBold" FontFamily="{StaticResource NumberFont}" Foreground="#2F3024" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
             <!-- Card 2: Unique Clients Logged (Dynamic Database Count) -->
-            <Border Grid.Column="2" Background="White" CornerRadius="18" Padding="22">
-                <StackPanel>
-                    <TextBlock Text="Unique Clients Logged" FontSize="12" Foreground="#8D8D76" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="UniquePatientsTxt" Text="0" FontSize="30" FontFamily="{StaticResource DisplayFont}" Foreground="#3A3B2C" Margin="0,6,0,0"/>
-                </StackPanel>
+            <Border Grid.Column="1" Style="{StaticResource Card}">
+                <DockPanel>
+                    <Border Width="48" Height="48" CornerRadius="24" Background="#F8EBE6" Margin="0,0,16,0" DockPanel.Dock="Left">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Users}" Foreground="#5F6048" Width="22" Height="22" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Unique patients logged" Style="{StaticResource StatLabel}"/>
+                        <TextBlock x:Name="UniquePatientsTxt" Text="0" FontSize="30" FontWeight="SemiBold" FontFamily="{StaticResource NumberFont}" Foreground="#2F3024" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
             <!-- Card 3: System / ONNX Status -->
-            <Border Grid.Column="4" Background="White" CornerRadius="18" Padding="22">
-                <StackPanel>
-                    <TextBlock Text="ONNX Engine Status" FontSize="12" Foreground="#8D8D76" FontWeight="SemiBold"/>
-                    <TextBlock Text="Active (PrecisionSkin)" FontSize="22" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="#588157" Margin="0,10,0,0"/>
-                </StackPanel>
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+                <DockPanel>
+                    <Border Width="48" Height="48" CornerRadius="24" Background="#EAF1E4" Margin="0,0,16,0" DockPanel.Dock="Left">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chip}" Foreground="#4F7A4E" Width="22" Height="22" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="ONNX engine status" Style="{StaticResource StatLabel}"/>
+                        <TextBlock Text="Active (LUMYVUE)" FontSize="22" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="#4F7A4E" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
         </Grid>
 
         <!-- Main Restricted Database Records Log Card -->
-        <Border Grid.Row="2" Background="White" CornerRadius="16" Padding="20">
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="22,20">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,0,0,15">
-                    <TextBlock Text="Legacy report log (read-only)" Style="{StaticResource H2}" Margin="0" VerticalAlignment="Center"/>
-                </Grid>
+                <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                    <TextBlock Text="LEGACY RECORDS" Style="{StaticResource Eyebrow}"/>
+                    <TextBlock Text="Report log (read-only)" Style="{StaticResource SectionTitle}"/>
+                </StackPanel>
 
                 <!-- SQLite Patient Records DataGrid -->
-                <DataGrid x:Name="RecordsDataGrid" Grid.Row="1" Style="{StaticResource Grid}" AutoGenerateColumns="True" 
-                          CanUserAddRows="False" IsReadOnly="True" GridLinesVisibility="Horizontal" 
-                          Background="Transparent" BorderThickness="1" BorderBrush="#D0D1A5" 
-                          RowHeight="40" FontSize="13" Foreground="#3A3B2C"/>
+                <DataGrid x:Name="RecordsDataGrid" Grid.Row="1" Style="{StaticResource Grid}" AutoGenerateColumns="True"
+                          CanUserAddRows="False" IsReadOnly="True" GridLinesVisibility="Horizontal"
+                          Background="Transparent" BorderThickness="1" BorderBrush="#E3DDCB"
+                          RowHeight="44" FontSize="13" Foreground="#2F3024"/>
+
+                <!-- empty state: shown when the old log has no rows -->
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" MaxWidth="460">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasItems, ElementName=RecordsDataGrid}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <Border Width="64" Height="64" CornerRadius="32" Background="#EFEADC" HorizontalAlignment="Center">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Archive}" Foreground="#818263" Width="29" Height="29" HorizontalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="No old reports" FontSize="17" FontWeight="SemiBold" Foreground="#2F3024" HorizontalAlignment="Center" Margin="0,14,0,4"/>
+                    <TextBlock Text="This log only holds reports saved by earlier versions of the app. New scans are kept in Patient records."
+                               FontSize="13" Foreground="#6F6F58" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

@@ -235,9 +235,17 @@ namespace SkinDevApp.Views
             var actions = new StackPanel();
             actions.Children.Add(Ui.Text("What would you like to do next?", 15, true));
 
+            var icons = new Dictionary<string, string>
+            {
+                { "Compare photographs and heat maps", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
+                { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
+                { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" }
+            };
             void Add(string text, RoutedEventHandler h, string style = "SecondaryButton", bool enabled = true)
             {
                 Button b = Ui.Btn(text, h, style);
+                string icon;
+                if (icons.TryGetValue(text, out icon)) b.Content = Ui.IconLabel(icon, text, 18);
                 b.Margin = new Thickness(0, 0, 0, 8);
                 b.IsEnabled = enabled;
                 actions.Children.Add(b);
@@ -293,7 +301,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
