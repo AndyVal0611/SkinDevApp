@@ -43,6 +43,9 @@ namespace SkinDevApp
                 }
             }));
 
+            // touchscreen: LUMYVUE's own keyboard opens when a text field is tapped (never for a mouse click or a physical keyboard)
+            OnScreenKeyboard.Install();
+
             // ---- LUMYVUE start-up: the splash screen reports each real step as it finishes ----------------------------------
             var splash = new SplashWindow();
             splash.Show();

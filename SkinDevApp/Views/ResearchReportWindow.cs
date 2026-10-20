@@ -79,27 +79,53 @@ namespace SkinDevApp.Views
             _d = d;
             _f = ReportFindings.Build(d);
             Title = "LUMYVUE Research Analysis Report — " + d.Session.DisplayId;
-            Width = 720;
-            Height = 900;
+            Width = 820;
+            Height = 940;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = Ui.Brush("#E5E7EB");
+            Background = (Brush)Application.Current.FindResource("PageWash");
+            FontFamily = (FontFamily)Application.Current.FindResource("BodyFont");
 
             var pagesPanel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 16) };
-            foreach (FrameworkElement p in BuildPages()) { p.Margin = new Thickness(0, 0, 0, 16); pagesPanel.Children.Add(p); }
+            List<FrameworkElement> pages = BuildPages();
+            foreach (FrameworkElement p in pages)
+            {
+                p.Margin = new Thickness(0, 0, 0, 20);
+                // each page sits on the screen like a sheet of paper (the shadow is on its own layer, so the page text stays sharp)
+                var sheet = new Grid { HorizontalAlignment = HorizontalAlignment.Center };
+                sheet.Children.Add(new Border
+                {
+                    Background = Brushes.White, Margin = new Thickness(0, 0, 0, 20), CornerRadius = new CornerRadius(2),
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Direction = 270, Opacity = 0.16, Color = (Color)ColorConverter.ConvertFromString("#2F3024") }
+                });
+                sheet.Children.Add(p);
+                pagesPanel.Children.Add(sheet);
+            }
 
-            var bar = new DockPanel { Margin = new Thickness(12), LastChildFill = false };
-            _pdfBtn = Ui.Btn("Save as PDF / Print", (s, e) => Export(), "PrimaryButton", 220);
+            var band = Ui.WindowBand("Research analysis report", "Scan " + d.Session.DisplayId + "  ·  Patient " + (d.Session.ParticipantID ?? "not assigned") +
+                                     "  ·  " + pages.Count + (pages.Count == 1 ? " page" : " pages"));
+            band.Margin = new Thickness(16, 16, 16, 0);
+
+            var bar = new DockPanel { LastChildFill = false };
+            _pdfBtn = new Button { Style = (Style)Application.Current.FindResource("PrimaryButton"), Height = 50, Content = Ui.IconLabel("Icon.Report", "Save as PDF / Print", 18) };
+            _pdfBtn.Click += (s, e) => Export();
             DockPanel.SetDock(_pdfBtn, Dock.Right);
             bar.Children.Add(_pdfBtn);
-            Button close = Ui.Btn("Close", (s, e) => Close(), "SecondaryButton", 110);
-            close.Margin = new Thickness(0, 0, 10, 0);
+            var close = new Button { Style = (Style)Application.Current.FindResource("GhostButton"), Height = 50, Width = 120, Content = "Close", Margin = new Thickness(0, 0, 10, 0) };
+            close.Click += (s, e) => Close();
             DockPanel.SetDock(close, Dock.Right);
             bar.Children.Add(close);
-            bar.Children.Add(Ui.Text("Choose \"Microsoft Print to PDF\" to save a PDF file.", 11.5, false, Ui.Muted, new Thickness(0, 12, 0, 0)));
+            var hint = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            hint.Children.Add(Ui.Icon("Icon.Info", 16, Ui.Muted));
+            ((FrameworkElement)hint.Children[0]).Margin = new Thickness(0, 0, 8, 0);
+            hint.Children.Add(Ui.Text("Choose \"Microsoft Print to PDF\" to save a PDF file.", 12, false, Ui.Muted, new Thickness(0)));
+            bar.Children.Add(hint);
+            var barCard = new Border { Style = (Style)Application.Current.FindResource("Card"), Padding = new Thickness(18, 12, 12, 12), Margin = new Thickness(16, 0, 16, 16), Child = bar };
 
             var root = new DockPanel();
-            DockPanel.SetDock(bar, Dock.Bottom);
-            root.Children.Add(bar);
+            DockPanel.SetDock(band, Dock.Top);
+            root.Children.Add(band);
+            DockPanel.SetDock(barCard, Dock.Bottom);
+            root.Children.Add(barCard);
             root.Children.Add(new ScrollViewer { Content = pagesPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
             Content = root;
         }

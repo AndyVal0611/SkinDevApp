@@ -48,6 +48,41 @@ namespace SkinDevApp
             return dlg.Tag is MessageBoxResult ? (MessageBoxResult)dlg.Tag : DefaultResult(button);
         }
 
+        /// <summary>
+        /// Turns a window into a LUMYVUE pop-up card: no Windows frame, rounded corners, a soft shadow, and the main screen dimmed behind it.
+        /// The window's behaviour (DialogResult, buttons, keys) is unchanged.
+        /// </summary>
+        internal static void Frame(Window win, FrameworkElement body, double width)
+        {
+            win.WindowStyle = WindowStyle.None;
+            win.AllowsTransparency = true;
+            win.Background = Brushes.Transparent;
+            win.ResizeMode = ResizeMode.NoResize;
+            win.SizeToContent = SizeToContent.WidthAndHeight;
+            win.ShowInTaskbar = false;
+            win.FontFamily = (FontFamily)Application.Current.FindResource("BodyFont");
+
+            var shadow = new Border
+            {
+                Background = Brushes.White, CornerRadius = new CornerRadius(24),
+                Effect = new DropShadowEffect { BlurRadius = 36, ShadowDepth = 8, Direction = 270, Opacity = 0.22, Color = (Color)ColorConverter.ConvertFromString("#2F3024") }
+            };
+            var card = new Border
+            {
+                Background = B("#FFFEFB"), CornerRadius = new CornerRadius(24), Padding = new Thickness(28, 24, 28, 24),
+                BorderBrush = B("#E8E2D3"), BorderThickness = new Thickness(1), Child = body, Width = width
+            };
+            var root = new Grid { Margin = new Thickness(30) };
+            root.Children.Add(shadow);
+            root.Children.Add(card);
+            win.Content = root;
+
+            win.Loaded += (s, e) => { var m = win.Owner as MainWindow; if (m != null) m.SetDimmed(true); };
+            win.Closed += (s, e) => { var m = win.Owner as MainWindow; if (m != null) m.SetDimmed(false); };
+            // the card can be dragged by its empty areas (there is no title bar)
+            card.MouseLeftButtonDown += (s, e) => { if (e.OriginalSource == card) try { win.DragMove(); } catch { } };
+        }
+
         /// <summary>The answer given when the dialog is closed without pressing a button (as MessageBox does).</summary>
         private static MessageBoxResult DefaultResult(MessageBoxButton button)
         {

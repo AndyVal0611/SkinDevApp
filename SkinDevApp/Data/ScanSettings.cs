@@ -28,6 +28,7 @@ namespace SkinDevApp.Data
         public double PreviewZoomMin { get; set; } = 1.0;
         public double PreviewZoomMax { get; set; } = 4.0;
         public bool PreviewZoomButtons { get; set; } = true;
+        public bool AlwaysShowKeyboard { get; set; } = false;    // on-screen keyboard for every text box, also with a mouse (for screens whose touch is reported as a mouse)
 
         // capture
         public bool AutoCapture { get; set; } = true;
@@ -89,6 +90,7 @@ namespace SkinDevApp.Data
                 s.PreviewZoomMin = Dbl(d, "preview.zoom_min", s.PreviewZoomMin);
                 s.PreviewZoomMax = Dbl(d, "preview.zoom_max", s.PreviewZoomMax);
                 s.PreviewZoomButtons = Bool(d, "preview.zoom_buttons", s.PreviewZoomButtons);
+                s.AlwaysShowKeyboard = Bool(d, "touch.always_keyboard", s.AlwaysShowKeyboard);
                 s.AutoCapture = Bool(d, "capture.auto", s.AutoCapture);
                 s.StableFramesRequired = Int(d, "capture.stable_frames", s.StableFramesRequired);
                 s.HoldStillMs = Int(d, "capture.hold_ms", s.HoldStillMs);
@@ -122,6 +124,7 @@ namespace SkinDevApp.Data
                 { "preview.zoom_min", F(PreviewZoomMin) },
                 { "preview.zoom_max", F(PreviewZoomMax) },
                 { "preview.zoom_buttons", F(PreviewZoomButtons) },
+                { "touch.always_keyboard", F(AlwaysShowKeyboard) },
                 { "capture.auto", F(AutoCapture) },
                 { "capture.stable_frames", F(StableFramesRequired) },
                 { "capture.hold_ms", F(HoldStillMs) },

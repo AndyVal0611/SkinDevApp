@@ -133,7 +133,7 @@ namespace SkinDevApp.Views
 
             // header
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-            header.Children.Add(GalleryUi.Text(_model.Title, 17, true));
+            header.Children.Add(Ui.WindowBand("Compare photographs and heat maps", _model.Title));
             header.Children.Add(new Border
             {
                 Background = GalleryUi.Brush("#F8EBE6"),

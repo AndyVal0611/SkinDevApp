@@ -233,7 +233,8 @@ namespace SkinDevApp.Views
         {
             bool r = AppSession.IsResearcher;
             var actions = new StackPanel();
-            actions.Children.Add(Ui.Text("What would you like to do next?", 15, true));
+            actions.Children.Add(Ui.Text("NEXT STEPS", 11, true, Ui.Brush("#8D8D76"), new Thickness(0, 0, 0, 2)));
+            actions.Children.Add(Ui.Text("What would you like to do next?", 16, true, Ui.Ink, new Thickness(0, 0, 0, 12)));
 
             var icons = new Dictionary<string, string>
             {
@@ -241,12 +242,17 @@ namespace SkinDevApp.Views
                 { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
                 { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" }
             };
+            void Group(string title)
+            {
+                actions.Children.Add(Ui.Text(title, 11, true, Ui.Brush("#9B9B84"), new Thickness(2, actions.Children.Count > 2 ? 8 : 0, 0, 6)));
+            }
             void Add(string text, RoutedEventHandler h, string style = "SecondaryButton", bool enabled = true)
             {
                 Button b = Ui.Btn(text, h, style);
                 string icon;
                 if (icons.TryGetValue(text, out icon)) b.Content = Ui.IconLabel(icon, text, 18);
                 b.Margin = new Thickness(0, 0, 0, 8);
+                if (style == "GhostButton") { b.Height = 46; b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Padding = new Thickness(18, 0, 18, 0); }
                 b.IsEnabled = enabled;
                 actions.Children.Add(b);
             }
@@ -254,20 +260,23 @@ namespace SkinDevApp.Views
             bool hasFolder = !string.IsNullOrEmpty(_d.Session.SessionFolder) && System.IO.Directory.Exists(_d.Session.SessionFolder);
             if (r)
             {
-                Add("Compare photographs and heat maps", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
+                Group("REVIEW");
                 Add("Add researcher notes", (s, e) => OpenVerification(), "PrimaryButton");
                 Add("Dermatologist review", (s, e) =>
                 {
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
                 }, "SecondaryButton");
+                Add("Compare photographs and heat maps", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
+            Group("SHARE");
             Add("Create report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
+            Group("GO TO");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))
-                Add("Patient record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)));
+                Add("Patient record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)), "GhostButton");
             if (!string.IsNullOrEmpty(_d.Session.ParticipantID))
-                Add("New scan for this patient", (s, e) => Workflow.ContinueToScan(_d.Session.ParticipantID));
-            Add("Back to home", (s, e) => Nav.Home());
+                Add("New scan for this patient", (s, e) => Workflow.ContinueToScan(_d.Session.ParticipantID), "GhostButton");
+            Add("Back to home", (s, e) => Nav.Home(), "GhostButton");
             SideColumn.Children.Add(Ui.Card(actions));
 
             // Human assessments (kept separate from the AI output)

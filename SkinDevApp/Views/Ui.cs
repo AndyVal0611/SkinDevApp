@@ -134,6 +134,37 @@ namespace SkinDevApp.Views
             return bar;
         }
 
+        /// <summary>The LUMYVUE band at the top of a secondary window (review, gallery, report): wordmark, ribbon, title and subtitle.</summary>
+        public static Border WindowBand(string title, string subtitle, out TextBlock titleText, out TextBlock subtitleText)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.Children.Add(BrandMark(true, 24));
+            var divider = new Border { Width = 1, Height = 34, Background = Brush("#40FFFFFF"), Margin = new Thickness(18, 0, 18, 0), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(divider, 1);
+            grid.Children.Add(divider);
+            var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            titleText = new TextBlock { Text = title, Foreground = Brush("#F7F5E9"), FontSize = 18, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
+            subtitleText = new TextBlock { Text = subtitle ?? "", Foreground = Brush("#DDDCC2"), FontSize = 12, Margin = new Thickness(0, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+            titles.Children.Add(titleText);
+            titles.Children.Add(subtitleText);
+            Grid.SetColumn(titles, 2);
+            grid.Children.Add(titles);
+            return new Border
+            {
+                Background = (Brush)Application.Current.FindResource("HeaderGradient"),
+                CornerRadius = new CornerRadius(18), Padding = new Thickness(22, 14, 22, 14), Margin = new Thickness(0, 0, 0, 14), Child = grid
+            };
+        }
+
+        public static Border WindowBand(string title, string subtitle)
+        {
+            TextBlock a, b;
+            return WindowBand(title, subtitle, out a, out b);
+        }
+
         /// <summary>The LUMYVUE wordmark with the six-tone skin ribbon under it.</summary>
         public static FrameworkElement BrandMark(bool onDark, double size = 26)
         {

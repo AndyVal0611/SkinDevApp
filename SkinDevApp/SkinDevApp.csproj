@@ -176,6 +176,7 @@
 		<Compile Include="Views\Fmt.cs" />
 		<Compile Include="Views\LumyDialog.cs" />
 		<Compile Include="Views\SplashWindow.cs" />
+		<Compile Include="Views\OnScreenKeyboard.cs" />
 		<Compile Include="Views\TouchZoom.cs" />
 		<Compile Include="Views\ClientDashboardForm.Touch.cs" />
 		<Compile Include="Views\ReportFindings.cs" />

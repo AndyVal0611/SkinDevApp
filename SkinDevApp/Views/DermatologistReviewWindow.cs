@@ -51,7 +51,7 @@ namespace SkinDevApp.Views
             Height = 900;
             MinWidth = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = Ui.Brush("#FCFAF5");
+            Background = (Brush)Application.Current.FindResource("PageWash");
             Build();
         }
 
@@ -72,8 +72,8 @@ namespace SkinDevApp.Views
                 return;
             }
 
-            root.Children.Add(Ui.Text("Dermatologist review", 24, true));
-            root.Children.Add(Ui.Text("The computer's reading of this scan, for your review. It is a decision aid and not a diagnosis.", 13, false, Ui.Muted, new Thickness(0, 2, 0, 12)));
+            root.Children.Add(Ui.WindowBand("Dermatologist review",
+                "Scan " + _d.Session.DisplayId + "  ·  The computer's reading of this scan, for your review. It is a decision aid and not a diagnosis."));
 
             root.Children.Add(IdentityCard());
             root.Children.Add(SummaryCard());

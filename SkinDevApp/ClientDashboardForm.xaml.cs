@@ -377,41 +377,78 @@ namespace SkinDevApp.Views
                 ViewOutcome o = session.Outcomes.FirstOrDefault(x => x.View == ScanViews.Name(v));
                 CaptureRecord rec = o != null && !string.IsNullOrEmpty(o.AbsoluteFolder) ? ReviewStore.LoadRecord(o.AbsoluteFolder) : null;
 
-                var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                bool ok = o != null && o.Ok;
+                var row = new Grid();
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 string img = o != null && o.AbsoluteFolder != null ? Path.Combine(o.AbsoluteFolder, "analysed.png") : null;
-                var thumb = Ui.Thumb(img, 80, "#E5E7EB", "not captured");
+                var thumb = Ui.Thumb(img, 72, ok ? Ui.ClassColor(o.PredictedClass) : "#E3DDCB", "not captured");
+                thumb.VerticalAlignment = VerticalAlignment.Top;
                 row.Children.Add(thumb);
 
-                var info = new StackPanel { Margin = new Thickness(10, 0, 8, 0) };
-                info.Children.Add(Ui.Text(ScanViews.Title(v) + (o != null && o.Ok ? "  —  " + o.PredictedClass + " " + o.ConfidencePercent.ToString("0.0") + "%" : "  —  not captured"),
-                    12.5, true, Ui.Ink, new Thickness(0)));
+                var info = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                var titleRow = new DockPanel();
+                info.Children.Add(titleRow);
+
+                var chips = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
+                if (ok)
+                {
+                    var res = new StackPanel { Orientation = Orientation.Horizontal };
+                    res.Children.Add(new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = Ui.Brush(Ui.ClassColor(o.PredictedClass)), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
+                    res.Children.Add(Ui.Text(ClinicalText.Name(o.PredictedClass) + "  " + o.ConfidencePercent.ToString("0.0") + "%", 12, true, Ui.Ink, new Thickness(0)));
+                    chips.Children.Add(new Border { Background = Ui.Brush("#F4F0E5"), CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 3, 10, 3), Margin = new Thickness(0, 0, 6, 4), Child = res });
+                }
+                else
+                    chips.Children.Add(new Border { Background = Ui.Brush("#EFEADC"), CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(0, 0, 6, 4),
+                        Child = Ui.Text("Not captured yet", 12, true, Ui.Muted, new Thickness(0)) });
+
                 if (rec != null)
                 {
                     string quality = SessionImporter.QualityStatus(rec, ScanViews.Name(v));
-                    info.Children.Add(Ui.Text("Overall capture quality: " + quality, 11.5, true, quality == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
-                    if (rec.Quality != null)
-                        info.Children.Add(Ui.Text(
-                            "Sharpness " + rec.Quality.Sharpness.ToString("0") + (rec.Quality.Sharpness >= ScanSettings.Current.MinSharpness ? " ✓" : " (low)") +
-                            "  ·  Brightness " + rec.Quality.Brightness.ToString("0") +
-                            "  ·  Face " + (rec.Quality.FaceFound ? "found" : "not found") +
-                            "  ·  Pose " + (rec.Session != null && rec.Session.PoseGateVerified ? "verified" : "not verified") +
-                            "  ·  " + (rec.Trigger == "auto" ? "auto-captured" : "manual"),
-                            10.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+                    bool good = quality == "Good";
+                    var q = new DockPanel();
+                    var qIcon = Ui.Icon(good ? "Icon.CheckCircle" : "Icon.Alert", 13, good ? Ui.Good : Ui.Warn);
+                    qIcon.Margin = new Thickness(0, 2, 5, 0);
+                    qIcon.VerticalAlignment = VerticalAlignment.Top;
+                    DockPanel.SetDock(qIcon, Dock.Left);
+                    q.Children.Add(qIcon);
+                    q.Children.Add(Ui.Text(good ? "Good photo" : "Check: " + ClinicalText.PlainQuality(quality).Replace("Check: ", ""), 12, true, good ? Ui.Good : Ui.Warn, new Thickness(0)));
+                    chips.Children.Add(new Border { Background = Ui.Brush(good ? "#EAF1E4" : "#FBF1DE"), CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 3, 10, 3), Margin = new Thickness(0, 0, 6, 4), Child = q });
                 }
+                info.Children.Add(chips);
+
+                if (rec != null && rec.Quality != null)
+                    info.Children.Add(Ui.Text(
+                        "Sharpness " + rec.Quality.Sharpness.ToString("0") + (rec.Quality.Sharpness >= ScanSettings.Current.MinSharpness ? " ✓" : " (low)") +
+                        "  ·  Brightness " + rec.Quality.Brightness.ToString("0") +
+                        "  ·  Face " + (rec.Quality.FaceFound ? "found" : "not found") +
+                        "  ·  Angle " + (rec.Session != null && rec.Session.PoseGateVerified ? "confirmed" : "not confirmed") +
+                        "  ·  " + (rec.Trigger == "auto" ? "taken automatically" : "taken manually"),
+                        11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
                 Grid.SetColumn(info, 1);
                 row.Children.Add(info);
 
+                // the retake button sits on the title line, so the details keep the full width of the narrow column
                 ScanView captured = v;
-                var retake = new Button { Content = o != null ? "Retake" : "Capture", Style = (Style)FindResource("SmallButton"), VerticalAlignment = VerticalAlignment.Center };
+                var retake = new Button
+                {
+                    Style = (Style)FindResource(o != null ? "GhostButton" : "PrimaryButton"), Height = 42, Padding = new Thickness(12, 0, 14, 0),
+                    VerticalAlignment = VerticalAlignment.Center, Content = Ui.IconLabel(o != null ? "Icon.Refresh" : "Icon.Capture", o != null ? "Retake" : "Capture", 16)
+                };
                 retake.Click += (s, e) => RetakeView(captured);
-                Grid.SetColumn(retake, 2);
-                row.Children.Add(retake);
+                DockPanel.SetDock(retake, Dock.Right);
+                titleRow.Children.Add(retake);
+                var title = Ui.Text(ScanViews.Title(v), 14, true, Ui.Ink, new Thickness(0));
+                title.VerticalAlignment = VerticalAlignment.Center;
+                titleRow.Children.Add(title);
 
-                ReviewList.Children.Add(row);
+                var card = new Border
+                {
+                    Background = Ui.Brush("#FFFEFB"), BorderBrush = Ui.Brush("#E8DED4"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
+                    Padding = new Thickness(10), Margin = new Thickness(0, 0, 0, 8), Child = row
+                };
+                ReviewList.Children.Add(card);
             }
 
             AcceptBtn.IsEnabled = session.IsComplete;

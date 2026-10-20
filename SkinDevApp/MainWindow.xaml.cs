@@ -63,6 +63,12 @@ namespace SkinDevApp
             slide.BeginAnimation(TranslateTransform.YProperty, rise);
         }
 
+        /// <summary>Leaves room at the bottom for the on-screen keyboard, so the field being typed into stays visible above it.</summary>
+        internal void SetKeyboardInset(double height)
+        {
+            ScaleHost.Margin = new Thickness(0, 0, 0, Math.Max(0, height));
+        }
+
         // ----------------------------------------------------------------- dialogs and notifications --
 
         /// <summary>Dims the screen behind a LUMYVUE dialog.</summary>

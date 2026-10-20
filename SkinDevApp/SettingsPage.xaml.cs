@@ -174,7 +174,9 @@ namespace SkinDevApp
                 Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent."),
                 NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the photograph that is taken. Default 1."),
                 NumRow("preview.zoom_max", "Largest zoom of the live picture", "How far the picture can be enlarged by pinching with two fingers or using the + button. Default 4."),
-                BoolRow("preview.zoom_buttons", "Show the zoom buttons", "Show + and − buttons on the live picture. Pinching with two fingers always works.")
+                BoolRow("preview.zoom_buttons", "Show the zoom buttons", "Show + and − buttons on the live picture. Pinching with two fingers always works."),
+                BoolRow("touch.always_keyboard", "Always show the on-screen keyboard", "Open the on-screen keyboard whenever a text box is selected, also with a mouse. " +
+                        "Turn this on if the keyboard does not open when a field is tapped (some touchscreens are reported to Windows as a mouse). Off by default.")
             });
         }
 
@@ -345,6 +347,7 @@ namespace SkinDevApp
             _num["preview.zoom_min"].Text = F(s.PreviewZoomMin);
             _num["preview.zoom_max"].Text = F(s.PreviewZoomMax);
             _bool["preview.zoom_buttons"].IsChecked = s.PreviewZoomButtons;
+            _bool["touch.always_keyboard"].IsChecked = s.AlwaysShowKeyboard;
             _bool["capture.auto"].IsChecked = s.AutoCapture;
             _bool["capture.review_before_finish"].IsChecked = s.ReviewBeforeFinish;
             _num["capture.stable_frames"].Text = s.StableFramesRequired.ToString(CultureInfo.InvariantCulture);
@@ -386,6 +389,7 @@ namespace SkinDevApp
             s.PreviewZoomMin = D("preview.zoom_min", 0.5, 1);
             s.PreviewZoomMax = D("preview.zoom_max", 1.5, 8);
             s.PreviewZoomButtons = _bool["preview.zoom_buttons"].IsChecked == true;
+            s.AlwaysShowKeyboard = _bool["touch.always_keyboard"].IsChecked == true;
             s.AutoCapture = _bool["capture.auto"].IsChecked == true;
             s.ReviewBeforeFinish = _bool["capture.review_before_finish"].IsChecked == true;
             s.StableFramesRequired = I("capture.stable_frames", 1, 60);
