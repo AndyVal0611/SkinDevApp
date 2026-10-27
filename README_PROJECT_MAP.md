@@ -26,16 +26,13 @@ shared/                     tools used by several conditions
   install_specialist_detector.py, build_report_notebooks.py, benchmark_pc.py, lesion_* diagnostics
   notebooks/                the general lesion-detector pipelines (Pipeline V5 etc.)
   docs/                     lesion detector diagnosis and plan
-docs/                       general documents: results for the paper, methods and limits, training explained for the defense, progress summary, setup guide
+docs/                       the single compiled technical record (PDF)
 ```
 
 ## Start here (docs/)
 | File | What it is |
 |---|---|
-| `docs/RESULTS_FOR_PAPER.md` | final numbers and thesis wording, acne and hyperpigmentation |
-| `docs/TRAINING_EXPLAINED_FOR_DEFENSE.md` | how the detectors were trained, in plain language, with likely panel questions |
-| `docs/METHODS_AND_LIMITATIONS_NOTES.md` | methods text and limits |
-| `docs/PROJECT_PROGRESS_SUMMARY.md` | whole-project status |
+| `docs/LUMYVUE_COMPLETE_TECHNICAL_RECORD.pdf` | the one compiled document: system, classifier, Grad-CAM++, detectors, results, ensemble review, code reference, limits, ethics, defense Q&A, setup guide |
 | `acne/docs/ACNE_DETECTOR_VERDICT.md` | strict review of the acne detector and the frozen evaluation protocol |
 | `hyperpigmentation/docs/HYPERPIGMENTATION_FULL_RESULTS.md`, `..._ANNOTATION_RULE_V2.md` | full results and the boxing rule |
 

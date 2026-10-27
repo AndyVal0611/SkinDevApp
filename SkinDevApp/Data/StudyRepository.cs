@@ -107,10 +107,10 @@ namespace SkinDevApp.Data
 
         /// <summary>
         /// Register a new participant: generates the ParticipantID inside the write
-        /// transaction (never reused, never duplicated), stores the skin profile and,
-        /// when collected, the manual Fitzpatrick record.
+        /// transaction (never reused, never duplicated), stores the skin profile, the
+        /// registration / medical-history intake and, when collected, the manual Fitzpatrick record.
         /// </summary>
-        public static string RegisterParticipant(Participant p, SkinProfile sp)
+        public static string RegisterParticipant(Participant p, SkinProfile sp, MedicalIntake intake = null)
         {
             using (var c = StudyDatabase.Open())
             using (var tx = c.BeginTransaction())
@@ -134,6 +134,11 @@ namespace SkinDevApp.Data
 
                 sp.ParticipantID = p.ParticipantID;
                 UpsertSkinProfile(c, tx, sp);
+                if (intake != null)
+                {
+                    intake.ParticipantID = p.ParticipantID;
+                    UpsertMedicalIntake(c, tx, intake);
+                }
                 RecordManualFitzpatrick(c, tx, p.ParticipantID, sp);
                 Audit(c, tx, "Register", "Participant", p.ParticipantID, "New participant registered");
 
@@ -143,7 +148,7 @@ namespace SkinDevApp.Data
         }
 
         /// <summary>Explicit edit of registration data. Never touches any scan result.</summary>
-        public static void UpdateParticipant(Participant p, SkinProfile sp, string reason)
+        public static void UpdateParticipant(Participant p, SkinProfile sp, string reason, MedicalIntake intake = null)
         {
             using (var c = StudyDatabase.Open())
             using (var tx = c.BeginTransaction())
@@ -159,6 +164,11 @@ namespace SkinDevApp.Data
 
                 sp.ParticipantID = p.ParticipantID;
                 UpsertSkinProfile(c, tx, sp);
+                if (intake != null)
+                {
+                    intake.ParticipantID = p.ParticipantID;
+                    UpsertMedicalIntake(c, tx, intake);
+                }
                 if (before == null || before.FitzpatrickManual != sp.FitzpatrickManual || before.FitzpatrickSource != sp.FitzpatrickSource)
                     RecordManualFitzpatrick(c, tx, p.ParticipantID, sp);
 
@@ -192,6 +202,39 @@ namespace SkinDevApp.Data
                 "@dur", sp.ConcernDuration, "@cl", sp.Cleanser, "@mo", sp.Moisturizer, "@su", sp.Sunscreen, "@at", sp.AcneTreatment,
                 "@et", sp.EczemaTreatment, "@pt", sp.PigmentationTreatment, "@op", sp.OtherProducts, "@rp", sp.RecentProcedures,
                 "@or", sp.OtherResponses, "@up", sp.UpdatedAt))
+                cmd.ExecuteNonQuery();
+        }
+
+        // ------------------------------------------------------ medical intake --
+
+        /// <summary>The MedicalIntakes columns have exactly the names of the MedicalIntake text properties, so the SQL is built from this list.</summary>
+        private static readonly string[] IntakeFields = typeof(MedicalIntake).GetProperties()
+            .Select(x => x.Name).Where(n => n != "ParticipantID" && n != "UpdatedAt").ToArray();
+
+        /// <summary>The registration / medical-history intake, or null for a patient registered before the form existed.</summary>
+        public static MedicalIntake GetMedicalIntake(string participantId)
+        {
+            using (var c = StudyDatabase.Open())
+            using (var cmd = Cmd(c, "SELECT * FROM MedicalIntakes WHERE ParticipantID=@id;", null, "@id", participantId))
+            using (var r = cmd.ExecuteReader())
+            {
+                if (!r.Read()) return null;
+                var m = new MedicalIntake { ParticipantID = S(r, "ParticipantID"), UpdatedAt = S(r, "UpdatedAt") };
+                foreach (string f in IntakeFields) typeof(MedicalIntake).GetProperty(f).SetValue(m, S(r, f));
+                return m;
+            }
+        }
+
+        private static void UpsertMedicalIntake(SQLiteConnection c, SQLiteTransaction tx, MedicalIntake m)
+        {
+            m.UpdatedAt = Now();
+            var args = new List<object> { "@ParticipantID", m.ParticipantID, "@UpdatedAt", m.UpdatedAt };
+            foreach (string f in IntakeFields) { args.Add("@" + f); args.Add(typeof(MedicalIntake).GetProperty(f).GetValue(m)); }
+
+            string sql = "INSERT INTO MedicalIntakes (ParticipantID, " + string.Join(", ", IntakeFields) + ", UpdatedAt) VALUES (@ParticipantID, " +
+                         string.Join(", ", IntakeFields.Select(f => "@" + f)) + ", @UpdatedAt) ON CONFLICT(ParticipantID) DO UPDATE SET " +
+                         string.Join(", ", IntakeFields.Select(f => f + "=excluded." + f)) + ", UpdatedAt=excluded.UpdatedAt;";
+            using (var cmd = Cmd(c, sql, tx, args.ToArray()))
                 cmd.ExecuteNonQuery();
         }
 

@@ -13,6 +13,7 @@
 //    6 AnalysisResults         13 FitzpatrickAssessments  (manual / dermatologist only)
 //    7 ClassScores             14 SystemSettings + AuditLog
 //  + AssessmentLabels: lets one human assessment carry several reference labels.
+//  + MedicalIntakes: contact, emergency contact and medical history from the registration form.
 //
 // Rules enforced here or in StudyRepository:
 //   * ParticipantID is generated (PS-0001...) inside a write transaction; a UNIQUE
@@ -210,6 +211,44 @@ CREATE TABLE IF NOT EXISTS SkinProfiles (
     OtherProducts         TEXT,
     RecentProcedures      TEXT,
     OtherResponses        TEXT,
+    UpdatedAt             TEXT
+);
+
+-- registration form: contact, referral, emergency contact and medical-history intake (one row per participant)
+CREATE TABLE IF NOT EXISTS MedicalIntakes (
+    ParticipantID         TEXT PRIMARY KEY REFERENCES Participants(ParticipantID),
+    MailingAddress        TEXT,
+    Email                 TEXT,
+    HomePhone             TEXT,
+    CellPhone             TEXT,
+    MaritalStatus         TEXT,
+    Occupation            TEXT,
+    ReferredBy            TEXT,
+    ReferralDetail        TEXT,
+    PrimaryCarePhysician  TEXT,
+    PrimaryCarePhone      TEXT,
+    EmergencyName         TEXT,
+    EmergencyRelationship TEXT,
+    EmergencyPhone        TEXT,
+    VisitReason           TEXT,
+    ProblemLocation       TEXT,
+    ProblemDuration       TEXT,
+    PastMedicalHistory    TEXT,
+    CancerDetail          TEXT,
+    SkinHistory           TEXT,
+    SkinHistoryDetail     TEXT,
+    Medications           TEXT,
+    Allergies             TEXT,
+    Smokes                TEXT,
+    SmokingAmount         TEXT,
+    DrinksAlcohol         TEXT,
+    AlcoholAmount         TEXT,
+    ReviewOfSystems       TEXT,
+    Alerts                TEXT,
+    PharmacyName          TEXT,
+    PharmacyPhone         TEXT,
+    PharmacyAddress       TEXT,
+    PharmacyCity          TEXT,
     UpdatedAt             TEXT
 );
 

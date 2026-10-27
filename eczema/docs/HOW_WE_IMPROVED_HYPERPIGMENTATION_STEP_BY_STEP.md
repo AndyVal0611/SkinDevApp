@@ -91,5 +91,5 @@ Export the three seeds to ONNX (opset 12, same image size), install as `lesion_d
 The reliability numbers (before and after the rule), the decision rule, the table of experiments with plain names, the test result with its 95 % range, the false-alarm rate on clear skin, the limits (one annotator, rule-dependent target), and the `_WITH_OUTPUTS` notebooks as proof of the training.
 
 ## Files to reuse
-`shared/lesion_exp.py` (experiment runner and registry), `shared/lesion_box_tool.py` (box tool with `--rule`), `hyperpigmentation/scripts/` (`hyp_v2_transform.py`, `make_hyp_v2_relabel.py`, `make_hyp_reliability_v2.py`, `hyp_reliability_v2.py`, `hyp_v2_train_consistency.py`, `make_more_boxing.py`), `hyperpigmentation/notebooks/` (final training and results notebook), `docs/TRAINING_EXPLAINED_FOR_DEFENSE.md`.
+`shared/lesion_exp.py` (experiment runner and registry), `shared/lesion_box_tool.py` (box tool with `--rule`), `hyperpigmentation/scripts/` (`hyp_v2_transform.py`, `make_hyp_v2_relabel.py`, `make_hyp_reliability_v2.py`, `hyp_reliability_v2.py`, `hyp_v2_train_consistency.py`, `make_more_boxing.py`), `hyperpigmentation/notebooks/` (final training and results notebook), `docs/LUMYVUE_COMPLETE_TECHNICAL_RECORD.pdf`.
 Participant photos stay on your own machines and are never committed or uploaded.

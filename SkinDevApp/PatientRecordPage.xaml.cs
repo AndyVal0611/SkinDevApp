@@ -162,11 +162,19 @@ namespace SkinDevApp
             _p = p;
             List<ScanSessionRow> sessions = StudyRepository.SessionsForParticipant(p.ParticipantID);
             SkinProfile sp = StudyRepository.GetSkinProfile(p.ParticipantID) ?? new SkinProfile();
+            MedicalIntake intake = StudyRepository.GetMedicalIntake(p.ParticipantID);
             Consent consent = StudyRepository.GetLatestConsent(p.ParticipantID);
 
             RecordPanel.Children.Add(LatestCard(sessions.FirstOrDefault()));
 
-            RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent), SkinCard(sp)));
+            if (intake == null)
+                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null), SkinCard(sp, false)));     // registered with the earlier form
+            else
+            {
+                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, intake), MedicalCard(intake, sp)));
+                bool earlierAnswers = !string.IsNullOrWhiteSpace(sp.GeneralSkinType) || !string.IsNullOrWhiteSpace(sp.Concerns);
+                RecordPanel.Children.Add(earlierAnswers ? Ui.Cols(700, ContactsCard(intake), SkinCard(sp, true)) : (UIElement)ContactsCard(intake));
+            }
 
             RecordPanel.Children.Add(HistoryCard(sessions));
 
@@ -210,7 +218,7 @@ namespace SkinDevApp
             return Ui.Card(sp);
         }
 
-        private Border InfoCard(Participant p, Consent consent)
+        private Border InfoCard(Participant p, Consent consent, MedicalIntake m)
         {
             var sp = new StackPanel();
             var head = new DockPanel();
@@ -220,21 +228,34 @@ namespace SkinDevApp
             head.Children.Add(Ui.Text("Patient information", 15, true));
             sp.Children.Add(head);
 
-            sp.Children.Add(Ui.InfoRows(new[]
+            var rows = new List<KeyValuePair<string, string>>
             {
                 Ui.KV("Patient ID", p.ParticipantID),
                 Ui.KV("Name", p.FullName),
                 Ui.KV("Age", p.Age.HasValue ? p.Age.Value.ToString(CultureInfo.InvariantCulture) + " years" : null),
                 Ui.KV("Date of birth", Fmt.Date(p.DateOfBirth)),
-                Ui.KV("Sex", p.Sex),
-                Ui.KV("Contact", p.Contact),
+                Ui.KV("Gender", p.Sex)
+            };
+            if (m == null) rows.Add(Ui.KV("Contact", p.Contact));
+            else rows.AddRange(new[]
+            {
+                Ui.KV("Marital status", m.MaritalStatus),
+                Ui.KV("Occupation", m.Occupation),
+                Ui.KV("Cell phone", m.CellPhone),
+                Ui.KV("Home phone", m.HomePhone),
+                Ui.KV("E-mail", m.Email),
+                Ui.KV("Mailing address", m.MailingAddress)
+            });
+            rows.AddRange(new[]
+            {
                 Ui.KV("Registered", Fmt.When(p.RegisteredAt) + (string.IsNullOrEmpty(p.OperatorID) ? "" : " by " + p.OperatorID)),
                 Ui.KV("Record status", p.Status),
                 Ui.KV("Consent", consent == null ? "Not recorded"
                     : (consent.Decision == "Agreed" ? "Given on " : "Declined on ") + Fmt.When(consent.RecordedAt) +
                       (consent.AllowsScanning ? "" : " (scanning is not allowed)") +
                       ". Use of the photographs for future model improvement: " + (consent.FutureModelUseConsent ? "agreed." : "not agreed."))
-            }, 120, 12.5));
+            });
+            sp.Children.Add(Ui.InfoRows(rows, 130, 12.5));
 
             var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             Button newScan = Ui.Btn("New scan", (o, e) => Workflow.ContinueToScan(p.ParticipantID), "SmallButton");
@@ -249,10 +270,71 @@ namespace SkinDevApp
             return Ui.Card(sp);
         }
 
-        private Border SkinCard(SkinProfile s)
+        /// <summary>Reason for visit and medical history from the registration form. Alerts come first, in red.</summary>
+        private Border MedicalCard(MedicalIntake m, SkinProfile s)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Skin profile", 15, true));
+            sp.Children.Add(Ui.Text("Reason for visit and medical history", 15, true));
+            if (!string.IsNullOrWhiteSpace(m.Alerts) && m.Alerts != "None")
+                sp.Children.Add(Ui.Callout("Alerts: " + m.Alerts, "Check these before any procedure.", 2));
+
+            string history = m.PastMedicalHistory;
+            if (history != null && !string.IsNullOrWhiteSpace(m.CancerDetail))
+                history = string.Join(", ", history.Split(',').Select(x => x.Trim()).Select(x => x == "Cancer" ? "Cancer (" + m.CancerDetail + ")" : x));
+            string Answer(string yesNo, string detail) => yesNo == "Yes" && !string.IsNullOrWhiteSpace(detail) ? "Yes — " + detail : yesNo;
+
+            sp.Children.Add(Ui.InfoRows(new[]
+            {
+                Ui.KV("Reason for visit", m.VisitReason),
+                Ui.KV("Location", m.ProblemLocation),
+                Ui.KV("Duration", m.ProblemDuration),
+                Ui.KV("Past medical history", history),
+                Ui.KV("Skin cancer or disorders", Answer(m.SkinHistory, m.SkinHistoryDetail)),
+                Ui.KV("Medications", m.Medications),
+                Ui.KV("Allergies", m.Allergies),
+                Ui.KV("Smoking", Answer(m.Smokes, m.SmokingAmount)),
+                Ui.KV("Alcohol", Answer(m.DrinksAlcohol, m.AlcoholAmount)),
+                Ui.KV("Review of systems", m.ReviewOfSystems ?? "Nothing ticked"),
+                Ui.KV("Alerts", m.Alerts),
+                Ui.KV("Monk Skin Tone", MonkText(s))
+            }, 170, 12.5));
+            sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            return Ui.Card(sp);
+        }
+
+        private Border ContactsCard(MedicalIntake m)
+        {
+            string Parts(params string[] parts)
+            {
+                string joined = string.Join("  ·  ", parts.Where(x => !string.IsNullOrWhiteSpace(x)));
+                return joined.Length == 0 ? null : joined;
+            }
+
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Referral, emergency contact and pharmacy", 15, true));
+            sp.Children.Add(Ui.Cols(760,
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Referred by", Parts(m.ReferredBy, m.ReferralDetail)),
+                    Ui.KV("Primary care physician", Parts(m.PrimaryCarePhysician, m.PrimaryCarePhone)),
+                    Ui.KV("Emergency contact", Parts(m.EmergencyName, m.EmergencyRelationship, m.EmergencyPhone))
+                }, 170, 12.5),
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Preferred pharmacy", Parts(m.PharmacyName, m.PharmacyPhone)),
+                    Ui.KV("Pharmacy address", Parts(m.PharmacyAddress, m.PharmacyCity))
+                }, 150, 12.5)));
+            return Ui.Card(sp);
+        }
+
+        private static string MonkText(SkinProfile s) =>
+            string.IsNullOrWhiteSpace(s.MonkSkinTone) || s.MonkSkinTone == "Not collected" ? "Not recorded yet" : "MST " + s.MonkSkinTone + " (" + (s.MonkSource ?? "source not recorded") + ")";
+
+        /// <summary>The skin-profile answers of the earlier registration form (kept exactly as saved).</summary>
+        private Border SkinCard(SkinProfile s, bool earlierForm)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text(earlierForm ? "Skin profile (earlier registration form)" : "Skin profile", 15, true));
             string concerns = s.Concerns + (string.IsNullOrWhiteSpace(s.ConcernOther) ? "" : " (" + s.ConcernOther + ")");
             string regions = s.Regions + (string.IsNullOrWhiteSpace(s.RegionOther) ? "" : " (" + s.RegionOther + ")");
             var care = new[] { Tuple.Create("Cleanser", s.Cleanser), Tuple.Create("Moisturizer", s.Moisturizer), Tuple.Create("Sunscreen", s.Sunscreen),
@@ -263,7 +345,7 @@ namespace SkinDevApp
             sp.Children.Add(Ui.InfoRows(new[]
             {
                 Ui.KV("Skin type", s.GeneralSkinType),
-                Ui.KV("Monk Skin Tone", string.IsNullOrWhiteSpace(s.MonkSkinTone) || s.MonkSkinTone == "Not collected" ? "Not recorded yet" : "MST " + s.MonkSkinTone + " (" + (s.MonkSource ?? "source not recorded") + ")"),
+                Ui.KV("Monk Skin Tone", MonkText(s)),
                 Ui.KV("Sensitivity", s.Sensitivity),
                 Ui.KV("Skin concerns", concerns),
                 Ui.KV("Areas affected", regions),
@@ -272,7 +354,10 @@ namespace SkinDevApp
                 Ui.KV("Recent procedures", s.RecentProcedures),
                 Ui.KV("Other notes", s.OtherResponses)
             }, 140, 12.5));
-            sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            sp.Children.Add(Ui.Text(earlierForm
+                ? "Saved with the earlier registration form and kept exactly as it was. The current form does not change these answers."
+                : "This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.",
+                10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
         }
 

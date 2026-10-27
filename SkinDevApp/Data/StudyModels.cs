@@ -95,6 +95,56 @@ namespace SkinDevApp.Data
         public string UpdatedAt { get; set; }
     }
 
+    /// <summary>
+    /// Registration and medical-history intake (the paper "Patient Registration" + "Medical History and Intake" format).
+    /// One row per participant. Check lists are stored comma-separated; "N/A" / "None" are stored as written.
+    /// Patients registered before this form existed simply have no row.
+    /// </summary>
+    public sealed class MedicalIntake
+    {
+        public string ParticipantID { get; set; }
+        // contact
+        public string MailingAddress { get; set; }
+        public string Email { get; set; }
+        public string HomePhone { get; set; }
+        public string CellPhone { get; set; }
+        public string MaritalStatus { get; set; }
+        public string Occupation { get; set; }
+        // referral and primary care
+        public string ReferredBy { get; set; }               // Doctor | Family / friend | Insurance company | Web search | Print ad | Other
+        public string ReferralDetail { get; set; }           // the doctor's name, or what "Other" means
+        public string PrimaryCarePhysician { get; set; }
+        public string PrimaryCarePhone { get; set; }
+        // emergency contact
+        public string EmergencyName { get; set; }
+        public string EmergencyRelationship { get; set; }
+        public string EmergencyPhone { get; set; }
+        // reason for visit
+        public string VisitReason { get; set; }
+        public string ProblemLocation { get; set; }
+        public string ProblemDuration { get; set; }
+        // medical history
+        public string PastMedicalHistory { get; set; }       // comma-separated, or "None"
+        public string CancerDetail { get; set; }
+        public string SkinHistory { get; set; }              // Yes | No (skin cancer or skin disorders)
+        public string SkinHistoryDetail { get; set; }
+        public string Medications { get; set; }              // free text, or "N/A"
+        public string Allergies { get; set; }                // free text, or "N/A"
+        // social history and review of systems
+        public string Smokes { get; set; }                   // Yes | No
+        public string SmokingAmount { get; set; }
+        public string DrinksAlcohol { get; set; }            // Yes | No
+        public string AlcoholAmount { get; set; }
+        public string ReviewOfSystems { get; set; }          // comma-separated
+        public string Alerts { get; set; }                   // comma-separated, or "None"
+        // preferred pharmacy
+        public string PharmacyName { get; set; }
+        public string PharmacyPhone { get; set; }
+        public string PharmacyAddress { get; set; }
+        public string PharmacyCity { get; set; }
+        public string UpdatedAt { get; set; }
+    }
+
     public sealed class Consent
     {
         public long ConsentID { get; set; }
