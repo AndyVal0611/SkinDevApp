@@ -168,6 +168,15 @@
 		<Compile Include="Data\StudyDatabase.cs" />
 		<Compile Include="Data\StudyModels.cs" />
 		<Compile Include="Data\StudyRepository.cs" />
+		<Compile Include="Data\ReceiptRepository.cs" />
+		<Compile Include="Printing\EscPos.cs" />
+		<Compile Include="Printing\PrinterSettings.cs" />
+		<Compile Include="Printing\ReceiptContent.cs" />
+		<Compile Include="Printing\ReceiptService.cs" />
+		<Compile Include="Printing\ThermalPrinter.cs" />
+		<Compile Include="Views\ReceiptHistoryWindow.cs" />
+		<Compile Include="Views\ReceiptPanel.cs" />
+		<Compile Include="Views\ReceiptPreviewWindow.cs" />
 		<Compile Include="Views\ParticipantPickerWindow.cs" />
 		<Compile Include="Views\GradCamLauncher.cs" />
 		<Compile Include="Views\DermatologistReviewWindow.cs" />

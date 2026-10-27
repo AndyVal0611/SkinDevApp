@@ -14,6 +14,7 @@
 //    7 ClassScores             14 SystemSettings + AuditLog
 //  + AssessmentLabels: lets one human assessment carry several reference labels.
 //  + MedicalIntakes: contact, emergency contact and medical history from the registration form.
+//  + Receipts / ReceiptPrintAttempts: patient thermal receipts (immutable snapshots) and their print history.
 //
 // Rules enforced here or in StudyRepository:
 //   * ParticipantID is generated (PS-0001...) inside a write transaction; a UNIQUE
@@ -413,6 +414,44 @@ CREATE TABLE IF NOT EXISTS LesionDetections (
     NX0 REAL, NY0 REAL, NX1 REAL, NY1 REAL
 );
 CREATE INDEX IF NOT EXISTS IX_LesionDetections_Capture ON LesionDetections(CaptureID);
+
+-- patient thermal receipts: one row per receipt version; the content snapshot is never updated
+CREATE TABLE IF NOT EXISTS Receipts (
+    ReceiptID       TEXT PRIMARY KEY,
+    Seq             INTEGER NOT NULL UNIQUE,
+    ScanSessionID   TEXT NOT NULL REFERENCES ScanSessions(ScanSessionID),
+    ParticipantID   TEXT,
+    ReceiptType     TEXT NOT NULL,
+    ReceiptVersion  INTEGER NOT NULL,
+    ReviewStatus    TEXT NOT NULL,
+    ValidationID    INTEGER,
+    AIClass         TEXT,
+    ContentJson     TEXT NOT NULL,
+    ContentSha256   TEXT NOT NULL,
+    LayoutWidth     INTEGER NOT NULL,
+    LayoutStyles    INTEGER NOT NULL DEFAULT 0,
+    GeneratedAt     TEXT NOT NULL,
+    GeneratedBy     TEXT,
+    UNIQUE (ScanSessionID, ReceiptType, ReceiptVersion)
+);
+CREATE INDEX IF NOT EXISTS IX_Receipts_Scan ON Receipts(ScanSessionID);
+
+-- every print request of a receipt and what happened to it (SentToPrinter never means printed: the QR701 cannot confirm paper)
+CREATE TABLE IF NOT EXISTS ReceiptPrintAttempts (
+    AttemptID       INTEGER PRIMARY KEY AUTOINCREMENT,
+    ReceiptID       TEXT NOT NULL REFERENCES Receipts(ReceiptID),
+    RequestedAt     TEXT NOT NULL,
+    FinishedAt      TEXT,
+    OperatorID      TEXT,
+    PrinterID       TEXT,
+    Outcome         TEXT NOT NULL,
+    BytesSent       INTEGER,
+    BytesTotal      INTEGER,
+    IsCopy          INTEGER NOT NULL DEFAULT 0,
+    Authorization   TEXT,
+    ErrorDetail     TEXT
+);
+CREATE INDEX IF NOT EXISTS IX_ReceiptPrintAttempts_Receipt ON ReceiptPrintAttempts(ReceiptID);
 
 CREATE TABLE IF NOT EXISTS ResearcherEvaluations (
     EvaluationID             INTEGER PRIMARY KEY AUTOINCREMENT,

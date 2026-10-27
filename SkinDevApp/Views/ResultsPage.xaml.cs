@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using SkinDevApp.Data;
+using SkinDevApp.Printing;
 using SkinDevApp.Scanning;
 
 namespace SkinDevApp.Views
@@ -240,7 +241,8 @@ namespace SkinDevApp.Views
             {
                 { "Compare photographs and heat maps", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
                 { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
-                { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" }
+                { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" },
+                { "Detailed A4 report", "Icon.Report" }
             };
             void Group(string title)
             {
@@ -269,8 +271,19 @@ namespace SkinDevApp.Views
                 }, "SecondaryButton");
                 Add("Compare photographs and heat maps", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
-            Group("SHARE");
-            Add("Create report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
+            Group("PATIENT RESULTS & REPORTS");
+            // thermal receipts: preliminary (AI only) and final (after the dermatologist review); printing always starts from the preview
+            ReceiptState rs = ReceiptService.State(_d);
+            PrinterSettings ps = PrinterSettings.Load();
+            foreach (Tuple<string, int> line in ReceiptPanel.Status(rs, ps))
+                actions.Children.Add(Ui.Text(line.Item1, 11.5, false, ReceiptPanel.LevelBrush(line.Item2), new Thickness(2, 0, 0, 6)));
+            foreach (ReceiptPanel.Item it in ReceiptPanel.Items(_d, rs, ps, Render))
+            {
+                ReceiptPanel.Item item = it;
+                icons[it.Text] = it.Icon;
+                Add(it.Text, (s, e) => item.Run?.Invoke(), it.Preferred && it.Enabled ? "PrimaryButton" : it.Text.StartsWith("Print") ? "SecondaryButton" : "GhostButton", it.Enabled);
+            }
+            Add("Detailed A4 report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
             Group("GO TO");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))
                 Add("Patient record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)), "GhostButton");

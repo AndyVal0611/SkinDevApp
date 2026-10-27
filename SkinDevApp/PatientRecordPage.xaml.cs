@@ -394,6 +394,7 @@ namespace SkinDevApp
             SessionDetail d = StudyRepository.GetSessionDetail(row.ScanSessionID);
             if (d == null) return;
             _detailHost.Children.Add(DetailCard(d));
+            _detailHost.Children.Add(ReceiptPanel.Card(d, () => ShowDetail(row)));
             _detailHost.Children.Add(EvidenceCard(d));
         }
 
