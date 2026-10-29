@@ -13,7 +13,8 @@
 //    6 AnalysisResults         13 FitzpatrickAssessments  (manual / dermatologist only)
 //    7 ClassScores             14 SystemSettings + AuditLog
 //  + AssessmentLabels: lets one human assessment carry several reference labels.
-//  + MedicalIntakes: contact, emergency contact and medical history from the registration form.
+//  + MedicalIntakes: contact, emergency contact and medical history from the earlier registration form.
+//  + PatientCharts: the patient's chart (current registration form).
 //  + Receipts / ReceiptPrintAttempts: patient thermal receipts (immutable snapshots) and their print history.
 //
 // Rules enforced here or in StudyRepository:
@@ -250,6 +251,62 @@ CREATE TABLE IF NOT EXISTS MedicalIntakes (
     PharmacyPhone         TEXT,
     PharmacyAddress       TEXT,
     PharmacyCity          TEXT,
+    UpdatedAt             TEXT
+);
+
+-- the patient's chart (current registration form): one row per participant
+CREATE TABLE IF NOT EXISTS PatientCharts (
+    ParticipantID         TEXT PRIMARY KEY REFERENCES Participants(ParticipantID),
+    Birthplace            TEXT,
+    CivilStatus           TEXT,
+    Citizenship           TEXT,
+    HomeAddress           TEXT,
+    HomeTel               TEXT,
+    HomeCell              TEXT,
+    ProvincialAddress     TEXT,
+    ProvincialTel         TEXT,
+    ProvincialCell        TEXT,
+    Occupation            TEXT,
+    Email                 TEXT,
+    BusinessAddress       TEXT,
+    BusinessTel           TEXT,
+    BusinessCell          TEXT,
+    IsStudent             TEXT,
+    GradeYear             TEXT,
+    School                TEXT,
+    FatherName            TEXT,
+    MotherName            TEXT,
+    OnsetDate             TEXT,
+    AffectedArea          TEXT,
+    DescribedLesions      TEXT,
+    PreviousConsultation  TEXT,
+    LabExams              TEXT,
+    TreatmentNotes        TEXT,
+    Orals                 TEXT,
+    Topicals              TEXT,
+    AllergyFood           TEXT,
+    AllergyDrugs          TEXT,
+    LastMenstrualPeriod   TEXT,
+    Pregnant              TEXT,
+    Breastfeeding         TEXT,
+    Supplements           TEXT,
+    SupplementsOther      TEXT,
+    Conditions            TEXT,
+    ConditionsOther       TEXT,
+    Surgery               TEXT,
+    SurgeryYear           TEXT,
+    FamilyHistory         TEXT,
+    FamilyHistoryOther    TEXT,
+    LesionCount           TEXT,
+    LesionNumber          TEXT,
+    Pruritus              TEXT,
+    Erythema              TEXT,
+    LesionColor           TEXT,
+    LesionTypes           TEXT,
+    Distribution          TEXT,
+    WoodLamp              TEXT,
+    Koh                   TEXT,
+    Biopsy                TEXT,
     UpdatedAt             TEXT
 );
 

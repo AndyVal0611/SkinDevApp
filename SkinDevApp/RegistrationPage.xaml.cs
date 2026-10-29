@@ -1,6 +1,6 @@
-// RegistrationPage.xaml.cs - patient registration and medical-history intake with an automatic PatientID.
-// The form follows the paper "Patient Registration" + "Medical History and Intake" format. Billing, insurance and
-// the signature are left out: participants sign the separate paper consent form.
+// RegistrationPage.xaml.cs - patient registration following the clinic's "Patient's Chart" (personal information, present
+// illness, personal / past and family medical history, and an optional physical examination and special tests),
+// with an automatic PatientID. The signature is left out: participants sign the separate paper consent form.
 // New mode: Save Registration -> Continue to Consent. Edit mode (from Participant Records):
 // explicit edit with a reason; scan results are never touched.
 using System;
@@ -35,20 +35,24 @@ namespace SkinDevApp.Views
         }
 
         private readonly List<Section> _sections = new List<Section>();
-        private Section _record, _patient, _contact, _referral, _emergency, _visit, _history, _meds, _social, _alerts, _pharmacy;
+        private Section _record, _patient, _contact, _work, _parents, _illness, _history, _famHistory, _exam, _tests;
         private Section _active;
         private TextBlock _progressText;
         private ProgressBar _progressBar;
         private DispatcherTimer _scrollAnim;
         private bool _navScrolling;
 
-        private SkinProfile _skin;                // carried through unchanged: Monk Skin Tone (rated later by a person) and the earlier form's skin answers
-        private string _legacyContact;            // the earlier form's single "contact" field, kept when it is not a phone number or e-mail
-        private bool _strict = true;              // false only while editing a patient registered with the earlier form
+        // family medical history: one Father and one Mother tick per condition
+        private static readonly string[] FamilyLeft = { "Asthma", "Hypertension", "Diabetes mellitus", "Heart diseases" };
+        private static readonly string[] FamilyRight = { "Acne", "Skin cancer", "Vitiligo", "Baldness" };
+        private readonly Dictionary<string, CheckBox[]> _family = new Dictionary<string, CheckBox[]>();
+
+        private SkinProfile _skin;                // carried through unchanged: Monk Skin Tone (rated later by a person) and any skin answers from an earlier form
+        private string _legacyContact;            // an earlier form's single "contact" field, kept when it is not a phone number or e-mail
+        private bool _strict = true;              // false only while editing a patient registered with an earlier form
         private readonly bool _editMode;
         private string _participantId;            // set once saved (new) or from the record (edit)
         private bool _loading = true;
-        private bool _syncing;
         private bool _dirty;
         private bool _showingProblems;            // the "Please complete" line is on screen and is kept up to date
 
@@ -59,6 +63,7 @@ namespace SkinDevApp.Views
             InitializeComponent();
             _editMode = !string.IsNullOrEmpty(editParticipantId);
             HeaderHost.Content = Ui.Header(_editMode ? "Edit registration" : "Registration");
+            FamilyHost.Content = BuildFamily();
             BuildSections();
 
             // one handler for every field: marks the form as changed and refreshes the section list
@@ -66,6 +71,7 @@ namespace SkinDevApp.Views
             AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(AnyCombo_Changed));
             AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(AnyCheck_Changed));
             AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler(AnyCheck_Changed));
+            AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(ClearOptionalChoice));
             SizeChanged += (s, e) => ApplyWidth();
 
             if (_editMode) LoadForEdit(editParticipantId);
@@ -92,19 +98,19 @@ namespace SkinDevApp.Views
             _skin = StudyRepository.GetSkinProfile(p.ParticipantID) ?? new SkinProfile();
             if (string.IsNullOrEmpty(_skin.MonkSkinTone)) _skin.MonkSkinTone = "Not collected";      // otherwise kept exactly as stored
             if (string.IsNullOrEmpty(_skin.MonkSource)) _skin.MonkSource = "Not collected";
-            MedicalIntake m = StudyRepository.GetMedicalIntake(p.ParticipantID);
+            PatientChart chart = StudyRepository.GetPatientChart(p.ParticipantID);
 
             _participantId = p.ParticipantID;
             PageTitle.Text = "Edit registration · " + p.ParticipantID;
             PatientIdTxt.Text = p.ParticipantID;
             RegDateTxt.Text = Fmt.When(p.RegisteredAt);
+            LastNameTxt.Text = p.LastName;
             FirstNameTxt.Text = p.FirstName;
             MiddleNameTxt.Text = p.MiddleName;
-            LastNameTxt.Text = p.LastName;
             DateTime dob;
             if (DateTime.TryParse(p.DateOfBirth, CultureInfo.InvariantCulture, DateTimeStyles.None, out dob)) DobPicker.SelectedDate = dob;
             AgeTxt.Text = p.Age.HasValue ? p.Age.Value.ToString(CultureInfo.InvariantCulture) : "";
-            Select(SexCombo, p.Sex);
+            SetSex(p.Sex);
             OperatorTxt.Text = p.OperatorID;
             OperatorTxt.IsReadOnly = true;
             OperatorTxt.Background = Ui.Brush("#F3EFE6");
@@ -112,18 +118,15 @@ namespace SkinDevApp.Views
             StatusPanel.Visibility = Visibility.Visible;
             Select(StatusCombo, p.Status ?? "Active");
 
-            if (m != null) FillIntake(m);
-            else if (!string.IsNullOrWhiteSpace(p.Contact))
-            {
-                // the earlier form had one free "contact" field: place it where it belongs, or keep it as it was
-                string c = p.Contact.Trim();
-                if (IsEmail(c)) EmailTxt.Text = c;
-                else if (IsPhone(c)) CellPhoneTxt.Text = c;
-                else _legacyContact = c;
-            }
+            if (chart != null) FillChart(chart);
+            else PrefillFromEarlierForm(p);
 
-            // A patient registered with the earlier form is not forced to complete the whole medical history on every edit.
-            // Once the form is complete it is checked like any other record.
+            // the earlier form had one free "contact" field: keep it when nothing on this form can hold it
+            if (!string.IsNullOrWhiteSpace(p.Contact) && T(HomeCellTxt) == null && T(HomeTelTxt) == null && T(EmailTxt) == null)
+                _legacyContact = p.Contact.Trim();
+
+            // A patient registered with an earlier form is not forced to complete the whole chart on every edit.
+            // Once the chart is complete it is checked like any other record.
             _strict = !Problems().Any(x => x.Key != _record);
             ApplyStrictness();
 
@@ -131,52 +134,94 @@ namespace SkinDevApp.Views
             ContinueBtn.Visibility = Visibility.Collapsed;
         }
 
-        private void FillIntake(MedicalIntake m)
+        /// <summary>Carries over what the earlier forms already collected, where it clearly belongs on this form. Nothing is deleted from the earlier record.</summary>
+        private void PrefillFromEarlierForm(Participant p)
         {
-            AddressTxt.Text = m.MailingAddress;
-            EmailTxt.Text = m.Email;
-            HomePhoneTxt.Text = m.HomePhone;
-            CellPhoneTxt.Text = m.CellPhone;
-            Select(MaritalCombo, m.MaritalStatus);
-            OccupationTxt.Text = m.Occupation;
-            SetChoice(ReferralPanel, m.ReferredBy);
-            ReferralDetailTxt.Text = m.ReferralDetail;
-            PcpNameTxt.Text = m.PrimaryCarePhysician;
-            PcpPhoneTxt.Text = m.PrimaryCarePhone;
-            EmergencyNameTxt.Text = m.EmergencyName;
-            EmergencyRelationTxt.Text = m.EmergencyRelationship;
-            EmergencyPhoneTxt.Text = m.EmergencyPhone;
-            VisitReasonTxt.Text = m.VisitReason;
-            LocationTxt.Text = m.ProblemLocation;
-            DurationTxt.Text = m.ProblemDuration;
-            SetChecks(PmhPanel, m.PastMedicalHistory);
-            CancerTxt.Text = m.CancerDetail;
-            SetYesNo(SkinHxYes, SkinHxNo, m.SkinHistory);
-            SkinHxTxt.Text = m.SkinHistoryDetail;
-            MedsNaChk.IsChecked = m.Medications == "N/A";
-            MedsTxt.Text = m.Medications == "N/A" ? "" : m.Medications;
-            AllergiesNaChk.IsChecked = m.Allergies == "N/A";
-            AllergiesTxt.Text = m.Allergies == "N/A" ? "" : m.Allergies;
-            SetYesNo(SmokeYes, SmokeNo, m.Smokes);
-            SmokeAmountTxt.Text = m.SmokingAmount;
-            SetYesNo(AlcoholYes, AlcoholNo, m.DrinksAlcohol);
-            AlcoholAmountTxt.Text = m.AlcoholAmount;
-            SetChecks(RosPanel, m.ReviewOfSystems);
-            SetChecks(AlertsPanel, m.Alerts);
-            PharmacyNameTxt.Text = m.PharmacyName;
-            PharmacyPhoneTxt.Text = m.PharmacyPhone;
-            PharmacyAddressTxt.Text = m.PharmacyAddress;
-            PharmacyCityTxt.Text = m.PharmacyCity;
+            MedicalIntake m = StudyRepository.GetMedicalIntake(p.ParticipantID);
+            if (m != null)
+            {
+                HomeAddressTxt.Text = m.MailingAddress;
+                EmailTxt.Text = m.Email;
+                HomeTelTxt.Text = m.HomePhone;
+                HomeCellTxt.Text = m.CellPhone;
+                OccupationTxt.Text = m.Occupation;
+                Select(CivilCombo, m.MaritalStatus);
+                if (!string.IsNullOrWhiteSpace(m.Medications) && m.Medications != "N/A") SupplementOtherTxt.Text = m.Medications;
+            }
+            else if (!string.IsNullOrWhiteSpace(p.Contact))
+            {
+                string c = p.Contact.Trim();
+                if (IsEmail(c)) EmailTxt.Text = c;
+                else if (IsPhone(c)) HomeCellTxt.Text = c;
+            }
         }
 
-        /// <summary>Earlier-form patients: only the record details, age and gender stay required, and the age can be typed.</summary>
+        private void FillChart(PatientChart c)
+        {
+            BirthplaceTxt.Text = c.Birthplace;
+            Select(CivilCombo, c.CivilStatus);
+            CitizenshipTxt.Text = c.Citizenship;
+            HomeAddressTxt.Text = c.HomeAddress;
+            HomeTelTxt.Text = c.HomeTel;
+            HomeCellTxt.Text = c.HomeCell;
+            ProvAddressTxt.Text = c.ProvincialAddress;
+            ProvTelTxt.Text = c.ProvincialTel;
+            ProvCellTxt.Text = c.ProvincialCell;
+            OccupationTxt.Text = c.Occupation;
+            EmailTxt.Text = c.Email;
+            BizAddressTxt.Text = c.BusinessAddress;
+            BizTelTxt.Text = c.BusinessTel;
+            BizCellTxt.Text = c.BusinessCell;
+            SetYesNo(StudentYes, StudentNo, c.IsStudent);
+            GradeTxt.Text = c.GradeYear;
+            SchoolTxt.Text = c.School;
+            FatherTxt.Text = c.FatherName;
+            MotherTxt.Text = c.MotherName;
+
+            OnsetTxt.Text = c.OnsetDate;
+            AreaTxt.Text = c.AffectedArea;
+            DescribedTxt.Text = c.DescribedLesions;
+            ConsultTxt.Text = c.PreviousConsultation;
+            LabTxt.Text = c.LabExams;
+            TreatmentTxt.Text = c.TreatmentNotes;
+            OralsTxt.Text = c.Orals;
+            TopicalsTxt.Text = c.Topicals;
+
+            AllergyFoodTxt.Text = c.AllergyFood;
+            AllergyDrugsTxt.Text = c.AllergyDrugs;
+            LmpTxt.Text = c.LastMenstrualPeriod;
+            PregnantChk.IsChecked = c.Pregnant == "Yes";
+            BreastfeedingChk.IsChecked = c.Breastfeeding == "Yes";
+            SetChecks(SupplementPanel, c.Supplements);
+            SupplementOtherTxt.Text = c.SupplementsOther;
+            SetChecks(ConditionPanel, c.Conditions);
+            ConditionOtherTxt.Text = c.ConditionsOther;
+            SurgeryTxt.Text = c.Surgery;
+            SurgeryYearTxt.Text = c.SurgeryYear;
+
+            SetFamily(c.FamilyHistory);
+            FamilyOtherTxt.Text = c.FamilyHistoryOther;
+
+            SetChoice(CountPanel, c.LesionCount);
+            LesionNumberTxt.Text = c.LesionNumber;
+            SetChoice(ItchPanel, c.Pruritus);
+            SetChoice(RednessPanel, c.Erythema);
+            SetChoice(ColorPanel, c.LesionColor);
+            SetChecks(LesionTypePanel, c.LesionTypes);
+            DistributionTxt.Text = c.Distribution;
+
+            WoodLampTxt.Text = c.WoodLamp;
+            SetChoice(KohPanel, c.Koh);
+            BiopsyTxt.Text = c.Biopsy;
+        }
+
+        /// <summary>Earlier-form patients: only the record details, age and sex stay required, and the age can be typed.</summary>
         private void ApplyStrictness()
         {
             if (_strict) return;
             LegacyNote.Visibility = Visibility.Visible;
-            foreach (Run req in new[] { FirstNameReq, LastNameReq, DobReq, HomePhoneReq, CellPhoneReq, VisitReq, PmhReq, SkinHxReq, MedsReq, AllergiesReq, SmokeReq, AlcoholReq, AlertsReq })
+            foreach (Run req in new[] { FirstNameReq, LastNameReq, DobReq, BirthplaceReq, CivilReq, CitizenshipReq, HomeAddressReq, HomeCellReq, OccupationReq, StudentReq })
                 req.Text = "";
-            PhoneHint.Visibility = Visibility.Collapsed;
             AgeLabel.Inlines.Clear();
             AgeLabel.Inlines.Add(new Run("Age "));
             AgeLabel.Inlines.Add(new Run("*") { Foreground = Ui.Brush("#B4483F") });
@@ -190,21 +235,22 @@ namespace SkinDevApp.Views
         private void BuildSections()
         {
             _record = AddSection(SecRecord, "Registration record", "Kept by LUMYVUE for this patient.");
-            _patient = AddSection(SecPatient, "Patient information", "Legal name as it appears on a driver's license or photo ID.");
-            _contact = AddSection(SecContact, "Contact details", "How the clinic can reach the patient.");
-            _referral = AddSection(SecReferral, "Referral and primary care", "Who referred the patient, and their regular doctor.");
-            _emergency = AddSection(SecEmergency, "Emergency contact", "Someone the patient authorizes to receive their health information.");
-            _visit = AddSection(SecVisit, "Reason for visit", "The problem, where it is and how long it has been there.");
-            _history = AddSection(SecHistory, "Medical history", "Past conditions, and any history of skin cancer or skin disorders.");
-            _meds = AddSection(SecMeds, "Medications and allergies", "If there are none, tick None (N/A).");
-            _social = AddSection(SecSocial, "Social history and review of systems", "Smoking, alcohol and recent symptoms.");
-            _alerts = AddSection(SecAlerts, "Alerts", "Conditions the care team must know before any procedure.");
-            _pharmacy = AddSection(SecPharmacy, "Preferred pharmacy", "Optional.");
+            _patient = AddSection(SecPatient, "Name and personal details", "Name, birth details, sex, civil status and citizenship.");
+            _contact = AddSection(SecContact, "Addresses and contact numbers", "Home and provincial address, phone numbers and e-mail.");
+            _work = AddSection(SecWork, "Occupation and school", "Work, and for students the grade or year and the school.");
+            _parents = AddSection(SecParents, "Parents", "Father's and mother's names.");
+            _illness = AddSection(SecIllness, "Present illness", "The skin problem the patient is here for.");
+            _history = AddSection(SecHistory, "Personal and past medical history", "Allergies, medications and supplements, conditions and surgery.");
+            _famHistory = AddSection(SecFamily, "Family medical history", "Conditions in the patient's father or mother.");
+            _exam = AddSection(SecExam, "Physical examination", "Optional. Usually filled in by the dermatologist; it can be added later by editing the registration.");
+            _tests = AddSection(SecTests, "Special tests", "Optional. Wood lamp, KOH and biopsy.");
 
-            NavPanel.Children.Add(Eyebrow("PATIENT REGISTRATION", 0));
+            NavPanel.Children.Add(Eyebrow("PERSONAL INFORMATION", 0));
             for (int i = 0; i < 5; i++) NavPanel.Children.Add(_sections[i].Item);
-            NavPanel.Children.Add(Eyebrow("MEDICAL HISTORY AND INTAKE", 16));
-            for (int i = 5; i < _sections.Count; i++) NavPanel.Children.Add(_sections[i].Item);
+            NavPanel.Children.Add(Eyebrow("MEDICAL INFORMATION", 16));
+            for (int i = 5; i < 8; i++) NavPanel.Children.Add(_sections[i].Item);
+            NavPanel.Children.Add(Eyebrow("EXAMINATION · OPTIONAL", 16));
+            for (int i = 8; i < _sections.Count; i++) NavPanel.Children.Add(_sections[i].Item);
 
             _progressText = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(8, 18, 8, 6));
             _progressBar = new ProgressBar
@@ -223,9 +269,9 @@ namespace SkinDevApp.Views
         private Section AddSection(Border card, string title, string hint)
         {
             var s = new Section { Number = _sections.Count + 1, Card = card };
-            bool intake = s.Number > 5;                                   // the second part of the paper form
-            s.BadgeBg = intake ? "#E7E8CF" : "#F6E6DF";
-            s.BadgeInk = intake ? "#5C5D45" : "#8A5A4C";
+            bool medical = s.Number > 5;                                  // the medical half of the chart
+            s.BadgeBg = medical ? "#E7E8CF" : "#F6E6DF";
+            s.BadgeInk = medical ? "#5C5D45" : "#8A5A4C";
             string number = s.Number.ToString(CultureInfo.InvariantCulture);
 
             // card heading: number, title, one line of help, then a hairline
@@ -285,7 +331,7 @@ namespace SkinDevApp.Views
             return s;
         }
 
-        /// <summary>Updates the "if yes" fields, the section ticks and the progress line.</summary>
+        /// <summary>Updates the dependent fields, the section ticks and the progress line.</summary>
         private void Refresh()
         {
             UpdateDependentFields();
@@ -318,22 +364,29 @@ namespace SkinDevApp.Views
                 : string.Join(", ", what.Take(3)) + " and " + (what.Count - 3) + " more (marked in the section list)") + ".";
         }
 
+        private static void SetLabel(TextBlock label, string text, bool required)
+        {
+            label.Inlines.Clear();
+            label.Inlines.Add(new Run(text));
+            if (required) label.Inlines.Add(new Run(" *") { Foreground = Ui.Brush("#B4483F") });
+        }
+
+        /// <summary>Fields that only apply after a choice are greyed out until then.</summary>
         private void UpdateDependentFields()
         {
-            string referral = SelectedChoice(ReferralPanel);
-            bool doctor = referral == "Doctor", other = referral == "Other";
-            ReferralDetailTxt.IsEnabled = doctor || other;
-            ReferralDetailLabel.Inlines.Clear();
-            ReferralDetailLabel.Inlines.Add(new Run(doctor ? "Doctor's name " : other ? "Please specify " : "Referral details"));
-            if (doctor || other) ReferralDetailLabel.Inlines.Add(new Run("*") { Foreground = Ui.Brush("#B4483F") });
+            bool student = StudentYes.IsChecked == true;
+            GradeTxt.IsEnabled = SchoolTxt.IsEnabled = student;
+            SetLabel(GradeLabel, "Grade / year", student && _strict);
+            SetLabel(SchoolLabel, "School", student && _strict);
 
-            CancerTxt.IsEnabled = CancerChk.IsChecked == true;
-            SkinHxTxt.IsEnabled = SkinHxYes.IsChecked == true;
-            SmokeAmountTxt.IsEnabled = SmokeYes.IsChecked == true;
-            AlcoholAmountTxt.IsEnabled = AlcoholYes.IsChecked == true;
-            MedsTxt.IsEnabled = MedsNaChk.IsChecked != true;
-            AllergiesTxt.IsEnabled = AllergiesNaChk.IsChecked != true;
-            PregnancyNote.Visibility = PregnantChk.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            bool female = SelectedChoice(SexPanel) == "Female";
+            LmpTxt.IsEnabled = PregnantChk.IsEnabled = BreastfeedingChk.IsEnabled = female;
+            FemaleHead.Opacity = female ? 1 : 0.5;
+            FemaleHint.Visibility = female ? Visibility.Collapsed : Visibility.Visible;
+
+            bool multiple = MultipleChip.IsChecked == true;
+            LesionNumberTxt.IsEnabled = multiple;
+            NumberLabel.Opacity = multiple ? 1 : 0.5;
         }
 
         private void SetActive(Section s)
@@ -398,6 +451,83 @@ namespace SkinDevApp.Views
             NavCol.Width = new GridLength(roomy ? 262 : 0);
         }
 
+        // ------------------------------------------------- family medical history --
+
+        /// <summary>Two blocks of conditions, each with a Father and a Mother tick (the chart's "F/M").</summary>
+        private UIElement BuildFamily()
+        {
+            var both = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -28, 0) };
+            foreach (string[] block in new[] { FamilyLeft, FamilyRight })
+            {
+                var g = new Grid { Margin = new Thickness(0, 0, 28, 0) };
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) });
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (int c = 1; c <= 2; c++)
+                {
+                    TextBlock h = Ui.Text(c == 1 ? "Father" : "Mother", 11.5, true, Ui.Muted, new Thickness(0, 0, 0, 2));
+                    h.HorizontalAlignment = HorizontalAlignment.Center;
+                    Grid.SetColumn(h, c);
+                    g.Children.Add(h);
+                }
+                for (int i = 0; i < block.Length; i++)
+                {
+                    g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var name = new Border
+                    {
+                        BorderBrush = Ui.Brush("#EEE8DA"), BorderThickness = new Thickness(0, 1, 0, 0),
+                        Child = Ui.Text(block[i], 13.5, false, Ui.Ink, new Thickness(0))
+                    };
+                    ((TextBlock)name.Child).VerticalAlignment = VerticalAlignment.Center;
+                    Grid.SetRow(name, i + 1);
+                    g.Children.Add(name);
+
+                    var boxes = new CheckBox[2];
+                    for (int c = 0; c < 2; c++)
+                    {
+                        // the tick box has no label here: nudge it so the box itself is centred in its column
+                        boxes[c] = new CheckBox
+                        {
+                            Style = (Style)FindResource("Tick"), HorizontalAlignment = HorizontalAlignment.Center,
+                            Margin = new Thickness(12, 1, 0, 1), ToolTip = (c == 0 ? "Father: " : "Mother: ") + block[i]
+                        };
+                        Grid.SetRow(boxes[c], i + 1);
+                        Grid.SetColumn(boxes[c], c + 1);
+                        g.Children.Add(boxes[c]);
+                    }
+                    _family[block[i]] = boxes;
+                }
+                both.Children.Add(g);
+            }
+            return both;
+        }
+
+        /// <summary>"Asthma (Father), Acne (Father/Mother)"</summary>
+        private string FamilyText()
+        {
+            var parts = new List<string>();
+            foreach (string name in FamilyLeft.Concat(FamilyRight))
+            {
+                bool father = _family[name][0].IsChecked == true, mother = _family[name][1].IsChecked == true;
+                if (father || mother) parts.Add(name + " (" + (father && mother ? "Father/Mother" : father ? "Father" : "Mother") + ")");
+            }
+            return string.Join(", ", parts);
+        }
+
+        private void SetFamily(string text)
+        {
+            foreach (CheckBox[] boxes in _family.Values) { boxes[0].IsChecked = false; boxes[1].IsChecked = false; }
+            foreach (string piece in (text ?? "").Split(','))
+            {
+                Match m = Regex.Match(piece.Trim(), @"^(.+?) \((Father|Mother|Father/Mother)\)$");
+                CheckBox[] boxes;
+                if (!m.Success || !_family.TryGetValue(m.Groups[1].Value, out boxes)) continue;
+                boxes[0].IsChecked = m.Groups[2].Value.Contains("Father");
+                boxes[1].IsChecked = m.Groups[2].Value.Contains("Mother");
+            }
+        }
+
         // ---------------------------------------------------------- helpers --
 
         private static string Selected(ComboBox c) => (c.SelectedItem as ComboBoxItem)?.Content as string;
@@ -428,19 +558,12 @@ namespace SkinDevApp.Views
             foreach (CheckBox c in Boxes(list)) c.IsChecked = set.Contains((string)c.Content);
         }
 
-        private static bool IsInside(DependencyObject element, DependencyObject container)
-        {
-            for (DependencyObject d = element; d != null; d = LogicalTreeHelper.GetParent(d))
-                if (d == container) return true;
-            return false;
-        }
-
         private static string SelectedChoice(Panel p) => p.Children.OfType<RadioButton>().FirstOrDefault(r => r.IsChecked == true)?.Content as string;
 
         private static void SetChoice(Panel p, string value)
         {
             foreach (RadioButton r in p.Children.OfType<RadioButton>())
-                r.IsChecked = string.Equals(r.Content as string, value, StringComparison.OrdinalIgnoreCase);
+                r.IsChecked = !string.IsNullOrEmpty(value) && string.Equals(r.Content as string, value, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string YesNo(RadioButton yes, RadioButton no) => yes.IsChecked == true ? "Yes" : no.IsChecked == true ? "No" : null;
@@ -449,6 +572,17 @@ namespace SkinDevApp.Views
         {
             yes.IsChecked = value == "Yes";
             no.IsChecked = value == "No";
+        }
+
+        /// <summary>Male and Female are the choices on the chart. A different value saved by an earlier form is shown as a third, selected choice so it is not lost.</summary>
+        private void SetSex(string sex)
+        {
+            if (string.IsNullOrWhiteSpace(sex)) return;
+            foreach (RadioButton r in SexPanel.Children.OfType<RadioButton>())
+                if (r != SexOtherChip && string.Equals(r.Content as string, sex, StringComparison.OrdinalIgnoreCase)) { r.IsChecked = true; return; }
+            SexOtherChip.Content = sex;
+            SexOtherChip.Visibility = Visibility.Visible;
+            SexOtherChip.IsChecked = true;
         }
 
         /// <summary>True when anything in the card has been answered (read-only boxes such as the Patient ID do not count).</summary>
@@ -482,26 +616,25 @@ namespace SkinDevApp.Views
 
         private void AnyField_Changed(object sender, TextChangedEventArgs e) => Changed();
         private void AnyCombo_Changed(object sender, SelectionChangedEventArgs e) => Changed();
+        private void AnyCheck_Changed(object sender, RoutedEventArgs e) => Changed();
 
-        private void AnyCheck_Changed(object sender, RoutedEventArgs e)
+        private static DependencyObject ParentOf(DependencyObject d) =>
+            d is Visual || d is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+
+        /// <summary>
+        /// The examination choices are optional: pressing a choice that is already selected clears it (a radio button cannot do this by itself).
+        /// Only groups whose panel is marked Tag="Optional" behave this way; Sex and the Yes / No questions are not affected.
+        /// </summary>
+        private void ClearOptionalChoice(object sender, MouseButtonEventArgs e)
         {
-            if (_syncing) return;
-
-            // "None" and the other answers of the same list exclude each other
-            var box = e.OriginalSource as CheckBox;
-            if (box != null && box.IsChecked == true)
-            {
-                DependencyObject list = IsInside(box, PmhPanel) ? PmhPanel : IsInside(box, AlertsPanel) ? (DependencyObject)AlertsPanel : null;
-                if (list != null)
-                {
-                    bool none = (box.Tag as string) == "None";
-                    _syncing = true;
-                    foreach (CheckBox other in Boxes(list))
-                        if (other != box && (none || (other.Tag as string) == "None")) other.IsChecked = false;
-                    _syncing = false;
-                }
-            }
-            Changed();
+            RadioButton rb = null;
+            for (DependencyObject d = e.OriginalSource as DependencyObject; d != null; d = ParentOf(d))
+                if (d is RadioButton r) { rb = r; break; }
+            if (rb == null || rb.IsChecked != true) return;
+            var panel = LogicalTreeHelper.GetParent(rb) as FrameworkElement;
+            if (panel == null || !string.Equals(panel.Tag as string, "Optional", StringComparison.Ordinal)) return;
+            rb.IsChecked = false;
+            e.Handled = true;
         }
 
         private void DobPicker_Changed(object sender, SelectionChangedEventArgs e)
@@ -532,64 +665,45 @@ namespace SkinDevApp.Views
             if (T(OperatorTxt) == null) Need(_record, "the staff ID");
             if (_editMode && T(EditReasonTxt) == null) Need(_record, ReasonNeeded);
 
-            // 2. patient information
-            if (_strict && T(FirstNameTxt) == null) Need(_patient, "the legal first name");
-            if (_strict && T(LastNameTxt) == null) Need(_patient, "the legal last name");
+            // 2. name and personal details (the fields highlighted on the chart)
+            if (_strict && T(LastNameTxt) == null) Need(_patient, "the family name");
+            if (_strict && T(FirstNameTxt) == null) Need(_patient, "the given name");
             int age;
             bool hasAge = int.TryParse((AgeTxt.Text ?? "").Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out age);
-            if (DobPicker.SelectedDate.HasValue && DobPicker.SelectedDate.Value.Date > DateTime.Today) Need(_patient, "a date of birth that is not in the future");
-            else if (_strict && !DobPicker.SelectedDate.HasValue) Need(_patient, "the date of birth");
-            else if (!hasAge) Need(_patient, "the age (or date of birth)");
+            if (DobPicker.SelectedDate.HasValue && DobPicker.SelectedDate.Value.Date > DateTime.Today) Need(_patient, "a birthday that is not in the future");
+            else if (_strict && !DobPicker.SelectedDate.HasValue) Need(_patient, "the birthday");
+            else if (!hasAge) Need(_patient, "the age (or birthday)");
             else if (age < 0 || age > 120) Need(_patient, "a valid age (0 to 120)");
-            if (Selected(SexCombo) == null) Need(_patient, "the gender");
+            if (SelectedChoice(SexPanel) == null) Need(_patient, "the sex");
+            if (_strict && T(BirthplaceTxt) == null) Need(_patient, "the birthplace");
+            if (_strict && Selected(CivilCombo) == null) Need(_patient, "the civil status");
+            if (_strict && T(CitizenshipTxt) == null) Need(_patient, "the citizenship");
 
-            // 3. contact details
-            if (_strict && T(HomePhoneTxt) == null && T(CellPhoneTxt) == null) Need(_contact, "a home or cell phone number");
-            Phone(_contact, HomePhoneTxt, "home phone number");
-            Phone(_contact, CellPhoneTxt, "cell phone number");
+            // 3. addresses and contact numbers
+            if (_strict && T(HomeAddressTxt) == null) Need(_contact, "the home address");
+            if (_strict && T(HomeCellTxt) == null) Need(_contact, "the cell phone number");
+            Phone(_contact, HomeTelTxt, "home telephone number");
+            Phone(_contact, HomeCellTxt, "cell phone number");
+            Phone(_contact, ProvTelTxt, "provincial telephone number");
+            Phone(_contact, ProvCellTxt, "provincial cell phone number");
             if (T(EmailTxt) != null && !IsEmail(T(EmailTxt))) Need(_contact, "a valid e-mail address");
 
-            // 4. referral and primary care
-            string referral = SelectedChoice(ReferralPanel);
-            if (referral == "Doctor" && T(ReferralDetailTxt) == null) Need(_referral, "the referring doctor's name");
-            if (referral == "Other" && T(ReferralDetailTxt) == null) Need(_referral, "who referred the patient");
-            Phone(_referral, PcpPhoneTxt, "PCP phone number");
+            // 4. occupation and school
+            if (_strict && T(OccupationTxt) == null) Need(_work, "the occupation");
+            Phone(_work, BizTelTxt, "business telephone number");
+            Phone(_work, BizCellTxt, "business cell phone number");
+            string student = YesNo(StudentYes, StudentNo);
+            if (_strict && student == null) Need(_work, "whether the patient is a student");
+            if (_strict && student == "Yes" && T(GradeTxt) == null) Need(_work, "the grade or year");
+            if (_strict && student == "Yes" && T(SchoolTxt) == null) Need(_work, "the school");
 
-            // 5. emergency contact
-            Phone(_emergency, EmergencyPhoneTxt, "emergency contact phone number");
-
-            // 6. reason for visit
-            if (_strict && T(VisitReasonTxt) == null) Need(_visit, "the reason for the visit");
-
-            // 7. medical history
-            if (_strict && Checked(PmhPanel).Length == 0) Need(_history, "the past medical history (or None)");
-            if (CancerChk.IsChecked == true && T(CancerTxt) == null) Need(_history, "the type of cancer");
-            string skinHx = YesNo(SkinHxYes, SkinHxNo);
-            if (_strict && skinHx == null) Need(_history, "the history of skin cancer or skin disorders (yes or no)");
-            if (skinHx == "Yes" && T(SkinHxTxt) == null) Need(_history, "the skin condition or disorder");
-
-            // 8. medications and allergies
-            if (_strict && MedsNaChk.IsChecked != true && T(MedsTxt) == null) Need(_meds, "the current medications (or None)");
-            if (_strict && AllergiesNaChk.IsChecked != true && T(AllergiesTxt) == null) Need(_meds, "the allergies (or None)");
-
-            // 9. social history
-            string smokes = YesNo(SmokeYes, SmokeNo), alcohol = YesNo(AlcoholYes, AlcoholNo);
-            if (_strict && smokes == null) Need(_social, "whether the patient smokes");
-            if (smokes == "Yes" && T(SmokeAmountTxt) == null) Need(_social, "how much the patient smokes");
-            if (_strict && alcohol == null) Need(_social, "whether the patient drinks alcohol");
-            if (alcohol == "Yes" && T(AlcoholAmountTxt) == null) Need(_social, "how much alcohol the patient drinks");
-
-            // 10. alerts
-            if (_strict && Checked(AlertsPanel).Length == 0) Need(_alerts, "the alerts (or None)");
-
-            // 11. preferred pharmacy
-            Phone(_pharmacy, PharmacyPhoneTxt, "pharmacy telephone number");
+            // 5-10: the rest of the chart is optional
             return list;
         }
 
-        private bool Validate(out Participant p, out MedicalIntake m)
+        private bool Validate(out Participant p, out PatientChart chart)
         {
-            p = null; m = null;
+            p = null; chart = null;
 
             List<KeyValuePair<Section, string>> problems = Problems();
             if (problems.Count > 0)
@@ -610,54 +724,76 @@ namespace SkinDevApp.Views
                 LastName = T(LastNameTxt),
                 DateOfBirth = DobPicker.SelectedDate.HasValue ? DobPicker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
                 Age = int.Parse(AgeTxt.Text.Trim(), CultureInfo.InvariantCulture),
-                Sex = Selected(SexCombo),
-                Contact = T(CellPhoneTxt) ?? T(HomePhoneTxt) ?? T(EmailTxt) ?? _legacyContact,      // the short contact shown in lists
+                Sex = SelectedChoice(SexPanel),
+                Contact = T(HomeCellTxt) ?? T(HomeTelTxt) ?? T(EmailTxt) ?? _legacyContact,      // the short contact shown in lists
                 OperatorID = T(OperatorTxt),
                 Status = _editMode ? (Selected(StatusCombo) ?? "Active") : "Active"
             };
 
-            string referral = SelectedChoice(ReferralPanel), skinHx = YesNo(SkinHxYes, SkinHxNo);
-            string smokes = YesNo(SmokeYes, SmokeNo), alcohol = YesNo(AlcoholYes, AlcoholNo);
-            m = new MedicalIntake
+            bool student = StudentYes.IsChecked == true, female = SelectedChoice(SexPanel) == "Female", multiple = MultipleChip.IsChecked == true;
+            chart = new PatientChart
             {
-                MailingAddress = T(AddressTxt),
-                Email = T(EmailTxt),
-                HomePhone = T(HomePhoneTxt),
-                CellPhone = T(CellPhoneTxt),
-                MaritalStatus = Selected(MaritalCombo),
+                Birthplace = T(BirthplaceTxt),
+                CivilStatus = Selected(CivilCombo),
+                Citizenship = T(CitizenshipTxt),
+                HomeAddress = T(HomeAddressTxt),
+                HomeTel = T(HomeTelTxt),
+                HomeCell = T(HomeCellTxt),
+                ProvincialAddress = T(ProvAddressTxt),
+                ProvincialTel = T(ProvTelTxt),
+                ProvincialCell = T(ProvCellTxt),
                 Occupation = T(OccupationTxt),
-                ReferredBy = referral,
-                ReferralDetail = referral == "Doctor" || referral == "Other" ? T(ReferralDetailTxt) : null,
-                PrimaryCarePhysician = T(PcpNameTxt),
-                PrimaryCarePhone = T(PcpPhoneTxt),
-                EmergencyName = T(EmergencyNameTxt),
-                EmergencyRelationship = T(EmergencyRelationTxt),
-                EmergencyPhone = T(EmergencyPhoneTxt),
-                VisitReason = T(VisitReasonTxt),
-                ProblemLocation = T(LocationTxt),
-                ProblemDuration = T(DurationTxt),
-                PastMedicalHistory = Null(Checked(PmhPanel)),
-                CancerDetail = CancerChk.IsChecked == true ? T(CancerTxt) : null,
-                SkinHistory = skinHx,
-                SkinHistoryDetail = skinHx == "Yes" ? T(SkinHxTxt) : null,
-                Medications = MedsNaChk.IsChecked == true ? "N/A" : T(MedsTxt),
-                Allergies = AllergiesNaChk.IsChecked == true ? "N/A" : T(AllergiesTxt),
-                Smokes = smokes,
-                SmokingAmount = smokes == "Yes" ? T(SmokeAmountTxt) : null,
-                DrinksAlcohol = alcohol,
-                AlcoholAmount = alcohol == "Yes" ? T(AlcoholAmountTxt) : null,
-                ReviewOfSystems = Null(Checked(RosPanel)),
-                Alerts = Null(Checked(AlertsPanel)),
-                PharmacyName = T(PharmacyNameTxt),
-                PharmacyPhone = T(PharmacyPhoneTxt),
-                PharmacyAddress = T(PharmacyAddressTxt),
-                PharmacyCity = T(PharmacyCityTxt)
+                Email = T(EmailTxt),
+                BusinessAddress = T(BizAddressTxt),
+                BusinessTel = T(BizTelTxt),
+                BusinessCell = T(BizCellTxt),
+                IsStudent = YesNo(StudentYes, StudentNo),
+                GradeYear = student ? T(GradeTxt) : null,
+                School = student ? T(SchoolTxt) : null,
+                FatherName = T(FatherTxt),
+                MotherName = T(MotherTxt),
+
+                OnsetDate = T(OnsetTxt),
+                AffectedArea = T(AreaTxt),
+                DescribedLesions = T(DescribedTxt),
+                PreviousConsultation = T(ConsultTxt),
+                LabExams = T(LabTxt),
+                TreatmentNotes = T(TreatmentTxt),
+                Orals = T(OralsTxt),
+                Topicals = T(TopicalsTxt),
+
+                AllergyFood = T(AllergyFoodTxt),
+                AllergyDrugs = T(AllergyDrugsTxt),
+                LastMenstrualPeriod = female ? T(LmpTxt) : null,
+                Pregnant = female && PregnantChk.IsChecked == true ? "Yes" : null,
+                Breastfeeding = female && BreastfeedingChk.IsChecked == true ? "Yes" : null,
+                Supplements = Null(Checked(SupplementPanel)),
+                SupplementsOther = T(SupplementOtherTxt),
+                Conditions = Null(Checked(ConditionPanel)),
+                ConditionsOther = T(ConditionOtherTxt),
+                Surgery = T(SurgeryTxt),
+                SurgeryYear = T(SurgeryYearTxt),
+
+                FamilyHistory = Null(FamilyText()),
+                FamilyHistoryOther = T(FamilyOtherTxt),
+
+                LesionCount = SelectedChoice(CountPanel),
+                LesionNumber = multiple ? T(LesionNumberTxt) : null,
+                Pruritus = SelectedChoice(ItchPanel),
+                Erythema = SelectedChoice(RednessPanel),
+                LesionColor = SelectedChoice(ColorPanel),
+                LesionTypes = Null(Checked(LesionTypePanel)),
+                Distribution = T(DistributionTxt),
+
+                WoodLamp = T(WoodLampTxt),
+                Koh = SelectedChoice(KohPanel),
+                Biopsy = T(BiopsyTxt)
             };
 
-            // an earlier-form patient whose new sections were left empty gets no empty intake row
-            MedicalIntake intake = m;
-            if (!_strict && typeof(MedicalIntake).GetProperties().All(x => x.Name == "ParticipantID" || x.Name == "UpdatedAt" || x.GetValue(intake) == null))
-                m = null;
+            // a patient registered with an earlier form whose chart was left empty gets no empty chart row
+            PatientChart c = chart;
+            if (!_strict && typeof(PatientChart).GetProperties().All(x => x.Name == "ParticipantID" || x.Name == "UpdatedAt" || x.GetValue(c) == null))
+                chart = null;
             return true;
         }
 
@@ -668,18 +804,18 @@ namespace SkinDevApp.Views
         {
             if (!_editMode && _participantId != null && !_dirty) return true;
 
-            Participant p; MedicalIntake intake;
-            if (!Validate(out p, out intake)) return false;
+            Participant p; PatientChart chart;
+            if (!Validate(out p, out chart)) return false;
 
             try
             {
                 if (_editMode)
                 {
-                    StudyRepository.UpdateParticipant(p, _skin, EditReasonTxt.Text.Trim(), intake);
+                    StudyRepository.UpdateParticipant(p, _skin, EditReasonTxt.Text.Trim(), null, chart);
                 }
                 else if (_participantId == null)
                 {
-                    _participantId = StudyRepository.RegisterParticipant(p, _skin, intake);
+                    _participantId = StudyRepository.RegisterParticipant(p, _skin, null, chart);
                     PatientIdTxt.Text = _participantId;
                     AppSession.CurrentParticipantId = _participantId;
                     PageTitle.Text = "Patient registration · " + _participantId;
@@ -687,7 +823,7 @@ namespace SkinDevApp.Views
                 }
                 else
                 {
-                    StudyRepository.UpdateParticipant(p, _skin, "Correction during registration", intake);
+                    StudyRepository.UpdateParticipant(p, _skin, "Correction during registration", null, chart);
                 }
 
                 _dirty = false;

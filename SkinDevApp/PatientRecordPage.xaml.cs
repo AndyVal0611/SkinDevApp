@@ -162,18 +162,29 @@ namespace SkinDevApp
             _p = p;
             List<ScanSessionRow> sessions = StudyRepository.SessionsForParticipant(p.ParticipantID);
             SkinProfile sp = StudyRepository.GetSkinProfile(p.ParticipantID) ?? new SkinProfile();
+            PatientChart chart = StudyRepository.GetPatientChart(p.ParticipantID);
             MedicalIntake intake = StudyRepository.GetMedicalIntake(p.ParticipantID);
             Consent consent = StudyRepository.GetLatestConsent(p.ParticipantID);
+            bool earlierSkin = !string.IsNullOrWhiteSpace(sp.GeneralSkinType) || !string.IsNullOrWhiteSpace(sp.Concerns);
 
             RecordPanel.Children.Add(LatestCard(sessions.FirstOrDefault()));
 
-            if (intake == null)
-                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null), SkinCard(sp, false)));     // registered with the earlier form
+            if (chart != null)
+            {
+                // registered (or edited) with the current form: the patient's chart
+                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null, chart), ChartMedicalCard(chart, sp)));
+                RecordPanel.Children.Add(ChartDetailsCard(chart));
+                if (HasExam(chart)) RecordPanel.Children.Add(ExamCard(chart));
+                // answers saved with an earlier form stay visible, unchanged
+                if (intake != null) RecordPanel.Children.Add(Ui.Cols(700, MedicalCard(intake, sp, "Earlier form: reason for visit and medical history", false), ContactsCard(intake)));
+                if (earlierSkin) RecordPanel.Children.Add(SkinCard(sp, true));
+            }
+            else if (intake == null)
+                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null, null), SkinCard(sp, false)));     // registered with the first form
             else
             {
-                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, intake), MedicalCard(intake, sp)));
-                bool earlierAnswers = !string.IsNullOrWhiteSpace(sp.GeneralSkinType) || !string.IsNullOrWhiteSpace(sp.Concerns);
-                RecordPanel.Children.Add(earlierAnswers ? Ui.Cols(700, ContactsCard(intake), SkinCard(sp, true)) : (UIElement)ContactsCard(intake));
+                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, intake, null), MedicalCard(intake, sp)));
+                RecordPanel.Children.Add(earlierSkin ? Ui.Cols(700, ContactsCard(intake), SkinCard(sp, true)) : (UIElement)ContactsCard(intake));
             }
 
             RecordPanel.Children.Add(HistoryCard(sessions));
@@ -218,7 +229,7 @@ namespace SkinDevApp
             return Ui.Card(sp);
         }
 
-        private Border InfoCard(Participant p, Consent consent, MedicalIntake m)
+        private Border InfoCard(Participant p, Consent consent, MedicalIntake m, PatientChart ch)
         {
             var sp = new StackPanel();
             var head = new DockPanel();
@@ -233,10 +244,20 @@ namespace SkinDevApp
                 Ui.KV("Patient ID", p.ParticipantID),
                 Ui.KV("Name", p.FullName),
                 Ui.KV("Age", p.Age.HasValue ? p.Age.Value.ToString(CultureInfo.InvariantCulture) + " years" : null),
-                Ui.KV("Date of birth", Fmt.Date(p.DateOfBirth)),
-                Ui.KV("Gender", p.Sex)
+                Ui.KV(ch != null ? "Birthday" : "Date of birth", Fmt.Date(p.DateOfBirth)),
+                Ui.KV(ch != null ? "Sex" : "Gender", p.Sex)
             };
-            if (m == null) rows.Add(Ui.KV("Contact", p.Contact));
+            if (ch != null) rows.AddRange(new[]
+            {
+                Ui.KV("Birthplace", ch.Birthplace),
+                Ui.KV("Civil status", ch.CivilStatus),
+                Ui.KV("Citizenship", ch.Citizenship),
+                Ui.KV("Occupation", ch.Occupation),
+                Ui.KV("Cell phone", ch.HomeCell),
+                Ui.KV("Home tel.", ch.HomeTel),
+                Ui.KV("E-mail", ch.Email)
+            });
+            else if (m == null) rows.Add(Ui.KV("Contact", p.Contact));
             else rows.AddRange(new[]
             {
                 Ui.KV("Marital status", m.MaritalStatus),
@@ -271,10 +292,10 @@ namespace SkinDevApp
         }
 
         /// <summary>Reason for visit and medical history from the registration form. Alerts come first, in red.</summary>
-        private Border MedicalCard(MedicalIntake m, SkinProfile s)
+        private Border MedicalCard(MedicalIntake m, SkinProfile s, string title = null, bool showMonk = true)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Reason for visit and medical history", 15, true));
+            sp.Children.Add(Ui.Text(title ?? "Reason for visit and medical history", 15, true));
             if (!string.IsNullOrWhiteSpace(m.Alerts) && m.Alerts != "None")
                 sp.Children.Add(Ui.Callout("Alerts: " + m.Alerts, "Check these before any procedure.", 2));
 
@@ -283,7 +304,7 @@ namespace SkinDevApp
                 history = string.Join(", ", history.Split(',').Select(x => x.Trim()).Select(x => x == "Cancer" ? "Cancer (" + m.CancerDetail + ")" : x));
             string Answer(string yesNo, string detail) => yesNo == "Yes" && !string.IsNullOrWhiteSpace(detail) ? "Yes — " + detail : yesNo;
 
-            sp.Children.Add(Ui.InfoRows(new[]
+            var medical = new List<KeyValuePair<string, string>>
             {
                 Ui.KV("Reason for visit", m.VisitReason),
                 Ui.KV("Location", m.ProblemLocation),
@@ -295,9 +316,10 @@ namespace SkinDevApp
                 Ui.KV("Smoking", Answer(m.Smokes, m.SmokingAmount)),
                 Ui.KV("Alcohol", Answer(m.DrinksAlcohol, m.AlcoholAmount)),
                 Ui.KV("Review of systems", m.ReviewOfSystems ?? "Nothing ticked"),
-                Ui.KV("Alerts", m.Alerts),
-                Ui.KV("Monk Skin Tone", MonkText(s))
-            }, 170, 12.5));
+                Ui.KV("Alerts", m.Alerts)
+            };
+            if (showMonk) medical.Add(Ui.KV("Monk Skin Tone", MonkText(s)));
+            sp.Children.Add(Ui.InfoRows(medical, 170, 12.5));
             sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
         }
@@ -324,6 +346,101 @@ namespace SkinDevApp
                     Ui.KV("Preferred pharmacy", Parts(m.PharmacyName, m.PharmacyPhone)),
                     Ui.KV("Pharmacy address", Parts(m.PharmacyAddress, m.PharmacyCity))
                 }, 150, 12.5)));
+            return Ui.Card(sp);
+        }
+
+        // -------------------------------------------- the patient's chart (current form) --
+
+        private static string Join(params string[] parts)
+        {
+            string joined = string.Join(", ", parts.Where(x => !string.IsNullOrWhiteSpace(x)));
+            return joined.Length == 0 ? null : joined;
+        }
+
+        /// <summary>"Hospital name  ·  tel  ·  cell" style line for an address with its numbers.</summary>
+        private static string WithNumbers(string address, string tel, string cell) =>
+            string.IsNullOrWhiteSpace(address) && string.IsNullOrWhiteSpace(tel) && string.IsNullOrWhiteSpace(cell) ? null
+            : string.Join("  ·  ", new[] { address, string.IsNullOrWhiteSpace(tel) ? null : "Tel. " + tel, string.IsNullOrWhiteSpace(cell) ? null : "Cell " + cell }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        /// <summary>Present illness, personal / past and family medical history.</summary>
+        private Border ChartMedicalCard(PatientChart c, SkinProfile s)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Present illness and medical history", 15, true));
+            if (c.Pregnant == "Yes" || c.Breastfeeding == "Yes")
+                sp.Children.Add(Ui.Callout(c.Pregnant == "Yes" && c.Breastfeeding == "Yes" ? "Pregnant and breastfeeding" : c.Pregnant == "Yes" ? "Pregnant" : "Breastfeeding",
+                    "Tell the care team before any treatment.", 1));
+
+            sp.Children.Add(Ui.InfoRows(new[]
+            {
+                Ui.KV("Date of onset", c.OnsetDate),
+                Ui.KV("Affected area", c.AffectedArea),
+                Ui.KV("Described lesions", c.DescribedLesions),
+                Ui.KV("Previous consultation", c.PreviousConsultation),
+                Ui.KV("Lab. exams", c.LabExams),
+                Ui.KV("Treatment so far", c.TreatmentNotes),
+                Ui.KV("Orals", c.Orals),
+                Ui.KV("Topicals", c.Topicals),
+                Ui.KV("Allergy", Join(string.IsNullOrWhiteSpace(c.AllergyFood) ? null : "Food: " + c.AllergyFood, string.IsNullOrWhiteSpace(c.AllergyDrugs) ? null : "Drugs: " + c.AllergyDrugs)),
+                Ui.KV("Medications / supplements", Join(c.Supplements, c.SupplementsOther)),
+                Ui.KV("Medical conditions", Join(c.Conditions, c.ConditionsOther)),
+                Ui.KV("Surgery", string.IsNullOrWhiteSpace(c.SurgeryYear) ? c.Surgery : string.IsNullOrWhiteSpace(c.Surgery) ? "Year " + c.SurgeryYear : c.Surgery + " (" + c.SurgeryYear + ")"),
+                Ui.KV("Last menstrual period", c.LastMenstrualPeriod),
+                Ui.KV("Family history", Join(c.FamilyHistory, c.FamilyHistoryOther)),
+                Ui.KV("Monk Skin Tone", MonkText(s))
+            }, 170, 12.5));
+            sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            return Ui.Card(sp);
+        }
+
+        /// <summary>Home, provincial and business addresses, school and parents.</summary>
+        private Border ChartDetailsCard(PatientChart c)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Addresses, school and parents", 15, true));
+            sp.Children.Add(Ui.Cols(760,
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Home address", c.HomeAddress),
+                    Ui.KV("Provincial address", WithNumbers(c.ProvincialAddress, c.ProvincialTel, c.ProvincialCell)),
+                    Ui.KV("Business address", WithNumbers(c.BusinessAddress, c.BusinessTel, c.BusinessCell))
+                }, 140, 12.5),
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Student", c.IsStudent == "Yes" ? "Yes" : c.IsStudent),
+                    Ui.KV("Grade / year", c.GradeYear),
+                    Ui.KV("School", c.School),
+                    Ui.KV("Father", c.FatherName),
+                    Ui.KV("Mother", c.MotherName)
+                }, 110, 12.5)));
+            return Ui.Card(sp);
+        }
+
+        private static bool HasExam(PatientChart c) =>
+            new[] { c.LesionCount, c.LesionNumber, c.Pruritus, c.Erythema, c.LesionColor, c.LesionTypes, c.Distribution, c.WoodLamp, c.Koh, c.Biopsy }
+                .Any(x => !string.IsNullOrWhiteSpace(x));
+
+        /// <summary>Physical examination and special tests (optional; usually filled in by the dermatologist).</summary>
+        private Border ExamCard(PatientChart c)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Physical examination and special tests", 15, true));
+            sp.Children.Add(Ui.Cols(760,
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Number of lesions", c.LesionCount == "Multiple" && !string.IsNullOrWhiteSpace(c.LesionNumber) ? "Multiple (" + c.LesionNumber + ")" : c.LesionCount),
+                    Ui.KV("Itch", c.Pruritus),
+                    Ui.KV("Redness", c.Erythema),
+                    Ui.KV("Colour", c.LesionColor),
+                    Ui.KV("Type of lesions", c.LesionTypes),
+                    Ui.KV("Distribution", c.Distribution)
+                }, 130, 12.5),
+                Ui.InfoRows(new[]
+                {
+                    Ui.KV("Wood lamp", c.WoodLamp),
+                    Ui.KV("KOH", c.Koh),
+                    Ui.KV("Biopsy", c.Biopsy)
+                }, 110, 12.5)));
             return Ui.Card(sp);
         }
 

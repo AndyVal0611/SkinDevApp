@@ -24,15 +24,8 @@
             <Setter Property="Background" Value="#F3EFE6"/>
             <Setter Property="Focusable" Value="False"/>
         </Style>
+        <!-- fields that only apply after a choice (student, female, multiple lesions): clearly greyed out while they do not apply -->
         <Style x:Key="IfField" TargetType="TextBox" BasedOn="{StaticResource Field}">
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#EDE8DC"/>
-                    <Setter Property="BorderBrush" Value="#E3DCCB"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="IfArea" TargetType="TextBox" BasedOn="{StaticResource FieldArea}">
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="#EDE8DC"/>
@@ -45,7 +38,12 @@
             <Setter Property="Background" Value="#EEE8DA"/>
             <Setter Property="Margin" Value="0,20,0,4"/>
         </Style>
-        <!-- check lists: one tick per line, wrapping long answers -->
+        <Style x:Key="SubHead" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#5C5D45"/>
+            <Setter Property="Margin" Value="0,14,0,0"/>
+        </Style>
         <Style x:Key="Tick" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
             <Setter Property="Margin" Value="0,1,16,1"/>
             <Setter Property="FontSize" Value="13.5"/>
@@ -55,6 +53,11 @@
             <Setter Property="MinWidth" Value="76"/>
             <Setter Property="FontSize" Value="13.5"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- one line of the physical examination: the label on the left, the choices on the right -->
+        <Style x:Key="ExamLabel" TargetType="TextBlock" BasedOn="{StaticResource FieldLabel}">
+            <Setter Property="Margin" Value="0,10,16,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
         </Style>
     </Page.Resources>
 
@@ -71,7 +74,7 @@
         <StackPanel Grid.Row="1" Margin="8,0,8,10">
             <TextBlock x:Name="PageTitle" Text="Patient registration" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0">
-                Fields marked <Run Text="*" Style="{StaticResource Req}"/> are required. The participant signs the separate paper consent form; no signature is collected on screen.
+                This form follows the clinic's patient's chart. Fields marked <Run Text="*" Style="{StaticResource Req}"/> are required. The participant signs the separate paper consent form; no signature is collected on screen.
                 Photographs are filed under the Patient ID, never under the name.
             </TextBlock>
         </StackPanel>
@@ -92,8 +95,8 @@
 
                     <Border x:Name="LegacyNote" Style="{StaticResource NoticeBox}" Margin="8,8,8,4" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource Body}" Foreground="#6B4438">
-                            <Run FontWeight="SemiBold" Text="Registered with the earlier form."/>
-                            <Run Text="The skin-profile answers from that form are kept unchanged and still appear in the patient record. The medical history below was not collected then, so fill in what is available. For this patient only the record details, age and gender are required."/>
+                            <Run FontWeight="SemiBold" Text="Registered with an earlier form."/>
+                            <Run Text="The answers from that form are kept unchanged and still appear in the patient record. This chart was not filled in then, so complete what is available. For this patient only the record details, age and sex are required."/>
                         </TextBlock>
                     </Border>
 
@@ -107,8 +110,9 @@
                                     <TextBlock Style="{StaticResource Hint}" Text="Created automatically. It cannot be changed."/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Registration date" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Style="{StaticResource FieldLabel}">Date <Run Text="*" Style="{StaticResource Req}"/></TextBlock>
                                     <TextBox x:Name="RegDateTxt" Style="{StaticResource ReadOnlyField}"/>
+                                    <TextBlock Style="{StaticResource Hint}" Text="Filled in automatically."/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
                                     <TextBlock Style="{StaticResource FieldLabel}">Recorded by (staff ID) <Run x:Name="OperatorReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
@@ -147,22 +151,22 @@
                         <StackPanel>
                             <UniformGrid Columns="3" Style="{StaticResource Row}">
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Legal first name <Run x:Name="FirstNameReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBlock Style="{StaticResource FieldLabel}">Family name <Run x:Name="LastNameReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBox x:Name="LastNameTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Given name <Run x:Name="FirstNameReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
                                     <TextBox x:Name="FirstNameTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Middle name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Text="Middle initial" Style="{StaticResource FieldLabel}"/>
                                     <TextBox x:Name="MiddleNameTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Legal last name <Run x:Name="LastNameReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <TextBox x:Name="LastNameTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                             </UniformGrid>
 
                             <UniformGrid Columns="3" Style="{StaticResource Row}">
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Date of birth <Run x:Name="DobReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBlock Style="{StaticResource FieldLabel}">Birthday <Run x:Name="DobReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
                                     <DatePicker x:Name="DobPicker" SelectedDateChanged="DobPicker_Changed"/>
                                     <TextBlock Style="{StaticResource Hint}" Text="MM/DD/YYYY, or pick the date from the calendar."/>
                                 </StackPanel>
@@ -171,250 +175,144 @@
                                     <TextBox x:Name="AgeTxt" Style="{StaticResource ReadOnlyField}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Gender <Run Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <ComboBox x:Name="SexCombo" Style="{StaticResource Combo}">
-                                        <ComboBoxItem Content="Male"/>
-                                        <ComboBoxItem Content="Female"/>
-                                        <ComboBoxItem Content="Intersex"/>
-                                        <ComboBoxItem Content="Prefer not to say"/>
-                                    </ComboBox>
+                                    <TextBlock Style="{StaticResource FieldLabel}">Sex <Run Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <WrapPanel x:Name="SexPanel">
+                                        <RadioButton Content="Male" GroupName="Sex" Style="{StaticResource Choice}"/>
+                                        <RadioButton Content="Female" GroupName="Sex" Style="{StaticResource Choice}"/>
+                                        <RadioButton x:Name="SexOtherChip" GroupName="Sex" Style="{StaticResource Choice}" Visibility="Collapsed"
+                                                     ToolTip="Recorded with an earlier form"/>
+                                    </WrapPanel>
                                 </StackPanel>
                             </UniformGrid>
 
-                            <Grid Style="{StaticResource Row}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                            <UniformGrid Columns="3" Style="{StaticResource Row}">
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Marital status" Style="{StaticResource FieldLabel}"/>
-                                    <ComboBox x:Name="MaritalCombo" Style="{StaticResource Combo}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Birthplace <Run x:Name="BirthplaceReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBox x:Name="BirthplaceTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Civil status <Run x:Name="CivilReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <ComboBox x:Name="CivilCombo" Style="{StaticResource Combo}">
                                         <ComboBoxItem Content="Single"/>
                                         <ComboBoxItem Content="Married"/>
-                                        <ComboBoxItem Content="Living with a partner"/>
-                                        <ComboBoxItem Content="Separated"/>
-                                        <ComboBoxItem Content="Divorced"/>
                                         <ComboBoxItem Content="Widowed"/>
-                                        <ComboBoxItem Content="Prefer not to say"/>
+                                        <ComboBoxItem Content="Separated"/>
+                                        <ComboBoxItem Content="Annulled"/>
                                     </ComboBox>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Occupation" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="OccupationTxt" Style="{StaticResource Field}"/>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Citizenship <Run x:Name="CitizenshipReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBox x:Name="CitizenshipTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
-                            </Grid>
+                            </UniformGrid>
                         </StackPanel>
                     </Border>
 
-                    <!-- ===================================================== 3. contact details -->
+                    <!-- ===================================================== 3. addresses and contact numbers -->
                     <Border x:Name="SecContact" Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="Mailing address (street, city, province or state, ZIP code)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox x:Name="AddressTxt" Style="{StaticResource Field}"/>
-
+                            <TextBlock Style="{StaticResource FieldLabel}">Home address <Run x:Name="HomeAddressReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                            <TextBox x:Name="HomeAddressTxt" Style="{StaticResource Field}"/>
                             <UniformGrid Columns="3" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Tel. #" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="HomeTelTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Cell. # <Run x:Name="HomeCellReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBox x:Name="HomeCellTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
                                     <TextBlock Text="E-mail address" Style="{StaticResource FieldLabel}"/>
                                     <TextBox x:Name="EmailTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Home phone <Run x:Name="HomePhoneReq" Text="†" Style="{StaticResource Req}"/></TextBlock>
-                                    <TextBox x:Name="HomePhoneTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Cell phone <Run x:Name="CellPhoneReq" Text="†" Style="{StaticResource Req}"/></TextBlock>
-                                    <TextBox x:Name="CellPhoneTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
                             </UniformGrid>
-                            <TextBlock x:Name="PhoneHint" Style="{StaticResource Hint}" HorizontalAlignment="Right">
-                                <Run Text="†" Style="{StaticResource Req}"/> At least one phone number is required.
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ===================================================== 4. referral and primary care -->
-                    <Border x:Name="SecReferral" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Referred to the clinic by" Style="{StaticResource FieldLabel}"/>
-                            <WrapPanel x:Name="ReferralPanel">
-                                <RadioButton Content="Doctor" GroupName="Referral" Style="{StaticResource Choice}"/>
-                                <RadioButton Content="Family / friend" GroupName="Referral" Style="{StaticResource Choice}"/>
-                                <RadioButton Content="Insurance company" GroupName="Referral" Style="{StaticResource Choice}"/>
-                                <RadioButton Content="Web search" GroupName="Referral" Style="{StaticResource Choice}"/>
-                                <RadioButton Content="Print ad" GroupName="Referral" Style="{StaticResource Choice}"/>
-                                <RadioButton Content="Other" GroupName="Referral" Style="{StaticResource Choice}"/>
-                            </WrapPanel>
-
-                            <Grid Style="{StaticResource Row}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock x:Name="ReferralDetailLabel" Text="Referral details" Style="{StaticResource FieldLabel}" Margin="0,4,0,5"/>
-                                    <TextBox x:Name="ReferralDetailTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid Style="{StaticResource Row}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Primary care physician (PCP) name" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PcpNameTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="PCP phone (if known)" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PcpPhoneTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ===================================================== 5. emergency contact -->
-                    <Border x:Name="SecEmergency" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <UniformGrid Columns="3" Style="{StaticResource Row}">
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Name" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="EmergencyNameTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Relationship to patient" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="EmergencyRelationTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Text="Phone number" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="EmergencyPhoneTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                            </UniformGrid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ===================================================== 6. reason for visit -->
-                    <Border x:Name="SecVisit" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource FieldLabel}">Reason for visit <Run x:Name="VisitReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                            <TextBox x:Name="VisitReasonTxt" Style="{StaticResource FieldArea}"/>
-
-                            <Grid Style="{StaticResource Row}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Location of the problem" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="LocationTxt" Style="{StaticResource Field}"/>
-                                    <TextBlock Style="{StaticResource Hint}" Text="For example: both cheeks and the forehead."/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Duration of the problem" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="DurationTxt" Style="{StaticResource Field}"/>
-                                    <TextBlock Style="{StaticResource Hint}" Text="For example: 3 months."/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ===================================================== 7. medical history -->
-                    <Border x:Name="SecHistory" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource FieldLabel}">Past medical history <Run x:Name="PmhReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,6" Text="Tick all that apply. If none apply, tick None."/>
-                            <UniformGrid x:Name="PmhPanel" Columns="3" Style="{StaticResource Row}">
-                                <StackPanel>
-                                    <CheckBox Content="Allergies (seasonal)" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Asthma" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Bleeding disorder (or bleeding issue)" Style="{StaticResource Tick}"/>
-                                    <CheckBox x:Name="CancerChk" Content="Cancer" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Coronary artery bypass" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Depression" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Diabetes" Style="{StaticResource Tick}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <CheckBox Content="Fever blister" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Heart valve replacement" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="High blood pressure" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="High cholesterol" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="HIV/AIDS" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Joint replacement" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Kidney transplant" Style="{StaticResource Tick}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <CheckBox Content="Liver disease" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Lumpectomy" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Lupus / rheumatoid arthritis" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Mastectomy" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Organ transplant" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Thyroid disease" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="None" Tag="None" Style="{StaticResource Tick}" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </UniformGrid>
-
-                            <Grid Style="{StaticResource Row}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Type of cancer (if ticked)" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="CancerTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
-                                </StackPanel>
-                            </Grid>
 
                             <Border Style="{StaticResource Divider}"/>
+                            <TextBlock Text="Provincial address" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="ProvAddressTxt" Style="{StaticResource Field}"/>
+                            <UniformGrid Columns="3" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Tel. #" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="ProvTelTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Cell. #" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="ProvCellTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
 
-                            <TextBlock Style="{StaticResource FieldLabel}">History of skin cancer or skin disorders? <Run x:Name="SkinHxReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8"
-                                       Text="For example: acne, actinic keratosis, basal cell carcinoma, melanoma, psoriasis, squamous cell carcinoma."/>
+                    <!-- ===================================================== 4. occupation and school -->
+                    <Border x:Name="SecWork" Style="{StaticResource Card}">
+                        <StackPanel>
                             <Grid Style="{StaticResource Row}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,16,0">
-                                    <RadioButton x:Name="SkinHxYes" Content="Yes" GroupName="SkinHx" Style="{StaticResource Choice}"/>
-                                    <RadioButton x:Name="SkinHxNo" Content="No" GroupName="SkinHx" Style="{StaticResource Choice}"/>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">Occupation <Run x:Name="OccupationReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBox x:Name="OccupationTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="Business address" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="BizAddressTxt" Style="{StaticResource Field}"/>
+                            <UniformGrid Columns="3" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Tel. #" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="BizTelTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Cell. #" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="BizCellTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <Border Style="{StaticResource Divider}"/>
+                            <TextBlock Style="{StaticResource FieldLabel}">Is the patient a student? <Run x:Name="StudentReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <RadioButton x:Name="StudentYes" Content="Yes" GroupName="Student" Style="{StaticResource Choice}"/>
+                                <RadioButton x:Name="StudentNo" Content="No" GroupName="Student" Style="{StaticResource Choice}"/>
+                            </StackPanel>
+                            <Grid Style="{StaticResource Row}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock x:Name="GradeLabel" Text="Grade / year" Style="{StaticResource FieldLabel}" Margin="0,4,0,5"/>
+                                    <TextBox x:Name="GradeTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBox x:Name="SkinHxTxt" Style="{StaticResource IfField}" IsEnabled="False"
-                                             ToolTip="If yes, the condition or disorder"/>
-                                    <TextBlock Style="{StaticResource Hint}" Text="If yes, name the condition or disorder."/>
+                                    <TextBlock x:Name="SchoolLabel" Text="School" Style="{StaticResource FieldLabel}" Margin="0,4,0,5"/>
+                                    <TextBox x:Name="SchoolTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
                     </Border>
 
-                    <!-- ===================================================== 8. medications and allergies -->
-                    <Border x:Name="SecMeds" Style="{StaticResource Card}">
+                    <!-- ===================================================== 5. parents -->
+                    <Border x:Name="SecParents" Style="{StaticResource Card}">
                         <StackPanel>
                             <UniformGrid Columns="2" Style="{StaticResource Row}">
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Current medications <Run x:Name="MedsReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,6" Text="Include non-prescription medicines and birth control."/>
-                                    <TextBox x:Name="MedsTxt" Style="{StaticResource IfArea}"/>
-                                    <CheckBox x:Name="MedsNaChk" Content="None (N/A)" Style="{StaticResource Tick}" Margin="0,6,0,0"/>
+                                    <TextBlock Text="Father's name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="FatherTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Allergies <Run x:Name="AllergiesReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,6" Text="Include allergies to medicines."/>
-                                    <TextBox x:Name="AllergiesTxt" Style="{StaticResource IfArea}"/>
-                                    <CheckBox x:Name="AllergiesNaChk" Content="None (N/A)" Style="{StaticResource Tick}" Margin="0,6,0,0"/>
+                                    <TextBlock Text="Mother's name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="MotherTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                             </UniformGrid>
                         </StackPanel>
                     </Border>
 
-                    <!-- ===================================================== 9. social history and review of systems -->
-                    <Border x:Name="SecSocial" Style="{StaticResource Card}">
+                    <!-- ===================================================== 6. present illness -->
+                    <Border x:Name="SecIllness" Style="{StaticResource Card}">
                         <StackPanel>
                             <Grid Style="{StaticResource Row}">
                                 <Grid.ColumnDefinitions>
@@ -422,94 +320,213 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Do you smoke? <Run x:Name="SmokeReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="SmokeYes" Content="Yes" GroupName="Smoke" Style="{StaticResource Choice}"/>
-                                        <RadioButton x:Name="SmokeNo" Content="No" GroupName="Smoke" Style="{StaticResource Choice}"/>
-                                    </StackPanel>
+                                    <TextBlock Text="Date of onset" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="OnsetTxt" Style="{StaticResource Field}"/>
+                                    <TextBlock Style="{StaticResource Hint}" Text="An exact or approximate date, e.g. June 2026."/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="If yes, how much?" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="SmokeAmountTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="1" Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Do you drink alcohol? <Run x:Name="AlcoholReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="AlcoholYes" Content="Yes" GroupName="Alcohol" Style="{StaticResource Choice}"/>
-                                        <RadioButton x:Name="AlcoholNo" Content="No" GroupName="Alcohol" Style="{StaticResource Choice}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="If yes, how much?" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="AlcoholAmountTxt" Style="{StaticResource IfField}" IsEnabled="False"/>
+                                    <TextBlock Text="Affected area" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="AreaTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                             </Grid>
+                            <TextBlock Text="Described lesions (according to the patient)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="DescribedTxt" Style="{StaticResource FieldArea}"/>
+                            <UniformGrid Columns="2" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Previous consultation" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="ConsultTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Lab. exams" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="LabTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Text="Treatment of present illness" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TreatmentTxt" Style="{StaticResource FieldArea}"/>
+                            <UniformGrid Columns="2" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Orals" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="OralsTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Topicals" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="TopicalsTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===================================================== 7. personal and past medical history -->
+                    <Border x:Name="SecHistory" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Allergy" Style="{StaticResource SubHead}" Margin="0,4,0,0"/>
+                            <UniformGrid Columns="2" Style="{StaticResource Row}">
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Food" Style="{StaticResource FieldLabel}" Margin="0,6,0,5"/>
+                                    <TextBox x:Name="AllergyFoodTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Drugs" Style="{StaticResource FieldLabel}" Margin="0,6,0,5"/>
+                                    <TextBox x:Name="AllergyDrugsTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock x:Name="FemaleHead" Text="If female" Style="{StaticResource SubHead}"/>
+                            <Grid Style="{StaticResource Row}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="2*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Style="{StaticResource Cell}">
+                                    <TextBlock Text="Last menstrual period" Style="{StaticResource FieldLabel}" Margin="0,6,0,5"/>
+                                    <TextBox x:Name="LmpTxt" Style="{StaticResource IfField}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Style="{StaticResource Cell}" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,16,2">
+                                    <CheckBox x:Name="PregnantChk" Content="Pregnant" Style="{StaticResource Tick}" Margin="0,0,28,0"/>
+                                    <CheckBox x:Name="BreastfeedingChk" Content="Breastfeeding" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock x:Name="FemaleHint" Style="{StaticResource Hint}" Text="Available when the sex is Female."/>
 
                             <Border Style="{StaticResource Divider}"/>
-
-                            <TextBlock Text="Review of systems" Style="{StaticResource FieldLabel}"/>
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,6" Text="Tick all that apply."/>
-                            <UniformGrid x:Name="RosPanel" Columns="3" Style="{StaticResource Row}">
+                            <TextBlock Text="Present medications / supplements" Style="{StaticResource SubHead}" Margin="0,4,0,6"/>
+                            <UniformGrid x:Name="SupplementPanel" Columns="3" Style="{StaticResource Row}">
                                 <StackPanel>
-                                    <CheckBox Content="Problems with bleeding" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Problems with healing" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Problems with scarring or keloids" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Vitamin B complex" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Growth hormones" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Vitamin E" Style="{StaticResource Tick}"/>
                                 </StackPanel>
                                 <StackPanel>
-                                    <CheckBox Content="Fever or chills" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Night sweats" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Myra E" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Rogine E" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Stress tabs" Style="{StaticResource Tick}"/>
                                 </StackPanel>
                                 <StackPanel>
-                                    <CheckBox Content="Unintentional weight loss" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Joint pain" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Fish oil" Style="{StaticResource Tick}"/>
                                 </StackPanel>
                             </UniformGrid>
+                            <TextBlock Text="Other medications or supplements" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="SupplementOtherTxt" Style="{StaticResource Field}"/>
+
+                            <Border Style="{StaticResource Divider}"/>
+                            <TextBlock Text="Medical conditions" Style="{StaticResource SubHead}" Margin="0,4,0,6"/>
+                            <UniformGrid x:Name="ConditionPanel" Columns="3" Style="{StaticResource Row}">
+                                <StackPanel>
+                                    <CheckBox Content="Asthma" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Hypertension" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <CheckBox Content="Diabetes mellitus" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Heart disease" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Text="Other conditions" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="ConditionOtherTxt" Style="{StaticResource Field}"/>
+
+                            <Grid Style="{StaticResource Row}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
+                                    <TextBlock Text="Surgery" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="SurgeryTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Style="{StaticResource Cell}">
+                                    <TextBlock Text="Year" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="SurgeryYearTxt" Style="{StaticResource Field}"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Border>
 
-                    <!-- ===================================================== 10. alerts -->
-                    <Border x:Name="SecAlerts" Style="{StaticResource Card}">
+                    <!-- ===================================================== 8. family medical history -->
+                    <Border x:Name="SecFamily" Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource FieldLabel}">Alerts <Run x:Name="AlertsReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,6" Text="Tick all that apply. If none apply, tick None."/>
-                            <UniformGrid x:Name="AlertsPanel" Columns="3" Style="{StaticResource Row}">
-                                <StackPanel>
-                                    <CheckBox Content="Allergy to adhesive" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Allergy to lidocaine" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Allergy to topical antibiotics" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Artificial heart valve" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Artificial joint replacement" Style="{StaticResource Tick}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <CheckBox Content="Blood thinners" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Defibrillator" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="MRSA" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Pacemaker" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Requires antibiotics before a surgical procedure" Style="{StaticResource Tick}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <CheckBox Content="Rapid heartbeat with epinephrine" Style="{StaticResource Tick}"/>
-                                    <CheckBox x:Name="PregnantChk" Content="Pregnant or trying to get pregnant" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="Breastfeeding" Style="{StaticResource Tick}"/>
-                                    <CheckBox Content="None" Tag="None" Style="{StaticResource Tick}" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </UniformGrid>
-                            <Border x:Name="PregnancyNote" Style="{StaticResource NoticeBox}" Margin="0,10,0,0" Visibility="Collapsed">
-                                <TextBlock Style="{StaticResource Body}" Foreground="#6B4438"
-                                           Text="Pregnant or trying to get pregnant: please also tell the physician verbally."/>
-                            </Border>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,6" Text="Tick Father and/or Mother for each condition in the family."/>
+                            <ContentControl x:Name="FamilyHost"/>
+                            <TextBlock Text="Other conditions in the family" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="FamilyOtherTxt" Style="{StaticResource Field}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- ===================================================== 11. preferred pharmacy -->
-                    <Border x:Name="SecPharmacy" Style="{StaticResource Card}">
+                    <!-- ===================================================== 9. physical examination (optional) -->
+                    <Border x:Name="SecExam" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="190"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="Number of lesions" Style="{StaticResource ExamLabel}"/>
+                                <WrapPanel x:Name="CountPanel" Grid.Column="1" Margin="0,4,0,0" Tag="Optional">
+                                    <RadioButton Content="Single" GroupName="LesionCount" Style="{StaticResource Choice}"/>
+                                    <RadioButton x:Name="MultipleChip" Content="Multiple" GroupName="LesionCount" Style="{StaticResource Choice}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="8,0,0,8">
+                                        <TextBlock x:Name="NumberLabel" Text="How many" Style="{StaticResource FieldLabel}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="LesionNumberTxt" Style="{StaticResource IfField}" Width="110" IsEnabled="False"/>
+                                    </StackPanel>
+                                </WrapPanel>
+
+                                <TextBlock Grid.Row="1" Text="Itch" Style="{StaticResource ExamLabel}"/>
+                                <WrapPanel x:Name="ItchPanel" Grid.Row="1" Grid.Column="1" Tag="Optional">
+                                    <RadioButton Content="Pruritic" GroupName="Itch" Style="{StaticResource Choice}"/>
+                                    <RadioButton Content="Non-pruritic" GroupName="Itch" Style="{StaticResource Choice}"/>
+                                </WrapPanel>
+
+                                <TextBlock Grid.Row="2" Text="Redness" Style="{StaticResource ExamLabel}"/>
+                                <WrapPanel x:Name="RednessPanel" Grid.Row="2" Grid.Column="1" Tag="Optional">
+                                    <RadioButton Content="Erythematous" GroupName="Redness" Style="{StaticResource Choice}"/>
+                                    <RadioButton Content="Non-erythematous" GroupName="Redness" Style="{StaticResource Choice}"/>
+                                </WrapPanel>
+
+                                <TextBlock Grid.Row="3" Text="Colour" Style="{StaticResource ExamLabel}"/>
+                                <WrapPanel x:Name="ColorPanel" Grid.Row="3" Grid.Column="1" Tag="Optional">
+                                    <RadioButton Content="Skin-colored" GroupName="Color" Style="{StaticResource Choice}"/>
+                                    <RadioButton Content="Hyperpigmented" GroupName="Color" Style="{StaticResource Choice}"/>
+                                    <RadioButton Content="Hypopigmented" GroupName="Color" Style="{StaticResource Choice}"/>
+                                </WrapPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,0" Text="Tap a selected choice again to clear it."/>
+
+                            <Border Style="{StaticResource Divider}"/>
+                            <TextBlock Text="Type of lesions" Style="{StaticResource SubHead}" Margin="0,4,0,0"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,6" Text="Tick all that apply."/>
+                            <UniformGrid x:Name="LesionTypePanel" Columns="3" Style="{StaticResource Row}">
+                                <StackPanel>
+                                    <CheckBox Content="Macules" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Wheals" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Papules" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Nodular" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <CheckBox Content="Vesicles or bullae" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Pustules" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Cystic" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Excoriations" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <CheckBox Content="Fissures or atrophy" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Scales or lichenification" Style="{StaticResource Tick}"/>
+                                    <CheckBox Content="Crusts or plaques" Style="{StaticResource Tick}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Text="Distribution" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="DistributionTxt" Style="{StaticResource FieldArea}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===================================================== 10. special tests (optional) -->
+                    <Border x:Name="SecTests" Style="{StaticResource Card}">
                         <StackPanel>
                             <Grid Style="{StaticResource Row}">
                                 <Grid.ColumnDefinitions>
@@ -517,27 +534,20 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
                                 <StackPanel Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Pharmacy name" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PharmacyNameTxt" Style="{StaticResource Field}"/>
+                                    <TextBlock Text="Wood lamp" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="WoodLampTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Telephone (if known)" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PharmacyPhoneTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="Address (or cross streets)" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PharmacyAddressTxt" Style="{StaticResource Field}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="2" Style="{StaticResource Cell}">
-                                    <TextBlock Text="City" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PharmacyCityTxt" Style="{StaticResource Field}"/>
+                                    <TextBlock Text="KOH" Style="{StaticResource FieldLabel}"/>
+                                    <WrapPanel x:Name="KohPanel" Tag="Optional">
+                                        <RadioButton Content="Positive" GroupName="Koh" Style="{StaticResource Choice}"/>
+                                        <RadioButton Content="Negative" GroupName="Koh" Style="{StaticResource Choice}"/>
+                                    </WrapPanel>
                                 </StackPanel>
                             </Grid>
+                            <TextBlock Text="Biopsy" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="BiopsyTxt" Style="{StaticResource Field}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
