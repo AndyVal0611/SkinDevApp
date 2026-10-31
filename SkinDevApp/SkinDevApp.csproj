@@ -363,9 +363,6 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Include="Model\precisionskin.onnx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <!-- optional single-class specialist detectors (installed by install_specialist_detector.py); copied only when present -->
     <None Include="Model\lesion_detector_acne.onnx" Condition="Exists('Model\lesion_detector_acne.onnx')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -379,13 +376,7 @@
     <None Include="Model\lesion_detector_hyperpigmentation.json" Condition="Exists('Model\lesion_detector_hyperpigmentation.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Model\lesion_detector_eczema.onnx" Condition="Exists('Model\lesion_detector_eczema.onnx')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="Model\lesion_detector_*_m*.onnx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Model\lesion_detector_eczema.json" Condition="Exists('Model\lesion_detector_eczema.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
