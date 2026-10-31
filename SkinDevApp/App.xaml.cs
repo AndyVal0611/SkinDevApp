@@ -19,6 +19,9 @@ namespace SkinDevApp
         {
             base.OnStartup(e);
 
+            // "SkinDevApp.exe --diagnose <image>": headless, read-only replay of the classifier and detectors (see CnnDiagnostics.cs)
+            if (SkinDevApp.AI.CnnDiagnostics.TryRunFromArgs(e.Args)) { Shutdown(0); return; }
+
             SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
 
             // Crisp rendering on every window (including the ones created in code): snap to whole pixels, ClearType text,

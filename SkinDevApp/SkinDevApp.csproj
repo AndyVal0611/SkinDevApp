@@ -154,6 +154,8 @@
 		<Compile Include="CaptureArchive.cs" />
 		<Compile Include="CaptureRecord.cs" />
 		<Compile Include="LesionDetector.cs" />
+		<Compile Include="DetectionDiagnostics.cs" />
+		<Compile Include="CnnDiagnostics.cs" />
 		<Compile Include="ClassHeatmapRenderer.cs" />
 		<Compile Include="ClassHeatmapSet.cs" />
 		<Compile Include="ClassPalette.cs" />

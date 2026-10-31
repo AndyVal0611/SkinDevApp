@@ -148,6 +148,85 @@ for s in SEEDS:
 '''
 
 
+ART_HELPER = r'''
+from matplotlib import image as mpimg
+def show_run_images(fname, title, figw=15, figh=4.8):
+    """shows one saved Ultralytics figure of every seed side by side; says so when a file is missing"""
+    found = [(s, FINAL_RUNS[s] / fname) for s in SEEDS if (FINAL_RUNS[s] / fname).exists()]
+    miss = [s for s in SEEDS if not (FINAL_RUNS[s] / fname).exists()]
+    if miss: print("MISSING for seed(s)", miss, "->", fname)
+    if not found: return
+    fig, ax = plt.subplots(1, len(found), figsize=(figw, figh)); ax = np.atleast_1d(ax)
+    for a, (s, p) in zip(ax, found):
+        a.imshow(mpimg.imread(str(p))); a.set_title("seed %d" % s, fontsize=10); a.axis("off")
+    fig.suptitle(title, fontsize=11); plt.tight_layout(); plt.show()
+
+rec = []
+for s in SEEDS:
+    f = FINAL_RUNS[s] / "results.csv"
+    if not f.exists(): continue
+    r = pd.read_csv(f); r.columns = [c.strip() for c in r.columns]; i = r["metrics/mAP50(B)"].idxmax()
+    rec.append({"seed": s, "epochs finished": len(r), "best epoch": int(r.loc[i, "epoch"]), "precision": r.loc[i, "metrics/precision(B)"], "recall": r.loc[i, "metrics/recall(B)"],
+                "mAP@0.5": r.loc[i, "metrics/mAP50(B)"], "mAP@0.5:0.95": r.loc[i, "metrics/mAP50-95(B)"]})
+print("Recorded by Ultralytics during training, at the best epoch, on the VALIDATION photos (these are the numbers written in each run's results.csv):")
+display(pd.DataFrame(rec).round(3).set_index("seed"))
+'''
+ART_PLAIN = r'''
+show_run_images("confusion_matrix.png", "confusion matrix (counts) on the validation photos; a one-class detector has a 2 x 2 matrix: lesion / background")
+show_run_images("confusion_matrix_normalized.png", "confusion matrix, normalised per true class")
+show_run_images("BoxPR_curve.png", "precision-recall curve (validation photos)")
+show_run_images("BoxF1_curve.png", "F1 against confidence (validation photos)")
+show_run_images("BoxP_curve.png", "precision against confidence (validation photos)")
+show_run_images("BoxR_curve.png", "recall against confidence (validation photos)")
+'''
+ART_PICS = r'''
+show_run_images("results.png", "Ultralytics' own training-curve sheet (losses, precision, recall, mAP per epoch)", figw=18, figh=7)
+show_run_images("labels.jpg", "what the training labels look like (box counts, sizes, positions)", figw=18, figh=6)
+show_run_images("val_batch0_labels.jpg", "validation photos with YOUR boxes (batch 0)", figw=18, figh=6)
+show_run_images("val_batch0_pred.jpg", "the same validation photos with the MODEL's boxes at the end of training (batch 0)", figw=18, figh=6)
+show_run_images("train_batch0.jpg", "a training batch as the network sees it (after augmentation)", figw=18, figh=6)
+'''
+ARGS_CODE = r'''
+import yaml
+keys = ["model", "imgsz", "epochs", "patience", "batch", "workers", "optimizer", "lr0", "cos_lr", "close_mosaic", "fliplr", "flipud", "degrees", "scale", "hsv_h", "hsv_s", "hsv_v", "seed", "pretrained", "amp", "deterministic", "device", "data"]
+args = {}
+for s in SEEDS:
+    f = FINAL_RUNS[s] / "args.yaml"
+    if f.exists(): args[s] = yaml.safe_load(open(f))
+    else: print("MISSING: args.yaml for seed", s)
+if args:
+    t = pd.DataFrame({("seed %d" % s): {k: a.get(k, "-") for k in keys} for s, a in args.items()})
+    doc = {k: TRAIN_ARGS.get(k, "(not set in TRAIN_ARGS)") for k in keys}
+    t.insert(0, "settings in this notebook (TRAIN_ARGS)", pd.Series(doc))
+    print("The settings Ultralytics recorded for each finished run (args.yaml) next to the settings this notebook would use if TRAIN = True:")
+    display(t)
+    diffs = [k for k in TRAIN_ARGS if any(a.get(k) != TRAIN_ARGS[k] for a in args.values())]
+    print("settings in TRAIN_ARGS that differ from at least one recorded run:", diffs if diffs else "none")
+'''
+MISSING_CODE = r'''
+def has(p): return "present" if Path(p).exists() else "MISSING"
+rows = []
+for s in SEEDS:
+    d = FINAL_RUNS[s]
+    for name, why in (("args.yaml", "exact training settings"), ("results.csv", "one row per epoch"), ("weights/best.pt", "the model that is used"), ("weights/last.pt", "last epoch (resume)"),
+                      ("confusion_matrix.png", "confusion matrix"), ("BoxPR_curve.png", "PR curve"), ("train_list.txt", "list of training photos"), ("spec.json", "experiment record"), ("DONE", "run finished marker")):
+        rows.append({"seed": s, "artifact": name, "what it is": why, "status": has(d / name)})
+t = pd.DataFrame(rows); piv = t.pivot_table(index=["artifact", "what it is"], columns="seed", values="status", aggfunc="first")
+display(piv)
+logs = FINAL_RUNS[SEEDS[0]].parent.parent / "logs"
+if "lesion_acne_boxed_only" in str(FINAL_RUNS[SEEDS[0]]) and logs.exists():
+    print("\nExtra records of the acne run (", logs, "):"); print(", ".join(sorted(p.name for p in logs.iterdir())))
+    tx = logs / "train_seed_123.txt"
+    if tx.exists():
+        first = tx.read_text(errors="replace").splitlines()[:2]
+        print("\nNOTE: the files train_seed_*.txt in that folder are NOT terminal logs: they contain only a list of training photo paths (%s ...). The terminal output of the real acne training is the executed notebook acne/evidence/Pipeline V5 - Lesion Detector__EXECUTED_by_researcher_2026-10-10.ipynb." % first[0].split("/")[-1])
+print("\nNot recorded anywhere I could find (so nothing is invented here):")
+print(" - the full terminal log of each seed (per-batch lines) except the one screenshot / executed notebook mentioned above")
+print(" - the GPU, wall-clock time and library versions at training time (Ultralytics' args.yaml does not store them; see the evidence notebook for what could be recovered)")
+print(" - validation / test scores of the INDIVIDUAL epochs beyond what results.csv contains")
+'''
+
+
 def build(cfg):
     nb = nbf.v4.new_notebook(); C = []
     md = lambda s: C.append(nbf.v4.new_markdown_cell(s.strip("\n")))
@@ -168,6 +247,16 @@ def build(cfg):
     code(LOGCODE)
     md("## 4. Training curves\nLoss should go down; the validation mAP rises, then flattens. The best epoch is kept (`best.pt`).")
     code(cfg["curves_code"])
+    md("### 4b. Recorded results of the original runs and the figures Ultralytics saved\nEverything in this block is read from the finished runs; nothing is re-trained or re-scored. First the numbers written during training (best epoch, validation photos), then the saved figures of each seed.")
+    code(ART_HELPER)
+    md("**Confusion matrices and precision / recall / F1 curves.** The detector has one class, so the confusion matrix has two rows and columns: *lesion* and *background*. The bottom-left cell counts lesions the model missed, the top-right counts boxes it drew where you boxed nothing.")
+    code(ART_PLAIN)
+    md("**Training sheets and sample images saved by the runs.**")
+    code(ART_PICS)
+    md("### 4c. Do the training settings documented here match the runs?\nThe `TRAIN = True` code in section 3 was written to reproduce the runs. This table compares it with `args.yaml`, which Ultralytics wrote at the start of each real run.")
+    code(ARGS_CODE)
+    md("### 4d. Which original records exist, and which are missing\nChecked live on disk. Anything marked MISSING is simply not available; it is not filled in with estimated values.")
+    code(MISSING_CODE)
     md("## 5. Validation results per model\nEach model scored on the validation photos (used to choose models and thresholds, never the test photos). One row per seed.")
     code(cfg["val_code"])
     md("## 6. Averaging the three models and choosing the threshold on validation\nBoxes that several models agree on are merged (weighted box fusion). The confidence threshold with the best F1 on the **validation** photos is chosen here, before the test photos are looked at.")

@@ -1,0 +1,471 @@
+#@@ md
+# Part V — Three YOLOv8 Detectors: Loading, Deployed-Equivalent Inference, Diagnostics and Localisation Evaluation
+
+Sections: **(23) loading and ONNX introspection · (24) ensemble inference and post-processing · detection diagnostics (duplicates / nesting / false positives) · localisation metrics.**
+
+**Preserving the deployed behaviour.** The Python engine below re-implements the C# `LesionDetector` / `LesionEngine` algorithm step by step, so Python evidence matches what the application would produce:
+
+1. letterbox to the model's `imgsz` (grey 114 padding, bilinear resize) → RGB → `/255` → NCHW float32;
+2. ONNX output `[1, 4 + nc, N]` = `cx, cy, w, h` (letterbox pixels) then per-class scores, **no objectness**;
+3. each ensemble member reports boxes down to confidence **0.02**, after *per-class NMS* (`nms_iou` from the detector JSON, ≤ 60 boxes);
+4. **ensemble fusion**: boxes of one class are sorted by confidence and clustered (IoU ≥ 0.5 against the running confidence-weighted average); fused confidence = `min(1, Σ confidences / number_of_members)`; the **deployed per-condition threshold is applied after fusion**;
+5. a single-model detector uses the same decoding with the threshold applied directly (a threshold never changes which boxes survive NMS, so keeping lower-confidence boxes as a *candidate pool* does not alter the deployed boxes);
+6. optional face filter (box centre inside the face box + 25 %), used by the application on live frames.
+
+Nothing is tuned: thresholds are the deployed values (`CFG.YOLO_THRESHOLDS`); an ensemble is never silently replaced by a single member; a detector that is not installed is **`detector_unavailable`**, never "no detection".
+
+#@@ code
+# 23.1 Detector registry: discovery follows the C# LesionEngine naming (lesion_detector_<class>.onnx [+ _m2.._m6], .json; else the 3-class lesion_detector_v1.onnx).
+#      Every Eczema-specific value is adjustable (CFG.ECZEMA_* / CFG.YOLO_OVERRIDES). Nothing about Eczema training is assumed.
+@dataclass
+class Member:
+    path: str; sha256: str; session: object; input_name: str; imgsz: int; layout: str; nc: int; class_names: list; out_shape: list
+
+
+@dataclass
+class DetectorSpec:
+    condition: str; kind: str; members: list; imgsz: int; nms_iou: float; threshold: float; floor: float; class_col: dict; available: bool
+    version: str = ""; notes: str = ""; meta: dict = field(default_factory=dict)
+
+
+def _read_json(p):
+    return json.load(open(p, encoding="utf-8")) if p and os.path.isfile(p) else {}
+
+
+def _introspect(path, meta, class_hint=None):
+    sess = ort.InferenceSession(path, providers=CFG.YOLO_PROVIDERS)
+    i, o = sess.get_inputs()[0], sess.get_outputs()[0]
+    shp = [d if isinstance(d, int) else None for d in i.shape]
+    require(len(shp) == 4 and shp[1] == 3, f"{os.path.basename(path)}: unexpected input shape {i.shape} (expected [1,3,H,W])")
+    imgsz = shp[2] or meta.get("imgsz")
+    require(imgsz, f"{os.path.basename(path)}: dynamic input size and no 'imgsz' in the JSON; set CFG.ECZEMA_IMGSZ or YOLO_OVERRIDES")
+    classes = [c.lower() for c in meta.get("classes", [])]
+    osh = [d if isinstance(d, int) else None for d in o.shape]
+    require(len(osh) == 3, f"{os.path.basename(path)}: unexpected output rank {o.shape}")
+    nc = (len(classes) if classes else None)
+    a, b = osh[1], osh[2]
+    if nc is not None and a == 4 + nc: layout = "rows_first"            # [1, 4+nc, N]   (deployed convention)
+    elif nc is not None and b == 4 + nc: layout = "cols_first"           # [1, N, 4+nc]
+    elif nc is None and a is not None and b is not None and a < b: layout, nc = "rows_first", a - 4
+    elif nc is None and a is not None and b is not None: layout, nc = "cols_first", b - 4
+    else: raise V6Error(f"{os.path.basename(path)}: cannot determine the output layout from {o.shape} and classes={classes}; add 'classes' to the JSON")
+    if not classes: classes = [class_hint.lower()] if (nc == 1 and class_hint) else []
+    require(len(classes) == nc, f"{os.path.basename(path)}: {nc} output classes but class names {classes}: add a 'classes' list to the JSON (class mapping is never guessed)")
+    return Member(path=path, sha256=sha256_file(path), session=sess, input_name=i.name, imgsz=int(imgsz), layout=layout, nc=int(nc), class_names=classes, out_shape=list(o.shape))
+
+
+def discover_detectors():
+    specs, d = {}, CFG.YOLO_MODEL_DIR
+    for cond in CFG.CONDITIONS:
+        key = cond.lower(); ov = (CFG.YOLO_OVERRIDES or {}).get(cond, {})
+        files = list(ov.get("onnx_files", [])); meta_p = ov.get("meta_json", "")
+        if cond == "Eczema":
+            files = files or list(CFG.ECZEMA_ONNX_FILES); meta_p = meta_p or CFG.ECZEMA_META_JSON
+        kind = "override" if files else ""
+        if not files and d:
+            spec = os.path.join(d, f"lesion_detector_{key}.onnx")
+            if os.path.isfile(spec):
+                files = [spec] + [f for f in (os.path.join(d, f"lesion_detector_{key}_m{k}.onnx") for k in range(2, 7)) if os.path.isfile(f)]
+                meta_p = meta_p or os.path.join(d, f"lesion_detector_{key}.json"); kind = "specialist"
+        if not files and d:
+            v1 = os.path.join(d, "lesion_detector_v1.onnx")
+            alt = [p for p in CFG.YOLO_OVERRIDES.get("three_class_onnx", [])] if isinstance(CFG.YOLO_OVERRIDES, dict) else []
+            v1 = (alt[0] if alt else v1)
+            if os.path.isfile(v1):
+                files = [v1]; meta_p = meta_p or v1.replace(".onnx", ".json"); kind = "three_class"
+        thr = float(ov.get("threshold", CFG.ECZEMA_THRESHOLD if cond == "Eczema" else CFG.YOLO_THRESHOLDS[cond]))
+        if not files:
+            specs[cond] = DetectorSpec(cond, "none", [], 0, 0.45, thr, CFG.YOLO_FLOOR, {}, False,
+                                       notes="no ONNX registered for this condition (specialist file, 3-class v1 file, or CFG override)")
+            continue
+        try:
+            meta = _read_json(meta_p)
+            members = [_introspect(f, meta, class_hint=cond) for f in files]
+            cls0 = members[0].class_names
+            require(all(m.class_names == cls0 and m.imgsz == members[0].imgsz and m.layout == members[0].layout for m in members), f"{cond}: ensemble members disagree on classes/imgsz/layout")
+            idx = ov.get("class_index", CFG.ECZEMA_CLASS_INDEX if cond == "Eczema" else None)
+            name = (CFG.ECZEMA_CLASS_NAME if cond == "Eczema" else key).lower()
+            if idx is None:
+                require(name in cls0, f"{cond}: class '{name}' not in detector classes {cls0}. Set the class index explicitly (CFG.ECZEMA_CLASS_INDEX / YOLO_OVERRIDES).")
+                idx = cls0.index(name)
+            specs[cond] = DetectorSpec(cond, kind, members, int(ov.get("imgsz") or (CFG.ECZEMA_IMGSZ if cond == "Eczema" and CFG.ECZEMA_IMGSZ else members[0].imgsz)),
+                                       float(ov.get("nms_iou") or (CFG.ECZEMA_NMS_IOU if cond == "Eczema" and CFG.ECZEMA_NMS_IOU else meta.get("nms_iou", 0.45))), thr, CFG.YOLO_FLOOR,
+                                       {cond: int(idx)}, True, version=meta.get("model", os.path.basename(files[0])) + (f" ({kind}, {len(members)} member(s))"), meta=meta)
+        except Exception as ex:                                              # a broken/missing detector must be VISIBLE and mean 'unavailable'
+            specs[cond] = DetectorSpec(cond, "error", [], 0, 0.45, thr, CFG.YOLO_FLOOR, {}, False, notes=f"{type(ex).__name__}: {str(ex)[:200]}")
+    return specs
+
+
+if os.path.isdir(CFG.YOLO_MODEL_DIR or ""):
+    DETECTORS = discover_detectors()
+else:
+    DETECTORS = {c: DetectorSpec(c, "none", [], 0, 0.45, CFG.YOLO_THRESHOLDS[c], CFG.YOLO_FLOOR, {}, False, notes="YOLO_MODEL_DIR not set") for c in CFG.CONDITIONS}
+reg_rows = []
+for c, sp in DETECTORS.items():
+    reg_rows.append(dict(condition=c, available=sp.available, kind=sp.kind, members=len(sp.members), imgsz=sp.imgsz, nms_iou=sp.nms_iou, deployed_threshold=sp.threshold, floor=sp.floor,
+                         onnx_input=[m.session.get_inputs()[0].shape for m in sp.members][:1], onnx_output=[m.out_shape for m in sp.members][:1], layout=sp.members[0].layout if sp.members else "",
+                         classes=sp.members[0].class_names if sp.members else [], sha256=[m.sha256[:12] for m in sp.members], notes=sp.notes))
+REGISTRY = pd.DataFrame(reg_rows); display(REGISTRY)
+YOLO_AVAILABLE = [c for c in CFG.CONDITIONS if DETECTORS[c].available]
+YOLO_UNAVAILABLE = [c for c in CFG.CONDITIONS if not DETECTORS[c].available]
+YOLO_CONFIG_HASH = hashlib.sha256(json.dumps({c: dict(av=sp.available, th=sp.threshold, nms=sp.nms_iou, sz=sp.imgsz, sha=[m.sha256 for m in sp.members], fl=sp.floor, fiou=CFG.YOLO_FUSION_IOU)
+                                              for c, sp in DETECTORS.items()}, sort_keys=True).encode()).hexdigest()[:16]
+write_json(os.path.join(CFG.DIRS["yolo"], "detector_registry.json"), dict(config_hash=YOLO_CONFIG_HASH, detectors=json.loads(REGISTRY.assign(onnx_input=REGISTRY.onnx_input.astype(str), onnx_output=REGISTRY.onnx_output.astype(str)).to_json(orient="records"))))
+print("detectors available:", YOLO_AVAILABLE, "| unavailable:", YOLO_UNAVAILABLE, "| config hash:", YOLO_CONFIG_HASH)
+set_gate("yolo_all_three", len(YOLO_UNAVAILABLE) == 0, f"detector(s) not available: {YOLO_UNAVAILABLE} - " + "; ".join(f"{c}: {DETECTORS[c].notes}" for c in YOLO_UNAVAILABLE))
+set_gate("yolo_any", len(YOLO_AVAILABLE) > 0, "no YOLO detector could be loaded; check CFG.YOLO_MODEL_DIR")
+if YOLO_UNAVAILABLE:
+    print(f"\n>>> {YOLO_UNAVAILABLE} will be treated as 'detector_unavailable' (NOT as 'no detection'). Stages that REQUIRE all three detectors are gated;")
+    print(">>> everything else (global CNN, the other detectors, the ROI branch for the available detectors, fusion with availability masks) still runs.")
+    print(">>> To add the Eczema detector later: set LUMYVUE_ECZEMA_ONNX_FILES (+ ECZEMA_META_JSON, ECZEMA_THRESHOLD) or install lesion_detector_eczema.onnx/.json, then re-run from this cell.")
+
+#@@ code
+# 24.1 Deployed-equivalent inference (letterbox -> decode -> per-class NMS -> ensemble fusion). Returns ALL pool boxes with their provenance.
+def iou_xyxy(a, b):
+    iw = min(a[2], b[2]) - max(a[0], b[0]); ih = min(a[3], b[3]) - max(a[1], b[1])
+    if iw <= 0 or ih <= 0: return 0.0
+    i = iw * ih; u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i
+    return i / u if u > 0 else 0.0
+
+
+def containment(a, b):
+    iw = min(a[2], b[2]) - max(a[0], b[0]); ih = min(a[3], b[3]) - max(a[1], b[1])
+    if iw <= 0 or ih <= 0: return 0.0
+    return iw * ih / max(min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])), 1e-9)
+
+
+def nms_boxes(boxes, thr, cap):
+    keep = []
+    for b in sorted(boxes, key=lambda x: -x[4]):
+        if any(iou_xyxy(b, k) > thr for k in keep): continue
+        keep.append(b)
+        if len(keep) >= cap: break
+    return keep
+
+
+def run_member(member, bgr, class_idx, nms_iou, floor):
+    """One ONNX member on one frame -> boxes of class `class_idx` in frame pixels after per-class NMS. Mirrors LesionDetector.DetectSingle."""
+    H, W = bgr.shape[:2]; S = member.imgsz
+    scale = min(S / W, S / H); nw, nh = max(1, round(W * scale)), max(1, round(H * scale)); px, py = (S - nw) // 2, (S - nh) // 2
+    canvas = np.full((S, S, 3), 114, np.uint8)
+    canvas[py:py + nh, px:px + nw] = cv2.resize(bgr, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    x = (cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0).transpose(2, 0, 1)[None]
+    o = member.session.run(None, {member.input_name: x})[0][0]
+    o = o if member.layout == "rows_first" else o.T                      # -> [4+nc, N]
+    require(o.shape[0] == 4 + member.nc, f"{os.path.basename(member.path)}: output rows {o.shape[0]} != 4+{member.nc}")
+    best = o[4:].argmax(0); sc = o[4:].max(0)                              # C#: best class per anchor, no objectness
+    sel = np.where((best == class_idx) & (sc >= floor))[0]
+    out = []
+    for i in sel:
+        cx, cy, bw, bh = o[0, i], o[1, i], o[2, i], o[3, i]
+        x0 = (cx - bw / 2 - px) / scale; y0 = (cy - bh / 2 - py) / scale; x1 = (cx + bw / 2 - px) / scale; y1 = (cy + bh / 2 - py) / scale
+        x0, x1 = max(0, min(W - 1, x0)), max(0, min(W - 1, x1)); y0, y1 = max(0, min(H - 1, y0)), max(0, min(H - 1, y1))
+        if x1 - x0 < 2 or y1 - y0 < 2: continue
+        out.append((float(x0), float(y0), float(x1), float(y1), float(sc[i])))
+    return nms_boxes(out, nms_iou, CFG.YOLO_MAX_BOXES), int(len(sel))
+
+
+def detect_condition(spec, bgr, face_box=None):
+    """All pool boxes (conf >= YOLO_POOL_MIN_CONF) for one condition with provenance. `deployed` = conf >= the deployed threshold (what the app would show)."""
+    if not spec.available: return None
+    H, W = bgr.shape[:2]
+    cidx = list(spec.class_col.values())[0]
+    per_member, raw_counts = [], []
+    for mi, m in enumerate(spec.members):
+        bx, nraw = run_member(m, bgr, cidx, spec.nms_iou, spec.floor); per_member.append([b + (mi,) for b in bx]); raw_counts.append(nraw)
+    if len(spec.members) == 1:
+        fused = [dict(box=b[:4], conf=b[4], support=1) for b in per_member[0]]
+    else:
+        clusters = []
+        def avg(cl):
+            w = sum(b[4] for b in cl) or 1.0
+            return [sum(b[k] * b[4] for b in cl) / w for k in range(4)]
+        for b in sorted([b for pm in per_member for b in pm], key=lambda x: -x[4]):
+            hit = None
+            for cl in clusters:
+                if iou_xyxy(avg(cl), b) >= CFG.YOLO_FUSION_IOU: hit = cl; break
+            if hit is None: clusters.append([b])
+            else: hit.append(b)
+        fused = [dict(box=tuple(avg(cl)), conf=min(1.0, sum(x[4] for x in cl) / len(spec.members)), support=len({x[5] for x in cl})) for cl in clusters]
+    fused = sorted([f for f in fused if f["conf"] >= CFG.YOLO_POOL_MIN_CONF], key=lambda f: -f["conf"])[:CFG.YOLO_MAX_BOXES]
+    if face_box is not None and CFG.YOLO_FACE_FILTER:
+        fx, fy, fw, fh = face_box; ex = 0.25
+        fused = [f for f in fused if fx - ex * fw <= (f["box"][0] + f["box"][2]) / 2 <= fx + fw + ex * fw and fy - ex * fh <= (f["box"][1] + f["box"][3]) / 2 <= fy + fh + ex * fh]
+    recs = []
+    for k, f in enumerate(fused):
+        x0, y0, x1, y1 = f["box"]
+        recs.append(dict(condition=spec.condition, conf=round(float(f["conf"]), 5), x0=round(x0, 2), y0=round(y0, 2), x1=round(x1, 2), y1=round(y1, 2), frame_w=W, frame_h=H,
+                         rel_area=round(((x1 - x0) * (y1 - y0)) / (W * H), 6), cx=round((x0 + x1) / 2 / W, 4), cy=round((y0 + y1) / 2 / H, 4), w_rel=round((x1 - x0) / W, 4), h_rel=round((y1 - y0) / H, 4),
+                         deployed=bool(f["conf"] >= spec.threshold), ensemble_support=int(f["support"]), ensemble_size=len(spec.members), rank=k))
+    return dict(boxes=recs, raw_counts=raw_counts)
+
+
+def detect_all(bgr, face_box=None):
+    """All three detectors on one frame. Unavailable detectors are reported as such (None), never as empty."""
+    return {c: detect_condition(DETECTORS[c], bgr, face_box) for c in CFG.CONDITIONS}
+
+
+def det_image_path(row):
+    return (row.orig_path, "original") if row.has_orig else (row.proc_path, "processed_224_upsampled")
+
+
+#@@ code
+# 24.2 Run the detectors over the dataset images that matter (annotated images + region-annotated images), with append-only caching and resume.
+#      Cost is roughly one second per image on CPU: run this cell once and let it finish; it resumes after interruption.
+YOLO_SCOPE = "annotated"       # 'annotated' (images with any known label / any verified region)  |  'all'
+DET_PATH = os.path.join(CFG.DIRS["yolo"], f"detections_{YOLO_CONFIG_HASH}.jsonl")
+
+
+def yolo_target_ids():
+    if YOLO_SCOPE == "all": return list(DF.image_id)
+    ids = set(DF[DF.eval_ok | DF.train_ok].image_id)
+    if len(REG): ids |= set(REG.image_id)
+    if not ids:                       # no annotations yet: a small stratified PREVIEW so the detectors and their diagnostics can be inspected
+        prev = pd.concat([g.sample(min(len(g), 15), random_state=3) for _, g in DF.groupby("src_label")])
+        print("No annotated images yet: running the detectors on a 60-image preview sample only (diagnostics; not used for any result).")
+        ids = set(prev.image_id)
+    return sorted(ids)
+
+
+def run_yolo_cache(ids, flush_every=25):
+    done = set()
+    if os.path.exists(DET_PATH):
+        with open(DET_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                try: done.add(json.loads(line)["image_id"])
+                except Exception: pass                                      # a truncated last line from an interrupted run
+    todo = [i for i in ids if i not in done]
+    print(f"YOLO: {len(done)} cached, {len(todo)} to run ({len(ids)} targets, scope={YOLO_SCOPE})")
+    byid = DF.set_index("image_id")
+    t0 = time.time(); buf = []
+    for n, iid in enumerate(todo):
+        r = byid.loc[iid]; p, src = (r.orig_path, "original") if r.has_orig else (r.proc_path, "processed_224_upsampled")
+        bgr = cv2.imread(p)
+        if bgr is None:
+            rec = dict(image_id=iid, error="unreadable_image", source=src)
+        else:
+            try:
+                fb = None
+                if CFG.YOLO_FACE_FILTER: fb, _ = detect_face(bgr)
+                res = detect_all(bgr, fb)
+                rec = dict(image_id=iid, source=src, frame_w=bgr.shape[1], frame_h=bgr.shape[0], registry=YOLO_CONFIG_HASH,
+                           detectors={c: (None if v is None else v) for c, v in res.items()})
+            except Exception as ex:                                       # a detector failure is recorded, never turned into 'no detection'
+                rec = dict(image_id=iid, error=f"{type(ex).__name__}: {str(ex)[:120]}", source=src)
+        buf.append(json.dumps(rec))
+        if len(buf) >= flush_every or n == len(todo) - 1:
+            with open(safe_path(DET_PATH), "a", encoding="utf-8") as f: f.write("\n".join(buf) + "\n")
+            buf = []
+            if (n + 1) % (flush_every * 4) == 0: print(f"  {n + 1}/{len(todo)}  {(time.time() - t0) / (n + 1):.2f}s/img")
+    return done | set(todo)
+
+
+if YOLO_AVAILABLE:
+    run_yolo_cache(yolo_target_ids())
+    DETRAW = [json.loads(l) for l in open(DET_PATH, encoding="utf-8") if l.strip()]
+    print("images with detector output:", len(DETRAW), "| errors:", sum("error" in r for r in DETRAW))
+    log_event("yolo_cached", n=len(DETRAW), registry=YOLO_CONFIG_HASH)
+else:
+    DETRAW = []
+    print("No detector available: YOLO inference skipped.")
+
+#@@ code
+# 24.3 Flatten to tables: DET (all pool boxes) and EVID (per image x condition: detector state + summary). States:
+#      not_available (no detector / detector error)  |  no_qualifying (detector ran, no box >= deployed threshold)  |  detected (>=1 box >= deployed threshold)
+rows, ev = [], []
+for r in DETRAW:
+    if "error" in r:
+        for c in CFG.CONDITIONS: ev.append(dict(image_id=r["image_id"], condition=c, state="not_available", reason=r["error"], n_pool=0, n_deployed=0, max_conf=np.nan, best_rel_area=np.nan, best_cx=np.nan, best_cy=np.nan, source=r.get("source", "")))
+        continue
+    for c in CFG.CONDITIONS:
+        d = r["detectors"].get(c)
+        if d is None:
+            ev.append(dict(image_id=r["image_id"], condition=c, state="not_available", reason="detector_unavailable", n_pool=0, n_deployed=0, max_conf=np.nan, best_rel_area=np.nan, best_cx=np.nan, best_cy=np.nan, source=r["source"])); continue
+        bx = d["boxes"]; dep = [b for b in bx if b["deployed"]]
+        for b in bx: rows.append(dict(image_id=r["image_id"], source=r["source"], registry=r["registry"], **b))
+        best = max(dep, key=lambda b: b["conf"]) if dep else None
+        ev.append(dict(image_id=r["image_id"], condition=c, state="detected" if dep else "no_qualifying", reason="", n_pool=len(bx), n_deployed=len(dep), max_conf=best["conf"] if best else np.nan,
+                       best_rel_area=best["rel_area"] if best else np.nan, best_cx=best["cx"] if best else np.nan, best_cy=best["cy"] if best else np.nan, source=r["source"]))
+DET = pd.DataFrame(rows); EVID = pd.DataFrame(ev)
+if len(EVID):
+    print(EVID.groupby(["condition", "state"]).size().unstack(fill_value=0))
+    print("detection image source:", EVID.drop_duplicates("image_id").source.value_counts().to_dict(),
+          "\n  (processed_224_upsampled = detectors were run on a 224x224 image upsampled to their input size: out-of-domain for 800-px detectors; provide ORIGINAL_IMAGE_ROOT.)")
+    write_csv(EVID, os.path.join(CFG.DIRS["yolo"], "evidence_per_image_condition.csv")); write_csv(DET, os.path.join(CFG.DIRS["yolo"], "detections_flat.csv"))
+
+#@@ md
+## 24.4 Detection diagnostics: duplicates, nesting, false-positive and missed regions
+* **Duplicate** = same-condition boxes with IoU > `DUP_IOU` (NMS should normally have removed one); **Nested** = a small box inside a larger one (IoU low, containment ≥ `NESTED_CONTAINMENT`); **Overlap** = partial overlap. IoU-based NMS cannot remove nested boxes.
+* The report compares per-member NMS output with the fused result so the *source* of overlap (loose per-member NMS, no post-fusion NMS, or genuinely separate patches) is visible. **This is diagnosis only — no box is removed and no setting is changed here.**
+* False-positive and missed-region statistics need **verified** labels/regions and are reported only where they exist.
+
+#@@ code
+def overlap_relation(a, b):
+    i, c = iou_xyxy(a, b), containment(a, b)
+    return "duplicate" if i > CFG.DUP_IOU else "nested" if c >= CFG.NESTED_CONTAINMENT else "overlap" if i > 0 else "none", i, c
+
+
+def overlap_report(det_df, only_deployed=True):
+    pairs = []
+    d = det_df[det_df.deployed] if only_deployed else det_df
+    for (iid, cond), g in d.groupby(["image_id", "condition"]):
+        bx = g[["x0", "y0", "x1", "y1"]].to_numpy()
+        for i in range(len(bx)):
+            for j in range(i + 1, len(bx)):
+                rel, iou_v, con = overlap_relation(bx[i], bx[j])
+                if rel != "none": pairs.append(dict(image_id=iid, condition=cond, relation=rel, iou=iou_v, containment=con))
+    return pd.DataFrame(pairs, columns=["image_id", "condition", "relation", "iou", "containment"])
+
+
+if len(DET):
+    OV = overlap_report(DET)
+    n_img = EVID[EVID.state == "detected"].groupby("condition").image_id.nunique()
+    summ = OV.groupby(["condition", "relation"]).image_id.nunique().unstack(fill_value=0) if len(OV) else pd.DataFrame()
+    summ = summ.reindex(CFG.CONDITIONS).fillna(0).astype(int)
+    summ.insert(0, "images_with_detections", n_img.reindex(CFG.CONDITIONS).fillna(0).astype(int))
+    display(summ); write_csv(summ.reset_index(), os.path.join(CFG.DIRS["yolo"], "duplicate_overlap_summary.csv"))
+    nm = DET.groupby(["condition"]).agg(pool_boxes=("conf", "size"), deployed_boxes=("deployed", "sum"), mean_support=("ensemble_support", "mean"))
+    display(nm)
+    fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
+    if len(OV):
+        for rel, g in OV.groupby("relation"): ax[0].hist(g.iou, bins=20, alpha=0.6, label=rel)
+        ax[0].legend(); ax[0].set_title("IoU of overlapping same-condition deployed boxes"); ax[0].set_xlabel("IoU")
+        ax[1].scatter(OV.iou, OV.containment, s=8, c=OV.relation.map({"duplicate": "r", "nested": "orange", "overlap": "gray"})); ax[1].set_xlabel("IoU"); ax[1].set_ylabel("containment of smaller box"); ax[1].set_title("duplicate (red) vs nested (orange)")
+    savefig(fig, "yolo_overlap_diagnostics")
+    cfgtbl = pd.DataFrame([dict(condition=c, per_member_nms_iou=sp.nms_iou, fusion_iou=CFG.YOLO_FUSION_IOU if len(sp.members) > 1 else None, members=len(sp.members), deployed_threshold=sp.threshold,
+                                post_fusion_nms="none (as deployed)") for c, sp in DETECTORS.items() if sp.available])
+    display(cfgtbl); write_csv(cfgtbl, os.path.join(CFG.DIRS["yolo"], "postprocessing_configuration.csv"))
+
+    # coordinate-conversion self-check: a synthetic box pasted at a known position must be recovered by the letterbox inverse mapping
+    def _letterbox_roundtrip(W, H, S, box):
+        scale = min(S / W, S / H); nw, nh = round(W * scale), round(H * scale); px, py = (S - nw) // 2, (S - nh) // 2
+        x0, y0, x1, y1 = box; lb = [x0 * scale + px, y0 * scale + py, x1 * scale + px, y1 * scale + py]
+        return [(lb[0] - px) / scale, (lb[1] - py) / scale, (lb[2] - px) / scale, (lb[3] - py) / scale]
+    for (_w, _h, _s) in [(640, 480, 800), (1280, 1280, 640), (300, 900, 800)]:
+        rt = _letterbox_roundtrip(_w, _h, _s, [10.0, 20.0, 100.0, 120.0])
+        assert np.allclose(rt, [10, 20, 100, 120], atol=1e-3), "letterbox coordinate conversion is not invertible"
+    print("coordinate-conversion round-trip check passed (3 aspect ratios).")
+
+#@@ code
+# 24.5 False-positive / missed-region statistics on VERIFIED data only (dev splits here; the test split is evaluated later, once).
+def cond_flag_rates(split_names):
+    if not len(EVID): return None
+    e = EVID.merge(DF[["image_id", "split", "y_acne", "y_hyperpigmentation", "y_eczema", "eval_ok", "image_origin"]], on="image_id")
+    e = e[e.split.isin(split_names) & e.eval_ok]
+    rows = []
+    for c in CFG.CONDITIONS:
+        col = "y_" + COND_COLS[c]; g = e[e.condition == c]
+        for lab, name in [(1, "present"), (0, "absent")]:
+            gg = g[g[col] == lab]
+            if len(gg) == 0: continue
+            rows.append(dict(condition=c, verified_label=name, n_images=len(gg), detector_not_available=int((gg.state == "not_available").sum()), detected=int((gg.state == "detected").sum()),
+                             no_qualifying=int((gg.state == "no_qualifying").sum()), detection_rate_where_available=float((gg.state == "detected").sum() / max(1, (gg.state != "not_available").sum()))))
+    return pd.DataFrame(rows)
+
+
+FLAG_DEV = cond_flag_rates(DEV)
+if FLAG_DEV is not None and len(FLAG_DEV):
+    display(FLAG_DEV); write_csv(FLAG_DEV, os.path.join(CFG.DIRS["yolo"], "detector_vs_verified_label_dev.csv"))
+    print("detection_rate on verified-Absent images = false-alarm rate (image level); on verified-Present = detector image-level recall.")
+else:
+    print("No verified labels with detector output in the dev splits yet: false-alarm / recall statistics not available.")
+
+# hard negatives from YOLO false positives (verified-absent condition + deployed box) -> feeds hard-example mining and the review queue
+YOLO_FLAGS = {}
+if len(EVID):
+    fp = EVID.merge(DF[["image_id", "split", "y_acne", "y_hyperpigmentation", "y_eczema", "full_known"]], on="image_id")
+    fp = fp[(fp.state == "detected") & (fp.split == "train")]
+    for r in fp.itertuples():
+        if r.full_known and getattr(r, "y_" + COND_COLS[r.condition]) == 0: YOLO_FLAGS.setdefault(r.image_id, []).append(r.condition)
+    _trn = DF[DF.split == "train"].reset_index(drop=True)
+    HARD = mine_hard_examples(_trn, _trn[[f"v5_{c}" for c in CFG.V5_CLASS_ORDER]].to_numpy(), yolo_flags=YOLO_FLAGS)
+    HARD_USABLE = set(HARD[HARD.usable_for_training].image_id)
+    write_csv(HARD, os.path.join(CFG.DIRS["data"], "hard_examples_train_with_yolo.csv"))
+    RQ = build_review_queue({k: [f"yolo_{c.lower()}_deployed_box" for c in v] for k, v in YOLO_FLAGS.items()})
+    print("hard examples now:", len(HARD), "(YOLO false positives on verified-absent conditions:", sum(len(v) for v in YOLO_FLAGS.values()), ") | review queue rows:", len(RQ))
+
+#@@ code
+# 24.6 Localisation metrics against VERIFIED region boxes (precision, recall, F1 at the deployed threshold; AP50 and AP50-95; localisation error; FP/FN counts).
+#      Eligible (image, condition) pairs: verified-Absent image labels (no GT boxes) or images whose regions of that class were marked `exhaustive`.
+def ap_from_matches(scores, tps, n_gt):
+    if n_gt == 0: return np.nan
+    o = np.argsort(-np.asarray(scores)); tp = np.cumsum(np.asarray(tps)[o]); fp = np.cumsum(1 - np.asarray(tps)[o])
+    rec = tp / n_gt; prec = tp / np.maximum(tp + fp, 1e-9)
+    mrec = np.concatenate([[0], rec, [1]]); mpre = np.concatenate([[0], prec, [0]])
+    for i in range(len(mpre) - 2, -1, -1): mpre[i] = max(mpre[i], mpre[i + 1])
+    idx = np.where(mrec[1:] != mrec[:-1])[0]
+    return float(((mrec[idx + 1] - mrec[idx]) * mpre[idx + 1]).sum())
+
+
+def localisation_metrics(split_names, cond, only_deployed=False):
+    sp = DETECTORS[cond]
+    if not sp.available: return dict(condition=cond, status="detector_unavailable")
+    if not len(REG) or not len(DET): return dict(condition=cond, status="no verified region annotations or no detections")
+    cname = cond.lower()
+    imgs = DF[DF.split.isin(split_names)]
+    r = REG[(REG.split.isin(split_names)) & REG.eval_ok & (REG.label == cname)]
+    exh = set(r[r.exhaustive].image_id)
+    absent = set(imgs[(imgs["y_" + COND_COLS[cond]] == 0) & imgs.eval_ok].image_id)
+    elig = (exh | absent) & set(EVID.image_id)
+    gts = {i: g[["x0", "y0", "x1", "y1"]].to_numpy() for i, g in r.groupby("image_id") if i in elig}
+    n_gt = int(sum(len(v) for v in gts.values()))
+    if n_gt < 10 or len(elig) < 10: return dict(condition=cond, status=f"insufficient verified exhaustive regions ({n_gt} boxes in {len(elig)} images)")
+    d = DET[(DET.condition == cond) & DET.image_id.isin(elig)]
+    d = d[d.deployed] if only_deployed else d
+    out = dict(condition=cond, status="ok", n_images=len(elig), n_gt_boxes=n_gt)
+    aps = []
+    for thr in np.arange(0.5, 0.96, 0.05):
+        sc, tps = [], []
+        for iid, g in d.groupby("image_id"):
+            gt = gts.get(iid, np.zeros((0, 4))); used = np.zeros(len(gt), bool)
+            for b in g.sort_values("conf", ascending=False).itertuples():
+                bn = [b.x0 / b.frame_w, b.y0 / b.frame_h, b.x1 / b.frame_w, b.y1 / b.frame_h]
+                ious = [iou_xyxy(bn, gg) if not used[k] else 0 for k, gg in enumerate(gt)]
+                k = int(np.argmax(ious)) if len(ious) else -1
+                if k >= 0 and ious[k] >= thr: used[k] = True; tps.append(1)
+                else: tps.append(0)
+                sc.append(b.conf)
+        aps.append(ap_from_matches(sc, tps, n_gt))
+        if abs(thr - 0.5) < 1e-9: out["AP50"] = aps[-1]
+    out["AP50_95"] = float(np.nanmean(aps))
+    dd = d[d.deployed]; tp = fp = 0; matched_iou = []; ratios = []
+    fn = 0
+    for iid in elig:
+        gt = gts.get(iid, np.zeros((0, 4))); used = np.zeros(len(gt), bool); g = dd[dd.image_id == iid].sort_values("conf", ascending=False)
+        for b in g.itertuples():
+            bn = [b.x0 / b.frame_w, b.y0 / b.frame_h, b.x1 / b.frame_w, b.y1 / b.frame_h]
+            ious = [iou_xyxy(bn, gg) if not used[k] else 0 for k, gg in enumerate(gt)]; k = int(np.argmax(ious)) if len(ious) else -1
+            if k >= 0 and ious[k] >= 0.5:
+                used[k] = True; tp += 1; matched_iou.append(ious[k]); ratios.append(((bn[2] - bn[0]) * (bn[3] - bn[1])) / max((gt[k][2] - gt[k][0]) * (gt[k][3] - gt[k][1]), 1e-9))
+            else: fp += 1
+        fn += int((~used).sum())
+    out.update(precision=tp / max(tp + fp, 1), recall=tp / max(tp + fn, 1), tp=tp, fp=fp, fn=fn, median_iou_matched=float(np.median(matched_iou)) if matched_iou else np.nan,
+               median_area_ratio_matched=float(np.median(ratios)) if ratios else np.nan, threshold=sp.threshold)
+    out["f1"] = 2 * out["precision"] * out["recall"] / max(out["precision"] + out["recall"], 1e-9)
+    return out
+
+
+LOC_DEV = pd.DataFrame([localisation_metrics(DEV, c) for c in CFG.CONDITIONS])
+display(LOC_DEV); write_csv(LOC_DEV, os.path.join(CFG.DIRS["yolo"], "localisation_metrics_dev.csv"))
+print("(mAP here is computed over the candidate pool down to conf %.2f, not Ultralytics' 0.001; values are therefore comparable across detectors in this notebook but not numerically identical to the training notebooks.)" % CFG.YOLO_POOL_MIN_CONF)
+
+#@@ code
+# 24.7 Example gallery of detections on annotated development images (box colour = condition; solid = deployed, dashed = pool-only). Saved for the thesis.
+def draw_detections(bgr, recs):
+    im = bgr.copy(); col = {"Acne": (0, 0, 255), "Hyperpigmentation": (255, 80, 0), "Eczema": (0, 200, 255)}
+    for r in recs:
+        p0, p1 = (int(r["x0"]), int(r["y0"])), (int(r["x1"]), int(r["y1"])); th = max(1, bgr.shape[1] // 400)
+        cv2.rectangle(im, p0, p1, col[r["condition"]], th if r["deployed"] else 1)
+        cv2.putText(im, f"{r['condition'][:3]} {r['conf']:.2f}", (p0[0], max(10, p0[1] - 3)), cv2.FONT_HERSHEY_SIMPLEX, max(0.35, bgr.shape[1] / 1600), col[r["condition"]], 1)
+    return im
+
+
+if len(DET):
+    ids = [i for i in DET.image_id.unique() if DF.set_index("image_id").loc[i].split in DEV][:CFG.N_EXAMPLE_IMAGES]
+    byid = DF.set_index("image_id"); fig, ax = plt.subplots(2, 6, figsize=(18, 6.5)); ax = ax.ravel()
+    for a in ax: a.axis("off")
+    for a, iid in zip(ax, ids):
+        r = byid.loc[iid]; bgr = cv2.imread(r.orig_path if r.has_orig else r.proc_path)
+        a.imshow(cv2.cvtColor(draw_detections(bgr, DET[DET.image_id == iid].to_dict("records")), cv2.COLOR_BGR2RGB)); a.set_title(f"{pseudo_id(iid)[-6:]} | {r.src_label}", fontsize=8)
+    fig.suptitle("YOLO detections (solid = deployed threshold, thin = candidate pool only). Source-class names are NOT verified labels.")
+    savefig(fig, "yolo_detection_gallery")

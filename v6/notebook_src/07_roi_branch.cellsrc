@@ -1,0 +1,340 @@
+#@@ md
+# Part VI — YOLO-Guided Regions of Interest and the ROI MobileNetV2
+
+Sections: **(25) ROI extraction · (26) ROI training-set preparation · (27) ROI MobileNetV2 training · (28) ROI feature aggregation.**
+
+This is where **YOLO information genuinely flows into MobileNetV2**: the boxes proposed by the three detectors select image regions; a MobileNetV2 looks at each region (its own pixels, with context) and produces an embedding and region-level condition scores that the fusion network later consumes.
+
+**Design rules.**
+* *Proposals are imperfect, so training uses imperfect proposals.* ROI training examples are the detectors' **actual proposals** on training images, labelled from **verified region annotations** (IoU ≥ 0.5 with a verified box of a class ⇒ that class; a reviewed `background_false_positive` region, or a proposal on a *verified-Normal* image ⇒ **Background**; anything else ⇒ **ignored**). The YOLO class is **never** the label.
+* *Leakage control.* Crops are derived **after** the frozen split and only from images of the split being built; no ROI of a test image exists in any training table.
+* *Variable ROI counts.* Tier 1 = boxes above the deployed threshold (round-robin across detectors, duplicates suppressed); Tier 2 = lower-confidence candidates from the pool; Tier 3 = **alternative context crops** (wider margin) of Tier-1 boxes — different pixels, used by the verification cycle. Empty detection ⇒ zero ROIs (an explicit mask), never a fabricated crop.
+* *Crop procedure.* Expand the box by `ROI_MARGIN` on each side, make it **square** by extending the shorter side (context-preserving, no stretching), shift it inside the image (never zero-pad), resize bilinearly to the ROI input size, then `(p/127.5)−1`. Validity checks reject degenerate, out-of-range and too-small boxes with an explicit reason.
+* *Memory.* ROI input is 224×224 so the cached ImageNet weights are used; batch 32 with mixed precision fits 8 GB. Crops of training ROIs are cached as PNGs under `roi/crops/` (pseudonymous names, folder mode 0700; `purge_roi_cache()` deletes them).
+
+#@@ code
+# 25.1 Square, context-preserving crop and the ROI candidate builder.
+ROI_S = 224          # ROI network input (the cached ImageNet weights exist for 224)
+
+
+def square_crop_box(x0, y0, x1, y1, W, H, margin):
+    """Margin-expanded SQUARE window containing the box, shifted to lie inside the image. Returns (cx0, cy0, side) ints, or None if the box is invalid."""
+    vals = np.array([x0, y0, x1, y1], float)
+    if not np.isfinite(vals).all() or x1 - x0 < 2 or y1 - y0 < 2: return None
+    side = max(x1 - x0, y1 - y0) * (1 + 2 * margin)
+    side = min(side, W, H)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    nx0 = min(max(cx - side / 2, 0), W - side); ny0 = min(max(cy - side / 2, 0), H - side)
+    side_i = int(round(side))
+    return int(round(nx0)), int(round(ny0)), max(side_i, 2)
+
+
+def crop_roi(bgr, box, margin=None, size=None):
+    """Returns (rgb_uint8 [size,size,3] or None, reason). reason == '' when valid."""
+    H, W = bgr.shape[:2]; margin = CFG.ROI_MARGIN if margin is None else margin; size = size or ROI_S
+    x0, y0, x1, y1 = box
+    if max(x1 - x0, y1 - y0) < CFG.ROI_MIN_SIDE_FRAC * min(W, H): return None, "too_small"
+    if x0 < -1 or y0 < -1 or x1 > W + 1 or y1 > H + 1: return None, "outside_image"
+    sq = square_crop_box(x0, y0, x1, y1, W, H, margin)
+    if sq is None: return None, "degenerate_box"
+    cx0, cy0, side = sq
+    crop = bgr[cy0:cy0 + side, cx0:cx0 + side]
+    if crop.size == 0 or min(crop.shape[:2]) < 2: return None, "empty_crop"
+    return cv2.cvtColor(cv2.resize(crop, (size, size), interpolation=cv2.INTER_LINEAR), cv2.COLOR_BGR2RGB), ""
+
+
+def roi_norm(rgb_uint8):
+    return (rgb_uint8.astype(np.float32) / 127.5) - 1.0
+
+
+def build_roi_candidates(det_rows, W, H):
+    """det_rows: list of detection dicts for ONE image (all conditions, pool). Returns a list of ROI candidate dicts with tier/alt/geometry. Deterministic."""
+    cand = sorted(det_rows, key=lambda r: -r["conf"])
+    box = lambda r: (r["x0"], r["y0"], r["x1"], r["y1"])
+    chosen = []
+    def dup(r): return any(iou_xyxy(box(r), box(c)) > CFG.ROI_OVERLAP_SUPPRESS_IOU for c in chosen)
+    # tier 1: deployed boxes, round-robin over detectors so that one chatty detector cannot fill every slot
+    per = {c: [r for r in cand if r["deployed"] and r["condition"] == c] for c in CFG.CONDITIONS}
+    t1 = []
+    while len(t1) < CFG.ROI_MAX_TIER1 and any(per.values()):
+        for c in CFG.CONDITIONS:
+            if per[c] and len(t1) < CFG.ROI_MAX_TIER1:
+                r = per[c].pop(0)
+                if not dup(r): chosen.append(r); t1.append(r)
+    n_alt = min(len(t1), max(0, CFG.ROI_MAX_TOTAL // 4))
+    t2 = []
+    for r in cand:
+        if len(t1) + len(t2) + n_alt >= CFG.ROI_MAX_TOTAL: break
+        if not r["deployed"] and not dup(r): chosen.append(r); t2.append(r)
+    out = []
+    for tier, lst, alt in [(1, t1, False), (2, t2, False), (3, t1[:n_alt], True)]:
+        for r in lst:
+            geo = dict(w_rel=(r["x1"] - r["x0"]) / W, h_rel=(r["y1"] - r["y0"]) / H)
+            out.append(dict(tier=tier, alt=alt, condition=r["condition"], conf=r["conf"], deployed=r["deployed"], support_frac=r["ensemble_support"] / max(r["ensemble_size"], 1),
+                            x0=r["x0"], y0=r["y0"], x1=r["x1"], y1=r["y1"], rel_area=r["rel_area"], cx=r["cx"], cy=r["cy"], w_rel=geo["w_rel"], h_rel=geo["h_rel"],
+                            aspect=float(np.clip(geo["w_rel"] * W / max(geo["h_rel"] * H, 1e-6), 0.1, 10.0))))
+    return out
+
+
+YOLO_FEATURE_NAMES = ["cond_acne", "cond_hyper", "cond_eczema", "conf", "rel_area", "cx", "cy", "w_rel", "h_rel", "aspect_log", "deployed", "support_frac", "tier1", "tier2", "tier3_alt"]
+
+
+def yolo_roi_features(c):
+    onehot = [1.0 if c["condition"] == k else 0.0 for k in CFG.CONDITIONS]
+    return onehot + [c["conf"], c["rel_area"], c["cx"], c["cy"], c["w_rel"], c["h_rel"], float(np.log(c["aspect"])), float(c["deployed"]), c["support_frac"],
+                     float(c["tier"] == 1), float(c["tier"] == 2), float(c["tier"] == 3)]
+
+
+#@@ code
+# 25.2 ROI visualisation on a few annotated development images (Tier 1 solid, Tier 2 dashed-look thin, Tier 3 = wider context window).
+DET_BY_IMG = {iid: g.to_dict("records") for iid, g in DET.groupby("image_id")} if len(DET) else {}
+EVID_IDS = set(EVID.image_id) if len(EVID) else set()
+
+
+def det_rows_for(iid):
+    return DET_BY_IMG.get(iid, [])
+
+
+def show_roi_examples(n=4):
+    if not len(DET): print("no detections yet"); return
+    byid = DF.set_index("image_id"); ids = [i for i in DET.image_id.unique() if byid.loc[i].split in DEV and len(DET[(DET.image_id == i) & DET.deployed])][:n]
+    if not ids: print("no development image with a deployed detection to illustrate"); return
+    fig, ax = plt.subplots(n, 7, figsize=(17, 2.7 * n), squeeze=False)
+    for a in ax.ravel(): a.axis("off")
+    for row, iid in enumerate(ids):
+        r = byid.loc[iid]; bgr = cv2.imread(r.orig_path if r.has_orig else r.proc_path); H, W = bgr.shape[:2]
+        cands = build_roi_candidates(det_rows_for(iid), W, H); vis = bgr.copy()
+        for c in cands:
+            if c["alt"]: continue
+            cv2.rectangle(vis, (int(c["x0"]), int(c["y0"])), (int(c["x1"]), int(c["y1"])), (0, 255, 0) if c["tier"] == 1 else (0, 200, 255), max(1, W // 400))
+        ax[row, 0].imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB)); ax[row, 0].set_title(f"{pseudo_id(iid)[-6:]}: {len(cands)} ROI cand.", fontsize=8)
+        k = 1
+        for c in cands[:6]:
+            rgb, why = crop_roi(bgr, (c["x0"], c["y0"], c["x1"], c["y1"]), CFG.ROI_ALT_MARGIN if c["alt"] else CFG.ROI_MARGIN)
+            if rgb is not None and k < 7: ax[row, k].imshow(rgb); ax[row, k].set_title(f"{c['condition'][:4]} {c['conf']:.2f} t{c['tier']}{' alt' if c['alt'] else ''}", fontsize=7); k += 1
+    fig.suptitle("YOLO-guided ROI candidates (green = tier 1, orange = tier 2) and the crops fed to the ROI MobileNetV2")
+    savefig(fig, "roi_examples")
+
+
+show_roi_examples()
+
+#@@ md
+## 26. ROI training-set preparation (verified regions → labelled proposals)
+The table below is built **separately for `train` and `validation`** (the `fusion` and `test` splits never produce ROI *training* rows). It needs verified region annotations (`regions_train`, `regions_validation` gates) and detector output for those images; otherwise it stops with the exact shortfall.
+
+#@@ code
+ROI_DIR = CFG.DIRS["roi"]; CROP_DIR = os.path.join(ROI_DIR, "crops"); os.makedirs(CROP_DIR, exist_ok=True)
+try: os.chmod(CROP_DIR, 0o700)
+except OSError: pass
+
+
+def purge_roi_cache():
+    """Delete cached ROI crops (they are derived from identifiable facial photographs)."""
+    n = 0
+    for f in glob.glob(os.path.join(CROP_DIR, "*.png")): os.remove(f); n += 1
+    print("deleted", n, "cached ROI crops"); log_event("roi_cache_purged", n=n)
+
+
+def label_proposal(c, W, H, regs, image_all_absent):
+    """Label a proposal from VERIFIED regions of its image. Returns class 0..2, 3 (Background) or -1 (ignore). The detector's own class is never used."""
+    bn = (c["x0"] / W, c["y0"] / H, c["x1"] / W, c["y1"] / H)
+    best, bi = 0.0, -1
+    for r in regs.itertuples():
+        i = iou_xyxy(bn, (r.x0, r.y0, r.x1, r.y1))
+        if i > best: best, bi = i, r.cls
+    if bi >= 0 and best >= CFG.ROI_MATCH_IOU: return int(bi)                     # 0 acne, 1 hyper, 2 eczema, 3 background_false_positive (a reviewed negative proposal)
+    if image_all_absent and best < CFG.ROI_BG_MAX_IOU: return 3                    # verified-Normal image: any proposal that touches no verified region is background
+    return -1
+
+
+def build_roi_table(split):
+    gate(f"regions_{split}")
+    if not len(DET): raise GateError("No YOLO detections available: run Section 24 first.")
+    ids = DF[(DF.split == split)].image_id
+    rows = []; byid = DF.set_index("image_id"); regs_all = REG[(REG.split == split) & (REG.train_ok if split == "train" else REG.eval_ok)]
+    reg_ids = set(regs_all.image_id)
+    for iid in ids:
+        r = byid.loc[iid]
+        if iid not in EVID_IDS: continue                                           # YOLO was not run for this image
+        if iid not in reg_ids and not (r.full_known and r.n_present == 0): continue   # no verified regions and not a verified-Normal image: nothing can be labelled
+        src, _ = det_image_path(r); bgr = cv2.imread(src)
+        if bgr is None: continue
+        H, W = bgr.shape[:2]
+        regs = regs_all[regs_all.image_id == iid]; all_absent = bool(r.full_known and r.n_present == 0)
+        for k, c in enumerate([c for c in build_roi_candidates(det_rows_for(iid), W, H) if not c["alt"]]):
+            lab = label_proposal(c, W, H, regs, all_absent)
+            if lab < 0: continue
+            rgb, why = crop_roi(bgr, (c["x0"], c["y0"], c["x1"], c["y1"]))
+            if rgb is None: continue
+            rid = pseudo_id(f"{iid}|{k}|{c['x0']:.0f}|{c['y0']:.0f}", "roi"); path = os.path.join(CROP_DIR, rid + ".png")
+            if not os.path.exists(path): cv2.imwrite(safe_path(path), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+            rows.append(dict(roi_id=rid, image_id=iid, split=split, label=lab, path=path, det_condition=c["condition"], conf=c["conf"], tier=c["tier"], group_id=int(r.group_id), source=("original" if r.has_orig else "processed")))
+    return pd.DataFrame(rows)
+
+
+ROI_TABLES = {}
+for sp in ["train", "validation"]:
+    try:
+        ROI_TABLES[sp] = build_roi_table(sp); print(sp, "ROI rows:", len(ROI_TABLES[sp]), ROI_TABLES[sp].label.value_counts().sort_index().to_dict() if len(ROI_TABLES[sp]) else "")
+    except GateError as g:
+        ROI_TABLES[sp] = None; print(f"[ROI table {sp}] BLOCKED - {g}")
+if all(t is not None and len(t) for t in ROI_TABLES.values()):
+    for sp, t in ROI_TABLES.items(): write_csv(t.drop(columns=["path"]), os.path.join(ROI_DIR, f"roi_table_{sp}.csv"))
+    assert not (set(ROI_TABLES["train"].image_id) & set(ROI_TABLES["validation"].image_id)), "ROI leakage: an image is in both ROI tables"
+    assert not (set(ROI_TABLES["train"].group_id) & set(ROI_TABLES["validation"].group_id)), "ROI leakage: a leakage group is in both ROI tables"
+    cnt = pd.crosstab(ROI_TABLES["train"].det_condition, ROI_TABLES["train"].label.map(dict(enumerate(CFG.ROI_CLASSES))))
+    display(cnt)
+    print("ROI classes:", CFG.ROI_CLASSES, "| rows with source=processed are crops from 224x224 images (low detail):", int((ROI_TABLES['train'].source == 'processed').sum()))
+    set_gate("roi_training_data", True)
+else:
+    set_gate("roi_training_data", False, "ROI training tables are empty: need verified region annotations + detector output for train and validation images")
+
+#@@ code
+# 27.1 ROI MobileNetV2 (separate encoder, 4 classes: Acne / Hyperpigmentation / Eczema / Background) + resumable staged training.
+ROI_INIT = "imagenet"            # 'imagenet' or 'global' (copy the selected global model's backbone weights as the starting point)
+ROI_AUG = keras.Sequential([keras.layers.RandomFlip("horizontal_and_vertical"), keras.layers.RandomRotation(15 / 360.0, fill_mode="reflect"),
+                            keras.layers.RandomZoom((-0.15, 0.10), fill_mode="reflect"), keras.layers.RandomBrightness(0.08, value_range=(0, 255)), keras.layers.RandomContrast(0.08)], name="roi_aug")
+
+
+def make_roi_ds(paths, y, w=None, training=False, batch=None):
+    batch = batch or CFG.ROI_BATCH
+    w = np.ones(len(paths), np.float32) if w is None else np.asarray(w, np.float32)
+    ds = tf.data.Dataset.from_tensor_slices((np.asarray(paths), np.asarray(y, np.int32), w))
+    if training: ds = ds.shuffle(min(4096, len(paths)), reshuffle_each_iteration=True)
+    dec = lambda p: tf.image.resize(tf.cast(tf.io.decode_image(tf.io.read_file(p), channels=3, expand_animations=False), tf.float32), [ROI_S, ROI_S])
+    ds = ds.map(lambda p, yy, ww: (dec(p), yy, ww), num_parallel_calls=AUTOTUNE).batch(batch)
+    if training: ds = ds.map(lambda x, yy, ww: (tf.clip_by_value(ROI_AUG(x, training=True), 0, 255), yy, ww), num_parallel_calls=AUTOTUNE)
+    return ds.map(lambda x, yy, ww: (x / 127.5 - 1.0, yy, ww), num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
+
+
+def build_roi_model():
+    base = pretrained_backbone(); base.trainable = False
+    if ROI_INIT == "global":
+        require(GLOBAL_SELECTED[0], "ROI_INIT='global' needs a selected global model (Section 22)", gate=True)
+        gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+        base.set_weights(find_backbone(gm).get_weights())
+    inp = keras.layers.Input((ROI_S, ROI_S, 3), name="roi_nhwc_m1p1")
+    x = base(inp, training=False)
+    x = keras.layers.GlobalAveragePooling2D(name="roi_gap")(x); x = keras.layers.Dropout(CFG.HEAD_DROPOUT, name="roi_drop1")(x)
+    x = keras.layers.Dense(CFG.ROI_EMB, activation="relu", kernel_regularizer=keras.regularizers.l2(CFG.HEAD_L2), name="roi_embedding")(x)
+    x = keras.layers.Dropout(CFG.HEAD_DROPOUT, name="roi_drop2")(x)
+    out = keras.layers.Dense(len(CFG.ROI_CLASSES), activation="softmax", dtype="float32", name="roi_probs")(x)
+    return keras.Model(inp, out, name="lumyvue_roi_mobilenetv2"), base
+
+
+class ValROI(keras.callbacks.Callback):
+    def __init__(self, ds_val, y_val):
+        super().__init__(); self.ds, self.y = ds_val, y_val
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs if logs is not None else {}
+        p = self.model.predict(self.ds.map(lambda x, y, w: x), verbose=0).argmax(1)
+        f1 = []; rec = []
+        for k in range(len(CFG.ROI_CLASSES)):
+            tp = int(((p == k) & (self.y == k)).sum()); fp = int(((p == k) & (self.y != k)).sum()); fn = int(((p != k) & (self.y == k)).sum())
+            f1.append(2 * tp / max(2 * tp + fp + fn, 1) if (tp + fp + fn) else np.nan); rec.append(tp / max(tp + fn, 1) if (tp + fn) else np.nan)
+        logs["val_macro_f1"] = float(np.nanmean(f1)); logs["val_macro_recall"] = float(np.nanmean(rec)); logs["val_sel"] = logs["val_macro_f1"]
+        print(f"   ROI val_macro_f1={logs['val_macro_f1']:.4f} recalls={np.round(rec, 3).tolist()}")
+
+
+def run_roi_phase(seed, phase, model, base, ds_tr, ds_va, y_va, epochs, lr):
+    d = os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}"); os.makedirs(d, exist_ok=True)
+    best, latest, hist, state = (os.path.join(d, f"phase{phase}_{n}") for n in ["best.weights.h5", "latest.keras", "history.csv", "state.json"])
+    done = len(pd.read_csv(hist)) if os.path.exists(hist) else 0
+    if (done >= epochs or os.path.exists(state)) and os.path.exists(best):
+        print(f"  [ROI seed {seed} phase {phase}] complete"); model.load_weights(best); return model
+    set_trainable(model, base, phase, CFG.FINE_TUNE_AT)
+    resumed = False
+    if done > 0 and os.path.exists(latest):
+        model = keras.models.load_model(latest); base = find_backbone(model); resumed = True; print(f"  RESUMING ROI phase {phase} from epoch {done} (optimizer state restored)")
+    if not resumed: model.compile(optimizer=keras.optimizers.Adam(lr), loss=keras.losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
+    cbs = [ValROI(ds_va, y_va), keras.callbacks.ModelCheckpoint(best, monitor="val_sel", mode="max", save_best_only=True, save_weights_only=True), keras.callbacks.ModelCheckpoint(latest),
+           keras.callbacks.EarlyStopping(monitor="val_sel", mode="max", patience=CFG.EARLY_STOP_PATIENCE), keras.callbacks.ReduceLROnPlateau(monitor="val_sel", mode="max", factor=CFG.LR_FACTOR, patience=CFG.LR_PATIENCE, min_lr=CFG.MIN_LR, verbose=1),
+           keras.callbacks.CSVLogger(hist, append=True)]
+    model.fit(ds_tr, validation_data=ds_va, epochs=epochs, initial_epoch=done, callbacks=cbs, verbose=2)
+    if os.path.exists(best): model.load_weights(best)
+    write_json(state, dict(done=True, finished=datetime.datetime.now().isoformat(timespec="seconds"))); log_event("roi_phase_done", seed=seed, phase=phase)
+    return model
+
+
+#@@ md
+## 27. ROI classifier training — run cell by cell
+Phase A trains the head with a frozen backbone; Phase B partially unfreezes it (BatchNorm frozen). The notebook **records the validation macro-F1 after Phase A and after Phase B** and keeps whichever is better, which answers the freezing / partial / full question empirically: *full fine-tuning is not run* (it overfits small ROI sets and costs memory on an 8 GB GPU) — set `ROI_TRY_FULL_UNFREEZE=True` in this cell to add it as a third, separately-recorded phase. Seeds are `CFG.SEEDS`; the best seed is chosen on validation macro-F1 only. **>>> THIS CELL TRAINS MODELS <<<**
+
+#@@ code
+ROI_TRY_FULL_UNFREEZE = False
+ROI_RESULTS = {}
+try:
+    gate("roi_training_data"); gate("regions_train"); gate("regions_validation")
+    tr, va = ROI_TABLES["train"], ROI_TABLES["validation"]
+    require(tr.label.nunique() == 4 and len(tr) >= 100, f"ROI training needs all 4 classes and >=100 rows (found classes {sorted(tr.label.unique())}, {len(tr)} rows)", gate=True)
+    cw = len(tr) / (4 * np.maximum(np.bincount(tr.label.values, minlength=4), 1)); w = cw[tr.label.values].astype(np.float32)
+    ds_tr = make_roi_ds(tr.path.values, tr.label.values, w, True); ds_va = make_roi_ds(va.path.values, va.label.values, None, False); y_va = va.label.values
+    for seed in CFG.SEEDS:
+        set_all_seeds(seed)
+        model, base = build_roi_model()
+        model = run_roi_phase(seed, "A", model, base, ds_tr, ds_va, y_va, CFG.ROI_PHASE_A_EPOCHS, CFG.PHASE_A_LR)
+        pA = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseA_history.csv")); fA = float(pA.val_macro_f1.max())
+        model = run_roi_phase(seed, "B", model, find_backbone(model), ds_tr, ds_va, y_va, CFG.ROI_PHASE_B_EPOCHS, CFG.PHASE_B_LR)
+        pB = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseB_history.csv")); fB = float(pB.val_macro_f1.max())
+        ROI_RESULTS[seed] = dict(frozen_backbone_val_macro_f1=fA, partial_finetune_val_macro_f1=fB, chosen="partial_finetune" if fB >= fA else "frozen_backbone")
+        model.save(safe_path(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "final_best.keras"))); keras.backend.clear_session()
+    best_seed = max(ROI_RESULTS, key=lambda s: max(ROI_RESULTS[s]["frozen_backbone_val_macro_f1"], ROI_RESULTS[s]["partial_finetune_val_macro_f1"]))
+    ROI_SELECTED_SEED = best_seed
+    write_json(os.path.join(CFG.DIRS["metrics"], "roi_training_summary.json"), dict(per_seed=ROI_RESULTS, selected_seed=best_seed, init=ROI_INIT))
+    display(pd.DataFrame(ROI_RESULTS).T)
+except GateError as g:
+    ROI_SELECTED_SEED = None
+    print(f"[ROI training] BLOCKED - {g}")
+
+#@@ md
+## 28. ROI feature aggregation for fusion
+For every image of the `fusion` and `test` splits (and for `validation` when diagnosing) the notebook builds a **padded ROI set** of at most `ROI_MAX_TOTAL` regions: for each ROI the ROI-network *embedding* (64-d), its 4 *softmax scores*, and the YOLO geometry/evidence features. A boolean **mask** marks real ROIs, so images with no detections contribute an *all-false mask* (not a zero crop). The fusion network's **masked attention pooling** (Part VII) aggregates a variable number of ROIs into fixed-size per-condition vectors.
+
+The ROI CNN and the global CNN are used **frozen**, and were trained only on `train` (ROI also selected on `validation`), so features for `fusion` and `test` are out-of-sample.
+
+#@@ code
+ROI_FEAT_DIM = CFG.ROI_EMB + len(CFG.ROI_CLASSES) + len(YOLO_FEATURE_NAMES)
+
+
+def load_roi_feature_model(seed=None):
+    seed = seed or ROI_SELECTED_SEED
+    require(seed is not None, "no trained ROI model: run Section 27 first", gate=True)
+    m = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "final_best.keras"), compile=False)
+    return keras.Model(m.input, [m.get_layer("roi_embedding").output, m.output], name="roi_features")
+
+
+def roi_sets_for(df, tiers=(1, 2, 3), fm=None):
+    """Padded ROI feature tensors for the images in df. Returns dict(feat [N,R,D], mask [N,R], tier [N,R], meta list). Uses detections already cached in DET."""
+    R = CFG.ROI_MAX_TOTAL; fm = fm or load_roi_feature_model()
+    missing = [i for i in df.image_id if i not in EVID_IDS]
+    require(not missing, f"YOLO has not been run for {len(missing)} of these images (e.g. {missing[:2]}): run Section 24 first. An image without detector output must never be treated as 'no detection'.", gate=True)
+    N = len(df); feat = np.zeros((N, R, ROI_FEAT_DIM), np.float32); mask = np.zeros((N, R), bool); tier = np.zeros((N, R), np.int8); meta = [[] for _ in range(N)]
+    crops, where = [], []
+    for n, r in enumerate(df.itertuples()):
+        src, _ = det_image_path(r); bgr = cv2.imread(src)
+        if bgr is None: continue
+        H, W = bgr.shape[:2]; k = 0
+        for c in build_roi_candidates(det_rows_for(r.image_id), W, H):
+            if c["tier"] not in tiers or k >= R: continue
+            rgb, why = crop_roi(bgr, (c["x0"], c["y0"], c["x1"], c["y1"]), CFG.ROI_ALT_MARGIN if c["alt"] else CFG.ROI_MARGIN)
+            if rgb is None: continue
+            crops.append(roi_norm(rgb)); where.append((n, k, c)); k += 1
+    for i in range(0, len(crops), CFG.ROI_BATCH):
+        emb, pr = fm.predict(np.stack(crops[i:i + CFG.ROI_BATCH]), verbose=0)
+        for j, (n, k, c) in enumerate(where[i:i + CFG.ROI_BATCH]):
+            feat[n, k] = np.concatenate([emb[j], pr[j], yolo_roi_features(c)]); mask[n, k] = True; tier[n, k] = c["tier"]; meta[n].append(dict(tier=c["tier"], alt=c["alt"], condition=c["condition"], conf=c["conf"], roi_probs=pr[j].round(4).tolist()))
+    return dict(feat=feat, mask=mask, tier=tier, meta=meta)
+
+
+def cached_roi_sets(split, tiers=(1, 2, 3)):
+    df = DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)] if split != "train" else DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)]
+    key = hashlib.md5((",".join(df.image_id) + str(ROI_SELECTED_SEED) + YOLO_CONFIG_HASH).encode()).hexdigest()[:10]
+    path = os.path.join(ROI_DIR, f"roi_sets_{split}_{key}.npz")
+    if os.path.exists(path):
+        z = np.load(path, allow_pickle=True); return df, dict(feat=z["feat"], mask=z["mask"], tier=z["tier"], meta=json.loads(str(z["meta"])))
+    s = roi_sets_for(df, tiers)
+    np.savez_compressed(safe_path(path), feat=s["feat"], mask=s["mask"], tier=s["tier"], meta=json.dumps(s["meta"]))
+    return df, s
+
+
+print("ROI feature dimension per region:", ROI_FEAT_DIM, "=", CFG.ROI_EMB, "(ROI embedding) +", len(CFG.ROI_CLASSES), "(ROI scores) +", len(YOLO_FEATURE_NAMES), "(YOLO geometry/evidence)")

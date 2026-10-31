@@ -1,0 +1,113 @@
+#@@ md
+# LUMYVUE V6 — Three-Detector YOLOv8-Guided MobileNetV2 with Trainable Multilabel Fusion, Two-Stage Adaptive Verification, Calibration, Abstention and Integrity Controls
+
+**Working thesis title:** *LUMYVUE: A Trustworthy Hybrid Deep-Learning and Object-Detection Screening Aid for Co-Occurring Acne, Eczema and Hyperpigmentation on the Face, Evaluated Against Dermatologist-Verified Findings.*
+
+**Notebook file:** `LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb` · **Training hardware:** Windows 11 + WSL2 Ubuntu, NVIDIA RTX 4060 Laptop GPU (8 GB VRAM).
+
+> ### Read this first
+> * This notebook is the **complete, runnable V6 pipeline**. **You** execute it; it has **not** been run by its author. It contains **no experimental result**: every number, table and figure is produced from files it saves under `…/v6/experiments/<RUN_ID>/` when you run it.
+> * Stages that need verified labels, region annotations or model files that do not exist yet **stop with a `GateError`** that says exactly what is missing. They never invent labels, never treat *Unknown* as *Absent*, and never train on invalid data.
+> * Original V5 and YOLO models, the datasets and the WPF application are **read-only** here: every write goes through `safe_write()` which refuses protected locations, and the notebook fingerprints the originals at the start and re-verifies them at the end.
+> * Nothing here claims that fusion improves accuracy. That is a hypothesis the evaluation sections test on **dermatologist-verified, leakage-controlled** data.
+
+## 1. Research introduction and objectives
+1. Diagnose and *experimentally* correct the V5 MobileNetV2 confusions Normal↔Hyperpigmentation, Eczema↔Hyperpigmentation and Acne↔Eczema, without hiding errors behind YOLO.
+2. Create real information flow between all three YOLOv8 detectors (Acne, Eczema, Hyperpigmentation) and MobileNetV2: YOLO boxes → ROI crops → ROI MobileNetV2 → trainable fusion.
+3. Support **several simultaneous conditions** with three independent per-condition outputs; **Normal = verified absence of all three**, never a competing class.
+4. Produce **one consolidated structured assessment per scan**, including calibrated scores, evidence provenance, and honest abstention.
+5. Stage 1 (initial assessment) and Stage 2 (targeted ROI verification) with a **bounded, evidence-driven** verification cycle that terminates.
+6. Calibration, uncertainty, input-quality screening, OOD evaluation, security, privacy and auditability.
+7. Evaluate seven systems (A–G) against **independent dermatologist-verified** findings; agreement between models is never used as proof of correctness.
+
+#@@ md
+## 2. Review of the existing baselines (facts found by inspecting the project; the notebook recomputes what it can)
+
+### 2.1 MobileNetV2 V5.2.1 (`Pipeline V5 - With Facial Eczema.ipynb`)
+| Item | Finding |
+|---|---|
+| Task / classes | single-label softmax over `[Acne, Hyperpigmentation, Eczema, Normal]` (this class order is the C# `ClassPalette` order) |
+| Backbone / head | MobileNetV2 ImageNet, 224×224×3; GAP → BN → Dropout 0.4 → Dense 256 (L2 1e-4) → BN → Dropout → Dense 128 → BN → Dropout → Dense 4 softmax (float32 output under mixed_float16) |
+| Preprocessing | RGB, bilinear (cv2/albumentations `Resize`) square stretch to 224, `(pixel/127.5)−1`; data were *pre-resized to 224×224* before training |
+| Augmentation | flip 0.5, rotate ±15°, shift/scale 0.1, brightness/contrast ±0.15, hue ±5 / sat ±10 / val ±8, blur, Gaussian noise, coarse dropout |
+| Data | 12 000 images, 3 000 per class (capped), manifest split 8 793 / 1 603 / 1 604; facial-only run trained on 7 160 (1 633 non-facial eczema auxiliary images excluded) |
+| Training | Phase A: frozen backbone, Adam 1e-3, up to 30 epochs; Phase B: unfreeze from layer 100, **BatchNorm frozen**, Adam 1e-5, up to 15 epochs; batch 16; 5 seeds (0–4); class weights; ReduceLROnPlateau(0.5, patience 4); best seed chosen on validation |
+| Reported test result | accuracy ≈ 0.926, macro-F1 ≈ 0.914; recall Acne 0.85, Hyperpigmentation 0.95, Eczema 0.93, Normal 0.98; largest error Acne→Eczema (59/465). **Optimistic**: no subject ids, filename-stem siblings cross splits, near-duplicate detection never ran |
+| Grad-CAM++ | Keras-3-safe implementation, target layer `Conv_1`, percentile normalisation; used as *attribution*, not segmentation |
+| ONNX | tf2onnx opset 13, input `input_layer_3` `[N,224,224,3]`, output `dense_5` `[N,4]`; verified against Keras on 50 test images |
+| Deployment | C# `OnnxInference.Preprocess` = BGR→RGB, bilinear resize to 224 (full frame, no face crop; live capture uses a centre square), `(p/127.5)−1`; working frame resized to 640 px wide first; prediction stabiliser applies only to the *live* display |
+
+### 2.2 YOLOv8 detectors (inspected from the Acne/Hyperpigmentation notebooks, JSON metadata and C# code)
+| Item | Acne | Hyperpigmentation | Eczema |
+|---|---|---|---|
+| Deployed files | `lesion_detector_acne.onnx` + `_m2`, `_m3` (3-seed ensemble), `.json` | `lesion_detector_hyperpigmentation.onnx` + `_m2`, `_m3`, `.json` | **No ONNX file exists in the WPF `Model/` folder on this machine** (neither in the repository nor in `bin/Debug`). The csproj and `LesionEngine` look for `lesion_detector_eczema.onnx/.json` (specialist) and for the 3-class `lesion_detector_v1.onnx/.json`; only the 3-class v1 file was found (Downloads and WSL), **not** in the app |
+| Architecture | YOLOv8s (`yolov8s.pt` start) | YOLOv8s | specialist: unknown (training notebook not available); v1 3-class: YOLOv8n |
+| Training image size | 800 | 800 | specialist: unknown; v1: 640 |
+| Training config (recorded) | 100 epochs, patience 30, batch 8, cosine LR, close_mosaic 10, fliplr .5, degrees 10, scale .5, hsv .015/.5/.35; seeds 42/7/123 | same + AdamW, lr0 0.0005; annotation rule v2; seeds 42/7/123 | **not documented — do not assume the same** |
+| Ensemble / fusion | 3 members, weighted box fusion IoU 0.5, members reported down to conf 0.02, fused confidence = sum/members | same | not applicable until an eczema ONNX is registered |
+| Per-member NMS | IoU 0.6 per class | IoU 0.6 per class | v1: 0.45 |
+| Deployed threshold | 0.275 (chosen on validation) | 0.225 (chosen on validation) | 0.25 (`ScanSettings`, "pilot class") |
+| Reported metrics | test mAP@0.5 ≈ 0.41 (167 hand-boxed photos), F1 ≈ 0.48 | **two figures exist in the repository and have not been reconciled**: 0.341 (full-results document, installed 3-model average, 100 rule-v2 test photos) vs 0.508 (JSON note, "single run"). Do not quote either until the scorer is re-run | v1 3-class test: eczema mAP@0.5 0.368 on **32** test photos (pilot, tiny set) |
+| ONNX I/O | `[1,3,800,800]` → `[1,5,N]` | same | v1: `[1,3,640,640]` → `[1,7,N]` (cx,cy,w,h + 3 class scores, no objectness) |
+| C# post-processing | letterbox (pad 114) → RGB → /255 → NCHW; decode; per-class threshold; per-class NMS; ensemble fusion; boxes whose centre is outside the detected face (+25 %) are dropped | same | same code path |
+| Known behaviour (labels unverified) | boxes appear on 54 % of eczema photos, 29 % of hyperpigmentation photos and 15 % of clear-skin photos (acne verdict, V3 check) | boxes appear on about 32 % of clear-skin photos (team's own measurement) | unknown |
+
+**Eczema compatibility policy (this notebook).** The Eczema detector is treated as a *registered, replaceable component*: its ONNX paths, metadata JSON, class index, threshold and ensemble members are plain configuration (`ECZEMA_*`). If no eczema-capable ONNX is registered, eczema evidence is `detector_unavailable` (never "no detection"), every stage that *requires* eczema localisation is gated, and all unrelated stages (global CNN, acne/hyperpigmentation branches) still run. When your teammate provides the training notebook or an installed `lesion_detector_eczema.onnx`, set the config keys and re-run Section 6; nothing else changes. What is missing for reproducibility is listed in the readiness report (training notebook, dataset fingerprint, seeds, evaluation protocol, threshold-selection record, ensemble membership).
+
+#@@ md
+## 3. Why V5 fails in the observed cases — hypotheses this notebook tests (none is assumed true)
+| # | Hypothesis | Test in this notebook |
+|---|---|---|
+| H-P | **Preprocessing mismatch** between notebook and C# | Section 5: tensor- and probability-level parity using the saved replay artifacts |
+| H-S | Single-label softmax cannot express co-occurring conditions; a softmax score is a share, not a presence probability | multilabel experiment D vs V5 on verified mixed-condition images |
+| H-D | **Domain shift**: training images are mostly lesion-region crops/close-ups (Normal is mostly full/partial faces); kiosk captures are full-face | image-type and camera-vs-source analysis, scale augmentation, ROI branch |
+| H-L | Label noise / missing co-labels / sibling leakage inflate V5 | duplicate + group analysis, reviewer queue, leak-aware split |
+| H-H | Hard examples (hyperpigmentation↔normal/eczema, acne↔eczema) are under-represented | hard-example mining on train/dev only; experiments B/C |
+| H-F | Learned fusion of global, regional and detector evidence beats any single source | systems A–G + ablations on the frozen test set |
+
+#@@ md
+## 4. Architecture and information flow
+```mermaid
+flowchart TD
+  IMG[Input facial image] --> QC[Input validity + quality + OOD checks]
+  QC --> G[Global MobileNetV2<br/>3 sigmoid logits + 128-d embedding]
+  QC --> Y1[YOLO Acne ensemble]
+  QC --> Y2[YOLO Eczema detector]
+  QC --> Y3[YOLO Hyperpigmentation ensemble]
+  Y1 --> P[Per-detector NMS / WBF<br/>raw detections preserved]
+  Y2 --> P
+  Y3 --> P
+  P --> R[ROI extraction<br/>margins, aspect, validity, caps]
+  R --> RC[ROI MobileNetV2<br/>acne / eczema / hyperpigmentation / background + 128-d embedding]
+  G --> F[Trainable fusion<br/>masked attention pooling over ROIs + detector evidence + global features]
+  RC --> F
+  P --> F
+  F --> CAL[Per-condition calibration + thresholds]
+  CAL --> S1{Stage 1 reliability<br/>rule validated on held-out data}
+  S1 -- reliable --> OUT[Unified final assessment]
+  S1 -- conflict / uncertain --> S2[Stage 2: ROI verification]
+  S2 --> V[Bounded adaptive verification<br/>new evidence each pass]
+  V --> OUT
+  OUT --> ST[FINDINGS_SUPPORTED · MULTIPLE_FINDINGS_SUPPORTED · NO_FINDINGS_SUPPORTED · UNCERTAIN_REVIEW_REQUIRED · RECAPTURE_REQUIRED · OUT_OF_SCOPE_REVIEW_REQUIRED · INFERENCE_ERROR]
+```
+A matplotlib version of this diagram is generated and saved by a cell in Section 3 so it is available as a figure for the thesis.
+
+**Leakage-controlled data roles.** Four group-disjoint splits are frozen before any annotation: `train` (global CNN and ROI CNN training), `validation` (CNN/ROI early stopping and model selection), `fusion` (fusion training + calibration + thresholds + Stage-1 rule, with grouped cross-fitting), `test` (opened once). Fusion features for the `fusion` and `test` splits come from CNNs that never saw those images. Features for `train` are never used to fit the fusion model (they would be over-confident).
+
+**Controlled experiments (A–F) and systems (A–G).** Global-model experiments are separate configurations with their own directories and are compared on **validation** data, including a per-class *regression check*:
+A original V5 · B fine-tune V5 on verified corrected images · C improved balance + hard examples · D three-output multilabel · E YOLO-guided ROI MobileNetV2 · F full hybrid fusion. Final **systems** evaluated on the test set: A V5 · B best improved global CNN · C YOLO-only (three detectors) · D ROI-only · E global + YOLO evidence fusion · F global + ROI + three YOLO fusion · G full two-stage adaptive verification system.
+
+#@@ md
+## 5. Evaluation methodology (Chapters III–IV)
+* **Reference standard:** dermatologist-verified labels with three states *Present / Absent / Unknown*. Metrics for a condition use only images where that condition's label is known; exact-match uses only fully-known images. *Unknown is never Absent.* Weak labels (the V5 class name) are never used for evaluation.
+* **Unit of resampling:** the leakage group (augmentation siblings, exact and near duplicates, optional subject id), not the image.
+* **Selection discipline:** thresholds, temperatures, fusion weights, Stage-1 rule and abstention bands are fitted on the `fusion` split (cross-fitted); CNN early stopping uses `validation`; the `test` split is evaluated **once** (lock file) and never used to select anything.
+* **Metrics:** per-condition precision, recall/sensitivity, specificity, F1, ROC-AUC, PR-AUC; micro/macro-F1, Hamming loss, exact match; calibration (reliability, ECE, Brier); selective prediction (risk–coverage); localisation (precision, recall, mAP50, mAP50–95 where verified boxes exist); verification statistics; latency; 95 % cluster-bootstrap intervals; AUC/AP only with enough positives *and* negatives.
+* **Camera vs source:** a separate `image_origin` column keeps source-dataset and real camera-capture performance apart.
+* **What cannot be concluded:** with small verified sets, intervals are wide; a non-significant difference is reported as such; inter-model agreement is reported as a *supplementary* statistic only.
+
+#@@ md
+## 6. Security, privacy and integrity scope (read before running)
+**Implemented in this notebook (research-environment controls):** pseudonymous image identifiers (keyed HMAC, key kept outside the artifact folders); no personal identifiers in output filenames; separation of *research labels* (annotation CSV) from *patient/clinical records* (never read here); restricted-permission experiment folders (`0700`); ROI crops cached only under a purgeable directory; **no network upload and no telemetry** (`OFFLINE_MODE` blocks weight downloads and no HTTP client is used); redaction of absolute paths in shareable logs; dataset provenance and permissible-use registry with a gate; SHA-256 registry of every model, fingerprint-before/after of originals, label-map and tensor-shape contracts, dependency snapshot; hash-chained audit log.
+
+**Not claimed / must be verified in the production C# application:** disk encryption, access control, retention and deletion of captured photographs, secure logging, code signing and model-file tamper detection at start-up, update channel security, consent capture, and any regulatory assessment (this notebook makes **no** compliance claim). A face photograph stays identifiable even when its filename is pseudonymised.

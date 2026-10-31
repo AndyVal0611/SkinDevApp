@@ -1,0 +1,474 @@
+#@@ md
+# Part X — ONNX Export, Deployment Metadata, Audit Logging, Automated Tests and Thesis Report
+
+Sections: **(50) ONNX export · (51) Keras-vs-ONNX verification · (52) deployment metadata · (53) structured audit logging · (54) unit and integration tests · (55) Chapter IV tables and visualisations · (56) final experiment and artifact summary.**
+
+**Protection of production models.** Everything is written under `…/v6/experiments/<RUN_ID>/export/` with a `v6_` file-name prefix. `export_path()` refuses any path that is, or lies under, the V5 model folder, the YOLO/WPF `Model` folder, or any protected directory — and the end-of-run check re-computes SHA-256 hashes of every original model and raises if one changed. **Deployment of any exported file into the WPF application is a separate, manual, approved step that this notebook does not perform.**
+
+#@@ code
+# 50.1 Export helpers (guarded) + contract checks used by the export verification and by the unit tests.
+def export_path(name):
+    p = os.path.join(CFG.DIRS["export"], "v6_" + name)
+    require(not is_protected(p), f"export path is protected: {p}")
+    return safe_path(p)
+
+
+def assert_contract(in_shape, out_shape, expected_in=(224, 224, 3), expected_out=None):
+    """Shape contract of an ONNX/Keras model: input [N,H,W,C] and the last output dimension. Raises V6Error on a mismatch (never silently adapts)."""
+    require(len(in_shape) == len(expected_in) + 1 and tuple(in_shape[1:]) == tuple(expected_in), f"input shape {tuple(in_shape)} != [N,{','.join(map(str, expected_in))}]")
+    if expected_out is not None: require(out_shape[-1] == expected_out, f"output has {out_shape[-1]} values, expected {expected_out}")
+
+
+def validate_label_map(classes, expected):
+    require(list(classes) == list(expected), f"label map {list(classes)} does not match the expected order {list(expected)}")
+
+
+def load_onnx_verified(path, expected_sha256=None):
+    """Hash check BEFORE loading; a corrupted or substituted model raises V6Error (never loaded silently)."""
+    require(os.path.isfile(path), f"model file not found: {path}")
+    if expected_sha256: require(sha256_file(path) == expected_sha256, f"SHA-256 mismatch for {os.path.basename(path)}: the model file is not the one that was registered")
+    try:
+        return ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+    except Exception as e:
+        raise V6Error(f"model file is corrupted or not a valid ONNX model: {os.path.basename(path)} ({type(e).__name__})")
+
+
+def to_onnx(model, name, opset=13):
+    """tf2onnx conversion with a recorded outcome. Returns dict(status, path, error)."""
+    import tf2onnx
+    path = export_path(name + ".onnx")
+    for attempt in ("from_keras", "from_keras_with_signature"):
+        try:
+            if attempt == "from_keras": tf2onnx.convert.from_keras(model, opset=opset, output_path=path)
+            else:
+                sig = [tf.TensorSpec(i.shape, tf.float32, name=i.name.split(":")[0]) for i in model.inputs]; tf2onnx.convert.from_keras(model, input_signature=sig, opset=opset, output_path=path)
+            return dict(status="exported", path=path, sha256=sha256_file(path), attempt=attempt)
+        except Exception as e:
+            err = f"{type(e).__name__}: {str(e)[:200]}"
+    return dict(status="FAILED", path=None, error=err)
+
+
+def dump_keras_weights_json(model, name):
+    """Fallback for tiny custom models: architecture summary + every weight as float32 lists (a C# port can implement the few layers natively)."""
+    path = export_path(name + "_weights.json")
+    write_json(path, dict(layers=[dict(name=l.name, cls=type(l).__name__, config={k: v for k, v in l.get_config().items() if isinstance(v, (int, float, str, bool, list, tuple, type(None)))},
+                                       weights={w.name: np.asarray(w).astype(np.float32).tolist() for w in l.weights}) for l in model.layers], inputs=[i.name for i in model.inputs]))
+    return path
+
+
+#@@ md
+## 50. Export of the newly trained components
+Exports (each skipped with a reason when its source model does not exist): **global features model** (128-d embedding + final output), **ROI features model** (64-d embedding + 4 softmax scores), and the **fusion models** `global_only`, `global_yolo`, `full` (first seed). tf2onnx may not convert the custom fusion layers; the notebook then writes the fusion weights as JSON and records that fact — it does not pretend the export worked. YOLO detectors and the V5 model are **not** re-exported.
+
+#@@ code
+EXPORT_STATUS = {}
+try:
+    require(GLOBAL_SELECTED[0], "no selected global model: nothing to export yet", gate=True)
+    gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+    fm = embedding_model(gm); EXPORT_STATUS["global_features"] = to_onnx(fm, "global_features_mobilenetv2")
+    EXPORT_STATUS["global_features"]["outputs"] = ["embedding_128", "logits (multilabel3: apply sigmoid; softmax4: probabilities)"]
+    if ROI_SELECTED_SEED is not None:
+        rfm = load_roi_feature_model(); EXPORT_STATUS["roi_features"] = to_onnx(rfm, "roi_features_mobilenetv2"); EXPORT_STATUS["roi_features"]["outputs"] = [f"embedding_{CFG.ROI_EMB}", "softmax_" + "_".join(CFG.ROI_CLASSES)]
+    for var in ("global_only", "global_yolo", "full"):
+        p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{CFG.SEEDS[0]}.keras")
+        if os.path.exists(p):
+            fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
+            st = to_onnx(fmod, f"fusion_{var}"); st["weights_json"] = dump_keras_weights_json(fmod, f"fusion_{var}"); EXPORT_STATUS[f"fusion_{var}"] = st
+    keras.backend.clear_session()
+    write_json(os.path.join(CFG.DIRS["export"], "v6_export_status.json"), EXPORT_STATUS); display(pd.DataFrame(EXPORT_STATUS).T[["status"] + [c for c in ["attempt", "error"] if c in pd.DataFrame(EXPORT_STATUS).T.columns]])
+except GateError as g:
+    print(f"[export] SKIPPED - {g}")
+
+#@@ md
+## 51. Keras-versus-ONNX verification (and the Python reference for C# parity)
+For every exported component the notebook feeds **identical inputs** to Keras and ONNX Runtime and reports the maximum absolute difference per output, the exact ONNX input/output **names and shapes**, and the SHA-256 of each file. Tolerance for float32 CPU runs is `1e-4` (probabilities) — larger differences are flagged, not hidden. The same procedure, with the C# application's output on the same tensor (`SkinDevApp.exe --diagnose`), is the **deployment parity test** (see the deployment guide): the Python reference `assess_image` must be reproduced by the C# port within these tolerances.
+
+#@@ code
+PARITY_EXPORT = {}
+TOL = 1e-4
+if EXPORT_STATUS:
+    sample = DF[DF.split.isin(["validation", "fusion"])].head(16)
+    xs = np.stack([read_rgb_norm(p) for p in sample.proc_path]).astype(np.float32)
+    def compare(name, keras_model, feed):
+        st = EXPORT_STATUS.get(name)
+        if not st or st["status"] != "exported": PARITY_EXPORT[name] = dict(status="not exported" if not st else st["status"]); return
+        sess = load_onnx_verified(st["path"], st["sha256"]); names = [i.name for i in sess.get_inputs()]
+        k_out = keras_model.predict(feed, verbose=0); k_out = [k_out] if not isinstance(k_out, (list, tuple)) else list(k_out)
+        o_out = sess.run(None, {n: f for n, f in zip(names, feed if isinstance(feed, list) else [feed])})
+        diffs = [float(np.abs(np.asarray(a, np.float32) - np.asarray(b, np.float32)).max()) for a, b in zip(k_out, o_out)]
+        PARITY_EXPORT[name] = dict(status="compared", max_abs_diff_per_output=diffs, within_tolerance=bool(max(diffs) <= TOL), onnx_inputs=[(i.name, i.shape) for i in sess.get_inputs()], onnx_outputs=[(o.name, o.shape) for o in sess.get_outputs()], sha256=st["sha256"])
+    try:
+        gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+        compare("global_features", embedding_model(gm), xs); keras.backend.clear_session()
+        if ROI_SELECTED_SEED is not None:
+            rx = np.stack([roi_norm(cv2.cvtColor(cv2.resize(cv2.imread(p), (ROI_S, ROI_S)), cv2.COLOR_BGR2RGB)) for p in sample.proc_path]); compare("roi_features", load_roi_feature_model(), rx); keras.backend.clear_session()
+        if FUSION_STATE.get("X"):
+            for var in ("global_only", "global_yolo", "full"):
+                p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{CFG.SEEDS[0]}.keras")
+                if os.path.exists(p) and var in FUSION_STATE["X"]:
+                    fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
+                    feed = x_list(subset(FUSION_STATE["X"][var], np.arange(min(16, len(FUSION_STATE["df"]))))); compare(f"fusion_{var}", fmod, feed); keras.backend.clear_session()
+    except Exception as e:
+        PARITY_EXPORT["error"] = f"{type(e).__name__}: {str(e)[:200]}"; print("verification could not complete:", PARITY_EXPORT["error"])
+    write_json(os.path.join(CFG.DIRS["export"], "v6_keras_vs_onnx_verification.json"), PARITY_EXPORT); display(pd.DataFrame(PARITY_EXPORT).T)
+else:
+    print("Nothing exported yet: verification not run.")
+
+#@@ md
+## 52. Deployment metadata and C# mapping
+`v6_model_metadata.json` collects everything the application needs: class/condition order, normalisation, tensor schemas, ROI procedure, detector execution order, post-processing, fusion input/output schemas, calibration and thresholds, Stage-1/2 rules, verification limits, versions and hashes. The **future** WPF implementation must use **one shared final-result object** (`FinalAssessment`, schema `lumyvue-final-assessment/1.0`) for the Results screen, localisation overlays, patient record, dermatologist review, thermal receipt and A4 report, keeping original CNN and YOLO outputs accessible. Parameters marked *provisional* must stay configuration, not constants.
+
+#@@ code
+def build_deployment_metadata():
+    return dict(
+        schema=SCHEMA_VERSION, created=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, status="EXPERIMENTAL - not validated for deployment; produced by an unexecuted-by-author notebook",
+        condition_order=CFG.CONDITIONS, normal_definition="Normal = all three conditions verified Absent (derived; never a model output)", v5_class_order=CFG.V5_CLASS_ORDER,
+        global_cnn=dict(experiment=GLOBAL_SELECTED, input="float32 NHWC [N,224,224,3]", preprocessing="BGR->RGB, bilinear (INTER_LINEAR) stretch to 224x224, (p/127.5)-1", outputs=["embedding_128", "logits/probabilities"],
+                        note="multilabel3: apply sigmoid; fusion consumes logit(clip(sigmoid(z), 1e-4, 1-1e-4)) i.e. z clipped to +-9.21"),
+        yolo=dict(execution_order=CFG.CONDITIONS, preprocessing="letterbox to imgsz (pad 114, bilinear), RGB, /255, NCHW", output="[1,4+nc,N] cx,cy,w,h (letterbox px) + class scores, no objectness",
+                  postprocessing=dict(per_member_nms_iou={c: DETECTORS[c].nms_iou for c in CFG.CONDITIONS}, member_floor=CFG.YOLO_FLOOR, ensemble_fusion_iou=CFG.YOLO_FUSION_IOU, fused_confidence="min(1, sum(conf)/members)",
+                                      deployed_thresholds={c: DETECTORS[c].threshold for c in CFG.CONDITIONS}, candidate_pool_min_conf=CFG.YOLO_POOL_MIN_CONF, max_boxes=CFG.YOLO_MAX_BOXES, face_filter="optional (centre inside face box +25%)"),
+                  availability={c: DETECTORS[c].available for c in CFG.CONDITIONS}, versions={c: DETECTORS[c].version for c in CFG.CONDITIONS}, sha256={c: [m.sha256 for m in DETECTORS[c].members] for c in CFG.CONDITIONS}, config_hash=YOLO_CONFIG_HASH,
+                  note="Detectors that are not installed are 'unavailable' (availability flag 0), never 'zero detections'."),
+        roi=dict(size=ROI_S, margin=CFG.ROI_MARGIN, alt_context_margin=CFG.ROI_ALT_MARGIN, square_window="extend shorter side, shift inside image, no padding", tiers={"1": "deployed boxes (round-robin over detectors, IoU>%.2f suppressed)" % CFG.ROI_OVERLAP_SUPPRESS_IOU, "2": "lower-confidence pool boxes", "3": "alternative wider-context crops of tier-1 boxes"},
+                 max_tier1=CFG.ROI_MAX_TIER1, max_total=CFG.ROI_MAX_TOTAL, classes=CFG.ROI_CLASSES, preprocessing="RGB, bilinear, (p/127.5)-1", feature_dim=ROI_FEAT_DIM, yolo_feature_names=YOLO_FEATURE_NAMES),
+        fusion=dict(inputs=dict(g_emb=[128], g_logit=[3], g_extra=[2], det_ev=[CFG.N_COND * DET_EV_DIM], roi_feat=[CFG.ROI_MAX_TOTAL, ROI_FEAT_DIM], roi_mask=[CFG.ROI_MAX_TOTAL]), det_ev_layout=["available", "detected", "max_deployed_conf", "max_pool_conf", "sqrt_rel_area", "cx", "cy"],
+                    output="[3] logits in CFG.CONDITIONS order", ensemble="mean of per-seed logits", seeds=CFG.SEEDS, calibration=CALIB, variants_used_at_runtime=["global_only", "global_yolo", "full"]),
+        stages=dict(stage1_rule=STAGE1, stage2_band=BAND2, verification=dict(max_passes=CFG.MAX_VERIFICATION_PASSES, max_seconds=CFG.MAX_VERIFICATION_SECONDS, min_new_rois=CFG.MIN_NEW_ROIS, convergence_eps=CFG.CONVERGENCE_EPS,
+                    actions=["pass1: tier-1 regions", "pass2: + tier-2 candidates", "pass3: + tier-3 alternative-context crops", "recapture request", "external verifier (if configured)"]),
+                    quality_thresholds=CFG.QUALITY, quality_status="provisional heuristics, unvalidated", ood=dict(method="Mahalanobis on global embedding", percentile=CFG.OOD_PERCENTILE, threshold=(None if OOD is None else OOD.threshold)), states=STATES),
+        versions=dict(v5_onnx_sha256=V5_SHA, yolo_config_hash=YOLO_CONFIG_HASH, python=sys.version.split()[0], tensorflow=tf.__version__, onnxruntime=ort.__version__), export_status=EXPORT_STATUS,
+        parity_procedure="Run `SkinDevApp.exe --diagnose <image> <dir>` for the C# tensor/probabilities, then Section 15.4; compare per-output differences with the tolerances recorded in v6_keras_vs_onnx_verification.json.",
+        production_guard="Nothing here replaces or overwrites the V5 model or any YOLO file.")
+
+
+META_V6 = build_deployment_metadata(); write_json(export_path("model_metadata.json"), META_V6)
+write_json(export_path("labels.json"), dict(conditions=CFG.CONDITIONS, roi_classes=CFG.ROI_CLASSES, v5_classes=CFG.V5_CLASS_ORDER, states=STATES, normal="derived: all conditions absent"))
+print("deployment metadata written to", redact(CFG.DIRS["export"]))
+
+#@@ md
+## 53. Structured audit logging
+Every gate, training phase, test-split opening, export and (when used) inference error is appended to a **hash-chained** `logs/audit_log.jsonl`; each record contains the hash of its predecessor, so an edit or deletion is detectable (`verify_audit_chain`). Logs contain **no images, no filenames and no identifiers except pseudonyms**. `log_assessment` writes one compact record per scan assessment (state, stage, passes, stop reason, model hashes) — never the image or the regions' pixels. **Production note:** the C# application must implement its own protected audit trail; this log protects the *research* run.
+
+#@@ code
+def log_assessment(fa):
+    d = fa.to_dict() if hasattr(fa, "to_dict") else fa
+    return log_event("assessment", scan=d["scan_id"], state=d["state"], stage=d["stage_reached"], passes=d["verification_passes"], stop=d["stop_reason"], predicted=d["predicted_conditions"],
+                     model_hash=hashlib.sha256(json.dumps(d["model_versions"], sort_keys=True, default=str).encode()).hexdigest()[:16])
+
+
+ok_chain, bad_at = verify_audit_chain()
+print("audit chain intact:", ok_chain, "" if ok_chain else f"(first broken record: {bad_at})")
+require(ok_chain, "The audit log hash chain is broken: the log was modified.")
+
+#@@ md
+## 54. Automated unit and integration tests
+The suite checks the **logic that guards against silent failure**: invalid images, RGB/BGR and normalisation, shape and label-map contracts, missing/corrupted/substituted models, empty/duplicate/overlapping boxes, missing detectors and detector failures, ROI coordinate errors, fusion shape mismatches, calibration failure, mixed/conflicting/low-confidence decisions, Stage-2 escalation, **bounded** verification termination, lack of new evidence, abstention, recapture, out-of-scope, deterministic replay, raw-prediction preservation and reproducibility of the final result, split leakage, write-protection of originals, *Unknown ≠ Absent*, and the audit chain. Tests that need trained components are **skipped with a reason**, never reported as passed. The notebook raises an error if any test fails.
+
+#@@ code
+import unittest, tempfile, copy
+
+
+class StubSession:
+    """Fake ONNX session: returns a fixed output so detector logic can be tested without model files."""
+    def __init__(self, out=None, raises=None): self.out, self.raises = out, raises
+    def run(self, names, feed):
+        if self.raises: raise self.raises
+        return [self.out]
+    def get_inputs(self): return [SimpleNamespace(name="images", shape=[1, 3, 64, 64])]
+
+
+def stub_spec(out=None, raises=None, available=True, nms=0.5):
+    m = Member(path="stub.onnx", sha256="0" * 64, session=StubSession(out, raises), input_name="images", imgsz=64, layout="rows_first", nc=1, class_names=["acne"], out_shape=[1, 5, 10])
+    return DetectorSpec("Acne", "specialist", [m] if available else [], 64, nms, 0.25, 0.02, {"Acne": 0}, available)
+
+
+def anchors(boxes, n=10):
+    """Build a [1,5,n] YOLO-style output from [(cx,cy,w,h,score)] in 64px letterbox coordinates."""
+    o = np.zeros((1, 5, n), np.float32)
+    for i, (cx, cy, w, h, s) in enumerate(boxes): o[0, :, i] = [cx, cy, w, h, s]
+    return o
+
+
+class TestV6(unittest.TestCase):
+    # ---- inputs, preprocessing, contracts --------------------------------------------------------------------------------------
+    def test_invalid_images(self):
+        for bad in [None, np.zeros((10, 10), np.uint8), np.zeros((64, 64, 3), np.float32), np.zeros((8, 8, 3), np.uint8)]:
+            self.assertFalse(validate_input(bad)[0])
+        self.assertTrue(validate_input(np.zeros((64, 64, 3), np.uint8))[0])
+
+    def test_rgb_bgr_order_and_normalisation(self):
+        red_bgr = np.zeros((40, 40, 3), np.uint8); red_bgr[..., 2] = 255
+        t = preprocess_global(red_bgr)
+        self.assertEqual(t.shape, (224, 224, 3)); self.assertAlmostEqual(float(t[0, 0, 0]), 1.0, places=5); self.assertAlmostEqual(float(t[0, 0, 2]), -1.0, places=5)
+        wrong = (cv2.resize(red_bgr, (224, 224)).astype(np.float32) / 255.0)                      # the classic 0..1 mistake must differ
+        self.assertFalse(np.allclose(wrong, t, atol=1e-3))
+
+    def test_shape_and_label_contracts(self):
+        assert_contract([1, 224, 224, 3], [1, 4], expected_out=4)
+        with self.assertRaises(V6Error): assert_contract([1, 128, 128, 3], [1, 4], expected_out=4)
+        with self.assertRaises(V6Error): assert_contract([1, 224, 224, 3], [1, 3], expected_out=4)
+        validate_label_map(CFG.V5_CLASS_ORDER, CFG.V5_CLASS_ORDER)
+        with self.assertRaises(V6Error): validate_label_map(["Acne", "Eczema", "Hyperpigmentation", "Normal"], CFG.V5_CLASS_ORDER)
+
+    def test_missing_corrupted_and_substituted_models(self):
+        with self.assertRaises(V6Error): load_onnx_verified("/nonexistent/model.onnx")
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "bad.onnx"); open(p, "wb").write(b"not an onnx file")
+            with self.assertRaises(V6Error): load_onnx_verified(p)
+            with self.assertRaises(V6Error): load_onnx_verified(p, expected_sha256="0" * 64)          # hash mismatch is checked before loading
+
+    # ---- detectors, boxes, ROI ------------------------------------------------------------------------------------------------------
+    def test_empty_detections_and_missing_detector(self):
+        img = np.full((100, 100, 3), 128, np.uint8)
+        r = detect_condition(stub_spec(anchors([])), img)
+        self.assertEqual(r["boxes"], [])                                                            # detector ran, found nothing
+        self.assertIsNone(detect_condition(stub_spec(available=False), img))                        # detector missing is NOT an empty result
+        self.assertEqual(build_roi_candidates([], 100, 100), [])
+
+    def test_detector_runtime_failure_is_not_swallowed(self):
+        with self.assertRaises(RuntimeError): detect_condition(stub_spec(raises=RuntimeError("boom")), np.zeros((100, 100, 3), np.uint8))
+
+    def test_duplicate_nested_and_overlapping_boxes(self):
+        self.assertEqual(overlap_relation((0, 0, 100, 100), (2, 2, 101, 99))[0], "duplicate")
+        self.assertEqual(overlap_relation((0, 0, 100, 100), (10, 10, 40, 40))[0], "nested")
+        self.assertEqual(overlap_relation((0, 0, 100, 100), (60, 60, 160, 160))[0], "overlap")
+        keep = nms_boxes([(0, 0, 100, 100, .9), (2, 2, 101, 99, .8), (10, 10, 40, 40, .7)], 0.5, 60)
+        self.assertEqual(len(keep), 2)                                                              # duplicate removed, nested kept (IoU-NMS cannot see nesting)
+
+    def test_decoding_and_letterbox_coordinates(self):
+        img = np.full((100, 200, 3), 128, np.uint8)                                                 # wide image: letterbox pads top/bottom
+        r = detect_condition(stub_spec(anchors([(32, 32, 20, 10, 0.9)])), img)
+        b = r["boxes"][0]
+        self.assertTrue(0 <= b["x0"] < b["x1"] <= 200 and 0 <= b["y0"] < b["y1"] <= 100)
+
+    def test_roi_coordinate_errors_and_square_crops(self):
+        img = np.random.RandomState(0).randint(0, 255, (120, 200, 3), np.uint8)
+        self.assertEqual(crop_roi(img, (10, 10, 11, 11))[1], "too_small")
+        self.assertEqual(crop_roi(img, (-50, 10, 40, 60))[1], "outside_image")
+        self.assertEqual(crop_roi(img, (50, 50, 50, 80))[1] in ("too_small", "degenerate_box"), True)
+        rgb, why = crop_roi(img, (150, 70, 199, 119)); self.assertEqual(why, ""); self.assertEqual(rgb.shape, (ROI_S, ROI_S, 3))
+        cx0, cy0, side = square_crop_box(150, 70, 199, 119, 200, 120, 0.25); self.assertTrue(cx0 >= 0 and cy0 >= 0 and cx0 + side <= 200 and cy0 + side <= 120)
+
+    def test_roi_candidate_caps(self):
+        rows = [dict(condition=CFG.CONDITIONS[i % 3], conf=0.9 - 0.01 * i, deployed=True, x0=10.0 * i, y0=5.0, x1=10.0 * i + 8, y1=13.0, ensemble_support=3, ensemble_size=3, rel_area=0.001, cx=.5, cy=.5) for i in range(30)]
+        c = build_roi_candidates(rows, 400, 100)
+        self.assertLessEqual(len(c), CFG.ROI_MAX_TOTAL); self.assertLessEqual(sum(1 for x in c if x["tier"] == 1), CFG.ROI_MAX_TIER1)
+
+    # ---- fusion, calibration ---------------------------------------------------------------------------------------------------------
+    def test_fusion_shape_mismatch_and_masked_pool(self):
+        m = build_fusion(dict(g_emb=8, det_ev=21, roi_feat=(4, 10)))
+        ok = [np.zeros((2, 8), np.float32), np.zeros((2, 3), np.float32), np.zeros((2, 2), np.float32), np.zeros((2, 21), np.float32), np.zeros((2, 4, 10), np.float32), np.zeros((2, 4), np.float32)]
+        self.assertEqual(m.predict(ok, verbose=0).shape, (2, 3))
+        bad = list(ok); bad[4] = np.zeros((2, 4, 11), np.float32)
+        with self.assertRaises(Exception): m.predict(bad, verbose=0)
+        pool = MaskedAttentionPool(3); h = tf.ones((2, 4, 5)); out = pool([h, tf.zeros((2, 4))]).numpy()
+        self.assertTrue(np.allclose(out, 0.0))                                                      # an empty ROI set yields zeros, not a fabricated crop
+
+    def test_calibration_failure_is_explicit(self):
+        z = np.random.RandomState(0).randn(30); y = np.array([1] * 3 + [0] * 27)
+        self.assertIsNone(fit_platt(z, y))                                                          # too few positives: no calibration is claimed
+        p = apply_platt(np.stack([z, z, z], 1), [None, None, None]); self.assertTrue(np.allclose(p, 1 / (1 + np.exp(-np.stack([z, z, z], 1))), atol=1e-6))
+        self.assertTrue(np.isfinite(fit_platt(np.r_[np.random.RandomState(1).randn(40) + 2, np.random.RandomState(2).randn(40) - 2], np.r_[np.ones(40), np.zeros(40)])["a"]))
+
+    def test_unknown_is_not_negative(self):
+        if not CFG.USE_SOURCE_LABEL_AS_WEAK_POSITIVE: self.skipTest("weak positives disabled in this configuration")
+        df = pd.DataFrame(dict(y_acne=[-1, 0], y_hyperpigmentation=[-1, 1], y_eczema=[-1, 0], train_ok=[False, True], src_label=["Acne", "Normal"]))
+        y, weak = build_train_labels(df)
+        self.assertEqual(y[0].tolist(), [1, -1, -1]); self.assertTrue(weak[0, 0])                    # weak positive only; the other two stay Unknown
+        self.assertEqual(y[1].tolist(), [0, 1, 0])
+
+    # ---- decisions, stages, verification ---------------------------------------------------------------------------------------------
+    def test_decide_states(self):
+        thr = [0.5, 0.5, 0.5]; av = [True, True, True]; q = dict(blocking=[], flags=[])
+        self.assertEqual(decide(np.array([.9, .05, .05]), thr, .1, av, q, False, [])["state"], "FINDINGS_SUPPORTED")
+        self.assertEqual(decide(np.array([.9, .9, .05]), thr, .1, av, q, False, [])["state"], "MULTIPLE_FINDINGS_SUPPORTED")
+        self.assertEqual(decide(np.array([.05, .05, .05]), thr, .1, av, q, False, [])["state"], "NO_FINDINGS_SUPPORTED")
+        self.assertEqual(decide(np.array([.52, .05, .05]), thr, .1, av, q, False, [])["state"], "UNCERTAIN_REVIEW_REQUIRED")            # low margin
+        self.assertEqual(decide(np.array([.05, .05, .05]), thr, .1, [True, True, False], q, False, [])["state"], "UNCERTAIN_REVIEW_REQUIRED")  # absence without a detector is not supported
+        self.assertEqual(decide(np.array([.9, .05, .05]), thr, .1, av, q, False, ["cnn_yolo_conflict_Acne"])["state"], "UNCERTAIN_REVIEW_REQUIRED")
+        self.assertEqual(decide(np.array([.9, .05, .05]), thr, .1, av, dict(blocking=["blur"], flags=["blur"]), False, [])["state"], "RECAPTURE_REQUIRED")
+        self.assertEqual(decide(np.array([.9, .05, .05]), thr, .1, av, q, True, [])["state"], "OUT_OF_SCOPE_REVIEW_REQUIRED")
+        self.assertEqual(decide(None, thr, .1, av, q, False, [], error="boom")["state"], "INFERENCE_ERROR")
+        for s in STATES: self.assertIsInstance(s, str)
+
+    def test_technical_failure_never_normal(self):
+        for kw in [dict(error="x"), dict(quality=dict(blocking=["blur"]))]:
+            d = decide(np.array([.01, .01, .01]), [.5] * 3, .1, [True] * 3, kw.get("quality", dict(blocking=[], flags=[])), False, [], error=kw.get("error"))
+            self.assertNotIn(d["state"], ("NO_FINDINGS_SUPPORTED",)); self.assertEqual(d["predicted"], [])
+        fa = assess_image(None, np.zeros((4, 4), np.uint8)); self.assertEqual(fa.state, "INFERENCE_ERROR")
+
+    def test_conflicting_outputs_flag(self):
+        flags, info = stage1_flags(np.array([.9, .1, .1]), np.array([.9, .1, .1]), [.5] * 3, [.5] * 3, [True, True, False], [False, False, False], [], [], False, 0.05)
+        self.assertIn("cnn_yolo_conflict_Acne", flags); self.assertIn("no_detector_Eczema", info)
+
+    def test_stage_escalation_and_bounded_verification(self):
+        thr = [.5, .5, .5]; calls = []
+        def provider(k, seen):
+            calls.append(k); return dict(action="x", signatures={f"s{k}_{i}" for i in range(2)}, probs=np.array([.5 + (0.01 if k % 2 else -0.01), .1, .1]))
+        r = verification_cycle(np.array([.52, .1, .1]), thr, 0.2, provider)
+        self.assertLessEqual(r["n_passes"], CFG.MAX_VERIFICATION_PASSES); self.assertLessEqual(len(calls), CFG.MAX_VERIFICATION_PASSES - 1)
+        self.assertIn(r["stop_reason"], ("max_passes", "converged", "unstable", "resolved"))
+        r2 = verification_cycle(np.array([.95, .05, .05]), thr, 0.1, provider); self.assertEqual(r2["stop_reason"], "resolved"); self.assertEqual(r2["n_passes"], 1)   # no escalation when already clear
+
+    def test_no_new_evidence_stops_without_reinference(self):
+        n = {"calls": 0}
+        def provider(k, seen):
+            n["calls"] += 1; return dict(action="same", signatures={"a", "b"}, probs=np.array([.58, .1, .1]))      # pass 2: new evidence moves p by 0.08 (> eps) but is not yet certain; pass 3 offers the SAME signatures
+        r = verification_cycle(np.array([.5, .1, .1]), [.5] * 3, .2, provider)
+        self.assertEqual(r["stop_reason"], "no_new_evidence"); self.assertEqual(r["n_passes"], 2); self.assertEqual(n["calls"], 2)      # the repeated evidence was detected and NOT scored again
+        r3 = verification_cycle(np.array([.5, .1, .1]), [.5] * 3, .2, lambda k, s: None); self.assertEqual(r3["stop_reason"], "no_new_evidence"); self.assertEqual(r3["n_passes"], 1)
+
+    def test_time_budget_and_recapture(self):
+        t = {"now": 0.0}
+        def clock(): t["now"] += 100.0; return t["now"]
+        r = verification_cycle(np.array([.5, .1, .1]), [.5] * 3, .2, lambda k, s: dict(action="x", signatures={f"n{k}"}, probs=np.array([.5, .1, .1])), VerifyCfg(max_seconds=1.0), clock=clock)
+        self.assertEqual(r["stop_reason"], "time_budget")
+        r2 = verification_cycle(np.array([.5, .1, .1]), [.5] * 3, .2, lambda k, s: dict(recapture=True, action="recapture"))
+        self.assertEqual(r2["stop_reason"], "recapture_needed")
+
+    def test_confidence_not_inflated_by_passes(self):
+        probs = []
+        def provider(k, seen): p = np.array([.55, .1, .1]); probs.append(p); return dict(action="x", signatures={f"n{k}"}, probs=p)
+        r = verification_cycle(np.array([.55, .1, .1]), [.5] * 3, .2, provider); self.assertLessEqual(float(r["probs"][0]), 0.55 + 1e-9)   # final = last evidence-union score, never compounded
+
+    # ---- reproducibility, preservation, security -------------------------------------------------------------------------------------
+    def test_deterministic_replay_and_result_reproducibility(self):
+        img = np.random.RandomState(3).randint(0, 255, (80, 90, 3), np.uint8)
+        self.assertTrue(np.array_equal(preprocess_global(img), preprocess_global(img.copy())))
+        a = decide(np.array([.8, .2, .1]), [.5] * 3, .1, [True] * 3, dict(blocking=[], flags=[]), False, []); b = decide(np.array([.8, .2, .1]), [.5] * 3, .1, [True] * 3, dict(blocking=[], flags=[]), False, [])
+        self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
+
+    def test_raw_predictions_preserved(self):
+        cnn = dict(scores_per_condition=dict(Acne=0.1234567, Hyperpigmentation=0.001, Eczema=0.7), raw_output=[0.1, 0.2, 0.3]); yolo = {"Acne": [dict(conf=0.3, x0=1, y0=2, x1=3, y1=4, deployed=True)], "Eczema": None}
+        fa = FinalAssessment(scan_id="scan_x", state="UNCERTAIN_REVIEW_REQUIRED", original_cnn_scores=copy.deepcopy(cnn), original_yolo_outputs=copy.deepcopy(yolo))
+        d = fa.to_dict(); self.assertEqual(d["original_cnn_scores"], cnn); self.assertEqual(d["original_yolo_outputs"], yolo); self.assertIsNone(d["original_yolo_outputs"]["Eczema"])   # unavailable stays None, not []
+        with self.assertRaises(AssertionError): FinalAssessment(scan_id="s", state="HEALTHY").to_dict()
+
+    def test_split_has_no_leakage_and_unique_ids(self):
+        self.assertTrue((DF.groupby("group_id").split.nunique() == 1).all()); self.assertFalse(DF.image_id.duplicated().any())
+
+    def test_write_protection_of_originals(self):
+        for prot in [CFG.V5_ONNX, CFG.V5_KERAS, os.path.join(CFG.YOLO_MODEL_DIR or "/nonexistent_yolo", "x.onnx"), os.path.join(CFG.PROCESSED_ROOT, "x.png")]:
+            with self.assertRaises(V6Error): safe_path(prot)
+        with self.assertRaises(V6Error): safe_path("/tmp/outside_workspace.txt")
+        self.assertTrue(safe_path(os.path.join(CFG.DIRS["tests"], "ok.txt")))
+
+    def test_pseudonyms_and_redaction(self):
+        self.assertEqual(pseudo_id("a"), pseudo_id("a")); self.assertNotEqual(pseudo_id("a"), pseudo_id("b")); self.assertNotIn("someone", redact("/mnt/c/Users/someone/x"))
+
+    def test_audit_chain_detects_tampering(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "audit.jsonl"); prev = "0" * 64
+            with open(p, "w") as f:
+                for i in range(3):
+                    rec = dict(ts=str(i), event="e", data={"i": i}, prev=prev); rec["hash"] = hashlib.sha256(json.dumps({k: rec[k] for k in ("ts", "event", "data", "prev")}, sort_keys=True).encode()).hexdigest(); prev = rec["hash"]; f.write(json.dumps(rec) + "\n")
+            self.assertTrue(verify_audit_chain(p)[0])
+            lines = open(p).read().splitlines(); r1 = json.loads(lines[1]); r1["data"] = {"i": 99}; lines[1] = json.dumps(r1); open(p, "w").write("\n".join(lines) + "\n")
+            self.assertFalse(verify_audit_chain(p)[0])
+
+    # ---- tests that need trained components (skipped, never 'passed', when unavailable) -----------------------------------------------
+    def test_end_to_end_reference_parity_with_batch_logic(self):
+        if BUNDLE is None or not TEST: self.skipTest("needs all trained components and the evaluated test split")
+        r = DF[DF.split == "fusion"].iloc[0]; fa = assess_image(BUNDLE, r.orig_path if r.has_orig else r.proc_path)
+        self.assertIn(fa.state, STATES); self.assertTrue(fa.original_cnn_scores and fa.original_yolo_outputs)
+
+
+def run_unit_tests():
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestV6)
+    buf = io.StringIO(); res = unittest.TextTestRunner(stream=buf, verbosity=2).run(suite); print(buf.getvalue()[-3500:])
+    rep = dict(ran=res.testsRun, failures=[str(t[0]) for t in res.failures], errors=[str(t[0]) for t in res.errors], skipped=[(str(t[0]), t[1]) for t in res.skipped], passed=res.testsRun - len(res.failures) - len(res.errors) - len(res.skipped))
+    write_json(os.path.join(CFG.DIRS["tests"], "unit_test_report.json"), rep); log_event("unit_tests", **{k: (v if isinstance(v, int) else len(v)) for k, v in rep.items()})
+    return rep, res
+
+
+BUNDLE = globals().get("BUNDLE", None); TEST = globals().get("TEST", {})
+TEST_REPORT, _res = run_unit_tests()
+print({k: (v if isinstance(v, int) else len(v)) for k, v in TEST_REPORT.items()})
+require(_res.wasSuccessful(), "Unit tests failed - see the report above. Do not trust any downstream result until they pass.")
+
+#@@ md
+## 55. Chapter IV tables and visualisations — built **only** from saved artifacts
+The cells below read the files written by the evaluation sections. For every table the report states its **source file and status**: `RESULT` (file exists, values shown) or `NOT RUN` (file missing — nothing is substituted). The Markdown report `report/chapter4_report.md` and the CSV/PNG files in `metrics/`, `figures/` and `report/` are the thesis inputs. Interpretation text in the report is generated **from the numbers** with hedged language; any interpretation of significance must come from the confidence intervals in the tables.
+
+#@@ code
+def md_table(df, floatfmt="{:.4f}"):
+    if df is None or len(df) == 0: return "_(empty)_"
+    d = df.copy()
+    for c in d.columns:
+        if d[c].dtype.kind == "f": d[c] = d[c].map(lambda v: "" if v != v else floatfmt.format(v))
+    head = "| " + " | ".join(map(str, d.columns)) + " |"; sep = "|" + "|".join(["---"] * len(d.columns)) + "|"
+    return "\n".join([head, sep] + ["| " + " | ".join(map(str, r)) + " |" for r in d.astype(str).values.tolist()])
+
+
+def read_artifact(rel, kind="csv"):
+    p = os.path.join(CFG.EXP_DIR, rel)
+    if not os.path.exists(p): return None, f"NOT RUN (missing {rel})"
+    return (pd.read_csv(p) if kind == "csv" else json.load(open(p))), "RESULT"
+
+
+REPORT = [f"# LUMYVUE V6 - Chapter IV material (generated {datetime.datetime.now().isoformat(timespec='seconds')}, run `{CFG.RUN_ID}`)\n",
+          "> Every table is read from a saved experiment artifact. `NOT RUN` means the artifact does not exist; no value is estimated or substituted. "
+          "Results are **experimental**, obtained on the data and annotations supplied by the researcher, and carry the limitations listed at the end.\n"]
+
+
+def add_section(title, items):
+    REPORT.append(f"\n## {title}\n")
+    for label, rel, kind in items:
+        obj, status = read_artifact(rel, kind)
+        REPORT.append(f"**{label}** - source `{rel}` - status: **{status}**\n")
+        if obj is not None: REPORT.append(md_table(obj) if kind == "csv" else "```json\n" + json.dumps(obj, indent=1, default=str)[:3000] + "\n```")
+        REPORT.append("")
+
+
+add_section("1. Dataset characteristics and integrity", [("Dataset policy log", "audit/dataset_policy_log.csv", "csv"), ("Inventory: class by V5 split", "audit/inventory_class_by_v5split.csv", "csv"), ("Image type per class", "audit/inventory_image_type.csv", "csv"),
+                                                        ("Leakage summary (V5 split)", "audit/v5_leakage_summary.json", "json"), ("Annotation gates", "audit/annotation_gate_table.csv", "csv"), ("Region annotation gates", "audit/region_gate_table.csv", "csv"),
+                                                        ("Quality/domain audit (medians)", "audit/quality_domain_audit.csv", "csv")])
+add_section("2. Deployment parity and V5 baseline", [("Parity summary", "audit/parity_summary.json", "json"), ("Python vs C# app records", "audit/parity_python_vs_app_records.csv", "csv"), ("V5 dev error pairs (source labels)", "v5_comparison/v5_dev_source_label_error_pairs.csv", "csv"),
+                                                    ("V5 dev error pairs (verified labels)", "v5_comparison/v5_dev_verified_error_pairs.csv", "csv")])
+add_section("3. Model training summary", [("Global experiment status", "metrics/global_training_status.json", "json"), ("Global experiments on validation (per condition)", "metrics/global_experiments_validation_per_condition.csv", "csv"), ("Global model selection", "metrics/global_selection.json", "json"),
+                                          ("ROI training summary", "metrics/roi_training_summary.json", "json"), ("Fusion calibration (out-of-fold)", "metrics/fusion_calibration_oof.csv", "csv")])
+add_section("4. Classification performance on the test split (single evaluation)", [("Per condition, by system", "metrics/test_per_condition_by_system.csv", "csv"), ("Set metrics by system", "metrics/test_set_metrics_by_system.csv", "csv"), ("Macro-F1 with 95% cluster-bootstrap CI", "metrics/test_macro_f1_ci_by_system.csv", "csv"),
+                                                                              ("Paired differences", "metrics/test_paired_differences.csv", "csv"), ("Single / mixed / none subsets", "metrics/test_subset_metrics.csv", "csv"), ("Calibration", "metrics/test_calibration.csv", "csv")])
+add_section("5. Localisation evaluation", [("YOLO registry", "yolo/detector_registry.json", "json"), ("Duplicate/overlap summary (dev)", "yolo/duplicate_overlap_summary.csv", "csv"), ("Localisation metrics (dev)", "yolo/localisation_metrics_dev.csv", "csv"), ("Localisation metrics (test)", "metrics/test_localisation_metrics.csv", "csv"),
+                                           ("Detector vs verified label (test)", "metrics/test_detector_vs_verified_label.csv", "csv")])
+add_section("6. Fusion system, ablation and verification statistics", [("Ablation", "metrics/test_ablation.csv", "csv"), ("Verification statistics", "metrics/test_verification_statistics.json", "json"), ("Risk-coverage (F)", "metrics/test_risk_coverage_F.csv", "csv"), ("Robustness (global CNN)", "metrics/test_robustness_global_cnn.csv", "csv"),
+                                                              ("Latency (Python reference)", "metrics/latency_reference_pipeline.json", "json")])
+add_section("7. Comparison against V5 and misclassification analysis", [("V5 reported (single-label; NOT comparable)", "v5_comparison/v5_reported_single_label_test_metrics.csv", "csv"), ("V5 vs V6 on the verified test split", "v5_comparison/v5_vs_v6_verified_test.csv", "csv"),
+                                                                        ("Misclassification pairs (test)", "metrics/test_misclassification_pairs.csv", "csv"), ("Hyperpigmentation missed as Normal", "v5_comparison/hyperpigmentation_missed_as_normal.json", "json")])
+REPORT.append("\n## 8. Limitations (always applicable)\n" + "\n".join(f"* {t}" for t in [
+    "No subject/session identifiers exist; group separation uses filename-stem, exact-hash and perceptual-hash proxies and cannot prove patient-level independence.",
+    "Reference labels are only as good as the reviewers; inter-rater agreement was not measured here (use `blinded_to_ai` and a double-read subset for Chapter III).",
+    "Quality thresholds, Stage-1/Stage-2 bands and the OOD threshold are provisional and selected on out-of-fold data; they are not validated clinical criteria.",
+    "OOD scores measure distance from the training distribution; they do not identify unknown conditions.",
+    "Eczema localisation depends on the registered Eczema detector; if none was registered, Eczema evidence is `detector_unavailable` and Eczema localisation metrics are not reported.",
+    "ROI crops from 224x224 processed images (when originals are missing) carry little detail; check the per-image `source` columns.",
+    "Python reference timing is not the C# latency; the C# parity of the new components is **untested** until the parity procedure is run.",
+    "A single test split, small verified sets and many comparisons: unadjusted intervals; non-significance is not equivalence."]))
+write_text(os.path.join(CFG.DIRS["report"], "chapter4_report.md"), "\n".join(REPORT)); print("report written:", redact(os.path.join(CFG.DIRS["report"], "chapter4_report.md")), "| sections with data:", sum("**RESULT**" in r for r in REPORT))
+
+#@@ md
+## 56. Final experiment and artifact summary
+Re-verifies that **no original model or dataset file changed**, that the audit chain is intact, lists every artifact produced (size and SHA-256), and prints the stage board: what ran, what was blocked and why. This is the cell to read before writing anything in the thesis.
+
+#@@ code
+ok_orig, bad_orig = verify_originals_unchanged()
+ok_chain, bad_at = verify_audit_chain()
+ART = []
+for root, _, files in os.walk(CFG.EXP_DIR):
+    for f in files:
+        p = os.path.join(root, f)
+        if f.endswith((".png", ".csv", ".json", ".md", ".jsonl", ".onnx", ".keras", ".h5", ".npz", ".npy", ".txt")) and os.path.getsize(p) < 600e6:
+            ART.append(dict(file=os.path.relpath(p, CFG.EXP_DIR), kb=round(os.path.getsize(p) / 1024, 1), sha256=sha256_file(p)[:16] if os.path.getsize(p) < 80e6 else "(large file)"))
+ART = pd.DataFrame(ART)
+BOARD = pd.DataFrame([dict(gate=k, open=v["ok"], reason=("" if v["ok"] else v["why"][:140])) for k, v in GATES.items()])
+display(BOARD)
+summary = dict(run_id=CFG.RUN_ID, finished=datetime.datetime.now().isoformat(timespec="seconds"), originals_unchanged=ok_orig, changed_originals=bad_orig, audit_chain_intact=ok_chain,
+               gates_open=int(BOARD.open.sum()), gates_blocked=int((~BOARD.open).sum()), artifacts=len(ART), unit_tests=TEST_REPORT, test_split_evaluated=os.path.exists(TEST_LOCK),
+               trained=dict(global_selected=GLOBAL_SELECTED, roi_seed=ROI_SELECTED_SEED, fusion_variants=list(FUSION_STATE.get("oof", {}).keys())),
+               honesty="Values appear only in files produced by this run. Where a stage was blocked, its outputs do not exist and no placeholder was created.")
+write_json(os.path.join(CFG.DIRS["report"], "final_summary.json"), summary); write_csv(ART, os.path.join(CFG.DIRS["report"], "artifact_index.csv")); write_csv(BOARD, os.path.join(CFG.DIRS["report"], "stage_gate_board.csv"))
+print(json.dumps({k: v for k, v in summary.items() if k != "unit_tests"}, indent=1, default=str))
+require(ok_orig, f"ORIGINAL FILES CHANGED DURING THIS RUN: {bad_orig}")
+require(ok_chain, "audit chain broken")
+print("\nDone. Original models and datasets verified unchanged; audit chain intact.")

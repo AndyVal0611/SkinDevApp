@@ -1,0 +1,502 @@
+#@@ md
+# Part IX — Evaluation of Systems A–G on the Frozen Test Split, Ablations, Robustness and Visualisations
+
+Sections: **(39) classification evaluation · (40) YOLO localisation evaluation · (41) fusion ablations · (42) robustness · (43) Grad-CAM++ · (44–48) learning curves, confusion matrices, PR/ROC, calibration, risk–coverage · (49) V5 vs V6.**
+
+## The seven systems (all evaluated on the **same** test images with the **same** verified labels)
+| | System | Decision rule |
+|---|---|---|
+| **A** | original V5 MobileNetV2 | arg-max of the 4-way softmax (Normal ⇒ no condition) — exactly what V5 does; threshold-free scores are used for AP/AUC |
+| **B** | improved global MobileNetV2 | selected in Section 22; per-condition thresholds chosen on the **fusion** split |
+| **C** | YOLO-only (three detectors) | `detected` at the deployed threshold; **Eczema (no detector) is "not evaluable", never counted as negative** |
+| **D** | YOLO-guided ROI MobileNetV2 | fusion variant `roi_only`, calibrated, thresholds from fusion split |
+| **E** | global CNN + YOLO evidence fusion | variant `global_yolo` |
+| **F** | global + ROI CNN + three-detector fusion | variant `full` |
+| **G** | full two-stage adaptive verification system | Stage 1 → Stage 2 → bounded verification → abstention; reported **on accepted cases** *and* with abstentions listed |
+
+**Test-set discipline.** The test split is opened **once**: a lock file records the first evaluation; a second run raises a `GateError` unless `ALLOW_TEST_REEVALUATION=True` (use only to reproduce a reported number). Nothing computed here feeds back into any model, threshold, calibration or band. Where a number cannot be computed (too few verified positives/negatives, missing labels, missing detector) the cell says so.
+
+**Reading the metrics.** Per-condition metrics use only images where that condition's reference label is *Present/Absent* (Unknown excluded); exact-match uses fully-known images. 95 % intervals resample **leakage groups**. *Agreement with another model is not a correctness metric.* Selective-prediction results (system G) are reported with their coverage, so a lower error on accepted cases is never presented without the abstention rate.
+
+#@@ code
+# 39.1 Test lock + helpers for decision-based metrics (decisions may be NaN where a condition cannot be evaluated, e.g. Eczema for YOLO-only).
+TEST_LOCK = os.path.join(CFG.DIRS["metrics"], "test_evaluated.lock.json")
+
+
+def open_test_once():
+    if os.path.exists(TEST_LOCK) and not CFG.ALLOW_TEST_REEVALUATION:
+        raise GateError(f"The test split was already evaluated ({json.load(open(TEST_LOCK))['when']}). Re-evaluating would let you tune against it. "
+                        "Set LUMYVUE_ALLOW_TEST_REEVALUATION=true ONLY to reproduce a reported number.")
+    write_json(TEST_LOCK, dict(when=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, split_sha=json.load(open(SPLIT_FP_PATH))["sha256"], reeval_allowed=CFG.ALLOW_TEST_REEVALUATION))
+    log_event("test_split_opened", reeval=CFG.ALLOW_TEST_REEVALUATION)
+
+
+def metrics_dec(y, s, dec, min_pos=None):
+    """Per-condition metrics from DECISIONS (1/0/NaN) and SCORES (may contain NaN). NaN decisions = not evaluable (excluded, reported as n_evaluable)."""
+    min_pos = CFG.MIN_POS_FOR_METRIC if min_pos is None else min_pos; rows = []
+    for j, c in enumerate(CFG.CONDITIONS):
+        kn = y[:, j] >= 0; ok = kn & ~np.isnan(dec[:, j])
+        yy, dd = y[ok, j], dec[ok, j] > 0.5
+        tp = int((dd & (yy == 1)).sum()); fp = int((dd & (yy == 0)).sum()); fn = int((~dd & (yy == 1)).sum()); tn = int((~dd & (yy == 0)).sum())
+        prec = tp / (tp + fp) if tp + fp else np.nan; rec = tp / (tp + fn) if tp + fn else np.nan; spec = tn / (tn + fp) if tn + fp else np.nan
+        f1 = 2 * prec * rec / (prec + rec) if (prec == prec and rec == rec and prec + rec > 0) else np.nan
+        ks = kn & ~np.isnan(s[:, j]); ys, ss = y[ks, j], s[ks, j]
+        okc = ((ys == 1).sum() >= min_pos) and ((ys == 0).sum() >= min_pos)
+        rows.append(dict(condition=c, n_evaluable=int(ok.sum()), pos=int((yy == 1).sum()), neg=int((yy == 0).sum()), precision=prec, recall=rec, specificity=spec, f1=f1, tp=tp, fp=fp, fn=fn, tn=tn,
+                         ap=float(average_precision_score(ys, ss)) if okc else np.nan, roc_auc=float(roc_auc_score(ys, ss)) if okc else np.nan))
+    return pd.DataFrame(rows)
+
+
+def set_metrics_dec(y, dec):
+    k = (y >= 0).all(axis=1) & ~np.isnan(dec).any(axis=1)
+    if k.sum() == 0: return dict(n=0, micro_f1=np.nan, macro_f1=np.nan, hamming_loss=np.nan, exact_match=np.nan)
+    yy, pp = y[k], (dec[k] > 0.5).astype(int)
+    tp = ((pp == 1) & (yy == 1)).sum(); fp = ((pp == 1) & (yy == 0)).sum(); fn = ((pp == 0) & (yy == 1)).sum()
+    f1s = [2 * ((pp[:, j] == 1) & (yy[:, j] == 1)).sum() / max(2 * ((pp[:, j] == 1) & (yy[:, j] == 1)).sum() + ((pp[:, j] == 1) & (yy[:, j] == 0)).sum() + ((pp[:, j] == 0) & (yy[:, j] == 1)).sum(), 1)
+           for j in range(yy.shape[1]) if ((yy[:, j] == 1).any() or (pp[:, j] == 1).any())]
+    return dict(n=int(k.sum()), micro_f1=float(2 * tp / max(2 * tp + fp + fn, 1)), macro_f1=float(np.mean(f1s)) if f1s else np.nan, hamming_loss=float((pp != yy).mean()), exact_match=float((pp == yy).all(axis=1).mean()))
+
+
+def macro_f1_dec(y, dec):
+    m = metrics_dec(y, np.full(dec.shape, np.nan), dec); return float(m.f1.mean()) if m.f1.notna().any() else np.nan
+
+
+def v5_argmax_decisions(df):
+    p = df[[f"v5_{c}" for c in CFG.V5_CLASS_ORDER]].to_numpy(); top = p.argmax(1); dec = np.zeros((len(df), 3))
+    for i, t in enumerate(top):
+        if t < 3: dec[i, t] = 1.0
+    return dec
+
+
+def combo_label(d):
+    names = [c for c, v in zip(CFG.CONDITIONS, d) if v > 0.5]; return "none" if not names else "+".join(names)
+
+
+#@@ md
+## 39. Classification evaluation (opens the test split once)
+This is the **single** evaluation of the test split. If a prerequisite is missing, the cell stops without opening the test split (no lock file is written).
+
+#@@ code
+TEST = {}
+try:
+    for g in ["annotations_test", "annotations_fusion", "yolo_any"]: gate(g)
+    require(GLOBAL_SELECTED[0] and ROI_SELECTED_SEED is not None and CALIB.get("full") and FUSION_STATE.get("oof"), "trained global/ROI/fusion components and calibration are required before the test split may be opened", gate=True)
+    # build every test input BEFORE opening the lock, so a missing prerequisite never burns the single evaluation
+    tdf, tsets = cached_roi_sets("test"); tdf = tdf.reset_index(drop=True)
+    _b = DF.set_index("image_id").loc[tdf.image_id]; yt = _b[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy().copy(); yt[~_b.eval_ok.values] = -1
+    gt = tdf.group_id.values
+    require((yt >= 0).all(axis=1).sum() >= CFG.MIN_VERIFIED["test"], f"test split has fewer than {CFG.MIN_VERIFIED['test']} fully verified images", gate=True)
+    LOGITS = {}
+    for var in FUSION_RUN:
+        for t in ((1, 2, 3) if VARIANTS[var]["roi"] else (3,)):
+            X, _ = assemble(tdf, tsets, var, max_tier=t); LOGITS[(var, t)] = fusion_predict(X, var)
+    logits_fn_test = lambda var, t: LOGITS[(var, t if VARIANTS[var]["roi"] else 3)]
+    gtest = global_inputs(tdf); ffd = FUSION_STATE["df"]; gfus = global_inputs(ffd)
+    evt = detector_evidence(tdf); detected_t = evt[:, :, 1] > 0.5; avail_t = evt[:, :, 0] > 0.5
+    TEST = dict(df=tdf, y=yt, groups=gt)
+    # thresholds for A2/B come from the FUSION split only
+    yfus = FUSION_STATE["y"]; v5f = v5_scores(ffd)
+    thr_B = [best_f1_threshold(yfus[yfus[:, j] >= 0, j], gfus["scores"][yfus[:, j] >= 0, j])[0] if ((yfus[:, j] == 1).sum() >= CFG.MIN_POS_FOR_METRIC) else 0.5 for j in range(3)]
+    thr_A2 = [best_f1_threshold(yfus[yfus[:, j] >= 0, j], v5f[yfus[:, j] >= 0, j])[0] if ((yfus[:, j] == 1).sum() >= CFG.MIN_POS_FOR_METRIC) else 0.5 for j in range(3)]
+    S = {}
+    S["A_v5_argmax"] = dict(s=v5_scores(tdf), dec=v5_argmax_decisions(tdf))
+    S["A2_v5_thresholded"] = dict(s=v5_scores(tdf), dec=(v5_scores(tdf) >= np.array(thr_A2)).astype(float))
+    S["B_improved_global"] = dict(s=gtest["scores"], dec=(gtest["scores"] >= np.array(thr_B)).astype(float))
+    ysc = np.where(avail_t, np.maximum(evt[:, :, 2], 0.0), np.nan)                      # YOLO score = max deployed confidence (0 if none); NaN when no detector
+    ydec = np.where(avail_t, detected_t.astype(float), np.nan)
+    S["C_yolo_only"] = dict(s=np.where(avail_t, np.maximum(evt[:, :, 3], evt[:, :, 2]), np.nan), dec=ydec)
+    for name, var in [("D_roi_only", "roi_only"), ("E_global_plus_yolo", "global_yolo"), ("F_full_fusion", "full"), ("X_global_recalibrated", "global_only")]:
+        p = apply_platt(logits_fn_test(var, 3), CALIB[var]["platt"]); S[name] = dict(s=p, dec=(p >= np.array(CALIB[var]["thresholds"])).astype(float), thr=CALIB[var]["thresholds"])
+    # system G: two-stage logic with abstention
+    qlist = [assess_quality(cv2.imread(r.orig_path if r.has_orig else r.proc_path)) for r in tdf.itertuples()]
+    ood_t = OOD.score(gtest["emb"]) if OOD is not None else None
+    tier_counts = [{t: int(((tsets["tier"][i] == t) & tsets["mask"][i]).sum()) for t in (1, 2, 3)} for i in range(len(tdf))]
+    GRES = batch_stage_logic(tdf, None, tier_counts, CALIB, STAGE1, BAND2, qlist, ood_t, logits_fn_test)
+    gd = np.array([[1.0 if c in str(p).split("|") else 0.0 for c in CFG.CONDITIONS] for p in GRES.predicted])
+    accepted = GRES.state.isin(["FINDINGS_SUPPORTED", "MULTIPLE_FINDINGS_SUPPORTED", "NO_FINDINGS_SUPPORTED"]).values
+    pF = S["F_full_fusion"]["s"]
+    S["G_two_stage_accepted_only"] = dict(s=np.where(accepted[:, None], pF, np.nan), dec=np.where(accepted[:, None], gd, np.nan))
+    TEST.update(S=S, GRES=GRES, accepted=accepted, qlist=qlist, tsets=tsets, thr_B=thr_B, thr_A2=thr_A2, avail=avail_t, detected=detected_t, ood=ood_t)
+    # ---- per-system tables + cluster bootstrap CIs. Predictions above used NO test labels; the lock is taken here, right before the first metric is computed ----
+    open_test_once()
+    rows, setrows, cis = [], [], []
+    for name, d in S.items():
+        m = metrics_dec(yt, d["s"], d["dec"]); m.insert(0, "system", name); rows.append(m)
+        sm = set_metrics_dec(yt, d["dec"]); sm["system"] = name; setrows.append(sm)
+        lo, hi, nv = cluster_bootstrap(gt, lambda idx, d=d: macro_f1_dec(yt[idx], d["dec"][idx]))
+        cis.append(dict(system=name, macro_f1=macro_f1_dec(yt, d["dec"]), ci_lo=lo, ci_hi=hi, n_boot_valid=nv))
+    PERCOND = pd.concat(rows, ignore_index=True); SETM = pd.DataFrame(setrows).set_index("system"); CI = pd.DataFrame(cis).set_index("system")
+    display(PERCOND.round(4)); display(SETM.round(4)); display(CI.round(4))
+    write_csv(PERCOND, os.path.join(CFG.DIRS["metrics"], "test_per_condition_by_system.csv")); write_csv(SETM.reset_index(), os.path.join(CFG.DIRS["metrics"], "test_set_metrics_by_system.csv"))
+    write_csv(CI.reset_index(), os.path.join(CFG.DIRS["metrics"], "test_macro_f1_ci_by_system.csv"))
+    np.savez_compressed(safe_path(os.path.join(CFG.DIRS["predictions"], "test_system_scores.npz")), image_id=tdf.image_id.values.astype(str), y=yt, **{f"{k}__s": v["s"] for k, v in S.items()}, **{f"{k}__d": v["dec"] for k, v in S.items()})
+    write_csv(GRES, os.path.join(CFG.DIRS["predictions"], "test_final_assessments_batch.csv"))
+    log_event("test_evaluated", n=len(tdf), systems=list(S))
+except GateError as g:
+    print(f"[test evaluation] NOT RUN - {g}")
+
+#@@ code
+# 39.2 Paired comparisons (cluster bootstrap of the macro-F1 difference): is F better than A, B, C, E; is G's accepted-case behaviour different from F?
+if TEST:
+    def paired(a, b):
+        S = TEST["S"]; yt, gt = TEST["y"], TEST["groups"]
+        lo, hi, nv = cluster_bootstrap(gt, lambda idx: macro_f1_dec(yt[idx], S[a]["dec"][idx]) - macro_f1_dec(yt[idx], S[b]["dec"][idx]))
+        return dict(system_1=a, system_2=b, macro_f1_difference=macro_f1_dec(yt, S[a]["dec"]) - macro_f1_dec(yt, S[b]["dec"]), ci_lo=lo, ci_hi=hi, interval_excludes_zero=bool(lo == lo and (lo > 0 or hi < 0)))
+    PAIRED = pd.DataFrame([paired("F_full_fusion", x) for x in ["A_v5_argmax", "A2_v5_thresholded", "B_improved_global", "E_global_plus_yolo", "D_roi_only"]] + [paired("E_global_plus_yolo", "B_improved_global"), paired("B_improved_global", "A2_v5_thresholded")])
+    display(PAIRED.round(4)); write_csv(PAIRED, os.path.join(CFG.DIRS["metrics"], "test_paired_differences.csv"))
+    print("An interval that includes 0 means the data do not show a difference; it does NOT show equivalence. Yolo-only (C) is excluded from paired tests because Eczema is not evaluable for it.")
+
+#@@ code
+# 39.3 Single / mixed / none subsets, misclassification pairs (Normal vs Hyperpigmentation, Hyperpigmentation vs Eczema, Acne vs Eczema), mixed combinations, camera vs source.
+if TEST:
+    S, yt, tdf = TEST["S"], TEST["y"], TEST["df"]; full = (yt >= 0).all(axis=1); npres = (yt == 1).sum(1)
+    sub_rows = []
+    for name, d in S.items():
+        for label, m in [("none (Normal)", full & (npres == 0)), ("single condition", full & (npres == 1)), ("mixed (>=2)", full & (npres >= 2))]:
+            if m.sum() == 0: continue
+            sm = set_metrics_dec(yt[m], d["dec"][m]); sub_rows.append(dict(system=name, subset=label, **sm))
+    SUBSETS = pd.DataFrame(sub_rows); display(SUBSETS.pivot(index="system", columns="subset", values="exact_match").round(4)); write_csv(SUBSETS, os.path.join(CFG.DIRS["metrics"], "test_subset_metrics.csv"))
+    truth = np.array([combo_label((yt[i] == 1).astype(float)) if full[i] else "unknown" for i in range(len(yt))])
+    pair_defs = [("none", "Hyperpigmentation"), ("Hyperpigmentation", "none"), ("Hyperpigmentation", "Eczema"), ("Eczema", "Hyperpigmentation"), ("Acne", "Eczema"), ("Eczema", "Acne")]
+    prow = []
+    for name in ["A_v5_argmax", "B_improved_global", "E_global_plus_yolo", "F_full_fusion"]:
+        dec = S[name]["dec"]; pred = np.array([combo_label(dec[i]) for i in range(len(yt))])
+        for t, p in pair_defs:
+            prow.append(dict(system=name, verified_truth=("Normal" if t == "none" else t), predicted=("Normal (no condition)" if p == "none" else p), n=int(((truth == t) & (pred == p)).sum()), n_truth=int((truth == t).sum())))
+    PAIRS_TEST = pd.DataFrame(prow); display(PAIRS_TEST.pivot_table(index=["verified_truth", "predicted"], columns="system", values="n")); write_csv(PAIRS_TEST, os.path.join(CFG.DIRS["metrics"], "test_misclassification_pairs.csv"))
+    mixed_combos = pd.Series(truth[truth.astype(str) != "unknown"]).value_counts(); mixed_combos = mixed_combos[[("+" in k) for k in mixed_combos.index]]
+    print("verified mixed combinations in the test split:", mixed_combos.to_dict())
+    by_origin = tdf.assign(_i=np.arange(len(tdf))).groupby("image_origin")._i.apply(list)
+    for org, idx in by_origin.items():
+        idx = np.array(idx); print(f"image_origin={org}: n={len(idx)} fully verified={int(full[idx].sum())} | F macro-F1 = {macro_f1_dec(yt[idx], S['F_full_fusion']['dec'][idx]):.4f}")
+    if len(by_origin) < 2: print("(only one image origin is annotated: camera-vs-source performance cannot be compared; annotate camera captures with image_origin=camera_capture.)")
+
+#@@ md
+## 40. YOLO localisation evaluation (test split)
+Box-level precision, recall, mAP50 and mAP50–95 against **verified exhaustive region boxes** (Section 24.6 logic), plus image-level false-alarm/recall against verified labels. Detectors without verified regions or with too few boxes report *why* instead of a number.
+
+#@@ code
+if TEST:
+    LOC_TEST = pd.DataFrame([localisation_metrics(["test"], c) for c in CFG.CONDITIONS]); display(LOC_TEST); write_csv(LOC_TEST, os.path.join(CFG.DIRS["metrics"], "test_localisation_metrics.csv"))
+    FLAG_TEST = cond_flag_rates(["test"]);
+    if FLAG_TEST is not None and len(FLAG_TEST): display(FLAG_TEST); write_csv(FLAG_TEST, os.path.join(CFG.DIRS["metrics"], "test_detector_vs_verified_label.csv"))
+    OV_TEST = overlap_report(DET[DET.image_id.isin(TEST["df"].image_id)]) if len(DET) else pd.DataFrame()
+    if len(OV_TEST): display(OV_TEST.groupby(["condition", "relation"]).image_id.nunique().unstack(fill_value=0))
+else:
+    print("Skipped: test split not evaluated.")
+
+#@@ md
+## 41. Fusion ablation studies
+Each ablation removes one source of evidence and **re-trains** the (tiny) fusion with the same cross-fitting, thresholds and calibration procedure (Section 30–31), then evaluates on the same test images: *without Acne / Eczema / Hyperpigmentation evidence* (detector evidence **and** its ROIs), *without the ROI branch* (= E), *without the global branch* (= D), *without trainable fusion* (a fixed rule), and *without adaptive verification* (Stage 1 only). The question answered is whether each component adds **measurable** value, with intervals.
+
+#@@ code
+if TEST:
+    S, yt, gt, tdf = TEST["S"], TEST["y"], TEST["groups"], TEST["df"]
+    abl = {}
+    for name, var in [("full", "full"), ("without Acne evidence", "no_acne_evidence"), ("without Eczema evidence", "no_eczema_evidence"), ("without Hyperpigmentation evidence", "no_hyper_evidence"),
+                      ("without ROI branch (= E)", "global_yolo"), ("without global branch (= D)", "roi_only"), ("without detector evidence and ROI (global only, recalibrated)", "global_only")]:
+        if var not in CALIB: continue
+        p = apply_platt(logits_fn_test(var, 3), CALIB[var]["platt"]); dec = (p >= np.array(CALIB[var]["thresholds"])).astype(float)
+        abl[name] = dec
+    # no trainable fusion: fixed YOLO-prioritising rule (present if the calibrated global model OR a detector says so); available detectors only
+    pg_t = apply_platt(logits_fn_test("global_only", 3), CALIB["global_only"]["platt"]); rule = (pg_t >= np.array(CALIB["global_only"]["thresholds"])) | (TEST["detected"] & TEST["avail"])
+    abl["without trainable fusion (fixed OR rule)"] = rule.astype(float)
+    # no adaptive verification: Stage-1 decisions only (E) vs the full two-stage system on the SAME images
+    abl["Stage 1 only (E decisions, no verification)"] = S["E_global_plus_yolo"]["dec"]
+    rows = []
+    for name, dec in abl.items():
+        lo, hi, nv = cluster_bootstrap(gt, lambda idx, dec=dec: macro_f1_dec(yt[idx], dec[idx]))
+        full_dec = abl["full"]
+        dlo, dhi, _ = cluster_bootstrap(gt, lambda idx, dec=dec: macro_f1_dec(yt[idx], full_dec[idx]) - macro_f1_dec(yt[idx], dec[idx]))
+        sm = set_metrics_dec(yt, dec)
+        rows.append(dict(configuration=name, macro_f1=macro_f1_dec(yt, dec), ci_lo=lo, ci_hi=hi, exact_match=sm["exact_match"], hamming_loss=sm["hamming_loss"], full_minus_this=macro_f1_dec(yt, full_dec) - macro_f1_dec(yt, dec), diff_ci_lo=dlo, diff_ci_hi=dhi,
+                         full_is_better_with_ci=bool(dlo == dlo and dlo > 0)))
+    ABL = pd.DataFrame(rows); display(ABL.round(4)); write_csv(ABL, os.path.join(CFG.DIRS["metrics"], "test_ablation.csv"))
+    fig, ax = plt.subplots(figsize=(9, 4.2)); y_ = np.arange(len(ABL))
+    ax.barh(y_, ABL.macro_f1, xerr=[ABL.macro_f1 - ABL.ci_lo, ABL.ci_hi - ABL.macro_f1], color="#4c78a8"); ax.set_yticks(y_); ax.set_yticklabels(ABL.configuration, fontsize=8); ax.invert_yaxis()
+    ax.set_xlabel("macro-F1 on the test split (95% cluster-bootstrap CI)"); ax.set_title("Fusion ablation (each bar re-trained without the component)")
+    savefig(fig, "ablation_study")
+else:
+    print("Skipped: test split not evaluated.")
+
+#@@ md
+## 42. Stage 1 vs Stage 2, verification statistics and robustness
+* **Verification statistics**: escalation rate, passes, stop reasons, resolved-vs-unresolved CNN–YOLO disagreements (judged against the **verified** label), false-confidence rate (accepted cases that are wrong), abstention rate, evidence redundancy (`no_new_evidence`), recapture frequency, **risk–coverage**.
+* **Robustness**: the global CNN is re-run on perturbed copies of test images (brightness, blur, JPEG, small rotation, crop, white-balance shift, down-/up-scaling) and the *change in calibrated score* and *decision flips* are reported — these are sensitivity statistics, not accuracy.
+* **Latency** of the Python reference pipeline (`assess_image`) is measured on a small subset when every component is available (CPU YOLO dominates).
+
+#@@ code
+if TEST:
+    G, yt, tdf = TEST["GRES"], TEST["y"], TEST["df"]; S = TEST["S"]
+    N = len(G); acc = TEST["accepted"]; full = (yt >= 0).all(axis=1)
+    rate = lambda m: float(np.mean(m)) if len(m) else np.nan
+    wrong = ((np.nan_to_num(S["G_two_stage_accepted_only"]["dec"]) > 0.5) != (yt == 1)) & (yt >= 0)
+    stats = dict(n_test=N, state_counts=G.state.value_counts().to_dict(), escalation_rate_to_stage2=rate(G.stage == 2), abstention_rate_uncertain=rate(G.state == "UNCERTAIN_REVIEW_REQUIRED"),
+                 recapture_rate=rate(G.state == "RECAPTURE_REQUIRED"), out_of_scope_rate=rate(G.state == "OUT_OF_SCOPE_REVIEW_REQUIRED"), inference_error_rate=rate(G.state == "INFERENCE_ERROR"),
+                 coverage_accepted=rate(acc), accepted_case_error_rate=float(wrong[acc & (yt >= 0).any(1)].any(1).mean()) if (acc & (yt >= 0).any(1)).any() else np.nan,
+                 mean_passes_stage2=float(G[G.stage == 2].passes.mean()) if (G.stage == 2).any() else np.nan, pass_distribution=G[G.stage == 2].passes.value_counts().sort_index().to_dict(),
+                 stop_reasons=G.stop_reason.value_counts().to_dict(), no_new_evidence_rate=rate(G.stop_reason == "no_new_evidence"))
+    # disagreements: stage-1 CNN-vs-YOLO conflict images, judged against verified labels
+    conflict = G.flags.fillna("").str.contains("cnn_yolo_conflict").values
+    res = acc & conflict; unres = ~acc & conflict
+    err_c = ((np.nan_to_num(S["G_two_stage_accepted_only"]["dec"]) > 0.5) != (yt == 1)) & (yt >= 0)
+    stats.update(conflicts=int(conflict.sum()), conflicts_resolved_to_supported=int(res.sum()), conflicts_resolved_correct=int((res & ~err_c.any(1) & full).sum()), conflicts_resolved_incorrect=int((res & err_c.any(1)).sum()), conflicts_left_uncertain=int(unres.sum()))
+    # risk-coverage on the final fusion probabilities: confidence = smallest margin to threshold over conditions
+    pF, thrF = S["F_full_fusion"]["s"], np.array(CALIB["full"]["thresholds"]); conf = np.abs(pF - thrF[None, :]).min(1); pred = pF >= thrF[None, :]
+    err = ((pred != (yt == 1)) & (yt >= 0)).any(1); ok = (yt >= 0).any(1); order = np.argsort(-conf[ok]); e_sorted = err[ok][order]
+    cov = np.arange(1, len(e_sorted) + 1) / len(e_sorted); risk = np.cumsum(e_sorted) / np.arange(1, len(e_sorted) + 1)
+    RC = pd.DataFrame(dict(coverage=cov, risk=risk)); write_csv(RC, os.path.join(CFG.DIRS["metrics"], "test_risk_coverage_F.csv"))
+    _trap = getattr(np, "trapezoid", None) or getattr(np, "trapz")
+    stats["aurc_F"] = float(_trap(risk, cov)); write_json(os.path.join(CFG.DIRS["metrics"], "test_verification_statistics.json"), stats); print(json.dumps(stats, indent=1, default=str))
+    fig, ax = plt.subplots(1, 2, figsize=(11, 4)); ax[0].plot(cov, risk); ax[0].set_xlabel("coverage (most confident first)"); ax[0].set_ylabel("error rate (any known condition wrong)"); ax[0].set_title("Risk-coverage, system F (test)")
+    G[G.stage > 0].state.value_counts().plot(kind="barh", ax=ax[1]); ax[1].set_title("Final states (system G)"); savefig(fig, "risk_coverage_and_states")
+    # Stage 1 vs Stage 2 on the same images
+    s1_err = ((np.nan_to_num(S["E_global_plus_yolo"]["dec"]) > 0.5) != (yt == 1)) & (yt >= 0); s2_err = ((np.nan_to_num(S["F_full_fusion"]["dec"]) > 0.5) != (yt == 1)) & (yt >= 0)
+    esc = (G.stage == 2).values & ok
+    print(f"Among the {int(esc.sum())} escalated images with a verified label: any-condition error Stage-1-style (E) = {float(s1_err[esc].any(1).mean()):.3f}  vs Stage-2-style (F) = {float(s2_err[esc].any(1).mean()):.3f}" if esc.any() else "no escalated images with verified labels")
+else:
+    print("Skipped: test split not evaluated.")
+
+#@@ code
+# 42.2 Robustness of the global CNN to perturbations (sensitivity only) + latency of the reference pipeline.
+def perturb(bgr, kind):
+    h, w = bgr.shape[:2]
+    if kind == "brightness_x0.7": return np.clip(bgr * 0.7, 0, 255).astype(np.uint8)
+    if kind == "brightness_x1.3": return np.clip(bgr * 1.3, 0, 255).astype(np.uint8)
+    if kind == "gaussian_blur_s2": return cv2.GaussianBlur(bgr, (0, 0), 2)
+    if kind == "jpeg_q30": return cv2.imdecode(cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 30])[1], 1)
+    if kind == "rotate_+8deg": return cv2.warpAffine(bgr, cv2.getRotationMatrix2D((w / 2, h / 2), 8, 1.0), (w, h), borderMode=cv2.BORDER_REFLECT)
+    if kind == "center_crop_85": dh, dw = int(h * 0.075), int(w * 0.075); return cv2.resize(bgr[dh:h - dh, dw:w - dw], (w, h))
+    if kind == "white_balance_warm": b = bgr.astype(np.float32); b[..., 2] *= 1.15; b[..., 0] *= 0.88; return np.clip(b, 0, 255).astype(np.uint8)
+    if kind == "downscale_x0.4": return cv2.resize(cv2.resize(bgr, (int(w * 0.4), int(h * 0.4))), (w, h))
+    raise V6Error(kind)
+
+
+PERTURBATIONS = ["brightness_x0.7", "brightness_x1.3", "gaussian_blur_s2", "jpeg_q30", "rotate_+8deg", "center_crop_85", "white_balance_warm", "downscale_x0.4"]
+ROBUST = None
+if TEST and GLOBAL_SELECTED[0]:
+    sub = TEST["df"].sample(min(CFG.ROBUSTNESS_N, len(TEST["df"])), random_state=5).reset_index(drop=True)
+    gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False); mode_g = EXPERIMENTS[GLOBAL_SELECTED[0]]["mode"]
+    imgs = [cv2.imread(r.orig_path if r.has_orig else r.proc_path) for r in sub.itertuples()]
+    def gscore(ims):
+        out = np.asarray(gm.predict(np.stack([preprocess_global(i) for i in ims]), verbose=0), np.float32); return 1 / (1 + np.exp(-out)) if mode_g == "multilabel3" else out[:, :3]
+    base = gscore(imgs); thr_ = np.array(TEST["thr_B"]); rows = []
+    for k in PERTURBATIONS:
+        p = gscore([perturb(i, k) for i in imgs])
+        for j, c in enumerate(CFG.CONDITIONS):
+            rows.append(dict(perturbation=k, condition=c, mean_abs_score_change=float(np.abs(p[:, j] - base[:, j]).mean()), decision_flip_rate=float(((p[:, j] >= thr_[j]) != (base[:, j] >= thr_[j])).mean())))
+    ROBUST = pd.DataFrame(rows); display(ROBUST.pivot(index="perturbation", columns="condition", values="decision_flip_rate").round(3)); write_csv(ROBUST, os.path.join(CFG.DIRS["metrics"], "test_robustness_global_cnn.csv"))
+    keras.backend.clear_session()
+
+LATENCY = None
+try:
+    BUNDLE = InferenceBundle(); lat = []; sub_l = DF[DF.split == "fusion"].head(8)
+    for r in sub_l.itertuples():
+        t0 = time.monotonic(); assess_image(BUNDLE, r.orig_path if r.has_orig else r.proc_path); lat.append(time.monotonic() - t0)
+    LATENCY = dict(n=len(lat), median_s=float(np.median(lat)), p95_s=float(np.percentile(lat, 95)), note="Python reference on this machine (CPU YOLO ensemble dominates); not the C# latency")
+    write_json(os.path.join(CFG.DIRS["metrics"], "latency_reference_pipeline.json"), LATENCY); print(LATENCY)
+except GateError as g:
+    BUNDLE = None; print("[latency/single-image reference] not available:", str(g)[:160])
+
+#@@ md
+## 43. Grad-CAM++ explanations (attribution, not segmentation)
+Grad-CAM++ (Chattopadhyay et al., 2018) shows which image areas influenced the **selected global model's** score for a condition, computed on the MobileNetV2 feature map (`out_relu`, 7×7). Maps are percentile-normalised and alpha-blended so low-attention areas stay transparent. **Wording for the thesis:** *"Grad-CAM++ visualises facial regions contributing to the model's score for a condition."* It does **not** perform lesion segmentation, and a map is not evidence that a lesion is present; YOLO boxes are overlaid *separately* so the two kinds of evidence stay distinguishable.
+
+#@@ code
+def _head_f32(layers, x):
+    """Runs the classifier head in FLOAT32 from the last feature map (mixed-precision models would otherwise compute gradients in float16). The final Dense is evaluated
+    WITHOUT its softmax/sigmoid: Grad-CAM++ uses the pre-activation score, because a saturated probability has a vanishing gradient."""
+    for l in layers:
+        if isinstance(l, keras.layers.GlobalAveragePooling2D): x = tf.reduce_mean(x, axis=[1, 2])
+        elif isinstance(l, keras.layers.BatchNormalization):
+            g = tf.cast(l.gamma, tf.float32) if l.scale else 1.0; b = tf.cast(l.beta, tf.float32) if l.center else 0.0
+            x = (x - tf.cast(l.moving_mean, tf.float32)) * tf.math.rsqrt(tf.cast(l.moving_variance, tf.float32) + l.epsilon) * g + b
+        elif isinstance(l, (keras.layers.Dropout, keras.layers.InputLayer)): continue
+        elif isinstance(l, keras.layers.Dense):
+            x = tf.matmul(x, tf.cast(l.kernel, tf.float32)) + (tf.cast(l.bias, tf.float32) if l.use_bias else 0.0)
+            act = getattr(l.activation, "__name__", "linear")
+            if act == "relu": x = tf.nn.relu(x)
+            elif act not in ("linear", "softmax", "sigmoid"): x = l.activation(x)
+        else:
+            raise V6Error(f"Grad-CAM++ head layer type not supported: {type(l).__name__}")
+    return x
+
+
+def gradcampp(model, bgr, cond_idx):
+    """Grad-CAM++ of condition `cond_idx` on the LAST MobileNetV2 feature map (7x7x1280, `out_relu`) of a nested-backbone model. Returns heat [H,W] in 0..1."""
+    require(CFG.GRADCAM_LAYER == "out_relu", "this implementation explains the last feature map ('out_relu'); other layers are not supported")
+    base = find_backbone(model); post = model.layers[model.layers.index(base) + 1:]
+    x = tf.convert_to_tensor(preprocess_global(bgr)[None])
+    a = tf.cast(base(x, training=False), tf.float32)                          # feature map, then everything downstream in float32
+    with tf.GradientTape() as tape:
+        tape.watch(a)
+        score = _head_f32(post, a)[:, cond_idx]
+    g = tape.gradient(score, a)
+    require(g is not None, "Grad-CAM++: gradient is None")
+    g = g.numpy()[0]; a_ = a.numpy()[0]
+    g2, g3 = g ** 2, g ** 3; denom = 2 * g2 + a_.sum(axis=(0, 1), keepdims=True) * g3; denom = np.where(denom != 0, denom, 1e-9)
+    alpha = g2 / denom; w = (alpha * np.maximum(g, 0)).sum(axis=(0, 1)); cam = np.maximum((w * a_).sum(-1), 0)
+    require(np.isfinite(cam).all() and cam.max() > 0, "Grad-CAM++ produced NaN/Inf or an all-zero map: the model has no positive evidence for this condition on this image")
+    lo, hi = np.percentile(cam, 1), np.percentile(cam, 99); cam = np.clip((cam - lo) / max(hi - lo, 1e-9), 0, 1)
+    return cv2.resize(cam, (bgr.shape[1], bgr.shape[0]), interpolation=cv2.INTER_CUBIC).clip(0, 1)
+
+
+def overlay_heat(bgr, heat, alpha=0.55):
+    cm = cv2.applyColorMap((heat * 255).astype(np.uint8), cv2.COLORMAP_JET); a = (heat[..., None] * alpha)
+    return (bgr * (1 - a) + cm * a).astype(np.uint8)
+
+
+if TEST and GLOBAL_SELECTED[0]:
+    gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+    S, yt, tdf = TEST["S"], TEST["y"], TEST["df"]; pred = S["F_full_fusion"]["dec"] > 0.5
+    pick = [i for i in range(len(tdf)) if (yt[i] == 1).any() and (pred[i] == (yt[i] == 1)).all()][:4] + [i for i in range(len(tdf)) if (yt[i] >= 0).all() and (pred[i] != (yt[i] == 1)).any()][:4]
+    fig, ax = plt.subplots(len(pick), 4, figsize=(13, 3.2 * len(pick)), squeeze=False)
+    for a in ax.ravel(): a.axis("off")
+    for r_, i in enumerate(pick):
+        r = tdf.iloc[i]; bgr = cv2.imread(r.orig_path if r.has_orig else r.proc_path); j = int(np.argmax(S["F_full_fusion"]["s"][i]))
+        ax[r_, 0].imshow(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)); ax[r_, 0].set_title(f"{pseudo_id(r.image_id)[-6:]} truth={combo_label((yt[i] == 1).astype(float))} F={combo_label(pred[i].astype(float))}", fontsize=7)
+        try:
+            heat = gradcampp(gm, bgr, j); ax[r_, 1].imshow(cv2.cvtColor(overlay_heat(bgr, heat), cv2.COLOR_BGR2RGB)); ax[r_, 1].set_title(f"Grad-CAM++ for {CFG.CONDITIONS[j]}", fontsize=7)
+        except V6Error as e_:                                          # no positive evidence in the global model for this condition: say so instead of drawing noise
+            heat = np.zeros(bgr.shape[:2], np.float32); ax[r_, 1].imshow(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)); ax[r_, 1].set_title("no Grad-CAM++ map: " + str(e_)[:60], fontsize=6)
+        ax[r_, 2].imshow(cv2.cvtColor(draw_detections(bgr, det_rows_for(r.image_id)), cv2.COLOR_BGR2RGB)); ax[r_, 2].set_title("YOLO boxes (separate evidence)", fontsize=7)
+        both = draw_detections(overlay_heat(bgr, heat, 0.4), det_rows_for(r.image_id)); ax[r_, 3].imshow(cv2.cvtColor(both, cv2.COLOR_BGR2RGB)); ax[r_, 3].set_title("both (outputs remain independent)", fontsize=7)
+    fig.suptitle("Grad-CAM++ and YOLO evidence: first rows = correct F predictions, last rows = incorrect (test; explanations only)")
+    savefig(fig, "gradcampp_and_yolo_examples"); keras.backend.clear_session()
+else:
+    print("Skipped: needs the evaluated test split and a trained global model.")
+
+#@@ md
+## 44–48. Learning curves, confusion matrices, ROC / PR curves, threshold plots, calibration and example galleries
+All figures below are generated from **saved experiment files** (training histories, out-of-fold fusion logits, test scores); a figure is skipped with a message when its source file does not exist.
+
+#@@ code
+# 44.1 Training and validation curves (loss; precision / recall / F1) for every trained global experiment and the ROI model.
+def plot_histories():
+    exps = [e for e in CFG.GLOBAL_EXPERIMENTS if os.path.isdir(os.path.join(CFG.DIRS["checkpoints"], e))] + (["ROI"] if os.path.isdir(os.path.join(CFG.DIRS["checkpoints"], "ROI")) else [])
+    if not exps: print("No training histories yet."); return
+    for e in exps:
+        for sd in sorted(os.listdir(os.path.join(CFG.DIRS["checkpoints"], e))):
+            hs = [(ph, os.path.join(CFG.DIRS["checkpoints"], e, sd, f"phase{ph}_history.csv")) for ph in "AB"]; hs = [(ph, p) for ph, p in hs if os.path.exists(p)]
+            if not hs: continue
+            h = pd.concat([pd.read_csv(p).assign(phase=ph) for ph, p in hs], ignore_index=True); h["epoch_total"] = np.arange(len(h))
+            fig, ax = plt.subplots(1, 3, figsize=(16, 3.8))
+            for col in ["loss", "val_loss"]:
+                if col in h: ax[0].plot(h.epoch_total, h[col], label=col)
+            ax[0].set_title(f"{e} {sd}: loss"); ax[0].legend()
+            for col in ["val_macro_precision", "val_macro_recall", "val_macro_f1"]:
+                if col in h: ax[1].plot(h.epoch_total, h[col], label=col)
+            ax[1].set_title("validation macro precision / recall / F1 @0.5"); ax[1].legend()
+            if "val_sel" in h: ax[2].plot(h.epoch_total, h.val_sel, label="selection metric")
+            if "learning_rate" in h: ax2 = ax[2].twinx(); ax2.plot(h.epoch_total, h.learning_rate, "g--"); ax2.set_yscale("log"); ax2.set_ylabel("learning rate")
+            ax[2].set_title("selection metric (macro AP / F1) and LR"); ax[2].legend()
+            for a in ax: a.axvline((h.phase == "A").sum() - 0.5, color="gray", ls=":")
+            savefig(fig, f"history_{e}_{sd}", "figures")
+
+
+plot_histories()
+
+#@@ code
+# 45.1 Threshold-vs-F1 (fusion OOF), ROC and PR curves, per-condition multilabel confusion matrices and reliability on the TEST split.
+from sklearn.metrics import precision_recall_curve, roc_curve, multilabel_confusion_matrix
+if FUSION_STATE.get("oof") and CALIB.get("full"):
+    yf = FUSION_STATE["y"]; pf = apply_platt(FUSION_STATE["oof"]["full"], CALIB["full"]["platt"]); fig, ax = plt.subplots(1, 3, figsize=(14, 3.8))
+    for j, c in enumerate(CFG.CONDITIONS):
+        k = yf[:, j] >= 0
+        if (yf[k, j] == 1).sum() < 5: ax[j].set_title(f"{c}: too few positives"); continue
+        fs = []
+        for t in CFG.THRESHOLD_GRID:
+            p = pf[k, j] >= t; tp = (p & (yf[k, j] == 1)).sum(); fp = (p & (yf[k, j] == 0)).sum(); fn = (~p & (yf[k, j] == 1)).sum(); fs.append(2 * tp / max(2 * tp + fp + fn, 1))
+        ax[j].plot(CFG.THRESHOLD_GRID, fs); ax[j].axvline(CALIB["full"]["thresholds"][j], color="r", ls="--"); ax[j].set_title(f"{c}: F1 vs threshold (fusion OOF, 'full')"); ax[j].set_xlabel("calibrated threshold")
+    savefig(fig, "threshold_vs_f1")
+if TEST:
+    S, yt = TEST["S"], TEST["y"]; show = ["A2_v5_thresholded", "B_improved_global", "C_yolo_only", "D_roi_only", "E_global_plus_yolo", "F_full_fusion"]
+    fig, ax = plt.subplots(2, 3, figsize=(15, 8))
+    for j, c in enumerate(CFG.CONDITIONS):
+        k0 = yt[:, j] >= 0
+        for name in show:
+            s = S[name]["s"][:, j]; k = k0 & ~np.isnan(s)
+            if k.sum() < 10 or (yt[k, j] == 1).sum() < CFG.MIN_POS_FOR_METRIC or (yt[k, j] == 0).sum() < CFG.MIN_POS_FOR_METRIC: continue
+            fpr, tpr, _ = roc_curve(yt[k, j], s[k]); ax[0, j].plot(fpr, tpr, label=name); pr, rc, _ = precision_recall_curve(yt[k, j], s[k]); ax[1, j].plot(rc, pr, label=name)
+        ax[0, j].plot([0, 1], [0, 1], "k:"); ax[0, j].set_title(f"{c}: ROC (test)"); ax[1, j].set_title(f"{c}: precision-recall (test)"); ax[0, j].set_xlabel("FPR"); ax[0, j].set_ylabel("TPR"); ax[1, j].set_xlabel("recall"); ax[1, j].set_ylabel("precision")
+    ax[0, 0].legend(fontsize=6); savefig(fig, "roc_pr_curves_test")
+    fig, ax = plt.subplots(2, 3, figsize=(12, 7))
+    for r_, name in enumerate(["A_v5_argmax", "F_full_fusion"]):
+        d = S[name]["dec"]; full = (yt >= 0).all(axis=1) & ~np.isnan(d).any(1)
+        if full.sum() == 0: continue
+        mcm = multilabel_confusion_matrix(yt[full], (d[full] > 0.5).astype(int))
+        for j, c in enumerate(CFG.CONDITIONS):
+            ax[r_, j].imshow(mcm[j], cmap="Blues"); ax[r_, j].set_xticks([0, 1]); ax[r_, j].set_yticks([0, 1]); ax[r_, j].set_xticklabels(["pred absent", "pred present"]); ax[r_, j].set_yticklabels(["true absent", "true present"])
+            for a_ in range(2):
+                for b_ in range(2): ax[r_, j].text(b_, a_, int(mcm[j][a_, b_]), ha="center", va="center")
+            ax[r_, j].set_title(f"{name[:2]} {c}", fontsize=9)
+    savefig(fig, "multilabel_confusion_matrices_test")
+    fig, ax = plt.subplots(1, 3, figsize=(13, 4))
+    for j, c in enumerate(CFG.CONDITIONS):
+        for name in ["B_improved_global", "F_full_fusion"]:
+            s = S[name]["s"][:, j]; k = (yt[:, j] >= 0) & ~np.isnan(s)
+            if k.sum() >= 30: _, rel = ece_binary(s[k], yt[k, j], CFG.CALIBRATION_BINS); ax[j].plot(rel.mean_conf, rel.accuracy, "o-", label=name)
+        ax[j].plot([0, 1], [0, 1], "k--"); ax[j].set_title(f"{c}: reliability (test)"); ax[j].legend(fontsize=7)
+    savefig(fig, "reliability_test")
+    cal_rows = []
+    for name in ["B_improved_global", "E_global_plus_yolo", "F_full_fusion"]:
+        bt = brier_ece(yt, np.nan_to_num(S[name]["s"], nan=0.5)); bt.insert(0, "system", name); cal_rows.append(bt)
+    CALT = pd.concat(cal_rows); display(CALT.round(4)); write_csv(CALT, os.path.join(CFG.DIRS["metrics"], "test_calibration.csv"))
+
+#@@ code
+# 46.1 Galleries: correct predictions, incorrect predictions, multi-condition predictions (test; images are shown only after the single evaluation).
+def eval_gallery(idx, title, fname, S_name="F_full_fusion"):
+    if not len(idx): print("(none:", title, ")"); return
+    tdf, yt, S = TEST["df"], TEST["y"], TEST["S"]; idx = list(idx)[:CFG.N_EXAMPLE_IMAGES]; cols = 6; rows = int(math.ceil(len(idx) / cols))
+    fig, ax = plt.subplots(rows, cols, figsize=(cols * 2.7, rows * 3.1), squeeze=False)
+    for a in ax.ravel(): a.axis("off")
+    for a, i in zip(ax.ravel(), idx):
+        r = tdf.iloc[i]; bgr = cv2.imread(r.orig_path if r.has_orig else r.proc_path); a.imshow(cv2.cvtColor(draw_detections(bgr, [b for b in det_rows_for(r.image_id) if b["deployed"]]), cv2.COLOR_BGR2RGB))
+        a.set_title(f"truth: {combo_label((yt[i] == 1).astype(float)) if (yt[i] >= 0).all() else 'partial'}\npred: {combo_label(S[S_name]['dec'][i])}\n" + " ".join(f"{c[:3]} {S[S_name]['s'][i, j]:.2f}" for j, c in enumerate(CFG.CONDITIONS)), fontsize=6.5)
+    fig.suptitle(title); savefig(fig, fname)
+
+
+if TEST:
+    S, yt = TEST["S"], TEST["y"]; d = S["F_full_fusion"]["dec"] > 0.5; full = (yt >= 0).all(1)
+    ok_ = np.where(full & (d == (yt == 1)).all(1) & ((yt == 1).sum(1) >= 1))[0]; bad_ = np.where(full & (d != (yt == 1)).any(1))[0]; multi_ = np.where(full & (d.sum(1) >= 2))[0]
+    eval_gallery(ok_, "Correct predictions (system F, test)", "gallery_test_correct"); eval_gallery(bad_, "Incorrect predictions (system F, test)", "gallery_test_incorrect"); eval_gallery(multi_, "Multi-condition predictions (system F, test)", "gallery_test_multi")
+
+#@@ md
+## 49. V5 versus V6 — what can and cannot be compared
+| Comparison | Valid? | Why |
+|---|---|---|
+| V5's *published* test metrics (4-class, single-label, V5 test split) vs V6 test metrics | **No** | different label scheme (softmax class vs per-condition Present/Absent), different population (V5 split leaks siblings and contains images V6 trains on), different metric definitions |
+| V5 (system A) vs V6 systems on the **V6 test split with verified multilabel labels** | **Yes, with a caveat** | same images, same labels, same metrics. Caveat: V5 saw some of these images (or their siblings) during training, which *favours V5*; the **V5-unseen subset** below removes images whose leakage group appears in the V5 training split |
+| Normal-vs-Hyperpigmentation confusion, mixed-condition detection | **Yes** (on verified labels) | V5 can name only one class, so "mixed" exact-match is structurally 0 for V5 |
+| Deployment behaviour on kiosk/upload captures | **Descriptive only** | there are no verified labels for the captures; outputs are compared, not scored |
+
+#@@ code
+# 49.1 V5 original reported metrics (read from the V5 logs; NOT comparable to V6) + V5-vs-V6 on the verified test split, all images and V5-unseen only.
+V5_REPORTED = None
+ea = os.path.join(CFG.V5_RUN_DIR, "logs", "error_analysis_with_leak_flag.csv")
+if os.path.exists(ea):
+    e = pd.read_csv(ea); rows = []
+    for c in CFG.V5_CLASS_ORDER:
+        tp = int(((e.true_class == c) & (e.pred_class == c)).sum()); fp = int(((e.true_class != c) & (e.pred_class == c)).sum()); fn = int(((e.true_class == c) & (e.pred_class != c)).sum())
+        rows.append(dict(class_=c, precision=tp / max(tp + fp, 1), recall=tp / max(tp + fn, 1), f1=2 * tp / max(2 * tp + fp + fn, 1), support=int((e.true_class == c).sum())))
+    V5_REPORTED = pd.DataFrame(rows); V5_REPORTED["accuracy_overall"] = float((e.true_class == e.pred_class).mean())
+    if "leaky" in e: V5_REPORTED["accuracy_without_leaky_siblings"] = float((e[~e.leaky].true_class == e[~e.leaky].pred_class).mean())
+    display(V5_REPORTED.round(4)); write_csv(V5_REPORTED, os.path.join(CFG.DIRS["v5_comparison"], "v5_reported_single_label_test_metrics.csv"))
+    print("These are V5's own single-label results on the V5 test split. They are shown for context and must NOT be compared numerically with the V6 multilabel tables.")
+else:
+    print("V5 error-analysis log not found; V5's historical metrics are not shown (the V5-on-V6-test comparison below does not need it).")
+
+if TEST:
+    v5train_groups = set(DF[DF.v5_split == "train"].group_id); tdf = TEST["df"]; unseen = ~tdf.group_id.isin(v5train_groups).values
+    print(f"V6 test images whose leakage group was in the V5 TRAIN split: {int((~unseen).sum())} of {len(tdf)}  -> V5-unseen subset n = {int(unseen.sum())}")
+    cmp = []
+    for scope, m in [("all V6 test images", np.ones(len(tdf), bool)), ("V5-unseen subset", unseen)]:
+        if m.sum() < 20: cmp.append(dict(scope=scope, note=f"only {int(m.sum())} images: not enough for a comparison")); continue
+        for name in ["A_v5_argmax", "A2_v5_thresholded", "B_improved_global", "E_global_plus_yolo", "F_full_fusion"]:
+            d = TEST["S"][name]["dec"][m]; sm = set_metrics_dec(TEST["y"][m], d); mc = metrics_dec(TEST["y"][m], TEST["S"][name]["s"][m], d)
+            cmp.append(dict(scope=scope, system=name, n=int(m.sum()), macro_f1=macro_f1_dec(TEST["y"][m], d), exact_match=sm["exact_match"], hamming_loss=sm["hamming_loss"], **{f"f1_{c}": float(mc.f1[j]) for j, c in enumerate(CFG.CONDITIONS)}))
+    V5V6 = pd.DataFrame(cmp); display(V5V6.round(4)); write_csv(V5V6, os.path.join(CFG.DIRS["v5_comparison"], "v5_vs_v6_verified_test.csv"))
+    hyper = (TEST["y"][:, 1] == 1) & (TEST["y"] >= 0).all(1)
+    nh = {n: float(((np.nan_to_num(TEST["S"][n]["dec"]).sum(1) == 0) & hyper).sum() / max(hyper.sum(), 1)) for n in ["A_v5_argmax", "B_improved_global", "E_global_plus_yolo", "F_full_fusion"]}
+    print("verified Hyperpigmentation images scored as 'no condition' (Normal):", {k: round(v, 3) for k, v in nh.items()}, f"(n verified hyperpigmentation = {int(hyper.sum())})")
+    write_json(os.path.join(CFG.DIRS["v5_comparison"], "hyperpigmentation_missed_as_normal.json"), dict(rates=nh, n=int(hyper.sum())))

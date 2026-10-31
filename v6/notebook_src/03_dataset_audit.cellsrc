@@ -1,0 +1,703 @@
+#@@ md
+# Part II — Dataset Inventory, Integrity, Leakage Control, Annotation and Provenance
+
+Sections: **(8) inventory · (9) integrity · (10) duplicate and source-overlap detection · (11) label verification · (12) multilabel preparation · (13) region-annotation validation · (14) preprocessing · domain / quality / skin-tone audit · reviewer queue.**
+
+**Principles.**
+1. The V5 manifest has **no subject, session or capture identifiers** (all `unknown`). Group-disjointness is therefore enforced on the best available proxies — exact hash, perceptual hash (including mirrored copies), and the *source stem* shared by augmentation siblings (Roboflow `*.rf.<hash>`, `aug_N_*`, `upscaled_N_*`). Proxies cannot *prove* patient separation; the limitation is reported, not hidden.
+2. The 4-way split (`train` / `validation` / `fusion` / `test`) is built **once**, saved, fingerprinted and then frozen — *before* any annotation or ROI derivation.
+3. Annotation has three states: **Present / Absent / Unknown**. Unknown is never negative. The V5 class name is only a *weak positive* for training and never an evaluation label.
+4. The notebook proposes review work (queues, templates); it **never rewrites a label** from a model prediction.
+
+#@@ code
+# 8.1 Load the V5 manifest, apply the dataset policy, resolve image paths (processed 224x224 and, when present, the original full-size photo).
+FACE_ONNX_DEFAULT = os.path.join(os.path.dirname(CFG.YOLO_MODEL_DIR), "face_detection_yunet_2023mar.onnx") if CFG.YOLO_MODEL_DIR else ""
+FACE_ONNX = os.environ.get("LUMYVUE_FACE_DETECTOR_ONNX", FACE_ONNX_DEFAULT)
+
+raw = pd.read_csv(CFG.V5_MANIFEST)
+need = ["filename", "md5", "dup_group_id", "image_type", "facial_qa_status", "used_as", "label_class", "split", "image_id", "is_exact_dup"]
+require(all(c in raw.columns for c in need), f"V5 manifest is missing columns: {[c for c in need if c not in raw.columns]}")
+require(set(raw.label_class.unique()) == set(CFG.V5_CLASS_ORDER), f"Unexpected class names in manifest: {sorted(raw.label_class.unique())}")
+
+DF = raw[need + [c for c in ["width", "height", "quality_score", "blur_score", "crop_origin_flag"] if c in raw.columns]].copy()
+DF = DF.rename(columns={"image_id": "v5_image_id", "split": "v5_split", "label_class": "src_label", "dup_group_id": "v5_dup_group"})
+n0 = len(DF)
+policy_log = [("manifest rows", n0)]
+if not CFG.INCLUDE_AUX_NONFACIAL:
+    DF = DF[DF.used_as == "facial_primary"]; policy_log.append(("after excluding non-facial auxiliary training images (INCLUDE_AUX_NONFACIAL=False)", len(DF)))
+DF = DF[~DF.facial_qa_status.isin(CFG.EXCLUDE_FACIAL_QA)]; policy_log.append((f"after excluding facial_qa_status in {CFG.EXCLUDE_FACIAL_QA}", len(DF)))
+DF = DF.sort_values("v5_image_id").reset_index(drop=True)
+
+DF["image_id"] = DF.v5_image_id            # join key used by annotation files (not personally identifying: a running manifest id)
+DF["proc_path"] = [os.path.join(CFG.PROCESSED_ROOT, s, c, f) for s, c, f in zip(DF.v5_split, DF.src_label, DF.filename)]
+DF["orig_path"] = [os.path.join(CFG.ORIGINAL_IMAGE_ROOT, c, f) if CFG.ORIGINAL_IMAGE_ROOT else "" for c, f in zip(DF.src_label, DF.filename)]
+def _listing(d):                       # one directory listing instead of one stat() per file (orders of magnitude faster on /mnt/c)
+    try: return set(os.listdir(d))
+    except OSError: return set()
+
+
+_proc_idx = {(s, c): _listing(os.path.join(CFG.PROCESSED_ROOT, s, c)) for s, c in DF[["v5_split", "src_label"]].drop_duplicates().itertuples(index=False)}
+_orig_idx = {c: _listing(os.path.join(CFG.ORIGINAL_IMAGE_ROOT, c)) for c in CFG.V5_CLASS_ORDER} if CFG.ORIGINAL_IMAGE_ROOT else {}
+DF["has_proc"] = [f in _proc_idx.get((s, c), ()) for s, c, f in zip(DF.v5_split, DF.src_label, DF.filename)]
+DF["has_orig"] = [f in _orig_idx.get(c, ()) for c, f in zip(DF.src_label, DF.filename)]
+DF["image_origin"] = "source_dataset"
+DF["fkind"] = DF.filename.map(lambda fn: "roboflow_export" if ".rf." in fn.lower() else "upscaled" if fn.lower().startswith("upscaled") else "aug" if fn.lower().startswith("aug_") else "other")
+DF["source_key"] = DF.src_label + "/" + DF.fkind
+
+for step, n in policy_log:
+    print(f"{n:6d}  {step}")
+print("processed 224 images found:", int(DF.has_proc.sum()), "/", len(DF), "| originals found:", int(DF.has_orig.sum()), "/", len(DF))
+require(DF.has_proc.mean() > 0.99, f"Only {DF.has_proc.mean():.1%} of processed images exist under PROCESSED_ROOT; check CFG.PROCESSED_ROOT / the manifest.", gate=True)
+DF = DF[DF.has_proc].reset_index(drop=True)
+write_csv(pd.DataFrame(policy_log, columns=["step", "rows"]), os.path.join(CFG.DIRS["audit"], "dataset_policy_log.csv"))
+
+#@@ code
+# 8.2 Inventory: class balance, image types, sources; charts saved for the thesis.
+inv = pd.crosstab(DF.src_label, DF.v5_split).reindex(CFG.V5_CLASS_ORDER)
+imgtype = pd.crosstab(DF.src_label, DF.image_type).reindex(CFG.V5_CLASS_ORDER)
+fk = pd.crosstab(DF.src_label, DF.fkind).reindex(CFG.V5_CLASS_ORDER)
+display(inv); display(imgtype); display(fk)
+
+fig, ax = plt.subplots(1, 3, figsize=(17, 4.2))
+inv.plot(kind="bar", ax=ax[0], rot=0); ax[0].set_title("V5 manifest: images per source class and V5 split")
+imgtype.plot(kind="bar", stacked=True, ax=ax[1], rot=0); ax[1].set_title("Image type per class (confound with the label)")
+fk.plot(kind="bar", stacked=True, ax=ax[2], rot=0); ax[2].set_title("Filename origin per class (augmentation siblings)")
+for a in ax: a.set_xlabel("")
+fig.suptitle("Dataset distribution (the 3 000-per-class balance is an artificial cap, not prevalence)")
+savefig(fig, "dataset_distribution")
+write_csv(inv.reset_index(), os.path.join(CFG.DIRS["audit"], "inventory_class_by_v5split.csv"))
+write_csv(imgtype.reset_index(), os.path.join(CFG.DIRS["audit"], "inventory_image_type.csv"))
+
+#@@ code
+# 9.1 Integrity: every processed image must decode, be 224x224 RGB, not be (near-)constant; originals are checked when present.
+from concurrent.futures import ThreadPoolExecutor
+
+INTEG_PATH = os.path.join(CFG.DIRS["audit"], "image_integrity.csv")
+
+
+def _check_one(p):
+    try:
+        with Image.open(p) as im:
+            im.verify()
+        with Image.open(p) as im:
+            im = im.convert("RGB"); a = np.asarray(im)
+        return dict(path=p, ok=True, w=a.shape[1], h=a.shape[0], std=float(a.std()), mean=float(a.mean()), err="")
+    except Exception as e:
+        return dict(path=p, ok=False, w=0, h=0, std=0.0, mean=0.0, err=type(e).__name__ + ": " + str(e)[:80])
+
+
+if os.path.exists(INTEG_PATH):
+    INTEG = pd.read_csv(INTEG_PATH)
+else:
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        INTEG = pd.DataFrame(list(ex.map(_check_one, DF.proc_path.tolist())))
+    write_csv(INTEG, INTEG_PATH)
+INTEG["not224"] = (INTEG.w != 224) | (INTEG.h != 224)
+INTEG["flat"] = INTEG["std"] < 3.0
+bad = INTEG[(~INTEG.ok) | INTEG.not224 | INTEG.flat]
+print(f"processed images checked: {len(INTEG)} | unreadable: {(~INTEG.ok).sum()} | not 224x224: {INTEG.not224.sum()} | near-constant: {INTEG.flat.sum()}")
+if len(bad):
+    print("Excluding these from every split (listed in audit/image_integrity.csv):", len(bad))
+    DF = DF[~DF.proc_path.isin(bad.path)].reset_index(drop=True)
+log_event("integrity", checked=len(INTEG), excluded=len(bad))
+
+#@@ code
+# 10.1 Duplicate and source-overlap detection -> leakage GROUPS.
+#   * exact duplicates: md5 from the manifest (original files)
+#   * near duplicates: 64-bit dHash of the processed image, compared with its own mirror (multi-index hashing, Hamming <= NEAR_DUP_MAX_HAMMING)
+#   * source siblings: shared filename stem after removing the Roboflow hash, augmentation prefixes and extension, within the same class
+#   All links are merged with union-find; one connected component = one group = never split across train/validation/fusion/test.
+GROUP_PATH = os.path.join(CFG.DIRS["audit"], "leakage_groups.csv")
+
+
+def dhash64(path):
+    a = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if a is None:
+        return None, None
+    g = cv2.resize(a, (9, 8), interpolation=cv2.INTER_AREA).astype(np.int16)
+    gf = cv2.resize(a[:, ::-1], (9, 8), interpolation=cv2.INTER_AREA).astype(np.int16)
+    def bits(x):
+        b = (x[:, 1:] > x[:, :-1]).flatten()
+        return int("".join("1" if v else "0" for v in b), 2)
+    return bits(g), bits(gf)
+
+
+def _stem(fn):
+    s = re.sub(r"\.rf\.[0-9a-f]+", "", fn.lower())
+    s = re.sub(r"\.[a-z0-9]+$", "", s)
+    s = re.sub(r"^(aug|upscaled)_\d+_", "", s)
+    s = re.sub(r"_(jpe?g|png)$", "", s)
+    return s
+
+
+class UnionFind:
+    def __init__(self, n): self.p = list(range(n))
+    def find(self, x):
+        while self.p[x] != x:
+            self.p[x] = self.p[self.p[x]]; x = self.p[x]
+        return x
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb: self.p[rb] = ra
+
+
+def build_groups(df, max_hamming, bucket_cap=300):
+    n = len(df); uf = UnionFind(n); stats = {}
+    # exact (md5) + stem within class
+    for key, col in (("md5", df.md5.astype(str)), ("stem", df.src_label + "|" + df.filename.map(_stem))):
+        first = {}
+        links = 0
+        for i, k in enumerate(col):
+            if key == "stem" and len(k.split("|", 1)[1]) < 5:
+                continue                                           # generic names ("1", "img") would over-group
+            if k in first: uf.union(first[k], i); links += 1
+            else: first[k] = i
+        stats[key + "_links"] = links
+    # near duplicates (own mirror included)
+    hs = [dhash64(p) for p in df.proc_path]
+    chunk_of = lambda h, c: (h >> (16 * c)) & 0xFFFF
+    buckets = [collections.defaultdict(list) for _ in range(4)]
+    for i, (h, hf) in enumerate(hs):
+        if h is None: continue
+        for c in range(4): buckets[c][chunk_of(h, c)].append(i)
+    links = 0; skipped = 0
+    popcount = lambda x: bin(x).count("1")
+    for i, (h, hf) in enumerate(hs):
+        if h is None: continue
+        cand = set()
+        for probe in (h, hf):
+            for c in range(4):
+                b = buckets[c].get(chunk_of(probe, c), [])
+                if len(b) > bucket_cap: skipped += 1; continue
+                cand.update(b)
+        for j in cand:
+            if j <= i or hs[j][0] is None: continue
+            d = min(popcount(h ^ hs[j][0]), popcount(hf ^ hs[j][0]))
+            if d <= max_hamming:
+                uf.union(i, j); links += 1
+    stats["near_links"] = links; stats["bucket_overflow_skips"] = skipped
+    root = [uf.find(i) for i in range(n)]
+    gid = pd.factorize(pd.Series(root))[0]
+    return gid, stats
+
+
+if os.path.exists(GROUP_PATH) and set(pd.read_csv(GROUP_PATH).v5_image_id) >= set(DF.v5_image_id):
+    _g = pd.read_csv(GROUP_PATH).drop_duplicates("v5_image_id").set_index("v5_image_id")
+    DF["group_id"] = DF.v5_image_id.map(_g.group_id).astype(int)
+    GROUP_STATS = json.load(open(os.path.join(CFG.DIRS["audit"], "leakage_group_stats.json")))
+else:
+    DF["group_id"], GROUP_STATS = build_groups(DF, CFG.NEAR_DUP_MAX_HAMMING)
+    write_csv(DF[["v5_image_id", "group_id"]], GROUP_PATH)
+    write_json(os.path.join(CFG.DIRS["audit"], "leakage_group_stats.json"), GROUP_STATS)
+
+gsz = DF.groupby("group_id").size()
+print("group links:", GROUP_STATS)
+print(f"images: {len(DF)} | groups: {gsz.size} | groups with >1 image: {(gsz > 1).sum()} ({int(gsz[gsz > 1].sum())} images) | largest group: {gsz.max()}")
+cross_cls = DF.groupby("group_id").src_label.nunique()
+print("groups spanning more than one source class (possible conflicting labels):", int((cross_cls > 1).sum()))
+DF["exact_dup_rank"] = DF.groupby("md5").cumcount()
+print("exact-duplicate images beyond the first copy:", int((DF.exact_dup_rank > 0).sum()), "by class:", DF[DF.exact_dup_rank > 0].src_label.value_counts().to_dict())
+
+# V5 leakage check with the same groups (explains why the reported V5 test result is optimistic)
+v5leak = DF.groupby("group_id").v5_split.nunique()
+leak_groups = v5leak[v5leak > 1].index
+v5_test_leaky = DF[(DF.v5_split == "test") & DF.group_id.isin(leak_groups)]
+print(f"V5 split: {len(leak_groups)} groups cross splits; {len(v5_test_leaky)} of {int((DF.v5_split == 'test').sum())} V5 test images share a group with another split "
+      f"(by class: {v5_test_leaky.src_label.value_counts().to_dict()})")
+write_json(os.path.join(CFG.DIRS["audit"], "v5_leakage_summary.json"), dict(groups=int(gsz.size), groups_crossing_v5_splits=int(len(leak_groups)),
+           v5_test_images=int((DF.v5_split == "test").sum()), v5_test_images_with_sibling_elsewhere=int(len(v5_test_leaky)),
+           by_class=v5_test_leaky.src_label.value_counts().to_dict(), subject_ids_available=False, group_stats=GROUP_STATS))
+log_event("groups_built", groups=int(gsz.size))
+
+#@@ md
+### 10.2 Frozen leakage-controlled split (train / validation / fusion / test)
+Groups (not images) are assigned greedily so every split keeps roughly the same *source-class mix*. Exact duplicates beyond the first copy are dropped from every split. The split is written to `splits/v6_split_manifest.csv` with a SHA-256 fingerprint. **Re-running reuses the frozen file; if the manifest content changes, the notebook refuses to continue** (a silent re-split would move test images into training).
+
+#@@ code
+SPLIT_PATH = os.path.join(CFG.SPLIT_DIR, "v6_split_manifest.csv")
+SPLIT_FP_PATH = os.path.join(CFG.SPLIT_DIR, "v6_split_fingerprint.json")
+
+
+def assign_splits(df, fractions, seed):
+    rng = np.random.RandomState(seed)
+    classes = sorted(df.src_label.unique())
+    tot = df.groupby("src_label").size().to_dict()
+    target = {s: {c: tot[c] * f for c in classes} for s, f in fractions.items()}
+    have = {s: {c: 0 for c in classes} for s in fractions}
+    comp = df.groupby(["group_id", "src_label"]).size().unstack(fill_value=0)
+    order = comp.sum(axis=1).sample(frac=1.0, random_state=rng).sort_values(ascending=False, kind="mergesort").index
+    out = {}
+    for g in order:
+        row = comp.loc[g]
+        best, best_gain = None, -1e18
+        for s in fractions:
+            gain = sum((target[s][c] - have[s][c]) / max(target[s][c], 1.0) * row[c] for c in classes)
+            if gain > best_gain: best, best_gain = s, gain
+        out[g] = best
+        for c in classes: have[best][c] += row[c]
+    return out
+
+
+if os.path.exists(SPLIT_PATH):
+    _s = pd.read_csv(SPLIT_PATH)
+    _fp = json.load(open(SPLIT_FP_PATH))
+    require(sha256_file(SPLIT_PATH) == _fp["sha256"], "The frozen split file was modified after it was created. Restore it or start a new RUN_ID with a new V6_WORKSPACE.")
+    missing_ids = set(DF[DF.exact_dup_rank == 0].v5_image_id) - set(_s.v5_image_id)        # exact duplicates beyond the first copy were never in the split
+    require(not missing_ids, f"{len(missing_ids)} images are not in the frozen split (the dataset policy changed). Changing the policy after the split was frozen is not allowed; use a new V6_WORKSPACE.")
+    DF = DF.merge(_s[["v5_image_id", "split"]], on="v5_image_id", how="inner")
+    print("Frozen split loaded:", _fp["created"])
+else:
+    d0 = DF[DF.exact_dup_rank == 0].copy()
+    gsplit = assign_splits(d0, CFG.SPLIT_FRACTIONS, CFG.SPLIT_SEED)
+    d0["split"] = d0.group_id.map(gsplit)
+    write_csv(d0[["v5_image_id", "group_id", "split", "src_label"]], SPLIT_PATH)
+    write_json(SPLIT_FP_PATH, dict(sha256=sha256_file(SPLIT_PATH), created=datetime.datetime.now().isoformat(timespec="seconds"), seed=CFG.SPLIT_SEED,
+                                   fractions=CFG.SPLIT_FRACTIONS, n_images=len(d0), note="Frozen BEFORE annotation. Do not edit."))
+    DF = DF.merge(d0[["v5_image_id", "split"]], on="v5_image_id", how="inner")
+    log_event("split_frozen", n=len(d0))
+
+# hard verification: no group in more than one split, no image in two splits
+chk = DF.groupby("group_id").split.nunique()
+require((chk == 1).all(), "LEAKAGE: some groups are present in more than one split.")
+print(pd.crosstab(DF.src_label, DF.split).reindex(CFG.V5_CLASS_ORDER)[CFG.SPLITS])
+print("dropped exact duplicates (beyond first copy):", int(len(raw) - len(DF)), "(includes policy exclusions)")
+DF = DF.reset_index(drop=True)
+
+#@@ md
+### 10.3 Dataset provenance and permissible-use record (security / research integrity)
+Every image source needs a **provenance record** (origin, terms, consent basis, permissible use, retention). The template is written once (never overwritten); training is gated until each `source_key` has `permissible_use` ∈ {`research_training`}. Evaluation-only sources may be used for evaluation but never for training. Fill this in from your dataset documentation — the notebook cannot know it.
+
+#@@ code
+PERMITTED_TRAIN = {"research_training"}
+PERMITTED_EVAL = {"research_training", "evaluation_only"}
+keys = sorted(DF.source_key.unique())
+if not os.path.exists(CFG.PROVENANCE_CSV):
+    tmpl = pd.DataFrame({"source_key": keys, "description": "", "license_or_terms": "", "consent_basis": "", "permissible_use": "",
+                         "contains_identifiable_faces": "unknown", "retention_policy": "", "responsible_person": "", "notes": ""})
+    write_csv(tmpl, CFG.PROVENANCE_CSV)
+    print("Provenance template written:", redact(CFG.PROVENANCE_CSV), "- fill it in (permissible_use: research_training | evaluation_only | not_permitted).")
+PROV = pd.read_csv(CFG.PROVENANCE_CSV, dtype=str).fillna("")
+miss = [k for k in keys if k not in set(PROV.source_key)]
+bad_use = PROV[~PROV.permissible_use.isin(PERMITTED_EVAL | {"not_permitted"})].source_key.tolist()
+not_train = set(PROV[~PROV.permissible_use.isin(PERMITTED_TRAIN)].source_key) | set(miss)
+prov_ok = (not miss) and (not bad_use)
+set_gate("provenance_defined", prov_ok or not CFG.REQUIRE_PROVENANCE_FOR_TRAINING,
+         f"provenance missing for {len(miss)} source keys / invalid permissible_use for {len(bad_use)}: fill {CFG.PROVENANCE_CSV}")
+_valid = [k for k in keys if k in set(PROV[PROV.permissible_use.isin(PERMITTED_EVAL | {"not_permitted"})].source_key)]
+print("sources:", len(keys), "| with a valid permissible_use:", len(_valid), "| NOT permitted for training (missing, blank or not research_training):", len(not_train))
+DF["train_permitted"] = ~DF.source_key.isin(not_train)
+
+#@@ md
+## 11. Annotation protocol, templates and loading (Present / Absent / Unknown)
+
+**Protocol (give this to the dermatologist).** For each photograph decide *independently* for Acne, Hyperpigmentation and Eczema: `present`, `absent`, or `unknown` (cannot judge). **Normal is not a label**: a photograph is Normal when all three are `absent` and the reviewer is satisfied the image is adequate. `review_status`: `verified` (all three decided), `partial` (some decided), `unverified`, `disputed`. Evaluation labels are accepted only from `reviewer_role = dermatologist` (configurable) and should be assigned **blind to the AI output** (`blinded_to_ai = yes`).
+
+The template lists every image with its frozen `split` and a random `review_rank` within each split, so **any prefix of the list is an unbiased random sample** — annotate validation, fusion and test first. Existing annotation files are **never overwritten**.
+
+#@@ code
+rng_t = np.random.RandomState(CFG.SPLIT_SEED + 1)
+DF["review_rank"] = DF.groupby("split").cumcount()
+DF["review_rank"] = DF.groupby("split").review_rank.transform(lambda s: rng_t.permutation(len(s)))
+
+ANN_COLS = ["image_id", "split", "review_rank", "acne", "hyperpigmentation", "eczema", "review_status", "reviewer_id", "reviewer_role",
+            "blinded_to_ai", "reviewed_at", "image_origin", "skin_tone_group", "notes"]
+REG_COLS = ["region_id", "image_id", "x0", "y0", "x1", "y1", "label", "exhaustive", "review_status", "reviewer_id", "reviewer_role", "annotation_source", "reviewed_at", "notes"]
+# `exhaustive` = yes when the reviewer boxed ALL regions of that label in that image (needed for box-level precision/recall/mAP); otherwise leave blank.
+RQ_COLS = ["image_id", "split", "reason_codes", "v5_pred", "v5_conf", "v5_margin", "yolo_flags", "current_label_state", "reviewer_decision", "reviewer_id", "reviewed_at", "notes"]
+
+if not os.path.exists(CFG.ANNOTATION_CSV):
+    t = DF.sort_values(["split", "review_rank"])[["image_id", "split", "review_rank", "image_origin"]].copy()
+    for c in ["acne", "hyperpigmentation", "eczema", "review_status", "reviewer_id", "reviewer_role", "blinded_to_ai", "reviewed_at", "skin_tone_group", "notes"]:
+        t[c] = ""
+    t["review_status"] = "unverified"
+    write_csv(t[ANN_COLS], CFG.ANNOTATION_CSV)
+    print("Multilabel annotation template written:", redact(CFG.ANNOTATION_CSV), "-", len(t), "rows (all labels blank = Unknown).")
+for path, cols, name in [(CFG.REGION_CSV, REG_COLS, "region"), (CFG.REVIEW_QUEUE_CSV, RQ_COLS, "hard-example review queue")]:
+    if not os.path.exists(path):
+        write_csv(pd.DataFrame(columns=cols), path)
+        print(f"Empty {name} template written:", redact(path))
+
+#@@ code
+# 11.2 / 12.1  Load + validate annotations -> label matrix with -1 = Unknown. Hard errors for malformed files; nothing is guessed.
+STATE_MAP = {"present": 1, "1": 1, "yes": 1, "true": 1, "absent": 0, "0": 0, "no": 0, "false": 0, "unknown": -1, "": -1, "-1": -1, "nan": -1}
+COND_COLS = {"Acne": "acne", "Hyperpigmentation": "hyperpigmentation", "Eczema": "eczema"}
+STATUSES = {"verified", "partial", "unverified", "disputed"}
+ROLES = {"dermatologist", "researcher", ""}
+
+
+def load_annotations(path=CFG.ANNOTATION_CSV):
+    a = pd.read_csv(path, dtype=str).fillna("")
+    missing = [c for c in ANN_COLS if c not in a.columns]
+    require(not missing, f"Annotation file lacks columns {missing}. Start from the template.")
+    a["image_id"] = a.image_id.str.strip()
+    dup = a[a.image_id.duplicated(keep=False)]
+    require(dup.empty, f"{dup.image_id.nunique()} image_ids appear more than once in the annotation file, e.g. {dup.image_id.head(3).tolist()}")
+    unknown_ids = set(a.image_id) - set(DF.image_id)
+    require(not unknown_ids, f"{len(unknown_ids)} annotated image_ids are not in the dataset (policy/split mismatch?), e.g. {sorted(unknown_ids)[:3]}")
+    for cond, col in COND_COLS.items():
+        v = a[col].str.strip().str.lower()
+        bad = ~v.isin(STATE_MAP)
+        require(not bad.any(), f"Invalid value in column '{col}': {sorted(set(a[col][bad]))[:5]} (use present | absent | unknown)")
+        a["y_" + col] = v.map(STATE_MAP).astype(int)
+    a["review_status"] = a.review_status.str.strip().str.lower().replace("", "unverified")
+    a["reviewer_role"] = a.reviewer_role.str.strip().str.lower()
+    require(set(a.review_status) <= STATUSES, f"review_status must be one of {sorted(STATUSES)}; found {sorted(set(a.review_status) - STATUSES)}")
+    require(set(a.reviewer_role) <= ROLES, f"reviewer_role must be dermatologist | researcher; found {sorted(set(a.reviewer_role) - ROLES)}")
+    ycols = ["y_" + c for c in COND_COLS.values()]
+    known = (a[ycols] >= 0)
+    bad_ver = a[(a.review_status == "verified") & (~known.all(axis=1))]
+    require(bad_ver.empty, f"{len(bad_ver)} rows are 'verified' but have an Unknown condition (use status 'partial'), e.g. {bad_ver.image_id.head(3).tolist()}")
+    bad_part = a[(a.review_status == "partial") & (known.all(axis=1) | (~known.any(axis=1)))]
+    require(bad_part.empty, f"{len(bad_part)} rows are 'partial' but have all or none of the conditions decided, e.g. {bad_part.image_id.head(3).tolist()}")
+    bad_unv = a[(a.review_status.isin(["unverified", "disputed"])) & known.any(axis=1) & (a.reviewer_role == "")]
+    require(bad_unv.empty, f"{len(bad_unv)} rows carry labels but no reviewer_role.")
+    role_ok_eval = a.reviewer_role.eq("dermatologist") if CFG.EVAL_REQUIRES_DERMATOLOGIST else a.reviewer_role.isin(["dermatologist", "researcher"])
+    a["eval_ok"] = a.review_status.isin(["verified", "partial"]) & role_ok_eval
+    a["train_ok"] = a.review_status.isin(["verified", "partial"]) & a.reviewer_role.isin(CFG.TRAIN_ACCEPTED_ROLES)
+    a["full_known"] = a.eval_ok & known.all(axis=1)
+    return a
+
+
+ANN = load_annotations()
+keep = ["image_id"] + [c for c in ANN.columns if c.startswith("y_")] + ["review_status", "reviewer_role", "blinded_to_ai", "skin_tone_group", "eval_ok", "train_ok", "full_known"]
+DF = DF.drop(columns=[c for c in keep if c != "image_id" and c in DF.columns]).merge(ANN[keep], on="image_id", how="left")
+for c in ["y_acne", "y_hyperpigmentation", "y_eczema"]:
+    DF[c] = DF[c].fillna(-1).astype(int)
+for c in ["eval_ok", "train_ok", "full_known"]:
+    DF[c] = DF[c].fillna(False).astype(bool)
+DF["review_status"] = DF.review_status.fillna("unverified")
+# evaluation labels (strict): known only if the row is eval_ok; otherwise Unknown
+EVAL_Y = DF[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy().astype(int).copy()
+EVAL_Y[~DF.eval_ok.values] = -1
+DF["n_present"] = np.where(DF.full_known, (EVAL_Y == 1).sum(1), -1)
+DF["combo"] = [("none" if n == 0 else "+".join(c for c, v in zip(CFG.CONDITIONS, y) if v == 1)) if fk else "unknown" for n, y, fk in zip(DF.n_present, EVAL_Y, DF.full_known)]
+print(DF.review_status.value_counts().to_dict())
+print("fully-known evaluation images per split:", DF[DF.full_known].split.value_counts().to_dict())
+
+#@@ code
+# 12.2 Training-label policy and annotation gates per split. TRAIN labels: verified/partial rows from accepted roles; optional WEAK positive = V5 class name.
+#      Unknown stays Unknown (-1) and is MASKED in every loss. Evaluation labels never use weak labels.
+def build_train_labels(df):
+    y = df[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy().copy()
+    y[~df.train_ok.values] = -1
+    weak = np.zeros_like(y, dtype=bool)
+    if CFG.USE_SOURCE_LABEL_AS_WEAK_POSITIVE:
+        for j, c in enumerate(CFG.CONDITIONS):
+            m = (df.src_label.values == c) & (y[:, j] == -1)
+            y[m, j] = 1; weak[m, j] = True
+    return y, weak
+
+
+TRAIN_Y, TRAIN_WEAK = build_train_labels(DF)
+TRAIN_Y_STRICT_KNOWN = (TRAIN_Y >= 0) & ~TRAIN_WEAK
+
+
+def annotation_gate_table():
+    rows = []
+    for sp in CFG.SPLITS:
+        m = (DF.split == sp).values
+        if sp == "train":
+            ver = int((DF.train_ok.values & m & (DF[["y_acne", "y_hyperpigmentation", "y_eczema"]] >= 0).all(axis=1).values).sum())
+            pos = [int(((TRAIN_Y[m, j] == 1) & ~TRAIN_WEAK[m, j]).sum()) for j in range(CFG.N_COND)]
+            neg = [int((TRAIN_Y[m, j] == 0).sum()) for j in range(CFG.N_COND)]
+        else:
+            ver = int((DF.full_known & m).sum())
+            pos = [int(((EVAL_Y[m, j] == 1)).sum()) for j in range(CFG.N_COND)]
+            neg = [int(((EVAL_Y[m, j] == 0)).sum()) for j in range(CFG.N_COND)]
+        rows.append(dict(split=sp, images=int(m.sum()), verified_full=ver, **{f"present_{c}": p for c, p in zip(CFG.CONDITIONS, pos)}, **{f"absent_{c}": n for c, n in zip(CFG.CONDITIONS, neg)}))
+    t = pd.DataFrame(rows)
+    ok, why = [], []
+    for r in t.itertuples():
+        sp = r.split; probs = []
+        if r.verified_full < CFG.MIN_VERIFIED[sp]: probs.append(f"verified photos {r.verified_full} < {CFG.MIN_VERIFIED[sp]}")
+        for c in CFG.CONDITIONS:
+            if getattr(r, f"present_{c}") < CFG.MIN_POSITIVES[sp]: probs.append(f"{c} present {getattr(r, f'present_{c}')} < {CFG.MIN_POSITIVES[sp]}")
+            if getattr(r, f"absent_{c}") < CFG.MIN_NEGATIVES[sp]: probs.append(f"{c} absent {getattr(r, f'absent_{c}')} < {CFG.MIN_NEGATIVES[sp]}")
+        ok.append(not probs); why.append("; ".join(probs))
+    t["gate_ok"] = ok; t["missing"] = why
+    return t
+
+
+GATE_TBL = annotation_gate_table()
+display(GATE_TBL)
+for r in GATE_TBL.itertuples():
+    set_gate(f"annotations_{r.split}", r.gate_ok, f"{r.split}: {r.missing}")
+write_csv(GATE_TBL, os.path.join(CFG.DIRS["audit"], "annotation_gate_table.csv"))
+if not all(GATE_TBL.gate_ok):
+    print("\n>>> SUPERVISED STAGES ARE BLOCKED until the annotations above are completed (this is intentional).")
+    print(">>> Annotate:", redact(CFG.ANNOTATION_CSV), "- start with validation, fusion and test (ordered by review_rank), then train.")
+    print(">>> Unrelated stages (inventory, V5 parity, V5 error analysis, YOLO engine checks) continue to run.")
+
+#@@ code
+# 12.3 Class balance, co-occurrence of VERIFIED labels, and V5-label vs verified-label disagreement (label-noise indicator). Charts saved.
+fk_df = DF[DF.full_known]
+fig, ax = plt.subplots(1, 3, figsize=(17, 4.2))
+if len(fk_df):
+    cnt = pd.DataFrame({c: fk_df["y_" + COND_COLS[c]].map({1: "Present", 0: "Absent", -1: "Unknown"}).value_counts() for c in CFG.CONDITIONS}).fillna(0).reindex(["Present", "Absent", "Unknown"])
+    cnt.T.plot(kind="bar", stacked=True, ax=ax[0], rot=0); ax[0].set_title("Verified labels per condition")
+    P = (fk_df[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy() == 1).astype(int)
+    co = P.T @ P
+    im = ax[1].imshow(co, cmap="Blues"); ax[1].set_xticks(range(3)); ax[1].set_yticks(range(3)); ax[1].set_xticklabels(CFG.CONDITIONS, rotation=20); ax[1].set_yticklabels(CFG.CONDITIONS)
+    for i in range(3):
+        for j in range(3): ax[1].text(j, i, int(co[i, j]), ha="center", va="center")
+    ax[1].set_title("Co-occurrence of VERIFIED Present labels")
+    fk_df.combo.value_counts().plot(kind="bar", ax=ax[2], rot=30); ax[2].set_title("Verified combinations (none = Normal)")
+else:
+    for a in ax: a.text(0.5, 0.5, "No verified annotations yet", ha="center"); a.axis("off")
+savefig(fig, "label_distribution_cooccurrence")
+if len(fk_df):
+    mism = pd.crosstab(fk_df.src_label, fk_df.combo)
+    display(mism); write_csv(mism.reset_index(), os.path.join(CFG.DIRS["audit"], "v5_label_vs_verified_combo.csv"))
+
+#@@ md
+## 13. ROI (region) annotation validation (boxes for the ROI classifier and for localisation metrics)
+A *region* is a dermatologist-verified box on the **original** photograph, in **normalised coordinates** (0–1, relative to the original image width/height), with a label `acne | eczema | hyperpigmentation | background_false_positive`. The last label is a *reviewed negative proposal* (for example a YOLO box the reviewer judged not to be a lesion) — it is how verified **hard negatives** enter the ROI classifier. YOLO-predicted classes are **never** used as region labels.
+
+#@@ code
+REG_LABELS = {"acne": 0, "hyperpigmentation": 1, "eczema": 2, "background_false_positive": 3}
+
+
+def load_regions(path=CFG.REGION_CSV):
+    r = pd.read_csv(path, dtype=str).fillna("")
+    if r.empty:
+        return pd.DataFrame(columns=REG_COLS + ["cls", "eval_ok", "train_ok"])
+    missing = [c for c in REG_COLS if c not in r.columns]
+    require(not missing, f"Region annotation file lacks columns {missing}.")
+    for c in ["x0", "y0", "x1", "y1"]:
+        r[c] = pd.to_numeric(r[c], errors="coerce")
+    bad = r[r[["x0", "y0", "x1", "y1"]].isna().any(axis=1)]
+    require(bad.empty, f"{len(bad)} regions have non-numeric coordinates, e.g. region_id {bad.region_id.head(3).tolist()}")
+    oob = r[(r.x0 < 0) | (r.y0 < 0) | (r.x1 > 1) | (r.y1 > 1) | (r.x1 <= r.x0) | (r.y1 <= r.y0)]
+    require(oob.empty, f"{len(oob)} regions have coordinates outside 0-1 or x1<=x0 / y1<=y0 (use normalised coordinates of the ORIGINAL image).")
+    r["label"] = r.label.str.strip().str.lower()
+    require(set(r.label) <= set(REG_LABELS), f"Invalid region label(s): {sorted(set(r.label) - set(REG_LABELS))}")
+    require(not r.region_id.duplicated().any(), "Duplicate region_id values.")
+    require(set(r.image_id) <= set(DF.image_id), "Region annotations refer to image_ids that are not in the dataset.")
+    r["review_status"] = r.review_status.str.strip().str.lower(); r["reviewer_role"] = r.reviewer_role.str.strip().str.lower()
+    r["cls"] = r.label.map(REG_LABELS)
+    r["exhaustive"] = r.exhaustive.str.strip().str.lower().eq("yes")
+    r["eval_ok"] = (r.review_status == "verified") & (r.reviewer_role == "dermatologist" if CFG.EVAL_REQUIRES_DERMATOLOGIST else r.reviewer_role.isin(["dermatologist", "researcher"]))
+    r["train_ok"] = (r.review_status == "verified") & r.reviewer_role.isin(CFG.TRAIN_ACCEPTED_ROLES)
+    return r
+
+
+REG = load_regions()
+REG = REG.merge(DF[["image_id", "split"]], on="image_id", how="left") if len(REG) else REG.assign(split=[])
+rg_rows = []
+for sp in CFG.SPLITS:
+    sub = REG[(REG.split == sp) & (REG.train_ok if sp == "train" else REG.eval_ok)] if len(REG) else REG
+    rg_rows.append(dict(split=sp, **{k: int((sub.label == k).sum()) if len(sub) else 0 for k in REG_LABELS}))
+REG_TBL = pd.DataFrame(rg_rows)
+display(REG_TBL)
+for r in REG_TBL.itertuples():
+    need_n = CFG.MIN_REGION_PER_CLASS[r.split]
+    short = [k for k in ["acne", "hyperpigmentation", "eczema", "background_false_positive"] if getattr(r, k) < need_n]
+    set_gate(f"regions_{r.split}", not short, f"{r.split}: fewer than {need_n} verified regions for {short}")
+write_csv(REG_TBL, os.path.join(CFG.DIRS["audit"], "region_gate_table.csv"))
+if len(REG) == 0:
+    print(">>> No verified region annotations yet: ROI-classifier training (Part VII) and box-level localisation metrics (mAP) are blocked; the rest continues.")
+
+#@@ code
+# 11.3 Optional annotation helper (needs ipywidgets). It only WRITES the rows you decide; it never pre-fills labels from any model.
+def annotation_helper(split="validation", n=20, reviewer_id="", reviewer_role="dermatologist", blinded=True):
+    try:
+        import ipywidgets as W
+        from IPython.display import display as _d, clear_output
+    except ImportError:
+        print("ipywidgets is not installed: edit the CSV in a spreadsheet instead (pip install ipywidgets to use this helper)."); return
+    require(reviewer_id, "Enter a pseudonymous reviewer_id (not a name).")
+    todo = DF[(DF.split == split) & (DF.review_status == "unverified")].sort_values("review_rank").head(n).reset_index(drop=True)
+    require(len(todo) > 0, f"No unverified images left in {split}.")
+    state = dict(i=0)
+    out = W.Output(); opts = ["unknown", "absent", "present"]
+    ws = {c: W.ToggleButtons(options=opts, value="unknown", description=c) for c in COND_COLS.values()}
+    btn = W.Button(description="Save & next", button_style="success")
+
+    def show():
+        with out:
+            clear_output(wait=True)
+            r = todo.iloc[state["i"]]
+            im = Image.open(r.orig_path if r.has_orig else r.proc_path).convert("RGB"); im.thumbnail((640, 640))
+            _d(im); print(f"{state['i'] + 1}/{len(todo)}  image_id={r.image_id}  (AI output is intentionally not shown)")
+
+    def save(_):
+        r = todo.iloc[state["i"]]
+        a = pd.read_csv(CFG.ANNOTATION_CSV, dtype=str).fillna("")
+        k = a.index[a.image_id == r.image_id][0]
+        vals = {c: ws[c].value for c in ws}
+        for c, v in vals.items(): a.loc[k, c] = v
+        decided = sum(v != "unknown" for v in vals.values())
+        a.loc[k, "review_status"] = "verified" if decided == 3 else "partial" if decided > 0 else "unverified"
+        a.loc[k, ["reviewer_id", "reviewer_role", "blinded_to_ai", "reviewed_at"]] = [reviewer_id, reviewer_role, "yes" if blinded else "no", datetime.datetime.now().isoformat(timespec="seconds")]
+        write_csv(a, CFG.ANNOTATION_CSV)
+        log_event("annotation_saved", image=pseudo_id(r.image_id), status=a.loc[k, "review_status"])
+        for w in ws.values(): w.value = "unknown"
+        state["i"] += 1
+        if state["i"] >= len(todo):
+            with out: clear_output(); print("Batch finished. Re-run the annotation-loading cell.")
+            return
+        show()
+    btn.on_click(save)
+    _d(W.VBox([out, *ws.values(), btn])); show()
+# Example (run when you are the reviewer):  annotation_helper("validation", n=25, reviewer_id="derm01")
+
+#@@ md
+## 14. Image preprocessing contract, domain-shift, quality and skin-tone audit
+**One preprocessing definition** is used everywhere in this notebook and must be identical in C#: decode → RGB → bilinear (`INTER_LINEAR`) stretch to 224×224 → `float32` → `(pixel/127.5)−1` → NHWC. YOLO uses letterbox (pad 114) → RGB → `/255` → NCHW, at the detector's own `imgsz`. ROI crops use a separate documented procedure (Part VII).
+
+The audit below compares **quality statistics** of training images with real **application captures** (when `CAMERA_CAPTURE_DIR` exists). Quality thresholds are *provisional* heuristics for recommending a re-capture; their validity is assessed in Section 38 against error rates — they are not validated clinical criteria. An **ITA°-based skin-tone proxy** is computed because per-image Fitzpatrick/Monk labels do not exist in the manifest; it is a *proxy* from pixel colour (sensitive to lighting) and must not be reported as a skin-tone label.
+
+#@@ code
+def preprocess_global(bgr, size=None):
+    """THE classifier preprocessing (matches C# OnnxInference.Preprocess): BGR->RGB, bilinear stretch to size x size, (p/127.5)-1, shape [224,224,3] float32."""
+    size = size or CFG.IMG_SIZE
+    require(bgr is not None and getattr(bgr, "size", 0) > 0 and bgr.ndim == 3 and bgr.shape[2] == 3, "preprocess_global: empty or non-3-channel image")
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    rgb = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_LINEAR)
+    return (rgb.astype(np.float32) / 127.5) - 1.0
+
+
+_FACE = {"det": None, "kind": None}
+
+
+def _face_detector():
+    if _FACE["kind"] is None:
+        if FACE_ONNX and os.path.isfile(FACE_ONNX) and hasattr(cv2, "FaceDetectorYN"):
+            _FACE["det"] = cv2.FaceDetectorYN.create(FACE_ONNX, "", (320, 320), 0.6, 0.3, 5000); _FACE["kind"] = "yunet"
+        else:
+            hp = os.path.join(getattr(cv2, "data", SimpleNamespace(haarcascades="")).haarcascades, "haarcascade_frontalface_default.xml") if hasattr(cv2, "data") else ""
+            if hp and os.path.isfile(hp):
+                _FACE["det"] = cv2.CascadeClassifier(hp); _FACE["kind"] = "haar"
+            else:
+                _FACE["kind"] = "none"
+    return _FACE["det"], _FACE["kind"]
+
+
+def detect_face(bgr):
+    """Returns (face_box x,y,w,h or None, detector_kind). `None` with kind 'none' means NO DETECTOR - the caller must treat the face as UNKNOWN, not absent."""
+    det, kind = _face_detector()
+    h, w = bgr.shape[:2]
+    if kind == "yunet":
+        s = 640.0 / max(h, w); im = cv2.resize(bgr, (int(w * s), int(h * s))) if s < 1 else bgr; s = min(s, 1.0)
+        det.setInputSize((im.shape[1], im.shape[0])); _, f = det.detect(im)
+        if f is None or len(f) == 0: return None, kind
+        f = f[np.argmax(f[:, -1])]
+        return tuple(int(v / s) for v in f[:4]), kind
+    if kind == "haar":
+        g = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY); fs = det.detectMultiScale(g, 1.1, 5, minSize=(max(30, w // 10), max(30, h // 10)))
+        return (tuple(int(v) for v in max(fs, key=lambda r: r[2] * r[3])), kind) if len(fs) else (None, kind)
+    return None, "none"
+
+
+def image_quality_metrics(bgr, with_face=True):
+    """Technical image-quality descriptors. Heuristics only; they recommend a re-capture, they never certify clinical suitability."""
+    h, w = bgr.shape[:2]
+    g = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    sm = cv2.resize(g, (512, int(512 * h / w))) if w > 512 else g
+    lap = float(cv2.Laplacian(sm, cv2.CV_64F).var())
+    mean_b = float(g.mean())
+    under = float((g < 25).mean()); over = float((g > 245).mean())
+    half = w // 2
+    lr = abs(float(g[:, :half].mean()) - float(g[:, half:].mean())) / max(mean_b, 1.0)
+    tb = abs(float(g[:h // 2].mean()) - float(g[h // 2:].mean())) / max(mean_b, 1.0)
+    glare = float(((bgr.min(axis=2)) > 245).mean())
+    m = bgr.reshape(-1, 3).mean(0); gw = float((m.max() - m.min()) / max(m.mean(), 1.0))
+    gs = g.astype(np.float32); cols = np.arange(8, gs.shape[1] - 1, 8)
+    blk = float(np.abs(gs[:, cols] - gs[:, cols - 1]).mean() / (np.abs(np.diff(gs, axis=1)).mean() + 1e-6)) if len(cols) else 1.0
+    ed = cv2.Canny(sm, 100, 200); bh = max(3, int(sm.shape[0] * 0.12))
+    band = np.concatenate([ed[:bh].ravel(), ed[-bh:].ravel()]); overlay = float((band > 0).mean())
+    ycc = cv2.cvtColor(bgr, cv2.COLOR_BGR2YCrCb); skin = (ycc[..., 1] > 133) & (ycc[..., 1] < 173) & (ycc[..., 2] > 77) & (ycc[..., 2] < 127)
+    ita = float("nan")
+    if skin.sum() > 200:
+        lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+        L = lab[..., 0][skin].mean() * 100 / 255; b = lab[..., 2][skin].mean() - 128
+        ita = float(math.degrees(math.atan2(L - 50, b)))
+    out = dict(width=w, height=h, laplacian_var=lap, mean_brightness=mean_b, under_frac=under, over_frac=over, uneven_lr=lr, uneven_tb=tb, glare_frac=glare,
+               gray_world_dev=gw, jpeg_blockiness=blk, overlay_edge_frac=overlay, skin_frac=float(skin.mean()), ita_proxy=ita)
+    if with_face:
+        box, kind = detect_face(bgr)
+        out.update(face_found=(None if kind == "none" else box is not None), face_detector=kind)
+    return out
+
+
+def quality_flags(q):
+    """Flags from provisional thresholds. A missing face detector yields the flag 'face_detector_unavailable', never 'ok'."""
+    T = CFG.QUALITY; f = []
+    if min(q["width"], q["height"]) < T["min_side_px"]: f.append("low_resolution")
+    if q["laplacian_var"] < T["blur_laplacian_min"]: f.append("blur")
+    if q["mean_brightness"] < T["dark_mean_max"] or q["under_frac"] > T["under_exposed_frac_max"]: f.append("underexposed")
+    if q["mean_brightness"] > T["bright_mean_min"] or q["over_frac"] > T["over_exposed_frac_max"]: f.append("overexposed")
+    if max(q["uneven_lr"], q["uneven_tb"]) > T["uneven_lr_ratio_max"]: f.append("uneven_lighting_or_shadow")
+    if q["glare_frac"] > T["glare_frac_max"]: f.append("glare")
+    if q["gray_world_dev"] > T["gray_world_dev_max"]: f.append("white_balance_cast")
+    if q["jpeg_blockiness"] > T["jpeg_blockiness_max"]: f.append("heavy_compression")
+    if q["overlay_edge_frac"] > T["overlay_edge_frac_max"]: f.append("possible_text_or_watermark_overlay")
+    if T["face_required"]:
+        if q.get("face_found") is None: f.append("face_detector_unavailable")
+        elif not q.get("face_found"): f.append("face_not_found_or_wrong_crop")
+    return f
+
+
+#@@ code
+# 14.2 Audit on a stratified sample of training images vs application captures (domain shift), saved as tables and a figure.
+AUDIT_N = 900
+samp = pd.concat([g.sample(min(len(g), AUDIT_N // 4), random_state=1) for _, g in DF.groupby("src_label")])
+rows = []
+for r in samp.itertuples():
+    p = r.orig_path if r.has_orig else r.proc_path
+    im = cv2.imread(p)
+    if im is None: continue
+    q = image_quality_metrics(im, with_face=False); q.update(domain="source_dataset", src_label=r.src_label, image_type=r.image_type, used_original=bool(r.has_orig)); rows.append(q)
+CAPT = []
+if CFG.CAMERA_CAPTURE_DIR:
+    for rec in sorted(glob.glob(os.path.join(CFG.CAMERA_CAPTURE_DIR, "**", "record.json"), recursive=True))[:300]:
+        try:
+            jr = json.load(open(rec, encoding="utf-8")); imgp = os.path.join(os.path.dirname(rec), "original.png")
+            im = cv2.imread(imgp)
+            if im is None: continue
+            q = image_quality_metrics(im); q.update(domain="app_" + str(jr.get("trigger", "unknown")), src_label="(unlabelled)", image_type="full_frame", used_original=True, capture_id=pseudo_id(jr.get("capture_id", imgp), "cap")); CAPT.append(q)
+        except Exception as e:
+            print("  skipped one capture:", type(e).__name__, str(e)[:60])
+AUD = pd.DataFrame(rows + CAPT)
+QCOLS = ["laplacian_var", "mean_brightness", "under_frac", "over_frac", "uneven_lr", "glare_frac", "gray_world_dev", "jpeg_blockiness", "overlay_edge_frac", "skin_frac", "ita_proxy", "width"]
+if len(AUD):
+    summ = AUD.groupby("domain")[QCOLS].median().T
+    display(summ); write_csv(summ.reset_index(), os.path.join(CFG.DIRS["audit"], "quality_domain_audit.csv"))
+    fig, ax = plt.subplots(2, 4, figsize=(18, 7))
+    for a, c in zip(ax.ravel(), ["laplacian_var", "mean_brightness", "over_frac", "uneven_lr", "gray_world_dev", "jpeg_blockiness", "overlay_edge_frac", "ita_proxy"]):
+        for dname, g in AUD.groupby("domain"):
+            v = g[c].replace([np.inf, -np.inf], np.nan).dropna()
+            if len(v): a.hist(v.clip(v.quantile(0.01), v.quantile(0.99)) if len(v) > 5 else v, bins=30, alpha=0.5, label=f"{dname} (n={len(v)})", density=True)
+        a.set_title(c); a.legend(fontsize=7)
+    fig.suptitle("Training images vs application captures: quality / lighting / colour statistics (domain-shift evidence)")
+    savefig(fig, "domain_shift_quality")
+    if CAPT:
+        qf = collections.Counter(f for q in CAPT for f in quality_flags(q))
+        print("quality flags among application captures:", dict(qf))
+    # skin-tone proxy representation (NOT a Fitzpatrick/Monk label)
+    ita = AUD[AUD.domain == "source_dataset"].ita_proxy.dropna()
+    bins = [(-1e9, -30, "dark (ITA<-30)"), (-30, 10, "brown (-30..10)"), (10, 28, "tan (10..28)"), (28, 41, "intermediate (28..41)"), (41, 55, "light (41..55)"), (55, 1e9, "very light (>55)")]
+    print("ITA skin-tone PROXY distribution of source images:", {n: int(((ita >= lo) & (ita < hi)).sum()) for lo, hi, n in bins})
+    print("   -> lighting-dependent proxy only. Obtain a verified Fitzpatrick/Monk annotation (column skin_tone_group) before making any fairness claim.")
+
+#@@ code
+# 14.3 Reviewer queue (static signals): suspicious labels, possible multi-condition images, domain outliers. Proposals only - labels are never rewritten.
+def static_review_reasons(df):
+    reasons = collections.defaultdict(list)
+    for r in df.itertuples():
+        fn = r.filename.lower()
+        for kw, cond in [("acne", "Acne"), ("pigment", "Hyperpigmentation"), ("melasma", "Hyperpigmentation"), ("eczema", "Eczema"), ("dermatitis", "Eczema"), ("rosacea", "Acne")]:
+            if kw in fn and cond != r.src_label:
+                reasons[r.image_id].append(f"filename_hints_{cond.lower()}_but_class_{r.src_label.lower()}")
+        if r.src_label == "Normal" and r.image_type == "lesion_region_facial": reasons[r.image_id].append("normal_but_lesion_region_crop")
+        if r.src_label != "Normal" and r.image_type == "full_face": reasons[r.image_id].append("disease_class_full_face_(possible_other_conditions)")
+        if r.image_type in ("unknown", "non_facial"): reasons[r.image_id].append(f"image_type_{r.image_type}")
+    cc = df.groupby("group_id").src_label.nunique()
+    for g in cc[cc > 1].index:
+        for iid in df[df.group_id == g].image_id: reasons[iid].append("same_group_different_class_labels")
+    return reasons
+
+
+STATIC_REASONS = static_review_reasons(DF)
+print("images with at least one static review reason:", len(STATIC_REASONS), "of", len(DF))
+print(pd.Series([x.split("_(")[0] for v in STATIC_REASONS.values() for x in v]).value_counts().head(12).to_string())
