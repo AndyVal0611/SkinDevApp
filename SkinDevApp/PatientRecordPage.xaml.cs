@@ -560,6 +560,7 @@ namespace SkinDevApp
             string headline, detail; int level;
             ClinicalText.Agreement(readings, single, out headline, out detail, out level);
             if (!single) sp.Children.Add(Ui.Callout(headline, detail, level));
+            InterpretationView.AddTo(sp, SessionInterpretation.For(d));
 
             var views = new UniformGrid { Columns = Math.Max(1, d.Views.Count), Margin = new Thickness(0, 12, 0, 0) };
             foreach (CaptureViewRow v in d.Views)

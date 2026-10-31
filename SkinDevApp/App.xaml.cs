@@ -19,6 +19,8 @@ namespace SkinDevApp
         {
             base.OnStartup(e);
 
+            SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
+
             // Crisp rendering on every window (including the ones created in code): snap to whole pixels, ClearType text,
             // high-quality image scaling. Combined with the DPI-aware manifest this removes the soft, blurry look.
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, args) =>

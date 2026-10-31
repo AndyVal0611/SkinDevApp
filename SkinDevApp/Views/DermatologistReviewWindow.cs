@@ -159,6 +159,9 @@ namespace SkinDevApp.Views
             ClinicalText.Agreement(readings, single, out headline, out detail, out level);
             if (!single) sp.Children.Add(Ui.Callout(headline, detail, level));
 
+            sp.Children.Add(Ui.Text("AI-generated interpretation (shown separately from your assessment; it never changes the saved AI prediction)", 11, true, Ui.Muted, new Thickness(0, 10, 0, 2)));
+            InterpretationView.AddTo(sp, SessionInterpretation.For(_d));
+
             var find = ClinicalText.Findings(readings, s.OverallPredictedClass);
             if (find.Count > 0)
             {

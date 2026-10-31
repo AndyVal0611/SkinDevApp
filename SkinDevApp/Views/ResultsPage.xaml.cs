@@ -91,8 +91,11 @@ namespace SkinDevApp.Views
             top.Children.Add(Ui.Text("   " + (s.OverallScore.HasValue ? char.ToUpper(ClinicalText.Strength(s.OverallScore.Value)[0]) + ClinicalText.Strength(s.OverallScore.Value).Substring(1) + " match (" + s.ScoreText + ")" : s.ScoreText), 13, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             sp.Children.Add(top);
 
-            sp.Children.Add(Ui.Text("How closely the photographs resemble each category", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
+            sp.Children.Add(Ui.Text("Image-level classification: how closely the photographs resemble each category", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
             sp.Children.Add(Ui.ScoreBars(OverallPercents()));
+
+            // classifier and lesion detector are independent; say plainly whether they agree (never overrides either)
+            InterpretationView.AddTo(sp, SessionInterpretation.For(_d));
 
             // completeness
             if (s.ScanMode != "Single")
@@ -164,6 +167,9 @@ namespace SkinDevApp.Views
                         Ui.Brush(Ui.ClassColor(v.Scores.PredictedClass)), new Thickness(0, 6, 0, 3)));
                     col.Children.Add(Ui.Text(ClinicalText.Meaning(rd), 11.5, false, Ui.Ink, new Thickness(0, 0, 0, 3)));
                     col.Children.Add(Ui.Text(ClinicalText.NextClosest(rd), 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
+                    if (rd.Interpretation.Category != InterpretationCategory.Unavailable)
+                        col.Children.Add(Ui.Text(rd.Interpretation.Headline + (rd.Interpretation.IsUncertain && rd.Interpretation.Category != InterpretationCategory.Mixed ? " · uncertain" : ""),
+                            11.5, true, rd.Interpretation.ReviewRecommended ? Ui.Warn : Ui.Muted, new Thickness(0, 0, 0, 4)));
                     col.Children.Add(Ui.ScoreBars(v.Scores.AsArray(), 6, compact: true));
                     col.Children.Add(Ui.Text("Photo quality: " + ClinicalText.PlainQuality(v.QualityStatus), 10.5, false,
                         v.QualityStatus == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
@@ -180,7 +186,8 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(grid);
                         sp.Children.Add(Ui.Text("Marked areas are places that may contain lesions (acne red, hyperpigmentation blue, eczema orange). " +
-                                    "Some lesions may be missed or mislabelled, so the boxes are not a lesion count and not a diagnosis.",
+                                    "Some lesions may be missed or mislabelled, so the boxes are not a lesion count, not a measure of severity and not a diagnosis. " +
+                                    "Box confidence (detector) and the percentage bars (classifier) are different measures and are not comparable.",
                                     10.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             return Ui.Card(sp);
         }

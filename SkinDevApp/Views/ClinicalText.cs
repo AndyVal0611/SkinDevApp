@@ -18,6 +18,7 @@ namespace SkinDevApp.Views
         public string View;                 // Front / Left / Right / Single
         public double[] Percent;            // Acne, Hyperpigmentation, Eczema, Normal (0-100)
         public string Quality;              // "Good" or "Check: ..." (may be null)
+        public ScanInterpretation Interpretation;   // how the classifier and the separate detectors relate (see ScanInterpreter)
 
         public int TopIndex { get { int t = 0; for (int i = 1; i < Percent.Length; i++) if (Percent[i] > Percent[t]) t = i; return t; } }
         public string TopClass => StudyText.Classes[TopIndex];
@@ -35,7 +36,11 @@ namespace SkinDevApp.Views
         public static List<ViewReading> Readings(SessionDetail d)
         {
             return d.Views.Where(v => v.Scores != null)
-                .Select(v => new ViewReading { View = v.ViewType, Percent = v.Scores.AsArray(), Quality = v.QualityStatus })
+                .Select(v => new ViewReading
+                {
+                    View = v.ViewType, Percent = v.Scores.AsArray(), Quality = v.QualityStatus,
+                    Interpretation = SessionInterpretation.For(v)
+                })
                 .ToList();
         }
 
@@ -69,6 +74,8 @@ namespace SkinDevApp.Views
         {
             string c = v.TopClass;
             string strength = Strength(v.TopPercent);
+            ScanInterpretation mixed = v.Interpretation;
+            if (mixed != null && mixed.Category == InterpretationCategory.Mixed) return mixed.Headline + ". " + mixed.Detail;
             if (v.TopPercent < 40) return "No category stands out clearly in this photograph. Please judge it directly.";
             if (c == "Normal")
                 return "The photograph looks most like healthy skin; the model did not find a " + (v.TopPercent >= 85 ? "notable" : "clear") + " match to acne, eczema or hyperpigmentation.";
@@ -131,6 +138,11 @@ namespace SkinDevApp.Views
             }
             lines.Add(others.Count == 0 ? "No other category reached 10% in any view."
                                         : "Other categories worth a look: " + string.Join(", ", others) + ".");
+
+            var mixedViews = views.Where(v => v.Interpretation != null && v.Interpretation.Category == InterpretationCategory.Mixed).ToList();
+            if (mixedViews.Count > 0)
+                lines.Add(ScanInterpreter.MixedHeadline + ": in the " + string.Join(", ", mixedViews.Select(v => v.View)) +
+                          " view the classifier scores and the lesion detector's marked areas disagree. The two are independent outputs; please judge the photograph directly.");
 
             var poor = views.Where(v => !string.IsNullOrEmpty(v.Quality) && v.Quality != "Good").ToList();
             lines.Add(poor.Count == 0 ? "All photographs were taken in suitable conditions."

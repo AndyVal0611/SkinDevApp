@@ -57,6 +57,9 @@ namespace SkinDevApp.Views
 
         public List<string> Lines { get; } = new List<string>();
 
+        /// <summary>How the classifier and the separate detectors relate (same object the Results page and receipt use). Never stored.</summary>
+        public ScanInterpretation Interpretation { get; private set; }
+
         public static string Label(string cls) => cls == "Normal" ? "Normal Skin" : cls;
 
         private static double Score(CaptureViewRow v, string cls) =>
@@ -80,6 +83,7 @@ namespace SkinDevApp.Views
                 return f;
             }
 
+            f.Interpretation = SessionInterpretation.For(d);
             string top = f.OverallClass;
             string[] others = StudyText.Classes.Where(c => c != top).ToArray();
 
@@ -95,6 +99,8 @@ namespace SkinDevApp.Views
                 if (s.ViewsCompleted < s.ViewsExpected)
                     f.Flags.Add("Incomplete scan: " + s.ViewsCompleted + " of " + s.ViewsExpected + " views captured.");
             }
+            if (f.Interpretation.Category == InterpretationCategory.Mixed)
+                f.Flags.Add(ScanInterpreter.MixedHeadline + ".");
             if (f.OverallScore.HasValue && f.OverallScore.Value < LowConfidence)
                 f.Flags.Add("Low-confidence primary prediction (" + P(f.OverallScore.Value) + ").");
 
@@ -182,6 +188,11 @@ namespace SkinDevApp.Views
             // ---- major findings text (stored values only) -----------------------------
             f.Lines.Add("Overall AI classification: " + Label(top) + (f.OverallScore.HasValue
                 ? " (" + P(f.OverallScore.Value) + (f.Single ? " Model Class Score)" : " pooled Model Class Score)") : ""));
+
+            f.Lines.Add("AI interpretation (display only; the scores and boxes are unchanged):");
+            foreach (string il in InterpretationText.Summary(f.Interpretation)) f.Lines.Add("   " + il);
+            foreach (string il in InterpretationText.DetectorLines(f.Interpretation)) f.Lines.Add("   Detector - " + il);
+            f.Lines.Add("   " + f.Interpretation.Caveat);
 
             foreach (CaptureViewRow v in d.Views)
                 f.Lines.Add(v.ViewType + ": " + (v.Scores == null ? "not analysed" : Label(v.Scores.PredictedClass) + " — " + P(v.Scores.Confidence)));
