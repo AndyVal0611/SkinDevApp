@@ -1,0 +1,43 @@
+{
+  "_comment": "Example LUMYVUE V6 configuration. Copy to v6_dataset_config.json, edit, then: export LUMYVUE_V6_CONFIG=/full/path/v6_dataset_config.json. Only keys that exist in the notebook's DEFAULTS are meaningful; omitted keys keep their defaults; paths left out are auto-discovered from your home directory and /mnt/c/Users/*.",
+  "RUN_ID": "v6_run01",
+  "OFFLINE_MODE": true,
+
+  "_paths_optional_overrides": "Uncomment/add only the paths that auto-discovery gets wrong, e.g. ORIGINAL_IMAGE_ROOT, YOLO_MODEL_DIR, CAMERA_CAPTURE_DIR, V5_RUN_DIR.",
+
+  "ECZEMA_ONNX_FILES": [],
+  "ECZEMA_META_JSON": "",
+  "ECZEMA_CLASS_NAME": "eczema",
+  "ECZEMA_CLASS_INDEX": null,
+  "ECZEMA_IMGSZ": null,
+  "ECZEMA_NMS_IOU": null,
+  "ECZEMA_THRESHOLD": 0.25,
+
+  "YOLO_THRESHOLDS": {"Acne": 0.275, "Hyperpigmentation": 0.225, "Eczema": 0.25},
+
+  "SPLIT_FRACTIONS": {"train": 0.60, "validation": 0.10, "fusion": 0.15, "test": 0.15},
+  "SPLIT_SEED": 2026,
+
+  "EVAL_REQUIRES_DERMATOLOGIST": true,
+  "MIN_VERIFIED": {"train": 300, "validation": 150, "fusion": 250, "test": 250},
+  "MIN_POSITIVES": {"train": 40, "validation": 20, "fusion": 30, "test": 30},
+  "MIN_NEGATIVES": {"train": 40, "validation": 20, "fusion": 30, "test": 30},
+  "MIN_REGION_PER_CLASS": {"train": 60, "validation": 20, "fusion": 20, "test": 20},
+  "USE_SOURCE_LABEL_AS_WEAK_POSITIVE": true,
+
+  "BATCH_SIZE": 32,
+  "ROI_BATCH": 32,
+  "SEEDS": [42, 7, 123],
+  "PHASE_A_EPOCHS": 12,
+  "PHASE_B_EPOCHS": 20,
+  "GLOBAL_EXPERIMENTS": ["B_v5_finetune_verified", "C_balanced_hard", "D_multilabel3", "D2_multilabel3_hard"],
+
+  "MAX_VERIFICATION_PASSES": 3,
+  "MAX_VERIFICATION_SECONDS": 20.0,
+  "TARGET_ACCEPTED_ERROR": 0.10,
+  "MIN_ACCEPT_COVERAGE": 0.30,
+  "ABSENCE_REQUIRES_ALL_DETECTORS": true,
+
+  "ALLOW_TEST_REEVALUATION": false,
+  "GPU_MEMORY_LIMIT_MB": 0
+}

@@ -145,6 +145,74 @@ namespace SkinDevApp.Data
         public string UpdatedAt { get; set; }
     }
 
+    /// <summary>
+    /// The patient's chart (current registration form): personal information, present illness, personal / past and family
+    /// medical history, and an optional physical examination and special tests. One row per participant; check lists are
+    /// stored comma-separated. Patients registered with an earlier form keep their earlier answers and have no row here
+    /// until their registration is edited with this form.
+    /// </summary>
+    public sealed class PatientChart
+    {
+        public string ParticipantID { get; set; }
+        // personal information
+        public string Birthplace { get; set; }
+        public string CivilStatus { get; set; }               // Single | Married | Widowed | Separated | Annulled
+        public string Citizenship { get; set; }
+        public string HomeAddress { get; set; }
+        public string HomeTel { get; set; }
+        public string HomeCell { get; set; }
+        public string ProvincialAddress { get; set; }
+        public string ProvincialTel { get; set; }
+        public string ProvincialCell { get; set; }
+        public string Occupation { get; set; }
+        public string Email { get; set; }
+        public string BusinessAddress { get; set; }
+        public string BusinessTel { get; set; }
+        public string BusinessCell { get; set; }
+        public string IsStudent { get; set; }                 // Yes | No
+        public string GradeYear { get; set; }
+        public string School { get; set; }
+        public string FatherName { get; set; }
+        public string MotherName { get; set; }
+        // present illness
+        public string OnsetDate { get; set; }                 // free text: an exact or approximate date
+        public string AffectedArea { get; set; }
+        public string DescribedLesions { get; set; }          // according to the patient
+        public string PreviousConsultation { get; set; }
+        public string LabExams { get; set; }
+        public string TreatmentNotes { get; set; }            // treatment of the present illness
+        public string Orals { get; set; }
+        public string Topicals { get; set; }
+        // personal and past medical history
+        public string AllergyFood { get; set; }
+        public string AllergyDrugs { get; set; }
+        public string LastMenstrualPeriod { get; set; }       // female patients only
+        public string Pregnant { get; set; }                  // Yes or empty
+        public string Breastfeeding { get; set; }             // Yes or empty
+        public string Supplements { get; set; }               // comma-separated
+        public string SupplementsOther { get; set; }
+        public string Conditions { get; set; }                // comma-separated
+        public string ConditionsOther { get; set; }
+        public string Surgery { get; set; }
+        public string SurgeryYear { get; set; }
+        // family medical history (F = father, M = mother)
+        public string FamilyHistory { get; set; }             // e.g. Asthma (Father), Acne (Father/Mother)
+        public string FamilyHistoryOther { get; set; }
+        // physical examination (optional; usually filled in by the dermatologist)
+        public string LesionCount { get; set; }               // Single | Multiple
+        public string LesionNumber { get; set; }
+        public string Pruritus { get; set; }                  // Pruritic | Non-pruritic
+        public string Erythema { get; set; }                  // Erythematous | Non-erythematous
+        public string LesionColor { get; set; }               // Skin-colored | Hyperpigmented | Hypopigmented
+        public string LesionTypes { get; set; }               // comma-separated
+        public string Distribution { get; set; }
+        // special tests (optional)
+        public string WoodLamp { get; set; }
+        public string Koh { get; set; }                       // Positive | Negative | Not done
+        public string Biopsy { get; set; }
+        public string UpdatedAt { get; set; }
+    }
+
     public sealed class Consent
     {
         public long ConsentID { get; set; }

@@ -1,0 +1,21 @@
+# LUMYVUE V6 - dependency specification.
+# Versions are those found in the training environment ~/PrecisionSkinV1/.venv (Python 3.13.15, WSL2 Ubuntu) when this notebook was prepared.
+# The notebook records the ACTUAL installed versions of your run in experiments/<RUN_ID>/config/pip_freeze.txt and hardware_software.json.
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+pillow==12.3.0
+opencv-python-headless==5.0.0.93
+tensorflow==2.21.0
+keras==3.15.1
+onnx==1.22.0
+onnxruntime==1.30.0
+tf2onnx==1.17.0
+# optional
+seaborn==0.13.2          # nicer heat-maps (matplotlib is used when absent)
+ipywidgets               # annotation helper widget only
+ipykernel==7.3.0
+# NOT required: ultralytics (YOLO is run through ONNX Runtime exactly like the C# app). Seen in the environment: ultralytics 8.4.172 (training notebooks only).
+# GPU: NVIDIA RTX 4060 Laptop (8 GB) via the WSL2 CUDA stack; TensorFlow memory growth and mixed_float16 are configured by the notebook.

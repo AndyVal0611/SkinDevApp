@@ -29,6 +29,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using SkinDevApp.Data;
+using SkinDevApp.Views;
 
 namespace SkinDevApp.Printing
 {
@@ -176,7 +177,7 @@ namespace SkinDevApp.Printing
             b.Pair("Most resembles", Plain(s.OverallPredictedClass).ToUpperInvariant());
             if (ps.ShowScores)
             {
-                double[] pct = OverallPercents(d);
+                double[] pct = SessionInterpretation.OverallPercents(d);
                 b.Left("AI similarity scores:");
                 for (int i = 0; i < StudyText.Classes.Length; i++)
                     b.Pair("  " + Plain(StudyText.Classes[i]), pct[i].ToString("0", CultureInfo.InvariantCulture) + "%");
@@ -184,14 +185,7 @@ namespace SkinDevApp.Printing
             }
             if (final) b.Text("Shown exactly as the AI saved it. The review below does not change it.");
 
-            b.Rule();
-            b.Heading("POSSIBLE SKIN FINDINGS");
-            foreach (var f in new[] { Tuple.Create("Acne", "Acne-like spots"), Tuple.Create("Hyperpigmentation", "Pigmentation patches"), Tuple.Create("Eczema", "Eczema-like patches") })
-            {
-                b.Left(f.Item2 + ":");
-                b.Left("  " + Finding(d, f.Item1));
-            }
-            b.Text("\"Found\" means possible areas were marked for review. They are not confirmed lesions. \"None found\" does not rule out a skin condition.");
+            ReceiptInterpretation.Append(b, SessionInterpretation.For(d));
 
             b.Rule();
             b.Heading("DERMATOLOGIST REVIEW");
@@ -358,54 +352,6 @@ namespace SkinDevApp.Printing
                 case "Uncertain": return "Could not be determined";
                 default: return null;
             }
-        }
-
-        /// <summary>The pooled four-class scores (as on the Results page): fused over the views, or the single analysed view.</summary>
-        private static double[] OverallPercents(SessionDetail d)
-        {
-            Scanning.FusedResult f = d.Fusion;
-            if (f != null && f.PooledPercent != null && f.PooledPercent.Count > 0)
-                return StudyText.Classes.Select(c => { double v; return f.PooledPercent.TryGetValue(c, out v) ? v : 0; }).ToArray();
-            CaptureViewRow only = d.Views.FirstOrDefault(v => v.Scores != null);
-            return only != null ? only.Scores.AsArray() : new double[4];
-        }
-
-        /// <summary>
-        /// One detector finding over the analysed photographs. A class counts as assessed in a photograph only when the saved
-        /// detector run for that photograph covered the class (read from the run's saved model tag).
-        /// </summary>
-        public static string Finding(SessionDetail d, string cls)
-        {
-            List<CaptureViewRow> views = d.Views.Where(v => v.Scores != null).ToList();
-            List<CaptureViewRow> assessed = views.Where(v => v.Localization != null && v.Localization.Status == "OK" && Covers(v.Localization.ModelTag, cls)).ToList();
-            if (assessed.Count == 0)
-            {
-                if (views.Any(v => v.Localization != null && v.Localization.Status == "OK")) return "Not assessed (no detector)";
-                if (views.Any(v => v.Localization != null && v.Localization.Status == "Failed")) return "Not assessed (detector error)";
-                return "Not assessed";
-            }
-            int found = assessed.Count(v => v.Lesions.Any(l => string.Equals(l.ClassName, cls, StringComparison.OrdinalIgnoreCase)));
-            string of = assessed.Count < views.Count ? " (" + assessed.Count + " of " + views.Count + " photos checked)" : "";
-            if (found == 0) return "None found" + of;
-            if (views.Count <= 1) return "Found";
-            return "Found in " + found + " of " + assessed.Count + " photos";
-        }
-
-        /// <summary>
-        /// Did the saved detector run cover this class? Specialist models are saved as "tag [Acne, 800 px]"; a part without brackets
-        /// is the older 3-class detector, which covered acne, hyperpigmentation and eczema.
-        /// </summary>
-        public static bool Covers(string modelTag, string cls)
-        {
-            if (string.IsNullOrWhiteSpace(modelTag)) return false;
-            foreach (string part in modelTag.Split(new[] { " + " }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                Match m = Regex.Match(part, @"\[([^\]]*)\]");
-                if (!m.Success) return true;
-                string names = m.Groups[1].Value.Split(',')[0];
-                if (names.Split('/').Any(n => string.Equals(n.Trim(), cls, StringComparison.OrdinalIgnoreCase))) return true;
-            }
-            return false;
         }
     }
 }

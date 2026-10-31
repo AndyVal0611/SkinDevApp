@@ -1,0 +1,334 @@
+#@@ md
+# Part III — Deployment Parity, V5 Baseline Inference, Error Analysis and Hard-Example Mining
+
+Sections: **(15) deployment preprocessing comparison · (16) V5 baseline inference · (17) V5 error and confusion analysis · (18) hard-example mining · (19) annotation-review queue.**
+
+> **Discipline.** Error analysis and hard-example mining use the **development splits only** (`train`, `validation`, `fusion`). The `test` split is never used here, and no example is selected by looking at test results.
+> **Terminology.** *Source-label disagreement* = V5 disagrees with the dataset's single class name (the label may be wrong or incomplete). *Verified misclassification* = V5 disagrees with a **dermatologist-verified** label. The two are reported separately and never conflated. *CNN–YOLO disagreement* is a third, different thing (Part VI).
+
+#@@ md
+## 15. Deployment preprocessing parity (notebook ↔ C# WPF)
+
+Three levels of evidence, in increasing strength. **Equivalence is claimed only for what was actually compared with comparable runtime artifacts.**
+
+1. **Static contract** — the notebook preprocessing vs the lines of `OnnxInference.cs` (text check; weakest).
+2. **Python reference vs the C# app's saved results** — every saved application capture contains the working frame (`analysed.png`) and the ONNX percentages the C# app computed (`record.json`). The notebook re-runs the *same ONNX file* in Python ONNX Runtime and reports the maximum and per-class differences (the percentages are rounded to 3 decimals in the record, so differences below ≈5e-4 percentage points are rounding).
+3. **Identical tensor** — folders created by `SkinDevApp.exe --diagnose <image> <dir>` contain the exact normalised tensor the C# app produced (`input_224_nhwc_float32.bin`) and its raw probabilities; the notebook feeds that tensor to Python and compares tensors and probabilities.
+
+Not covered by any check here: camera acquisition, the live centre-square crop, face-detection side effects, and the prediction stabiliser (which only smooths the *live display*; the scan result is the raw ONNX output of the frozen frame). They are listed as deployment-test items in the readiness report.
+
+#@@ code
+# 15.1 Static contract: expected preprocessing vs the C# source (if the source is reachable).
+import onnxruntime as ort
+
+CS_SRC = os.path.join(os.path.dirname(CFG.YOLO_MODEL_DIR), "OnnxInference.cs") if CFG.YOLO_MODEL_DIR else ""
+EXPECT = [("BGR->RGB", r"ColorConversionCodes\.BGR2RGB"), ("bilinear resize", r"InterpolationFlags\.Linear"), ("image size 224", r"ImageSize\s*=\s*224"),
+          ("normalisation (p/127.5)-1", r"1\.0\s*/\s*127\.5\s*,\s*-1\.0"), ("NHWC tensor [1,224,224,3]", r"new\[\]\s*\{\s*1,\s*ImageSize,\s*ImageSize,\s*3\s*\}")]
+if os.path.isfile(CS_SRC):
+    src = open(CS_SRC, encoding="utf-8-sig").read()
+    rows = [(n, bool(re.search(p, src))) for n, p in EXPECT]
+    static_tbl = pd.DataFrame(rows, columns=["expected preprocessing element", "found in OnnxInference.cs"])
+    display(static_tbl); write_csv(static_tbl, os.path.join(CFG.DIRS["audit"], "parity_static_contract.csv"))
+    require(static_tbl.iloc[:, 1].all(), "C# preprocessing text differs from the notebook contract: investigate before trusting any result.")
+else:
+    print("C# source not reachable from YOLO_MODEL_DIR; static contract check skipped (levels 2 and 3 below do not need it).")
+
+# 15.2 Model contract of the V5 ONNX + label-map validation.
+def onnx_session(path, providers=None):
+    require(os.path.isfile(path), f"ONNX file not found: {path}")
+    so = ort.SessionOptions(); so.intra_op_num_threads = 2
+    return ort.InferenceSession(path, so, providers=providers or CFG.YOLO_PROVIDERS)
+
+
+V5_SESS = onnx_session(CFG.V5_ONNX)
+_in, _out = V5_SESS.get_inputs()[0], V5_SESS.get_outputs()[0]
+V5_SHA = sha256_file(CFG.V5_ONNX)
+print("V5 ONNX input :", _in.name, _in.shape, "| output:", _out.name, _out.shape, "| sha256:", V5_SHA[:16], "...")
+require(len(_in.shape) == 4 and _in.shape[1:] == [224, 224, 3], f"V5 ONNX input shape {_in.shape} is not NHWC 224x224x3")
+require(_out.shape[-1] == 4, f"V5 ONNX output has {_out.shape[-1]} values, expected 4")
+if os.path.isfile(CFG.V5_LABELS_JSON):
+    _lj = json.load(open(CFG.V5_LABELS_JSON))
+    require(list(_lj["classes"]) == CFG.V5_CLASS_ORDER, f"labels.json class order {_lj['classes']} != {CFG.V5_CLASS_ORDER}: the label map is inconsistent")
+    print("labels.json class order matches the C# ClassPalette order:", _lj["classes"], "| normalisation:", _lj.get("normalization"), "| channel order:", _lj.get("channel_order"))
+else:
+    print("labels.json not found: label order could not be cross-checked (reported in the readiness report).")
+
+
+def v5_predict_bgr(bgr_list, bs=64):
+    out = []
+    for i in range(0, len(bgr_list), bs):
+        x = np.stack([preprocess_global(b) for b in bgr_list[i:i + bs]]).astype(np.float32)
+        out.append(V5_SESS.run([_out.name], {_in.name: x})[0])
+    return np.concatenate(out) if out else np.zeros((0, 4), np.float32)
+
+
+#@@ code
+# 15.3 Level 2: Python reference vs the probabilities the C# app saved (record.json + analysed.png) for every available capture.
+PARITY_ROWS = []
+if CFG.CAMERA_CAPTURE_DIR:
+    for rec in sorted(glob.glob(os.path.join(CFG.CAMERA_CAPTURE_DIR, "**", "record.json"), recursive=True)):
+        try:
+            jr = json.load(open(rec, encoding="utf-8")); folder = os.path.dirname(rec)
+            work = cv2.imread(os.path.join(folder, "analysed.png"))
+            if work is None or "scores" not in jr: continue
+            sc = jr["scores"]["onnx_percent"]
+            app = np.array([sc[c] for c in CFG.V5_CLASS_ORDER], float)
+            py = v5_predict_bgr([work])[0].astype(float) * 100
+            PARITY_ROWS.append(dict(capture=pseudo_id(jr.get("capture_id", folder), "cap"), trigger=jr.get("trigger", ""), same_model_hash=(jr.get("model", {}).get("onnx_sha256") == V5_SHA),
+                                    max_abs_diff_pp=float(np.abs(app - py).max()), **{f"diff_{c}": float(abs(app[i] - py[i])) for i, c in enumerate(CFG.V5_CLASS_ORDER)},
+                                    same_top_class=bool(app.argmax() == py.argmax())))
+        except Exception as e:
+            print("  skipped one capture:", type(e).__name__, str(e)[:70])
+PAR = pd.DataFrame(PARITY_ROWS)
+if len(PAR):
+    display(PAR.describe().T[["count", "mean", "max"]])
+    print(f"captures compared: {len(PAR)} | same model hash in record: {int(PAR.same_model_hash.sum())} | same top class: {int(PAR.same_top_class.sum())} | max abs diff: {PAR.max_abs_diff_pp.max():.5f} percentage points")
+    write_csv(PAR, os.path.join(CFG.DIRS["audit"], "parity_python_vs_app_records.csv"))
+    PARITY_LEVEL2 = dict(n=len(PAR), max_abs_diff_pp=float(PAR.max_abs_diff_pp.max()), per_class_max_pp={c: float(PAR[f"diff_{c}"].max()) for c in CFG.V5_CLASS_ORDER})
+else:
+    PARITY_LEVEL2 = None
+    print("No application captures with record.json found: level-2 parity NOT established. Set LUMYVUE_CAMERA_CAPTURE_DIR to the LUMYVUE Captures folder.")
+
+#@@ code
+# 15.4 Level 3: identical-tensor comparison from `SkinDevApp.exe --diagnose` folders (cnn_diagnostic.json + input_224_nhwc_float32.bin).
+PARITY3 = []
+for d in CFG.DEPLOY_PARITY_DIRS:
+    jp = os.path.join(d, "cnn_diagnostic.json")
+    if not os.path.isfile(jp):
+        print("  no cnn_diagnostic.json in", redact(d)); continue
+    j = json.load(open(jp, encoding="utf-8")); c = j["classifier"]
+    cs = np.fromfile(os.path.join(d, c["tensor_file"]), np.float32).reshape(1, 224, 224, 3)
+    p_cs = V5_SESS.run([_out.name], {_in.name: cs})[0][0].astype(float)
+    p_app = np.array([float(v) for v in c["raw_probabilities"][0]])
+    ref = None
+    if os.path.isfile(j.get("image", "")):
+        src = cv2.imread(j["image"]); w = src.shape[1]
+        work = src if w <= 640 else cv2.resize(src, (640, int(round(src.shape[0] * 640 / w))), interpolation=cv2.INTER_LINEAR)
+        ref = preprocess_global(work)[None]
+    PARITY3.append(dict(folder=pseudo_id(d, "dir"), model_hash_equal=(c["model_sha256"] == V5_SHA), tensor_max_abs_diff=(float(np.abs(cs - ref).max()) if ref is not None else None),
+                        prob_max_abs_diff=float(np.abs(p_cs - p_app).max()), per_class_abs_diff=np.abs(p_cs - p_app).round(10).tolist(), app_repeats_bitwise_identical=c.get("repeats_bitwise_identical")))
+if PARITY3:
+    P3 = pd.DataFrame(PARITY3); display(P3); write_csv(P3, os.path.join(CFG.DIRS["audit"], "parity_identical_tensor.csv"))
+else:
+    print("No --diagnose folders configured (CFG.DEPLOY_PARITY_DIRS): identical-tensor parity NOT established.\n"
+          "Create them with:  SkinDevApp.exe --diagnose <image> <outDir> 5   and list the folders in LUMYVUE_DEPLOY_PARITY_DIRS.")
+write_json(os.path.join(CFG.DIRS["audit"], "parity_summary.json"), dict(level1_static=os.path.isfile(CS_SRC), level2=PARITY_LEVEL2, level3_folders=len(PARITY3),
+           claim="Equivalence is established only for the levels with data; camera, face detection and stabiliser are not covered."))
+
+#@@ md
+## 16. V5 baseline inference (the deployed ONNX model, unchanged)
+V5 probabilities for every image of the dataset are computed once with the **deployed ONNX file** (not the Keras file) and cached. They are used for error analysis (dev splits), hard-example mining, reviewer queues and — only in Part IX — for the V5 comparison. The V5 output is a 4-way softmax; for multi-condition questions it is mapped to three per-condition scores (`p(Acne)`, `p(Hyperpigmentation)`, `p(Eczema)`) and `p(Normal)`.
+
+#@@ code
+V5_PROBS_PATH = os.path.join(CFG.DIRS["predictions"], "v5_probs_all.csv")
+
+
+def read_rgb_norm(path):
+    bgr = cv2.imread(path)
+    require(bgr is not None, f"unreadable image: {path}")
+    return preprocess_global(bgr)
+
+
+def v5_probs_for(df, bs=64):
+    out = np.zeros((len(df), 4), np.float32)
+    paths = df.proc_path.tolist()
+    for i in range(0, len(paths), bs):
+        x = np.stack([read_rgb_norm(p) for p in paths[i:i + bs]])
+        out[i:i + bs] = V5_SESS.run([_out.name], {_in.name: x})[0]
+    return out
+
+
+if os.path.exists(V5_PROBS_PATH) and set(pd.read_csv(V5_PROBS_PATH).image_id) >= set(DF.image_id):
+    _v = pd.read_csv(V5_PROBS_PATH).set_index("image_id").loc[DF.image_id]
+    V5P = _v[[f"v5_{c}" for c in CFG.V5_CLASS_ORDER]].to_numpy(np.float32)
+else:
+    t0 = time.time(); V5P = v5_probs_for(DF)
+    pd.DataFrame({"image_id": DF.image_id, **{f"v5_{c}": V5P[:, i] for i, c in enumerate(CFG.V5_CLASS_ORDER)}, "v5_sha256": V5_SHA}).to_csv(safe_path(V5_PROBS_PATH), index=False)
+    print(f"V5 inference on {len(DF)} images: {time.time() - t0:.0f}s")
+require(np.isfinite(V5P).all() and np.allclose(V5P.sum(1), 1, atol=1e-3), "V5 probabilities are not a valid softmax: wrong model or preprocessing.")
+DF["v5_pred"] = [CFG.V5_CLASS_ORDER[i] for i in V5P.argmax(1)]
+DF["v5_conf"] = V5P.max(1)
+_s = np.sort(V5P, axis=1); DF["v5_margin"] = _s[:, -1] - _s[:, -2]
+for i, c in enumerate(CFG.V5_CLASS_ORDER): DF[f"v5_{c}"] = V5P[:, i]
+log_event("v5_inference", n=len(DF), model_sha=V5_SHA[:16])
+DEV = ["train", "validation", "fusion"]
+print("V5 top-class agreement with the dataset's single class name, per V5 split (historical protocol, NOT verified misclassification):")
+print(DF.groupby("v5_split").apply(lambda g: float((g.v5_pred == g.src_label).mean()), include_groups=False).round(4).to_dict())
+
+#@@ md
+## 17. V5 error and confusion analysis (development splits only)
+Part A compares V5 with the **source class name**; Part B compares it with **verified** labels when they exist. The seven error types of interest are tabulated for both. Representative galleries are saved; no example from `test` is shown.
+
+#@@ code
+# 17.1 Part A - source-label disagreement (dev splits).
+dev = DF[DF.split.isin(DEV)]
+cm = pd.crosstab(dev.src_label, dev.v5_pred).reindex(index=CFG.V5_CLASS_ORDER, columns=CFG.V5_CLASS_ORDER, fill_value=0)
+display(cm)
+PAIRS = [("Normal", "Hyperpigmentation"), ("Hyperpigmentation", "Normal"), ("Hyperpigmentation", "Eczema"), ("Eczema", "Hyperpigmentation"),
+         ("Acne", "Eczema"), ("Eczema", "Acne")]
+pair_rows = []
+for t, p in PAIRS:
+    sub = dev[(dev.src_label == t) & (dev.v5_pred == p)]
+    pair_rows.append(dict(source_label=t, v5_predicted=p, n=len(sub), rate_of_source_class=len(sub) / max(1, int((dev.src_label == t).sum())),
+                          median_conf=float(sub.v5_conf.median()) if len(sub) else np.nan, median_margin=float(sub.v5_margin.median()) if len(sub) else np.nan))
+PAIR_A = pd.DataFrame(pair_rows); display(PAIR_A)
+write_csv(PAIR_A, os.path.join(CFG.DIRS["v5_comparison"], "v5_dev_source_label_error_pairs.csv"))
+
+fig, ax = plt.subplots(1, 3, figsize=(18, 4.6))
+im = ax[0].imshow(cm.to_numpy() / cm.sum(1).to_numpy()[:, None], cmap="Blues", vmin=0, vmax=1)
+ax[0].set_xticks(range(4)); ax[0].set_yticks(range(4)); ax[0].set_xticklabels(CFG.V5_CLASS_ORDER, rotation=25); ax[0].set_yticklabels(CFG.V5_CLASS_ORDER)
+for i in range(4):
+    for j in range(4): ax[0].text(j, i, f"{cm.iloc[i, j]}", ha="center", va="center", color="black", fontsize=8)
+ax[0].set_title("V5 vs source class (dev splits; row-normalised colour)"); ax[0].set_xlabel("V5 predicted"); ax[0].set_ylabel("source label")
+corr = dev.v5_pred == dev.src_label
+ax[1].hist([dev[corr].v5_conf, dev[~corr].v5_conf], bins=25, label=["agrees with source label", "disagrees"], stacked=True); ax[1].legend(); ax[1].set_title("V5 top-class confidence")
+ax[2].hist([dev[corr].v5_margin, dev[~corr].v5_margin], bins=25, label=["agrees", "disagrees"], stacked=True); ax[2].legend(); ax[2].set_title("V5 prediction margin (top1 - top2)")
+savefig(fig, "v5_dev_confusion_confidence_margin")
+
+
+def gallery(df, title, fname, n=None, prob_cols=None):
+    n = n or CFG.N_EXAMPLE_IMAGES
+    sub = df.head(n)
+    if len(sub) == 0:
+        print("(no examples for:", title, ")"); return
+    cols = 6; rows = int(math.ceil(len(sub) / cols))
+    fig, ax = plt.subplots(rows, cols, figsize=(cols * 2.6, rows * 3.0), squeeze=False)
+    for a in ax.ravel(): a.axis("off")
+    for a, r in zip(ax.ravel(), sub.itertuples()):
+        a.imshow(cv2.cvtColor(cv2.imread(r.proc_path), cv2.COLOR_BGR2RGB))
+        probs = " ".join(f"{c[:3]} {getattr(r, 'v5_' + c):.2f}" for c in CFG.V5_CLASS_ORDER)
+        a.set_title(f"{r.pid}\nsrc {r.src_label[:4]} -> {r.v5_pred[:4]}\n{probs}", fontsize=6.5)
+    fig.suptitle(title); savefig(fig, fname)
+
+
+DF["pid"] = [pseudo_id(i)[-6:] for i in DF.image_id]
+dev = DF[DF.split.isin(DEV)]
+for t, p in PAIRS[:6]:
+    g = dev[(dev.src_label == t) & (dev.v5_pred == p)].sort_values("v5_conf", ascending=False)
+    gallery(g, f"V5 dev: source '{t}' predicted '{p}' (highest-confidence first) - source-label disagreement, labels NOT verified", f"gallery_v5_{t[:4]}_as_{p[:4]}")
+
+#@@ code
+# 17.2 Part B - verified misclassification (needs verified labels in the dev splits; Unknown is never counted as an error).
+def verified_combo_table(df):
+    d = df[df.full_known].copy()
+    if d.empty:
+        return None
+    d["v5_as_set"] = d.v5_pred.map(lambda p: "none" if p == "Normal" else p)
+    return d
+
+
+vd = verified_combo_table(DF[DF.split.isin(DEV)])
+if vd is None:
+    print("No fully verified images in the dev splits yet: verified-misclassification analysis NOT available (source-label analysis above is available).")
+    VERIFIED_PAIRS = None
+else:
+    cmv = pd.crosstab(vd.combo, vd.v5_as_set); display(cmv)
+    rows = []
+    for t, p in [("none", "Hyperpigmentation"), ("Hyperpigmentation", "none"), ("Hyperpigmentation", "Eczema"), ("Eczema", "Hyperpigmentation"), ("Acne", "Eczema"), ("Eczema", "Acne")]:
+        sub = vd[(vd.combo == t) & (vd.v5_as_set == p)]
+        rows.append(dict(verified_truth=t, v5_predicted=p if p != "none" else "Normal", n=len(sub), of_truth_class=int((vd.combo == t).sum())))
+    mixed = vd[vd.n_present >= 2]
+    hit = mixed.apply(lambda r: r.v5_as_set in r.combo.split("+"), axis=1) if len(mixed) else pd.Series(dtype=bool)
+    rows.append(dict(verified_truth="mixed (>=2 conditions)", v5_predicted="one single class", n=len(mixed), of_truth_class=len(mixed)))
+    rows.append(dict(verified_truth="mixed: V5 single class is one of the true conditions", v5_predicted="(partial credit)", n=int(hit.sum()) if len(mixed) else 0, of_truth_class=len(mixed)))
+    VERIFIED_PAIRS = pd.DataFrame(rows); display(VERIFIED_PAIRS)
+    write_csv(VERIFIED_PAIRS, os.path.join(CFG.DIRS["v5_comparison"], "v5_dev_verified_error_pairs.csv"))
+    gallery(vd[(vd.n_present >= 2)].sort_values("v5_conf", ascending=False), "Verified mixed-condition images (dev): V5 must name one class", "gallery_v5_verified_mixed")
+
+#@@ code
+# 17.3 V5 calibration behaviour on the historical protocol (max-softmax vs agreement with the source label) and a per-class view.
+def ece_binary(conf, correct, bins=10):
+    conf = np.asarray(conf, float); correct = np.asarray(correct, float)
+    edges = np.linspace(0, 1, bins + 1); e = 0.0; rows = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        m = (conf > lo) & (conf <= hi) if lo > 0 else (conf >= lo) & (conf <= hi)
+        if m.any():
+            e += m.mean() * abs(correct[m].mean() - conf[m].mean()); rows.append((lo, hi, int(m.sum()), float(conf[m].mean()), float(correct[m].mean())))
+    return float(e), pd.DataFrame(rows, columns=["lo", "hi", "n", "mean_conf", "accuracy"])
+
+
+v5val = DF[DF.v5_split == "validation"]
+e, rel = ece_binary(v5val.v5_conf, v5val.v5_pred == v5val.src_label, CFG.CALIBRATION_BINS)
+fig, ax = plt.subplots(figsize=(4.5, 4.5)); ax.plot([0, 1], [0, 1], "k--"); ax.plot(rel.mean_conf, rel.accuracy, "o-")
+ax.set_xlabel("mean top-class confidence"); ax.set_ylabel("agreement with source label"); ax.set_title(f"V5 reliability (V5-validation, source label)  ECE={e:.3f}")
+savefig(fig, "v5_reliability_source_label")
+print(f"V5 ECE against the source label (historical; sibling leakage makes it optimistic): {e:.4f}")
+
+#@@ md
+## 18. Hard-example mining (train split only; the test set is never consulted)
+
+Hard examples are *candidates* for extra weight or for human review, never automatic label changes:
+* **Verified** labels may drive hard-negative sampling (a verified *Absent* condition that a model scores highly is a legitimate hard negative).
+* **Weak/unverified** labels can only produce *review candidates* — an unknown condition is not a negative.
+
+Categories: Hyperpigmentation→Normal, Hyperpigmentation→Eczema, Normal-skin variation scored as Hyperpigmentation, Acne↔Eczema, verified mixed-condition images, and (after Part VI) YOLO false-positive boxes on verified-absent conditions.
+
+#@@ code
+def mine_hard_examples(df, probs4, yolo_flags=None):
+    """Returns a DataFrame of hard-example candidates for rows of `df` (use only train/dev). Verified-based entries are marked usable_for_training=True."""
+    rows = []
+    P = dict(zip(CFG.V5_CLASS_ORDER, probs4.T))
+    for k, r in enumerate(df.itertuples()):
+        pr = {c: P[c][k] for c in CFG.V5_CLASS_ORDER}
+        ver = bool(r.full_known)
+        truth = set(c for c, y in zip(CFG.CONDITIONS, [r.y_acne, r.y_hyperpigmentation, r.y_eczema]) if y == 1) if ver else None
+        src = r.src_label
+        def add(code, usable): rows.append(dict(image_id=r.image_id, split=r.split, reason=code, usable_for_training=bool(usable and ver), basis="verified" if ver else "weak_source_label", v5_pred=r.v5_pred, v5_conf=r.v5_conf))
+        # hyperpigmentation present (verified) or labelled (weak) but V5 prefers Normal / Eczema
+        hyper_pos = ("Hyperpigmentation" in truth) if ver else (src == "Hyperpigmentation")
+        if hyper_pos and pr["Normal"] >= pr["Hyperpigmentation"]: add("hyperpigmentation_scored_as_normal", True)
+        if hyper_pos and pr["Eczema"] >= pr["Hyperpigmentation"]: add("hyperpigmentation_scored_as_eczema", True)
+        hyper_neg = ("Hyperpigmentation" not in truth) if ver else False
+        if hyper_neg and pr["Hyperpigmentation"] >= 0.30: add("verified_not_hyperpigmentation_scored_as_hyperpigmentation", True)
+        if (src == "Normal" and not ver) and pr["Hyperpigmentation"] >= 0.30: add("normal_label_with_pigment_like_score_(review)", False)
+        acne_pos = ("Acne" in truth) if ver else (src == "Acne"); ecz_pos = ("Eczema" in truth) if ver else (src == "Eczema")
+        if acne_pos and pr["Eczema"] >= pr["Acne"]: add("acne_scored_as_eczema", True)
+        if ecz_pos and pr["Acne"] >= pr["Eczema"]: add("eczema_scored_as_acne", True)
+        if ver and len(truth) >= 2: add("verified_mixed_conditions", True)
+        if yolo_flags is not None and r.image_id in yolo_flags:
+            for c in yolo_flags[r.image_id]:
+                if ver and c not in truth: add(f"yolo_{c.lower()}_box_on_verified_absent_condition", True)
+    return pd.DataFrame(rows, columns=["image_id", "split", "reason", "usable_for_training", "basis", "v5_pred", "v5_conf"])
+
+
+_trn = DF[DF.split == "train"].reset_index(drop=True)
+HARD = mine_hard_examples(_trn, _trn[[f"v5_{c}" for c in CFG.V5_CLASS_ORDER]].to_numpy())
+assert (HARD.split == "train").all() if len(HARD) else True, "hard-example mining touched a non-train split"
+print("hard-example candidates (train):", len(HARD), "images:", HARD.image_id.nunique())
+display(HARD.groupby(["reason", "basis", "usable_for_training"]).size().rename("n").reset_index())
+write_csv(HARD, os.path.join(CFG.DIRS["data"], "hard_examples_train_v5.csv"))
+log_event("hard_examples", n=int(len(HARD)))
+
+#@@ md
+## 19. Annotation-review queue
+Suspicious images are added to `hard_example_review_queue.csv` (existing reviewer decisions are **preserved**; only new candidates are appended). Reasons come from filename/label conflicts, image-type/label mismatches, V5 confidently disagreeing with the source label, a strong second condition in V5, and (later) YOLO flags. A model prediction is a *reason to look*, never a label.
+
+#@@ code
+def build_review_queue(extra_flags=None):
+    rq = pd.read_csv(CFG.REVIEW_QUEUE_CSV, dtype=str).fillna("") if os.path.exists(CFG.REVIEW_QUEUE_CSV) else pd.DataFrame(columns=RQ_COLS)
+    for c in RQ_COLS:
+        if c not in rq.columns: rq[c] = ""
+    reasons = {k: list(v) for k, v in STATIC_REASONS.items()}
+    for r in DF[DF.split.isin(DEV + ["test"])].itertuples():                      # test images may be QUEUED for labelling, but are never inspected for model behaviour
+        if r.split != "test":
+            if r.v5_conf >= 0.85 and r.v5_pred != r.src_label: reasons.setdefault(r.image_id, []).append("v5_confident_disagreement_with_source_label")
+            sec = sorted([(getattr(r, f"v5_{c}"), c) for c in CFG.V5_CLASS_ORDER if c != r.v5_pred], reverse=True)[0]
+            if r.v5_pred == r.src_label and r.src_label != "Normal" and sec[1] != "Normal" and sec[0] >= 0.25: reasons.setdefault(r.image_id, []).append(f"v5_strong_second_condition_{sec[1].lower()}")
+    for k, v in (extra_flags or {}).items(): reasons.setdefault(k, []).extend(v)
+    have = set(rq.image_id)
+    new = []
+    byid = DF.set_index("image_id")
+    for iid, rs in reasons.items():
+        if iid in have or iid not in byid.index: continue
+        r = byid.loc[iid]
+        state = "verified" if r.full_known else "weak_source_label_only"
+        new.append({"image_id": iid, "split": r.split, "reason_codes": ";".join(sorted(set(rs))), "v5_pred": r.v5_pred, "v5_conf": f"{r.v5_conf:.3f}", "v5_margin": f"{r.v5_margin:.3f}",
+                    "yolo_flags": "", "current_label_state": state, "reviewer_decision": "", "reviewer_id": "", "reviewed_at": "", "notes": ""})
+    out = pd.concat([rq, pd.DataFrame(new, columns=RQ_COLS)], ignore_index=True)
+    write_csv(out, CFG.REVIEW_QUEUE_CSV)
+    return out
+
+
+RQ = build_review_queue()
+print("review queue rows:", len(RQ), "| reviewer decisions already recorded:", int((RQ.reviewer_decision != "").sum()))
+print(RQ.reason_codes.str.split(";").explode().str.replace(r"_\(.*\)", "", regex=True).value_counts().head(12).to_string())

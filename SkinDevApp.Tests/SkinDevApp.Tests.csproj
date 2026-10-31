@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- the real production files; they have no WPF / database references -->
+    <Compile Include="..\SkinDevApp\Views\ScanInterpreter.cs" Link="Linked\ScanInterpreter.cs" />
+    <Compile Include="..\SkinDevApp\Views\SessionInterpretation.cs" Link="Linked\SessionInterpretation.cs" />
+    <Compile Include="..\SkinDevApp\Views\ClinicalText.cs" Link="Linked\ClinicalText.cs" />
+    <Compile Include="..\SkinDevApp\Views\ReportFindings.cs" Link="Linked\ReportFindings.cs" />
+    <Compile Include="..\SkinDevApp\Views\Fmt.cs" Link="Linked\Fmt.cs" />
+    <Compile Include="..\SkinDevApp\Data\StudyModels.cs" Link="Linked\StudyModels.cs" />
+    <Compile Include="..\SkinDevApp\Printing\ReceiptContent.cs" Link="Linked\ReceiptContent.cs" />
+    <Compile Include="..\SkinDevApp\Printing\ReceiptInterpretation.cs" Link="Linked\ReceiptInterpretation.cs" />
+    <Compile Include="..\SkinDevApp\OnnxInference.cs" Link="Linked\OnnxInference.cs" />
+    <Compile Include="..\SkinDevApp\Predictionresult.cs" Link="Linked\PredictionResult.cs" />
+    <Compile Include="..\SkinDevApp\LesionDetector.cs" Link="Linked\LesionDetector.cs" />
+    <Compile Include="..\SkinDevApp\ClassPalette.cs" Link="Linked\ClassPalette.cs" />
+    <Compile Include="..\SkinDevApp\DetectionDiagnostics.cs" Link="Linked\DetectionDiagnostics.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <None Include="golden\preprocess_golden.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

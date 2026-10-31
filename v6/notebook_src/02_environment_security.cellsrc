@@ -1,0 +1,506 @@
+#@@ md
+# Part I — Environment, Reproducibility, Dependencies and Integrity Controls
+
+Sections in this part: **(3) Environment verification · (4) GPU setup · (5) Dependency management · (6) Reproducibility configuration · (7) Dataset path configuration · security, provenance and model-integrity controls.**
+
+* `CFG` (next-but-one cell) is the **only** place where paths and hyper-parameters are set. Override any value with an environment variable `LUMYVUE_<NAME>` (JSON for lists/dicts) or with a JSON file named in `LUMYVUE_V6_CONFIG`. Nothing is hard-coded to one machine: defaults are discovered from your home directory and from `/mnt/c/Users/*`.
+* Re-running the notebook with the **same `RUN_ID` resumes**; a new `RUN_ID` starts a new experiment folder. Nothing outside `…/v6/` is ever written.
+* A failed requirement raises `GateError` (a deliberate stop) or `V6Error`; errors are **never swallowed silently** — optional features print why they were skipped.
+
+#@@ code
+# 3.1 Package check (set INSTALL_MISSING=True only if you want this cell to pip-install what is missing).
+import importlib.util, subprocess, sys
+
+INSTALL_MISSING = False
+REQUIRED = {"numpy": "numpy", "pandas": "pandas", "scipy": "scipy", "sklearn": "scikit-learn", "matplotlib": "matplotlib",
+            "PIL": "pillow", "cv2": "opencv-python-headless", "tensorflow": "tensorflow", "onnxruntime": "onnxruntime",
+            "onnx": "onnx", "tf2onnx": "tf2onnx"}
+OPTIONAL = {"seaborn": "nicer heat-maps (matplotlib fallback is used)", "ipywidgets": "annotation helper widget only",
+            "ultralytics": "not needed: YOLO runs through ONNX Runtime exactly like the C# application"}
+
+missing = [pip for mod, pip in REQUIRED.items() if importlib.util.find_spec(mod) is None]
+print("Python", sys.version.split()[0], "|", sys.executable)
+print("Missing required packages:", missing or "none")
+for mod, why in OPTIONAL.items():
+    print(f"  optional {mod:12s}:", "present" if importlib.util.find_spec(mod) else f"absent -> {why}")
+if missing:
+    cmd = [sys.executable, "-m", "pip", "install", *missing]
+    if INSTALL_MISSING:
+        subprocess.check_call(cmd)
+    else:
+        raise RuntimeError("Required packages are missing. Install with:\n  " + " ".join(cmd) + "\nor set INSTALL_MISSING = True in this cell.")
+
+#@@ code
+# 6.1 Experiment configuration. Override order (later wins): defaults < JSON file ($LUMYVUE_V6_CONFIG) < environment LUMYVUE_<NAME>.
+import os, json, glob, datetime
+from types import SimpleNamespace
+
+HOME = os.path.expanduser("~")
+
+
+def _first_existing(cands, default=""):
+    for c in cands:
+        if c and os.path.exists(c):
+            return c
+    return default
+
+
+_PR = _first_existing([os.environ.get("LUMYVUE_PROJECT_ROOT"), os.path.join(HOME, "PrecisionSkinV1")], os.path.join(HOME, "PrecisionSkinV1"))
+_MODEL_DIRS = [os.environ.get("LUMYVUE_YOLO_MODEL_DIR")] + sorted(glob.glob("/mnt/c/Users/*/source/repos/SkinDevApp/SkinDevApp/Model"))
+_ORIG_DIRS = [os.environ.get("LUMYVUE_ORIGINAL_IMAGE_ROOT")] + sorted(glob.glob("/mnt/c/Users/*/Downloads/PrecisionSkin/Classes"))
+_CAPT_DIRS = [os.environ.get("LUMYVUE_CAMERA_CAPTURE_DIR")] + sorted(glob.glob("/mnt/c/Users/*/AppData/Local/LUMYVUE/Captures"))
+
+DEFAULTS = dict(
+    # ---------------------------------------------------------------- run identity / security
+    RUN_ID="v6_run01", OFFLINE_MODE=True,                 # OFFLINE_MODE blocks any attempt to download weights
+    PSEUDONYM_KEY_FILE=os.path.join(HOME, ".lumyvue_v6", "pseudonym.key"),   # kept OUTSIDE the experiment folders
+    REQUIRE_PROVENANCE_FOR_TRAINING=True,                # gate: every training source needs a permissible-use record
+    # ---------------------------------------------------------------- read-only inputs
+    PROJECT_ROOT=_PR,
+    V5_MANIFEST=os.path.join(_PR, "metadata", "metadata", "split_manifest.csv"),
+    PROCESSED_ROOT=os.path.join(_PR, "dataset_processed", "processed"),          # <split>/<class>/<filename>, 224x224
+    ORIGINAL_IMAGE_ROOT=_first_existing(_ORIG_DIRS, ""),                          # <Class>/<filename>; originals for YOLO and ROI crops
+    V5_RUN_DIR=os.path.join(_PR, "runs", "facial_only"),
+    V5_KERAS=os.path.join(_PR, "runs", "facial_only", "models", "final", "precisionskin_best.keras"),
+    V5_ONNX=os.path.join(_PR, "runs", "facial_only", "models", "final", "precisionskin.onnx"),
+    V5_LABELS_JSON=os.path.join(_PR, "runs", "facial_only", "models", "final", "labels.json"),
+    V5_CLASS_ORDER=["Acne", "Hyperpigmentation", "Eczema", "Normal"],
+    YOLO_MODEL_DIR=_first_existing(_MODEL_DIRS, ""),                              # SkinDevApp/Model (read-only)
+    CAMERA_CAPTURE_DIR=_first_existing(_CAPT_DIRS, ""),                           # optional: LUMYVUE capture folders (record.json + original.png)
+    OOD_REFERENCE_DIR="",                                                         # optional: folder of out-of-scope images (non-face, other skin sites ...)
+    DEPLOY_PARITY_DIRS=[],                                                        # optional: folders produced by `SkinDevApp.exe --diagnose` (cnn_diagnostic.json + tensor .bin)
+    PRETRAINED_WEIGHTS_PATH="",                                                   # optional local MobileNetV2 no-top .h5 (needed when OFFLINE_MODE and not cached)
+    PROTECTED_DIRS=[],                                                            # extra directories that must never be written
+    # ---------------------------------------------------------------- Eczema detector (all adjustable; see Part VI)
+    ECZEMA_ONNX_FILES=[],            # explicit list of ensemble member files; empty = auto-discover lesion_detector_eczema*.onnx, else 3-class lesion_detector_v1.onnx
+    ECZEMA_META_JSON="", ECZEMA_CLASS_NAME="eczema", ECZEMA_CLASS_INDEX=None,     # None = read from the JSON / ONNX output
+    ECZEMA_IMGSZ=None, ECZEMA_NMS_IOU=None, ECZEMA_THRESHOLD=0.25,                # None = read from the JSON; threshold default = app's ScanSettings (pilot class)
+    YOLO_OVERRIDES={},               # per-condition dict, e.g. {"Acne": {"threshold": 0.275}}; empty = deployed values from JSON/ScanSettings
+    # ---------------------------------------------------------------- label space / dataset policy
+    CONDITIONS=["Acne", "Hyperpigmentation", "Eczema"],                           # C# ClassPalette order 0..2; Normal is derived (all Absent)
+    INCLUDE_AUX_NONFACIAL=False, EXCLUDE_FACIAL_QA=["reject", "manual_review"], NEAR_DUP_MAX_HAMMING=3,   # exact duplicates beyond the first copy are always dropped
+    SPLIT_FRACTIONS=dict(train=0.60, validation=0.10, fusion=0.15, test=0.15), SPLIT_SEED=2026,
+    # ---------------------------------------------------------------- annotation gates (Section 12)
+    ANNOTATION_CSV="", REGION_CSV="", PROVENANCE_CSV="", REVIEW_QUEUE_CSV="",
+    EVAL_REQUIRES_DERMATOLOGIST=True, TRAIN_ACCEPTED_ROLES=["dermatologist", "researcher"],
+    MIN_VERIFIED=dict(train=300, validation=150, fusion=250, test=250),             # fully-known verified photographs per split
+    MIN_POSITIVES=dict(train=40, validation=20, fusion=30, test=30),                # verified Present per condition per split
+    MIN_NEGATIVES=dict(train=40, validation=20, fusion=30, test=30),                # verified Absent per condition per split
+    MIN_REGION_PER_CLASS=dict(train=60, validation=20, fusion=20, test=20),         # verified boxes per class (needed for ROI training and localisation metrics)
+    USE_SOURCE_LABEL_AS_WEAK_POSITIVE=True,           # train only: V5 class name = weak POSITIVE for that condition (never negative for the others, never used for evaluation)
+    UNCERTAIN_IN_TRAIN="mask",                          # 'mask' keeps the image with the label ignored; 'exclude' drops the image
+    # ---------------------------------------------------------------- input / augmentation (dermatology-safe)
+    IMG_SIZE=224, BATCH_SIZE=32, SHUFFLE_BUFFER=2048,
+    AUG=dict(flip=True, rotation_deg=10, translation=0.05, zoom=(-0.30, 0.10), brightness=0.08, contrast=0.08, scale_crop_p=0.5),
+    MIXED_OVERSAMPLE=2,
+    # ---------------------------------------------------------------- global model experiments
+    HEAD_UNITS=128, HEAD_DROPOUT=0.3, HEAD_L2=1e-4, POS_WEIGHT_CLIP=(1.0, 8.0), USE_CLASS_WEIGHTS=True,
+    SEEDS=[42, 7, 123], PHASE_A_EPOCHS=12, PHASE_A_LR=1e-3, PHASE_B_EPOCHS=20, PHASE_B_LR=1e-5, FINE_TUNE_AT=100,
+    EARLY_STOP_PATIENCE=6, LR_PATIENCE=3, LR_FACTOR=0.5, MIN_LR=1e-7, MIN_POS_FOR_METRIC=15,
+    GLOBAL_EXPERIMENTS=["B_v5_finetune_verified", "C_balanced_hard", "D_multilabel3", "D2_multilabel3_hard"],     # A (V5 baseline) is evaluation-only
+    REGRESSION_TOLERANCE_F1=0.03,                       # a per-condition F1 drop larger than this vs the baseline is flagged as a regression
+    # ---------------------------------------------------------------- hard-example mining
+    HARD_CONF_MARGIN=0.20, HARD_MAX_FRACTION=0.25, HARD_UPWEIGHT=3.0,
+    # ---------------------------------------------------------------- YOLO engine (replicates the deployed C# post-processing)
+    YOLO_FLOOR=0.02, YOLO_FUSION_IOU=0.5, YOLO_MAX_BOXES=60, YOLO_POOL_MIN_CONF=0.05, YOLO_PROVIDERS=["CPUExecutionProvider"], YOLO_FACE_FILTER=False,
+    YOLO_THRESHOLDS={"Acne": 0.275, "Hyperpigmentation": 0.225, "Eczema": 0.25},
+    DUP_IOU=0.5, NESTED_CONTAINMENT=0.8,
+    # ---------------------------------------------------------------- ROI
+    ROI_MARGIN=0.25, ROI_MIN_SIDE_FRAC=0.02, ROI_MAX_TIER1=6, ROI_MAX_TOTAL=12, ROI_OVERLAP_SUPPRESS_IOU=0.70, ROI_ALT_MARGIN=0.60,
+    ROI_MATCH_IOU=0.50, ROI_BG_MAX_IOU=0.10, ROI_CLASSES=["Acne", "Hyperpigmentation", "Eczema", "Background"], ROI_EMB=64, ROI_BATCH=32,
+    ROI_PHASE_A_EPOCHS=8, ROI_PHASE_B_EPOCHS=12, ROI_CACHE_ROIS=True,
+    # ---------------------------------------------------------------- fusion
+    FUSION_HIDDEN=64, FUSION_DROPOUT=0.3, FUSION_EPOCHS=150, FUSION_LR=1e-3, FUSION_BATCH=64, FUSION_PATIENCE=20, FUSION_MODALITY_DROPOUT=0.25, FUSION_CV_FOLDS=5,
+    # ---------------------------------------------------------------- calibration / selective prediction / stages
+    THRESHOLD_GRID=[round(0.05 + 0.01 * i, 2) for i in range(91)], CALIBRATION_BINS=10,
+    TARGET_ACCEPTED_ERROR=0.10, MIN_ACCEPT_COVERAGE=0.30,
+    MAX_VERIFICATION_PASSES=3, MAX_VERIFICATION_SECONDS=20.0, MIN_NEW_ROIS=1, CONVERGENCE_EPS=0.02,
+    EXTERNAL_VERIFIER_MODELS=[],                       # optional extra independently trained verifiers (paths); empty = action unavailable
+    ABSENCE_REQUIRES_ALL_DETECTORS=True,               # NO_FINDINGS_SUPPORTED needs a working detector for every condition
+    # ---------------------------------------------------------------- input quality (PROVISIONAL, unvalidated; flags only recommend re-capture)
+    QUALITY=dict(min_side_px=224, blur_laplacian_min=40.0, dark_mean_max=45.0, bright_mean_min=215.0, over_exposed_frac_max=0.08, under_exposed_frac_max=0.20,
+                 uneven_lr_ratio_max=0.35, glare_frac_max=0.02, gray_world_dev_max=0.25, jpeg_blockiness_max=1.8, overlay_edge_frac_max=0.12, face_required=True),
+    OOD_PERCENTILE=99.0,
+    # ---------------------------------------------------------------- evaluation
+    BOOTSTRAP_B=1000, BOOTSTRAP_SEED=11, ALLOW_TEST_REEVALUATION=False, ROBUSTNESS_N=150, N_EXAMPLE_IMAGES=12, GRADCAM_LAYER="out_relu",
+    # ---------------------------------------------------------------- hardware / reproducibility
+    DETERMINISTIC=True, GPU_MEMORY_LIMIT_MB=0,         # 0 = memory growth only; e.g. 7000 caps TensorFlow at ~7 GB
+)
+
+
+def _coerce(raw, default):
+    if isinstance(default, bool):
+        return raw.strip().lower() in ("1", "true", "yes", "y")
+    if isinstance(default, (int, float)) and not isinstance(default, bool):
+        return type(default)(raw)
+    if default is None or isinstance(default, (list, dict, tuple)):
+        try:
+            return json.loads(raw)
+        except Exception:
+            return raw
+    return raw
+
+
+_cfg = dict(DEFAULTS)
+if os.environ.get("LUMYVUE_V6_CONFIG"):
+    with open(os.environ["LUMYVUE_V6_CONFIG"], "r", encoding="utf-8") as _f:
+        _cfg.update(json.load(_f))
+for _k, _d in DEFAULTS.items():
+    if os.environ.get("LUMYVUE_" + _k) is not None:
+        _cfg[_k] = _coerce(os.environ["LUMYVUE_" + _k], _d)
+CFG = SimpleNamespace(**_cfg)
+CFG.V6_WORKSPACE = os.environ.get("LUMYVUE_V6_WORKSPACE", os.path.join(CFG.PROJECT_ROOT, "v6"))
+CFG.ANNOTATION_CSV = CFG.ANNOTATION_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "multilabel_annotations.csv")
+CFG.REGION_CSV = CFG.REGION_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "region_annotations.csv")
+CFG.PROVENANCE_CSV = CFG.PROVENANCE_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "dataset_provenance.csv")
+CFG.REVIEW_QUEUE_CSV = CFG.REVIEW_QUEUE_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "hard_example_review_queue.csv")
+CFG.SPLIT_DIR = os.path.join(CFG.V6_WORKSPACE, "splits")
+CFG.EXP_DIR = os.path.join(CFG.V6_WORKSPACE, "experiments", CFG.RUN_ID)
+CFG.DIRS = {d: os.path.join(CFG.EXP_DIR, d) for d in
+            ["config", "audit", "data", "checkpoints", "logs", "metrics", "figures", "predictions", "yolo", "roi", "fusion", "stages", "v5_comparison", "export", "report", "tests"]}
+CFG.AUG["zoom"] = tuple(CFG.AUG["zoom"])
+CFG.POS_WEIGHT_CLIP = tuple(CFG.POS_WEIGHT_CLIP)
+CFG.N_COND = len(CFG.CONDITIONS)
+CFG.SPLITS = ["train", "validation", "fusion", "test"]
+CFG.EVAL_SPLITS = ["validation", "fusion", "test"]
+assert abs(sum(CFG.SPLIT_FRACTIONS.values()) - 1.0) < 1e-6, "SPLIT_FRACTIONS must add up to 1"
+
+for _k in ["RUN_ID", "PROJECT_ROOT", "V6_WORKSPACE", "EXP_DIR", "ANNOTATION_CSV", "REGION_CSV", "YOLO_MODEL_DIR", "ORIGINAL_IMAGE_ROOT", "CAMERA_CAPTURE_DIR", "V5_ONNX", "V5_KERAS"]:
+    print(f"{_k:20s}:", getattr(CFG, _k) or "(not set / not found)")
+
+#@@ code
+# 3.2 / 4.1 / 6.2  Imports, seeds, GPU setup (memory growth, optional cap, mixed precision), hardware + software metadata, experiment folders.
+import os, sys, io, re, json, math, time, random, shutil, hashlib, hmac, platform, subprocess, datetime, itertools, collections, warnings, stat, secrets, glob
+from dataclasses import dataclass, field, asdict
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg") if os.environ.get("LUMYVUE_HEADLESS") == "1" else None
+import matplotlib.pyplot as plt
+import cv2
+from PIL import Image
+from IPython.display import display
+
+if CFG.DETERMINISTIC:
+    os.environ["TF_DETERMINISTIC_OPS"] = "1"
+    os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
+import tensorflow as tf
+import keras                                   # standalone Keras 3 (what tf.keras resolves to); needed for keras.saving in this TensorFlow 2.21 / Keras 3.15 build
+import sklearn, scipy
+
+warnings.filterwarnings("ignore", category=UserWarning, module="keras")
+
+
+class V6Error(RuntimeError):
+    """A requirement is not met. The message says what is missing and how to fix it."""
+
+
+class GateError(V6Error):
+    """A deliberate stop: a stage needs data/files that do not exist (yet). Nothing invalid has been created."""
+
+
+def require(cond, msg, gate=False):
+    if not cond:
+        raise (GateError if gate else V6Error)(msg)
+
+
+def set_all_seeds(seed):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed); np.random.seed(seed); tf.random.set_seed(seed)
+    if CFG.DETERMINISTIC:
+        try:
+            tf.config.experimental.enable_op_determinism()
+        except Exception as e:                     # already enabled, or unsupported -> report, do not hide
+            print("  (op determinism not (re)enabled:", repr(e)[:80], ")")
+
+
+set_all_seeds(CFG.SEEDS[0])
+
+# ---- GPU (RTX 4060 Laptop, 8 GB): memory growth + optional hard cap + mixed precision. Must run before any model is built.
+GPUS = tf.config.list_physical_devices("GPU")
+if GPUS:
+    for g in GPUS:
+        try:
+            tf.config.experimental.set_memory_growth(g, True)
+        except RuntimeError as e:
+            print("  memory growth must be set before the GPU is initialised (restart the kernel):", e)
+    if CFG.GPU_MEMORY_LIMIT_MB:
+        try:
+            tf.config.set_logical_device_configuration(GPUS[0], [tf.config.LogicalDeviceConfiguration(memory_limit=int(CFG.GPU_MEMORY_LIMIT_MB))])
+        except RuntimeError as e:
+            print("  could not cap GPU memory:", e)
+    keras.mixed_precision.set_global_policy("mixed_float16")
+    print("GPU:", [g.name for g in GPUS], "| mixed_float16 ON (all output layers are float32)")
+else:
+    keras.mixed_precision.set_global_policy("float32")
+    print("WARNING: no GPU visible. Training on CPU will be very slow. In WSL check `nvidia-smi`; start Jupyter/VS Code the same way you started the V5 training "
+          "(the CUDA libraries must be on the library path of the kernel).")
+
+
+def _run(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=20).stdout.strip()
+    except Exception as e:
+        return f"(unavailable: {type(e).__name__})"
+
+
+def hardware_software_metadata():
+    bi = tf.sysconfig.get_build_info()
+    return dict(
+        created=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID,
+        python=sys.version, platform=platform.platform(), machine=platform.machine(), cpu_count=os.cpu_count(),
+        tensorflow=tf.__version__, keras=keras.__version__, numpy=np.__version__, pandas=pd.__version__, sklearn=sklearn.__version__, scipy=scipy.__version__,
+        opencv=cv2.__version__, matplotlib=matplotlib.__version__,
+        onnxruntime=__import__("onnxruntime").__version__, onnx=__import__("onnx").__version__, tf2onnx=__import__("tf2onnx").__version__,
+        cuda_build=bi.get("cuda_version"), cudnn_build=bi.get("cudnn_version"),
+        gpus=[g.name for g in GPUS], nvidia_smi=_run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"]),
+        mixed_precision=keras.mixed_precision.global_policy().name, deterministic=CFG.DETERMINISTIC)
+
+
+META = hardware_software_metadata()
+print(json.dumps({k: META[k] for k in ["tensorflow", "keras", "cuda_build", "cudnn_build", "nvidia_smi", "mixed_precision"]}, indent=1))
+
+#@@ code
+# Experiment folders (0700), safe writing, hashing, originals fingerprint, redaction, pseudonyms, hash-chained audit log, gates.
+for _d in CFG.DIRS.values():
+    os.makedirs(_d, exist_ok=True)
+    try:
+        os.chmod(_d, 0o700)
+    except OSError:
+        pass                                           # e.g. /mnt/c (NTFS) does not support POSIX modes: documented limitation
+for _d in [os.path.dirname(CFG.ANNOTATION_CSV), CFG.SPLIT_DIR]:
+    os.makedirs(_d, exist_ok=True)
+
+
+def sha256_file(path, chunk=1 << 20):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(chunk), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+# ---- write protection: originals (V5, YOLO, datasets, WPF app) can never be overwritten ------------------------------------
+def _norm(p):
+    return os.path.normcase(os.path.realpath(os.path.abspath(p)))
+
+
+def _protected_roots():
+    roots = [CFG.V5_RUN_DIR, os.path.dirname(CFG.V5_ONNX), os.path.dirname(CFG.V5_KERAS), CFG.YOLO_MODEL_DIR, CFG.PROCESSED_ROOT, CFG.ORIGINAL_IMAGE_ROOT,
+             os.path.dirname(CFG.V5_MANIFEST), CFG.CAMERA_CAPTURE_DIR, CFG.OOD_REFERENCE_DIR, *CFG.PROTECTED_DIRS]
+    if CFG.YOLO_MODEL_DIR:
+        roots.append(os.path.dirname(CFG.YOLO_MODEL_DIR))      # the whole WPF project folder
+    return [_norm(r) for r in roots if r]
+
+
+def is_protected(path):
+    p = _norm(path)
+    exp = _norm(CFG.V6_WORKSPACE)
+    if p == exp or p.startswith(exp + os.sep):
+        return False
+    return any(p == r or p.startswith(r + os.sep) for r in _protected_roots())
+
+
+def safe_path(path):
+    """Return `path` if writing there is allowed, else raise. Only the V6 workspace is writable; protected originals never are."""
+    p = _norm(path)
+    ws = _norm(CFG.V6_WORKSPACE)
+    require(p == ws or p.startswith(ws + os.sep), f"Refusing to write outside the V6 workspace: {path}")
+    require(not is_protected(path), f"Refusing to write to a protected original location: {path}")
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    return path
+
+
+def write_text(path, text):
+    with open(safe_path(path), "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
+def write_json(path, obj):
+    return write_text(path, json.dumps(obj, indent=2, default=_json_default))
+
+
+def _json_default(o):
+    if isinstance(o, (np.integer,)): return int(o)
+    if isinstance(o, (np.floating,)): return float(o)
+    if isinstance(o, (np.ndarray,)): return o.tolist()
+    if isinstance(o, (set, tuple)): return list(o)
+    if isinstance(o, (pd.Timestamp, datetime.datetime)): return o.isoformat()
+    return str(o)
+
+
+def write_csv(df, path, **kw):
+    df.to_csv(safe_path(path), index=kw.pop("index", False), **kw)
+    return path
+
+
+def savefig(fig, name, subdir="figures", dpi=160, show=True):
+    path = safe_path(os.path.join(CFG.DIRS[subdir], name if name.endswith(".png") else name + ".png"))
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+    return path
+
+
+def redact(text):
+    """Remove absolute paths and the user name from text that may be shared."""
+    t = str(text)
+    for k, v in [(CFG.PROJECT_ROOT, "<PROJECT>"), (CFG.V6_WORKSPACE, "<V6>"), (HOME, "<HOME>")]:
+        if k:
+            t = t.replace(k, v)
+    return re.sub(r"/mnt/c/Users/[^/]+", "/mnt/c/Users/<USER>", t)
+
+
+# ---- pseudonymous identifiers (keyed HMAC; the key lives outside every artifact folder) -----------------------------------
+def _pseudonym_key():
+    kf = CFG.PSEUDONYM_KEY_FILE
+    if not os.path.exists(kf):
+        os.makedirs(os.path.dirname(kf), exist_ok=True)
+        with open(kf, "wb") as f:
+            f.write(secrets.token_bytes(32))
+        try:
+            os.chmod(kf, 0o600)
+        except OSError:
+            pass
+        print("Created a new pseudonymisation key (back it up privately; without it ids cannot be re-linked):", redact(kf))
+    with open(kf, "rb") as f:
+        return f.read()
+
+
+_PKEY = _pseudonym_key()
+
+
+def pseudo_id(raw, prefix="im"):
+    return f"{prefix}_" + hmac.new(_PKEY, str(raw).encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+
+
+# ---- hash-chained audit log ------------------------------------------------------------------------------------------------
+AUDIT_PATH = os.path.join(CFG.DIRS["logs"], "audit_log.jsonl")
+
+
+def _last_hash():
+    if not os.path.exists(AUDIT_PATH):
+        return "0" * 64
+    last = "0" * 64
+    with open(AUDIT_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                last = json.loads(line)["hash"]
+    return last
+
+
+def log_event(event, **data):
+    """Append-only, tamper-evident (each record hashes its predecessor). Never put image content or identifiers in `data`."""
+    rec = dict(ts=datetime.datetime.now().isoformat(timespec="milliseconds"), event=event, data=json.loads(json.dumps(data, default=_json_default)), prev=_last_hash())
+    rec["hash"] = hashlib.sha256(json.dumps({k: rec[k] for k in ("ts", "event", "data", "prev")}, sort_keys=True).encode()).hexdigest()
+    with open(safe_path(AUDIT_PATH), "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+    return rec["hash"]
+
+
+def verify_audit_chain(path=AUDIT_PATH):
+    prev = "0" * 64
+    with open(path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            h = hashlib.sha256(json.dumps({k: r[k] for k in ("ts", "event", "data", "prev")}, sort_keys=True).encode()).hexdigest()
+            if r["prev"] != prev or r["hash"] != h:
+                return False, i
+            prev = r["hash"]
+    return True, None
+
+
+# ---- model integrity: fingerprint every original before anything runs; re-verify at the end ------------------------------
+def original_files():
+    fs = [CFG.V5_KERAS, CFG.V5_ONNX, CFG.V5_LABELS_JSON, CFG.V5_MANIFEST]
+    if CFG.YOLO_MODEL_DIR and os.path.isdir(CFG.YOLO_MODEL_DIR):
+        fs += sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR, "*.onnx")) + glob.glob(os.path.join(CFG.YOLO_MODEL_DIR, "*.json")))
+    fs += [f for f in CFG.ECZEMA_ONNX_FILES if f] + ([CFG.ECZEMA_META_JSON] if CFG.ECZEMA_META_JSON else [])
+    return [f for f in dict.fromkeys(fs) if f and os.path.isfile(f)]
+
+
+def fingerprint_originals():
+    return {f: dict(sha256=sha256_file(f), bytes=os.path.getsize(f)) for f in original_files()}
+
+
+FP_START_PATH = os.path.join(CFG.DIRS["audit"], "originals_fingerprint_start.json")
+if os.path.exists(FP_START_PATH):                      # resuming: compare with the fingerprint taken the first time
+    _old = json.load(open(FP_START_PATH))
+    _new = fingerprint_originals()
+    _changed = [redact(k) for k in _old if k in _new and _old[k]["sha256"] != _new[k]["sha256"]]
+    require(not _changed, "ORIGINAL FILES CHANGED since this run started (stop and investigate): " + ", ".join(_changed))
+    ORIGINALS_FP = _old
+else:
+    ORIGINALS_FP = fingerprint_originals()
+    write_json(FP_START_PATH, ORIGINALS_FP)
+print(f"Fingerprinted {len(ORIGINALS_FP)} original files (SHA-256) -> audit/originals_fingerprint_start.json")
+
+
+def verify_originals_unchanged():
+    now = fingerprint_originals()
+    bad = [redact(k) for k, v in ORIGINALS_FP.items() if k not in now or now[k]["sha256"] != v["sha256"]]
+    return len(bad) == 0, bad
+
+
+# ---- gates -----------------------------------------------------------------------------------------------------------------------
+GATES = {}
+
+
+def set_gate(name, ok, why=""):
+    GATES[name] = dict(ok=bool(ok), why=why)
+    log_event("gate", name=name, ok=bool(ok), why=redact(why)[:300])
+
+
+def gate(name):
+    g = GATES.get(name)
+    if g is None:
+        raise GateError(f"Gate '{name}' has not been evaluated yet: run the section that defines it first.")
+    if not g["ok"]:
+        raise GateError(f"STAGE BLOCKED by gate '{name}': {g['why']}")
+    return True
+
+
+write_json(os.path.join(CFG.DIRS["config"], "config_snapshot.json"), {k: v for k, v in vars(CFG).items()})
+write_json(os.path.join(CFG.DIRS["config"], "hardware_software.json"), META)
+write_text(os.path.join(CFG.DIRS["config"], "pip_freeze.txt"), _run([sys.executable, "-m", "pip", "freeze"]))
+log_event("run_started", run_id=CFG.RUN_ID, tf=tf.__version__, gpus=len(GPUS))
+print("Experiment folder ready:", redact(CFG.EXP_DIR))
+
+#@@ md
+## 7. Dataset path configuration and preflight
+
+The preflight lists every input the pipeline can use and what depends on it. A missing **optional** input disables only the stages that need it; a missing **required** input stops the notebook with the exact fix. Nothing is created to stand in for a missing input.
+
+#@@ code
+# 7.1 Preflight: required vs optional inputs, and which later stages each unlocks.
+def _exists(p, isdir=False):
+    return bool(p) and (os.path.isdir(p) if isdir else os.path.isfile(p))
+
+
+PREFLIGHT = pd.DataFrame([
+    # name, path, kind, level, unlocks
+    ("V5 split manifest", CFG.V5_MANIFEST, "file", "required", "dataset inventory, splits, everything downstream"),
+    ("Processed 224x224 images", CFG.PROCESSED_ROOT, "dir", "required", "global CNN / V5 baseline inference"),
+    ("V5 ONNX model", CFG.V5_ONNX, "file", "required", "V5 baseline inference and deployment-parity checks"),
+    ("V5 Keras model", CFG.V5_KERAS, "file", "recommended", "experiments B/C (fine-tune from V5), Grad-CAM++ on V5"),
+    ("Original (full-size) images", CFG.ORIGINAL_IMAGE_ROOT, "dir", "recommended", "YOLO on original resolution and ROI crops (else 224x224 processed images are used and flagged)"),
+    ("YOLO model folder", CFG.YOLO_MODEL_DIR, "dir", "required", "three-detector branch, ROI extraction, fusion"),
+    ("Camera capture folder", CFG.CAMERA_CAPTURE_DIR, "dir", "optional", "camera-vs-training domain audit, deployment replay"),
+    ("OOD reference folder", CFG.OOD_REFERENCE_DIR, "dir", "optional", "OOD detection evaluation (AUROC)"),
+    ("Multilabel annotations", CFG.ANNOTATION_CSV, "file", "gate", "ALL supervised training and evaluation"),
+    ("Region annotations", CFG.REGION_CSV, "file", "gate", "ROI classifier training, localisation metrics"),
+    ("Dataset provenance", CFG.PROVENANCE_CSV, "file", "gate", "training (permissible-use record)"),
+], columns=["input", "path", "kind", "level", "unlocks"])
+PREFLIGHT["found"] = [_exists(p, k == "dir") for p, k in zip(PREFLIGHT.path, PREFLIGHT.kind)]
+PREFLIGHT["path"] = PREFLIGHT.path.map(redact)
+display(PREFLIGHT)
+
+_req = PREFLIGHT[(PREFLIGHT.level == "required") & (~PREFLIGHT.found)]
+require(_req.empty, "Required inputs not found:\n" + "\n".join(f"  - {r.input}: {r.path}   (needed for: {r.unlocks})" for r in _req.itertuples()) +
+        "\nSet the matching LUMYVUE_<NAME> environment variable (see the configuration cell) or edit DEFAULTS.", gate=True)
+write_csv(PREFLIGHT, os.path.join(CFG.DIRS["audit"], "preflight.csv"))

@@ -1,0 +1,460 @@
+#@@ md
+# Part IV — Improved Global MobileNetV2: Controlled Experiments
+
+Sections: **(20) architecture · (21) global classifier training · (22) controlled fine-tuning · (31 part) per-condition metrics · regression analysis.**
+
+Each global experiment is an **independent configuration** with its own directory and seeds; they are compared on the **validation** split (never test), with an explicit *regression check* so a gain in Hyperpigmentation that costs Acne, Eczema or Normal is visible.
+
+| Exp | Mode | Initialisation | Training data | Extra technique | Question |
+|---|---|---|---|---|---|
+| **A** | 4-class softmax | V5 (unchanged) | — (evaluation only) | none | baseline |
+| **B** | 4-class softmax | **V5 full model** | verified single-condition / none images | fine-tuning only | does correction by *verified* labels help? |
+| **C** | 4-class softmax | V5 full model | as B | + class-balanced sampling + hard examples | do balance + hard examples add anything over B? |
+| **D** | **3 sigmoids** (multilabel) | ImageNet backbone | all train images with masked loss | none | does multilabel support help (mixed conditions)? |
+| **D2** | 3 sigmoids | ImageNet backbone | as D | + balancing + mixed oversampling + hard examples | do the extras help over D? |
+| **E** | ROI MobileNetV2 | Part VII | | | YOLO-guided regions (evaluated as a system) |
+| **F** | full hybrid fusion | Parts VII–VIII | | | evaluated as a system |
+
+*Why two softmax and two multilabel experiments:* techniques are added **one at a time** (B → C; D → D2) so each effect can be measured. Mixed-condition images cannot be represented by a softmax target, so they are excluded from B/C training (and counted); they are the reason D exists.
+
+**Dermatology-safe augmentation.** Allowed: horizontal flip, small rotation/translation, zoom/crop (it also simulates the *close-up vs full-face* shift), very small brightness/contrast change. **Not used:** hue/saturation/colour jitter, grayscale, channel shuffling, CutMix/MixUp (they fabricate multi-condition images with fabricated labels), random erasing/cut-out (can delete the lesion). Colour carries the clinical signal (erythema, pigmentation).
+
+**Loss.** Multilabel: sigmoid binary cross-entropy **with a mask** (Unknown labels contribute nothing) and an optional per-condition `pos_weight = negatives/positives` (clipped) computed from *known* labels only. Softmax experiments: categorical cross-entropy with sample weights. Output layers are float32 under mixed precision.
+
+#@@ code
+# Metrics used by callbacks and by every evaluation section (defined once). y has -1 for Unknown and is never counted.
+from sklearn.metrics import average_precision_score, roc_auc_score
+
+
+def cond_metrics(y, s, thr, min_pos=None):
+    """Per-condition metrics on the images where that condition's label is KNOWN. Returns a DataFrame (one row per condition)."""
+    min_pos = CFG.MIN_POS_FOR_METRIC if min_pos is None else min_pos
+    rows = []
+    for j, c in enumerate(CFG.CONDITIONS):
+        k = y[:, j] >= 0
+        yy, ss = y[k, j], s[k, j]
+        pos, neg = int((yy == 1).sum()), int((yy == 0).sum())
+        pred = ss >= thr[j]
+        tp = int((pred & (yy == 1)).sum()); fp = int((pred & (yy == 0)).sum()); fn = int((~pred & (yy == 1)).sum()); tn = int((~pred & (yy == 0)).sum())
+        prec = tp / (tp + fp) if tp + fp else np.nan; rec = tp / (tp + fn) if tp + fn else np.nan; spec = tn / (tn + fp) if tn + fp else np.nan
+        f1 = 2 * prec * rec / (prec + rec) if (prec == prec and rec == rec and prec + rec > 0) else np.nan
+        ok = pos >= min_pos and neg >= min_pos
+        rows.append(dict(condition=c, n_known=int(k.sum()), pos=pos, neg=neg, threshold=float(thr[j]), precision=prec, recall=rec, sensitivity=rec, specificity=spec, f1=f1, tp=tp, fp=fp, fn=fn, tn=tn,
+                         ap=float(average_precision_score(yy, ss)) if ok else np.nan, roc_auc=float(roc_auc_score(yy, ss)) if ok else np.nan))
+    return pd.DataFrame(rows)
+
+
+def set_metrics(y, s, thr):
+    """Multilabel set metrics on FULLY-KNOWN rows: micro/macro F1, Hamming loss, exact match."""
+    k = (y >= 0).all(axis=1)
+    if k.sum() == 0:
+        return dict(n=0, micro_f1=np.nan, macro_f1=np.nan, hamming_loss=np.nan, exact_match=np.nan)
+    yy = y[k]; pp = (s[k] >= np.asarray(thr)[None, :]).astype(int)
+    tp = ((pp == 1) & (yy == 1)).sum(); fp = ((pp == 1) & (yy == 0)).sum(); fn = ((pp == 0) & (yy == 1)).sum()
+    micro = 2 * tp / max(2 * tp + fp + fn, 1)
+    f1s = []
+    for j in range(yy.shape[1]):
+        t, f, n = ((pp[:, j] == 1) & (yy[:, j] == 1)).sum(), ((pp[:, j] == 1) & (yy[:, j] == 0)).sum(), ((pp[:, j] == 0) & (yy[:, j] == 1)).sum()
+        f1s.append(2 * t / max(2 * t + f + n, 1) if (t + f + n) else np.nan)
+    return dict(n=int(k.sum()), micro_f1=float(micro), macro_f1=float(np.nanmean(f1s)), hamming_loss=float((pp != yy).mean()), exact_match=float((pp == yy).all(axis=1).mean()))
+
+
+def macro_ap(y, s):
+    m = cond_metrics(y, s, [0.5] * CFG.N_COND)
+    v = m.ap.dropna()
+    return (float(v.mean()) if len(v) == CFG.N_COND else float("nan")), m
+
+
+def best_f1_threshold(yy, ss, grid=None):
+    grid = grid or CFG.THRESHOLD_GRID
+    best, bt = -1, 0.5
+    for t in grid:
+        p = ss >= t; tp = (p & (yy == 1)).sum(); fp = (p & (yy == 0)).sum(); fn = (~p & (yy == 1)).sum()
+        f = 2 * tp / max(2 * tp + fp + fn, 1)
+        if f > best: best, bt = f, t
+    return bt, best
+
+
+def cluster_bootstrap(groups, fn, B=None, seed=None):
+    """95% percentile interval of fn(index_array) when resampling leakage GROUPS (not images). Returns (lo, hi, n_valid)."""
+    B = B or CFG.BOOTSTRAP_B; rng = np.random.RandomState(seed or CFG.BOOTSTRAP_SEED)
+    g = np.asarray(groups); ug = np.unique(g); idx_by = {u: np.where(g == u)[0] for u in ug}
+    vals = []
+    for _ in range(B):
+        pick = rng.choice(ug, len(ug), replace=True)
+        v = fn(np.concatenate([idx_by[u] for u in pick]))
+        if v == v: vals.append(v)
+    return (float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5)), len(vals)) if len(vals) >= max(20, B // 10) else (np.nan, np.nan, len(vals))
+
+
+#@@ code
+# 20.1 Data pipeline: decode -> (train only) dermatology-safe augmentation -> (p/127.5)-1. Batch-level augmentation keeps the CPU pipeline fast.
+AUTOTUNE = tf.data.AUTOTUNE
+IMG_PX = CFG.IMG_SIZE                 # (never reuse a one-letter global: other cells assign S, H, W ...)
+
+
+def decode_img(path):
+    img = tf.io.decode_image(tf.io.read_file(path), channels=3, expand_animations=False)       # RGB
+    img.set_shape([None, None, 3])
+    return tf.cast(tf.image.resize(img, [IMG_PX, IMG_PX], method="bilinear"), tf.float32)
+
+
+_aug_layers = []
+if CFG.AUG["flip"]: _aug_layers.append(keras.layers.RandomFlip("horizontal"))
+_aug_layers += [keras.layers.RandomRotation(CFG.AUG["rotation_deg"] / 360.0, fill_mode="reflect"),
+                keras.layers.RandomTranslation(CFG.AUG["translation"], CFG.AUG["translation"], fill_mode="reflect"),
+                keras.layers.RandomZoom(CFG.AUG["zoom"], fill_mode="reflect"),
+                keras.layers.RandomBrightness(CFG.AUG["brightness"], value_range=(0, 255)),
+                keras.layers.RandomContrast(CFG.AUG["contrast"])]
+AUGMENT = keras.Sequential(_aug_layers, name="derm_safe_augmentation")
+
+
+def scale_crop(x, p):
+    """With probability p per image, crop a random 55-100% window and resize back (simulates close-up vs full-face framing)."""
+    b = tf.shape(x)[0]
+    s = tf.where(tf.random.uniform([b]) < p, tf.random.uniform([b], 0.55, 1.0), tf.ones([b]))
+    cy = tf.random.uniform([b], s / 2, 1 - s / 2); cx = tf.random.uniform([b], s / 2, 1 - s / 2)
+    boxes = tf.stack([cy - s / 2, cx - s / 2, cy + s / 2, cx + s / 2], axis=1)
+    return tf.image.crop_and_resize(x, boxes, tf.range(b), [IMG_PX, IMG_PX], method="bilinear")
+
+
+def augment_batch(x):
+    x = scale_crop(x, CFG.AUG["scale_crop_p"])
+    return tf.clip_by_value(AUGMENT(x, training=True), 0.0, 255.0)
+
+
+def make_dataset(paths, y, w=None, training=False, batch=None):
+    batch = batch or CFG.BATCH_SIZE
+    paths = np.asarray(paths); y = np.asarray(y, np.float32)
+    w = np.ones(len(paths), np.float32) if w is None else np.asarray(w, np.float32)
+    ds = tf.data.Dataset.from_tensor_slices((paths, y, w))
+    if training:
+        ds = ds.shuffle(min(CFG.SHUFFLE_BUFFER, len(paths)), reshuffle_each_iteration=True)
+    ds = ds.map(lambda p, yy, ww: (decode_img(p), yy, ww), num_parallel_calls=AUTOTUNE).batch(batch)
+    if training:
+        ds = ds.map(lambda x, yy, ww: (augment_batch(x), yy, ww), num_parallel_calls=AUTOTUNE)
+    ds = ds.map(lambda x, yy, ww: (x / 127.5 - 1.0, yy, ww), num_parallel_calls=AUTOTUNE)
+    return ds.prefetch(AUTOTUNE)
+
+
+def pack_ml(y_known, mask):
+    """Multilabel target packing: [y(3) | mask(3)] -> (N,6)."""
+    return np.concatenate([np.where(mask, np.clip(y_known, 0, 1), 0), mask.astype(np.float32)], axis=1).astype(np.float32)
+
+
+#@@ code
+# 20.2 Masked BCE loss, backbone, head, builders. The loss is registered so .keras checkpoints reload.
+@keras.saving.register_keras_serializable(package="lumyvue")
+class MaskedBCE(keras.losses.Loss):
+    """Sigmoid BCE on logits with an UNKNOWN-label mask. y_true=[y(K)|mask(K)], y_pred = logits (K). Optional per-condition pos_weight."""
+    def __init__(self, pos_weight=None, name="masked_bce", **kw):
+        super().__init__(name=name, **kw)
+        self.pos_weight = [1.0] * CFG.N_COND if pos_weight is None else [float(v) for v in pos_weight]
+
+    def call(self, y_true, y_pred):
+        k = CFG.N_COND
+        y = tf.cast(y_true[:, :k], tf.float32); m = tf.cast(y_true[:, k:], tf.float32); z = tf.cast(y_pred, tf.float32)
+        pw = tf.constant(self.pos_weight, tf.float32)[None, :]
+        bce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=z)
+        wt = m * (1.0 + (pw - 1.0) * y)
+        return tf.reduce_sum(bce * wt, axis=1) / tf.maximum(tf.reduce_sum(m, axis=1), 1.0)
+
+    def get_config(self):
+        c = super().get_config(); c.update(pos_weight=self.pos_weight); return c
+
+
+def pretrained_backbone():
+    kw = dict(input_shape=(IMG_PX, IMG_PX, 3), include_top=False)
+    if CFG.PRETRAINED_WEIGHTS_PATH:
+        require(os.path.isfile(CFG.PRETRAINED_WEIGHTS_PATH), f"PRETRAINED_WEIGHTS_PATH not found: {CFG.PRETRAINED_WEIGHTS_PATH}", gate=True)
+        return keras.applications.MobileNetV2(weights=CFG.PRETRAINED_WEIGHTS_PATH, **kw)
+    cache = os.path.join(os.path.expanduser("~"), ".keras", "models", "mobilenet_v2_weights_tf_dim_ordering_tf_kernels_1.0_224_no_top.h5")
+    require(os.path.isfile(cache) or not CFG.OFFLINE_MODE,
+            "ImageNet MobileNetV2 weights are not cached and OFFLINE_MODE=True blocks the download.\nProvide the 'no_top' .h5 via LUMYVUE_PRETRAINED_WEIGHTS_PATH or set LUMYVUE_OFFLINE_MODE=false once.", gate=True)
+    return keras.applications.MobileNetV2(weights="imagenet", **kw)
+
+
+def find_backbone(model):
+    for l in model.layers:
+        if isinstance(l, keras.Model):
+            return l
+    raise V6Error("MobileNetV2 backbone (nested Model) not found in the model")
+
+
+def build_head(x, k, final_activation=None, name_prefix="global"):
+    x = keras.layers.GlobalAveragePooling2D(name=f"{name_prefix}_gap")(x)
+    x = keras.layers.Dropout(CFG.HEAD_DROPOUT, name=f"{name_prefix}_drop1")(x)
+    x = keras.layers.Dense(CFG.HEAD_UNITS, activation="relu", kernel_regularizer=keras.regularizers.l2(CFG.HEAD_L2), name=f"{name_prefix}_embedding")(x)
+    x = keras.layers.Dropout(CFG.HEAD_DROPOUT, name=f"{name_prefix}_drop2")(x)
+    return keras.layers.Dense(k, activation=final_activation, dtype="float32", name=f"{name_prefix}_logits" if final_activation is None else f"{name_prefix}_probs")(x)
+
+
+def build_global(mode, init):
+    """mode: 'softmax4' | 'multilabel3'. init: 'imagenet' | 'v5_full'. Returns (model, backbone). multilabel3 outputs LOGITS; softmax4 outputs probabilities."""
+    if init == "v5_full":
+        require(os.path.isfile(CFG.V5_KERAS), f"V5 Keras model not found: {CFG.V5_KERAS} (needed for experiments B/C)", gate=True)
+        require(mode == "softmax4", "v5_full initialisation is only meaningful for the 4-class softmax experiments")
+        m = keras.models.load_model(CFG.V5_KERAS, compile=False)               # read-only load into memory; the V5 file is never saved back
+        return m, find_backbone(m)
+    base = pretrained_backbone(); base.trainable = False
+    inp = keras.layers.Input((IMG_PX, IMG_PX, 3), name="image_nhwc_m1p1")
+    x = base(inp, training=False)
+    out = build_head(x, 4 if mode == "softmax4" else CFG.N_COND, "softmax" if mode == "softmax4" else None)
+    return keras.Model(inp, out, name=f"lumyvue_global_{mode}"), base
+
+
+def embedding_model(model):
+    """Model returning [128-d embedding, final output]. The embedding is the 128-unit Dense before the output (V5 and V6 heads both have one)."""
+    dense = [l for l in model.layers if isinstance(l, keras.layers.Dense) and l.units == CFG.HEAD_UNITS]
+    require(dense, "no 128-unit Dense layer found to use as the embedding")
+    return keras.Model(model.input, [dense[-1].output, model.output], name="global_features")
+
+
+def set_trainable(model, base, phase, fine_tune_at):
+    if phase == "A":
+        base.trainable = False
+    else:
+        base.trainable = True
+        for l in base.layers[:fine_tune_at]: l.trainable = False
+        for l in base.layers:
+            if isinstance(l, keras.layers.BatchNormalization): l.trainable = False          # keep ImageNet/V5 BN statistics
+    n = sum(1 for l in base.layers if l.trainable)
+    return n
+
+
+#@@ code
+# 21.1 Experiment definitions and training-table construction (labels, masks, weights). Gated: needs verified annotations + provenance.
+EXPERIMENTS = {
+    "B_v5_finetune_verified": dict(mode="softmax4", init="v5_full", data="verified_single", balance=False, hard=False, mixed_oversample=1, phase_a_lr=1e-4),
+    "C_balanced_hard":        dict(mode="softmax4", init="v5_full", data="verified_single", balance=True, hard=True, mixed_oversample=1, phase_a_lr=1e-4),
+    "D_multilabel3":          dict(mode="multilabel3", init="imagenet", data="all_masked", balance=False, hard=False, mixed_oversample=1, phase_a_lr=None),
+    "D2_multilabel3_hard":    dict(mode="multilabel3", init="imagenet", data="all_masked", balance=True, hard=True, mixed_oversample=CFG.MIXED_OVERSAMPLE, phase_a_lr=None),
+}
+unknown_exp = [e for e in CFG.GLOBAL_EXPERIMENTS if e not in EXPERIMENTS]
+require(not unknown_exp, f"Unknown experiment names in GLOBAL_EXPERIMENTS: {unknown_exp}. Valid: {list(EXPERIMENTS)}")
+HARD_USABLE = set(HARD[HARD.usable_for_training].image_id) if len(HARD) else set()
+
+
+def derive_softmax_label(df):
+    """4-class index (V5 order) from VERIFIED labels: none->Normal, exactly one condition -> that condition. Mixed / not fully known -> -1 (excluded)."""
+    lab = np.full(len(df), -1)
+    for i, (n, fk, a, h, e) in enumerate(zip(df.n_present, df.full_known, df.y_acne, df.y_hyperpigmentation, df.y_eczema)):
+        if not fk: continue
+        if n == 0: lab[i] = 3
+        elif n == 1: lab[i] = [a, h, e].index(1)
+    return lab
+
+
+def training_tables(exp):
+    """Returns dict(train=(paths,y,w), val=(paths,y,w), info) for experiment `exp`. Raises GateError when the data requirements are not met."""
+    gate("provenance_defined"); gate("annotations_train"); gate("annotations_validation")
+    e = EXPERIMENTS[exp]
+    tr = DF[(DF.split == "train") & DF.train_permitted].copy()
+    if CFG.UNCERTAIN_IN_TRAIN == "exclude": tr = tr[tr.review_status != "disputed"]
+    va = DF[(DF.split == "validation")].copy()
+    info = dict(experiment=exp)
+    if e["mode"] == "softmax4":
+        tr["lab"] = derive_softmax_label(tr); va["lab"] = derive_softmax_label(va)
+        info["excluded_mixed_or_unverified_train"] = int((tr.lab < 0).sum()); info["excluded_mixed_train_verified"] = int(((tr.n_present >= 2)).sum())
+        tr = tr[tr.lab >= 0]; va = va[va.lab >= 0]
+        require(len(tr) >= 50 and tr.lab.nunique() == 4, f"{exp}: not enough verified single-condition/none training images covering all 4 classes ({len(tr)} images, classes {sorted(tr.lab.unique())})", gate=True)
+        ytr = np.eye(4, dtype=np.float32)[tr.lab.values]; yva = np.eye(4, dtype=np.float32)[va.lab.values]
+        w = np.ones(len(tr), np.float32)
+        if e["balance"]:
+            cnt = np.bincount(tr.lab.values, minlength=4).astype(float); cw = cnt.sum() / (4 * np.maximum(cnt, 1)); w *= cw[tr.lab.values]
+        if e["hard"]: w *= np.where(tr.image_id.isin(HARD_USABLE), CFG.HARD_UPWEIGHT, 1.0)
+        info["class_counts_train"] = np.bincount(tr.lab.values, minlength=4).tolist()
+        return dict(train=(tr.proc_path.values, ytr, w), val=(va.proc_path.values, yva, np.ones(len(va), np.float32)), info=info, train_df=tr)
+    y, weak = TRAIN_Y[(DF.split == "train").values & DF.train_permitted.values], TRAIN_WEAK[(DF.split == "train").values & DF.train_permitted.values]
+    tr = DF[(DF.split == "train") & DF.train_permitted].copy()
+    if CFG.UNCERTAIN_IN_TRAIN == "exclude":
+        keep = (tr.review_status != "disputed").values; tr, y, weak = tr[keep], y[keep], weak[keep]
+    mask = (y >= 0)
+    keep = mask.any(axis=1); tr, y, mask = tr[keep], y[keep], mask[keep]
+    reps = np.ones(len(tr), int)
+    if e["mixed_oversample"] > 1: reps = np.where(tr.n_present.values >= 2, e["mixed_oversample"], 1)
+    idx = np.repeat(np.arange(len(tr)), reps)
+    tr, y, mask = tr.iloc[idx], y[idx], mask[idx]
+    w = np.ones(len(tr), np.float32)
+    if e["hard"]: w *= np.where(tr.image_id.isin(HARD_USABLE), CFG.HARD_UPWEIGHT, 1.0)
+    pw = [1.0] * CFG.N_COND
+    if CFG.USE_CLASS_WEIGHTS and e["balance"]:
+        pos = ((y == 1) & mask).sum(0).astype(float); neg = ((y == 0) & mask).sum(0).astype(float)
+        pw = [float(np.clip(n / max(p, 1.0), *CFG.POS_WEIGHT_CLIP)) for p, n in zip(pos, neg)]
+    ymask_va = (EVAL_Y[(DF.split == "validation").values] >= 0)
+    kv = ymask_va.any(axis=1)
+    va = va[kv]; yva_k = EVAL_Y[(DF.split == "validation").values][kv]
+    info.update(pos_weight=pw, known_labels_train=mask.sum(0).tolist(), positives_train=((y == 1) & mask).sum(0).tolist(), negatives_train=((y == 0) & mask).sum(0).tolist(),
+                n_train=int(len(tr)), n_val=int(len(va)))
+    require(len(tr) >= 50, f"{exp}: fewer than 50 training images with any known label", gate=True)
+    return dict(train=(tr.proc_path.values, pack_ml(y.astype(np.float32), mask), w), val=(va.proc_path.values, pack_ml(yva_k.astype(np.float32), yva_k >= 0), np.ones(len(va), np.float32)),
+                info=info, train_df=tr, pos_weight=pw)
+
+
+#@@ code
+# 21.2 Validation-metric callback (VERIFIED validation images only) + checkpoint/resume machinery. `val_sel` = macro AP if computable else -val_loss.
+def eval_global_scores(model, paths, mode, batch=64):
+    """Returns per-condition scores (N,3): sigmoid of logits (multilabel) or the 3 condition softmax probabilities (softmax4)."""
+    ds = make_dataset(paths, np.zeros((len(paths), 6 if mode == "multilabel3" else 4), np.float32), training=False, batch=batch)
+    out = model.predict(ds.map(lambda x, y, w: x), verbose=0)
+    out = np.asarray(out, np.float32)
+    return 1 / (1 + np.exp(-out)) if mode == "multilabel3" else out[:, :3]
+
+
+class ValMetrics(keras.callbacks.Callback):
+    def __init__(self, mode, val_paths, val_y_eval):
+        super().__init__(); self.mode, self.paths, self.y = mode, val_paths, val_y_eval
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs if logs is not None else {}
+        s = eval_global_scores(self.model, self.paths, self.mode)
+        m = cond_metrics(self.y, s, [0.5] * CFG.N_COND)
+        ap = m.ap.dropna()
+        logs["val_macro_ap"] = float(ap.mean()) if len(ap) == CFG.N_COND else float("nan")
+        logs["val_macro_precision"] = float(np.nanmean(m.precision)) if m.precision.notna().any() else float("nan")
+        logs["val_macro_recall"] = float(np.nanmean(m.recall)) if m.recall.notna().any() else float("nan")
+        logs["val_macro_f1"] = float(np.nanmean(m.f1)) if m.f1.notna().any() else float("nan")
+        logs["val_sel"] = logs["val_macro_ap"] if logs["val_macro_ap"] == logs["val_macro_ap"] else -float(logs.get("val_loss", 1e9))
+        print(f"   val_macro_ap={logs['val_macro_ap']:.4f} val_macro_f1@0.5={logs['val_macro_f1']:.4f} val_sel={logs['val_sel']:.4f}")
+
+
+def phase_paths(exp, seed, phase):
+    d = os.path.join(CFG.DIRS["checkpoints"], exp, f"seed_{seed}"); os.makedirs(d, exist_ok=True)
+    return dict(dir=d, latest=os.path.join(d, f"phase{phase}_latest.keras"), best=os.path.join(d, f"phase{phase}_best.weights.h5"),
+                hist=os.path.join(d, f"phase{phase}_history.csv"), state=os.path.join(d, f"phase{phase}_state.json"))
+
+
+def run_phase(exp, seed, phase, model, base, tabs, epochs, lr, loss, metrics):
+    """One training phase with checkpointing and resume. Re-running continues from the last completed epoch; a finished phase is skipped."""
+    P = phase_paths(exp, seed, phase)
+    done = len(pd.read_csv(P["hist"])) if os.path.exists(P["hist"]) else 0
+    if (done >= epochs or os.path.exists(P["state"])) and os.path.exists(P["best"]):
+        print(f"  [{exp} seed {seed} phase {phase}] already complete ({done}/{epochs} epochs)")
+        model.load_weights(P["best"]); return model
+    n_tr = set_trainable(model, base, phase, CFG.FINE_TUNE_AT)
+    resumed = False
+    if done > 0 and os.path.exists(P["latest"]):
+        model = keras.models.load_model(P["latest"], custom_objects={"MaskedBCE": MaskedBCE})      # compiled model incl. optimizer state and the current (possibly reduced) learning rate
+        base = find_backbone(model); n_tr = sum(1 for l in base.layers if l.trainable); resumed = True
+        print(f"  RESUMING {exp} seed {seed} phase {phase} from epoch {done} (optimizer state restored)")
+    if not resumed: model.compile(optimizer=keras.optimizers.Adam(lr), loss=loss, metrics=metrics)
+    train_ds = make_dataset(*tabs["train"], training=True); val_ds = make_dataset(*tabs["val"], training=False)
+    cbs = [ValMetrics("multilabel3" if EXPERIMENTS[exp]["mode"] == "multilabel3" else "softmax4", tabs["val"][0], tabs["val_y_eval"]),
+           keras.callbacks.ModelCheckpoint(P["best"], monitor="val_sel", mode="max", save_best_only=True, save_weights_only=True),
+           keras.callbacks.ModelCheckpoint(P["latest"], save_best_only=False),
+           keras.callbacks.EarlyStopping(monitor="val_sel", mode="max", patience=CFG.EARLY_STOP_PATIENCE, restore_best_weights=False),
+           keras.callbacks.ReduceLROnPlateau(monitor="val_sel", mode="max", factor=CFG.LR_FACTOR, patience=CFG.LR_PATIENCE, min_lr=CFG.MIN_LR, verbose=1),
+           keras.callbacks.CSVLogger(P["hist"], append=True)]
+    print(f"  [{exp} seed {seed} phase {phase}] trainable backbone layers: {n_tr}, lr={lr}, epochs {done}->{epochs}")
+    model.fit(train_ds, validation_data=val_ds, epochs=epochs, initial_epoch=done, callbacks=cbs, verbose=2)
+    if os.path.exists(P["best"]): model.load_weights(P["best"])
+    write_json(P["state"], dict(exp=exp, seed=seed, phase=phase, epochs_target=epochs, completed=True, finished=datetime.datetime.now().isoformat(timespec="seconds")))
+    log_event("phase_done", exp=exp, seed=seed, phase=phase)
+    return model
+
+
+#@@ md
+## 21. Global classifier training — run cell by cell
+
+The next cell trains **every experiment in `CFG.GLOBAL_EXPERIMENTS` for every seed in `CFG.SEEDS`**. It is safe to interrupt: re-running resumes from `phase*_latest.keras` and the epoch counter in `phase*_history.csv`; completed phases are skipped. Edit `CFG.GLOBAL_EXPERIMENTS` (or the environment variable) to train experiments one at a time. If a gate is closed, the cell stops *before* creating any dataset or model and prints the exact missing requirement.
+
+Expected effort on an RTX 4060 8 GB at batch 32 (indicative only — measure on your machine): a few minutes per phase for ≈ 2 000–6 000 images.
+
+#@@ code
+# 21.3 / 22.1  Train experiments B, C, D, D2 (Phase A: frozen backbone; Phase B: partial unfreeze, BatchNorm frozen).  >>> THIS CELL TRAINS MODELS <<<
+GLOBAL_RESULTS = {}
+for exp in CFG.GLOBAL_EXPERIMENTS:
+    try:
+        tabs = training_tables(exp)
+    except GateError as g:
+        print(f"\n[{exp}] SKIPPED - {g}")
+        GLOBAL_RESULTS[exp] = dict(status="blocked", why=str(g)); continue
+    e = EXPERIMENTS[exp]
+    yv = EVAL_Y[(DF.split == "validation").values]
+    keep_val = DF[(DF.split == "validation")].proc_path.isin(tabs["val"][0]).values
+    tabs["val_y_eval"] = yv[keep_val]
+    write_json(os.path.join(CFG.DIRS["config"], f"{exp}_data_info.json"), tabs["info"])
+    print(f"\n=== {exp}: {json.dumps({k: v for k, v in tabs['info'].items() if k != 'experiment'}, default=str)}")
+    for seed in CFG.SEEDS:
+        set_all_seeds(seed)
+        model, base = build_global(e["mode"], e["init"])
+        if e["mode"] == "multilabel3":
+            loss = MaskedBCE(tabs["pos_weight"]); metrics = []
+        else:
+            loss = keras.losses.CategoricalCrossentropy(); metrics = ["accuracy"]
+        # weights are supplied by the dataset (3rd element) for the softmax experiments and through pos_weight for multilabel
+        lrA = e["phase_a_lr"] or CFG.PHASE_A_LR
+        epochsA = CFG.PHASE_A_EPOCHS if e["init"] == "imagenet" else max(3, CFG.PHASE_A_EPOCHS // 3)
+        model = run_phase(exp, seed, "A", model, base, tabs, epochsA, lrA, loss, metrics)
+        model = run_phase(exp, seed, "B", model, find_backbone(model), tabs, CFG.PHASE_B_EPOCHS, CFG.PHASE_B_LR, loss, metrics)
+        model.save(safe_path(os.path.join(CFG.DIRS["checkpoints"], exp, f"seed_{seed}", "final_best.keras")))
+        keras.backend.clear_session()
+    GLOBAL_RESULTS[exp] = dict(status="trained", info=tabs["info"])
+write_json(os.path.join(CFG.DIRS["metrics"], "global_training_status.json"), GLOBAL_RESULTS)
+
+#@@ md
+## 22. Selecting the global model on validation data, with a regression check
+For each trained experiment and seed, scores on the verified **validation** images are computed and compared with the V5 baseline (experiment A) on the *same images*. The **best seed per experiment** is chosen by validation macro-AP; the **improved global model** is the experiment with the highest macro-AP **among those without a per-condition regression** (F1@0.5 drop larger than `REGRESSION_TOLERANCE_F1` versus A). If every candidate regresses somewhere, the best is still reported but flagged. The choice is saved to `metrics/global_selection.json`; the test set plays no part.
+
+#@@ code
+def global_scores_for(exp, seed, df, tag="final_best.keras"):
+    """Cached per-condition scores/embeddings of a trained global model for the rows of df (any split). Returns dict(scores, emb, pnormal)."""
+    e = EXPERIMENTS[exp]
+    cache = os.path.join(CFG.DIRS["predictions"], f"global_{exp}_seed{seed}_{hashlib.md5(','.join(df.image_id).encode()).hexdigest()[:10]}.npz")
+    if os.path.exists(cache):
+        z = np.load(cache); return dict(scores=z["scores"], emb=z["emb"], pnormal=z["pnormal"])
+    path = os.path.join(CFG.DIRS["checkpoints"], exp, f"seed_{seed}", tag)
+    require(os.path.isfile(path), f"trained model not found: {path} (train experiment {exp} first)", gate=True)
+    m = keras.models.load_model(path, custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+    fm = embedding_model(m)
+    ds = make_dataset(df.proc_path.values, np.zeros((len(df), 4), np.float32), training=False, batch=64).map(lambda x, y, w: x)
+    emb, out = fm.predict(ds, verbose=0); out = np.asarray(out, np.float32)
+    if e["mode"] == "multilabel3":
+        sc = 1 / (1 + np.exp(-out)); pn = np.full(len(df), np.nan, np.float32)
+    else:
+        sc, pn = out[:, :3], out[:, 3]
+    np.savez_compressed(safe_path(cache), scores=sc, emb=emb.astype(np.float32), pnormal=pn)
+    keras.backend.clear_session()
+    return dict(scores=sc, emb=emb.astype(np.float32), pnormal=pn)
+
+
+def v5_scores(df):
+    return df[[f"v5_{c}" for c in CFG.CONDITIONS]].to_numpy(np.float32)
+
+
+val_df = DF[DF.split == "validation"]
+yv_all = EVAL_Y[(DF.split == "validation").values]
+SEL = dict(candidates={})
+if (yv_all >= 0).any():
+    rowsA = cond_metrics(yv_all, v5_scores(val_df), [0.5] * 3); rowsA["experiment"] = "A_v5_baseline"; rowsA["seed"] = -1
+    all_rows = [rowsA]
+    for exp, res in GLOBAL_RESULTS.items():
+        if res.get("status") != "trained": continue
+        best = None
+        for seed in CFG.SEEDS:
+            try:
+                gs = global_scores_for(exp, seed, val_df)
+            except GateError as g:
+                print("  ", g); continue
+            m = cond_metrics(yv_all, gs["scores"], [0.5] * 3); ap = m.ap.mean(); m["experiment"] = exp; m["seed"] = seed; all_rows.append(m)
+            if best is None or (ap == ap and ap > best[0]): best = (ap, seed)
+        if best: SEL["candidates"][exp] = dict(best_seed=best[1], val_macro_ap=float(best[0]))
+    CMP = pd.concat(all_rows, ignore_index=True)
+    write_csv(CMP, os.path.join(CFG.DIRS["metrics"], "global_experiments_validation_per_condition.csv"))
+    summ = CMP.groupby(["experiment", "seed"]).agg(macro_ap=("ap", "mean"), macro_f1=("f1", "mean")).reset_index()
+    display(summ)
+    base_f1 = rowsA.set_index("condition").f1
+    for exp, c in SEL["candidates"].items():
+        m = CMP[(CMP.experiment == exp) & (CMP.seed == c["best_seed"])].set_index("condition")
+        c["delta_f1_vs_A"] = (m.f1 - base_f1).round(4).to_dict()
+        c["regression"] = [k for k, v in c["delta_f1_vs_A"].items() if v == v and v < -CFG.REGRESSION_TOLERANCE_F1]
+    ok = {e: c for e, c in SEL["candidates"].items() if not c["regression"] and c["val_macro_ap"] == c["val_macro_ap"]}
+    pool = ok or {e: c for e, c in SEL["candidates"].items() if c["val_macro_ap"] == c["val_macro_ap"]}
+    if pool:
+        SEL["selected"] = max(pool, key=lambda e: pool[e]["val_macro_ap"]); SEL["selected_seed"] = pool[SEL["selected"]]["best_seed"]; SEL["selected_has_regression"] = bool(pool[SEL["selected"]]["regression"])
+    write_json(os.path.join(CFG.DIRS["metrics"], "global_selection.json"), SEL)
+    print(json.dumps(SEL, indent=1, default=str))
+    if SEL.get("selected_has_regression"): print("NOTE: the selected model regresses on a condition versus V5 (see delta_f1_vs_A). Report it as such.")
+else:
+    print("Global-model comparison needs verified validation labels (and trained experiments): not available yet. Nothing was invented.")
+GLOBAL_SELECTED = (SEL.get("selected"), SEL.get("selected_seed"))
+print("improved global model:", GLOBAL_SELECTED)

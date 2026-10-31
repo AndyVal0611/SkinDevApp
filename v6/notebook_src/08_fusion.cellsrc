@@ -1,0 +1,342 @@
+#@@ md
+# Part VII — Trainable Multilabel Fusion, Cross-Fitting, Calibration and Thresholds
+
+Sections: **(29) fusion architecture · (30) fusion training · (31) calibration and threshold selection.**
+
+## Fusion network
+Inputs per image (all produced by frozen, out-of-sample models):
+
+| Group | Content | Notes |
+|---|---|---|
+| Global | 128-d embedding, 3 **logits** of the selected global model (probabilities are clipped and logit-transformed), `p(Normal)` (softmax models) + flag | calibrated *by the fusion*, not averaged with anything |
+| Detector evidence (per condition, 7 numbers) | `available`, `detected` (≥ deployed threshold), max deployed confidence, max pool confidence, relative area, centre x, centre y | **no box counts** (not severity/prevalence). `available = 0` ⇒ all other numbers 0 (**missing detector ≠ zero detections**) |
+| ROI set (≤ 12 regions) | ROI-CNN embedding (64) + 4 ROI scores + YOLO geometry/evidence features per region, with a **mask** | variable counts, empty set allowed |
+| Quality (optional, off by default) | a few technical-quality numbers | only enable if Section 38 shows they carry information |
+
+**Aggregation of regions:** *masked attention pooling* — three attention heads (one per condition) score each region, a softmax over the **real** regions (masked) gives weights, and the weighted sums are concatenated with the global and detector features → MLP → **3 logits** (one per condition). **Modality dropout** randomly hides the whole detector-evidence group and/or the ROI group during training, so the network cannot learn to simply trust YOLO and learns how to behave when a branch is missing (Eczema detector unavailable, no detections, …).
+
+**Loss:** the same *masked* binary cross-entropy (Unknown labels contribute nothing). Labels for the fusion split come from the **reference standard** (dermatologist-verified).
+
+## Leakage control (the reason for the `fusion` split)
+The CNNs were trained on `train` (selected on `validation`). The fusion network is trained and calibrated on `fusion` images that none of the CNNs has seen, using **grouped K-fold cross-fitting**: every `fusion` image receives an *out-of-fold* fusion logit from a model that never saw its group. Out-of-fold logits are the only data used to fit **calibration**, **thresholds**, the **Stage-1 reliability rule** and the **abstention bands** — all frozen before the `test` split is opened. The final fusion models (one per seed, trained on all `fusion` data, logits averaged) are applied to `test` once.
+
+#@@ code
+# 29.1 Feature assembly. A missing detector is encoded by available=0 (never by 'detected=0').
+DET_EV_DIM = 7
+
+
+def logit(p, eps=1e-4):
+    p = np.clip(np.asarray(p, np.float64), eps, 1 - eps)
+    return np.log(p / (1 - p)).astype(np.float32)
+
+
+def global_inputs(df, choice=None):
+    choice = choice or GLOBAL_SELECTED
+    require(choice[0], "no improved global model selected (Section 22)", gate=True)
+    g = global_scores_for(choice[0], choice[1], df)
+    pn = g["pnormal"]; has = (~np.isnan(pn)).astype(np.float32)
+    return dict(emb=g["emb"].astype(np.float32), logit=logit(g["scores"]), extra=np.stack([np.nan_to_num(pn, nan=0.0), has], 1).astype(np.float32), scores=g["scores"].astype(np.float32))
+
+
+def detector_evidence(df):
+    """[N,3,7]: available, detected, max deployed conf, max pool conf, rel area, cx, cy. Unavailable detector (or image without detector output) -> all zeros incl. available=0."""
+    ev = np.zeros((len(df), CFG.N_COND, DET_EV_DIM), np.float32)
+    if not len(EVID): return ev
+    E = EVID.set_index(["image_id", "condition"])
+    pool_max = DET.groupby(["image_id", "condition"]).conf.max() if len(DET) else pd.Series(dtype=float)
+    for n, iid in enumerate(df.image_id):
+        for j, c in enumerate(CFG.CONDITIONS):
+            if (iid, c) not in E.index: continue
+            r = E.loc[(iid, c)]
+            if r.state == "not_available": continue
+            det = r.state == "detected"
+            ev[n, j] = [1.0, float(det), 0.0 if not det else float(r.max_conf), float(pool_max.get((iid, c), 0.0)), 0.0 if not det else float(np.sqrt(r.best_rel_area)),
+                        0.0 if not det else float(r.best_cx), 0.0 if not det else float(r.best_cy)]
+    return ev
+
+
+QUALITY_FEATURES = ["laplacian_var", "mean_brightness", "over_frac", "under_frac", "uneven_lr", "gray_world_dev"]
+FUSION_USE_QUALITY = False
+
+
+def quality_matrix(df):
+    rows = []
+    for r in df.itertuples():
+        q = image_quality_metrics(cv2.imread(r.orig_path if r.has_orig else r.proc_path), with_face=False)
+        rows.append([math.log1p(q["laplacian_var"]), q["mean_brightness"] / 255.0, q["over_frac"], q["under_frac"], q["uneven_lr"], q["gray_world_dev"]])
+    return np.asarray(rows, np.float32)
+
+
+VARIANTS = {                      # which input groups are visible; drop = detectors whose evidence and ROIs are removed
+    "full": dict(global_=True, roi=True, det=True, drop=[]),
+    "global_yolo": dict(global_=True, roi=False, det=True, drop=[]),         # system E: global + YOLO evidence, no ROI CNN
+    "global_only": dict(global_=True, roi=False, det=False, drop=[]),         # trainable re-calibration of the global model only
+    "roi_only": dict(global_=False, roi=True, det=False, drop=[]),            # system D: ROI MobileNetV2 branch (with its YOLO geometry), no global model
+    "no_acne_evidence": dict(global_=True, roi=True, det=True, drop=["Acne"]),
+    "no_eczema_evidence": dict(global_=True, roi=True, det=True, drop=["Eczema"]),
+    "no_hyper_evidence": dict(global_=True, roi=True, det=True, drop=["Hyperpigmentation"]),
+}
+
+
+def assemble(df, roi_sets, variant="full", choice=None, max_tier=3):
+    """Returns the model-input dict for `df` (rows aligned with roi_sets). Ablations are implemented by hiding groups (zeros + masks), so one architecture serves all variants."""
+    v = VARIANTS[variant]; N = len(df); R = CFG.ROI_MAX_TOTAL
+    g = global_inputs(df, choice)
+    ev = detector_evidence(df); feat = roi_sets["feat"].copy(); mask = roi_sets["mask"] & (roi_sets["tier"] <= max_tier)      # max_tier = evidence available at this verification pass
+    for c in v["drop"]:
+        j = CFG.CONDITIONS.index(c); ev[:, j, :] = 0
+        cond_col = CFG.ROI_EMB + len(CFG.ROI_CLASSES) + YOLO_FEATURE_NAMES.index("cond_" + ("hyper" if c == "Hyperpigmentation" else c.lower()))
+        drop = feat[:, :, cond_col] > 0.5
+        mask &= ~drop; feat[drop] = 0
+    feat[~mask] = 0
+    X = dict(g_emb=g["emb"] * v["global_"], g_logit=g["logit"] * v["global_"], g_extra=g["extra"] * v["global_"],
+             det_ev=(ev * v["det"]).reshape(N, -1), roi_feat=feat * (v["roi"] or 0), roi_mask=(mask & bool(v["roi"])).astype(np.float32))
+    if FUSION_USE_QUALITY: X["quality"] = quality_matrix(df)
+    return X, g["scores"]
+
+
+#@@ code
+# 29.2 Fusion network (float32 inside; mixed precision is switched off while it is built because the inputs are tiny and numerically sensitive).
+@keras.saving.register_keras_serializable(package="lumyvue")
+class MaskedAttentionPool(keras.layers.Layer):
+    """K attention heads over a padded set. h: [B,R,H], mask: [B,R] (1 = real region). Returns [B, K*H]; an all-masked set yields zeros."""
+    def __init__(self, heads=3, **kw):
+        super().__init__(**kw); self.heads = heads; self.score = keras.layers.Dense(heads, name="att_score")
+    def call(self, inputs):
+        h, m = inputs
+        s = self.score(h) + (1.0 - m[..., None]) * -1e9
+        a = tf.nn.softmax(s, axis=1) * m[..., None]
+        pooled = tf.einsum("brk,brh->bkh", a, h)
+        return tf.reshape(pooled, [tf.shape(h)[0], self.heads * h.shape[-1]])
+    def get_config(self):
+        c = super().get_config(); c.update(heads=self.heads); return c
+
+
+@keras.saving.register_keras_serializable(package="lumyvue")
+class MaskFraction(keras.layers.Layer):
+    """Fraction of the R region slots that hold a real region: [B,R] -> [B,1]."""
+    def call(self, m):
+        return tf.reduce_sum(m, axis=1, keepdims=True) / tf.cast(tf.shape(m)[1], m.dtype)
+
+
+@keras.saving.register_keras_serializable(package="lumyvue")
+class ModalityDropout(keras.layers.Layer):
+    """Training only: zero a whole input group for a random fraction of samples (a missing branch must be tolerated, never relied on)."""
+    def __init__(self, rate=0.25, **kw):
+        super().__init__(**kw); self.rate = rate
+    def call(self, x, training=None):
+        if not training or self.rate <= 0: return x
+        keep = tf.cast(tf.random.uniform([tf.shape(x)[0]] + [1] * (len(x.shape) - 1)) >= self.rate, x.dtype)
+        return x * keep
+    def get_config(self):
+        c = super().get_config(); c.update(rate=self.rate); return c
+
+
+def build_fusion(dims):
+    """dims: dict(g_emb, det_ev, roi_feat=(R,D), quality (optional))."""
+    H = CFG.FUSION_HIDDEN
+    old = keras.mixed_precision.global_policy().name; keras.mixed_precision.set_global_policy("float32")
+    try:
+        i_emb = keras.layers.Input((dims["g_emb"],), name="g_emb"); i_lg = keras.layers.Input((CFG.N_COND,), name="g_logit"); i_ex = keras.layers.Input((2,), name="g_extra")
+        i_det = keras.layers.Input((dims["det_ev"],), name="det_ev"); i_roi = keras.layers.Input(dims["roi_feat"], name="roi_feat"); i_m = keras.layers.Input((dims["roi_feat"][0],), name="roi_mask")
+        ins = [i_emb, i_lg, i_ex, i_det, i_roi, i_m]
+        g = keras.layers.Dense(H, activation="relu", name="g_proj")(keras.layers.Dropout(CFG.FUSION_DROPOUT)(i_emb))
+        det = ModalityDropout(CFG.FUSION_MODALITY_DROPOUT, name="det_modality_dropout")(i_det)
+        m = ModalityDropout(CFG.FUSION_MODALITY_DROPOUT, name="roi_modality_dropout")(i_m)   # hiding the whole ROI group = all-false mask
+        h = keras.layers.Dense(H, activation="relu", name="roi_proj")(i_roi)
+        pooled = MaskedAttentionPool(CFG.N_COND, name="roi_attention_pool")([h, m])
+        n_roi = MaskFraction(name="roi_fraction")(m)
+        parts = [g, i_lg, i_ex, det, pooled, n_roi]
+        if dims.get("quality"):
+            i_q = keras.layers.Input((dims["quality"],), name="quality"); ins.append(i_q); parts.append(i_q)
+        x = keras.layers.Concatenate(name="fusion_concat")(parts)
+        x = keras.layers.Dense(H, activation="relu", kernel_regularizer=keras.regularizers.l2(CFG.HEAD_L2), name="fusion_hidden")(x)
+        x = keras.layers.Dropout(CFG.FUSION_DROPOUT)(x)
+        out = keras.layers.Dense(CFG.N_COND, dtype="float32", name="fusion_logits")(x)
+        model = keras.Model(ins, out, name="lumyvue_fusion")
+    finally:
+        keras.mixed_precision.set_global_policy(old)
+    return model
+
+
+def fusion_dims(X):
+    d = dict(g_emb=X["g_emb"].shape[1], det_ev=X["det_ev"].shape[1], roi_feat=tuple(X["roi_feat"].shape[1:]))
+    if "quality" in X: d["quality"] = X["quality"].shape[1]
+    return d
+
+
+FUSION_ORDER = ["g_emb", "g_logit", "g_extra", "det_ev", "roi_feat", "roi_mask"]
+x_list = lambda X: [X[k] for k in FUSION_ORDER] + ([X["quality"]] if "quality" in X else [])
+
+#@@ code
+# 30.1 Grouped K-fold cross-fitting on the `fusion` split -> out-of-fold logits; final models trained on all fusion data (one per seed).
+from sklearn.model_selection import GroupKFold
+
+
+def train_one_fusion(Xtr, ytr, Xva, yva, seed, pos_weight=None, epochs=None):
+    set_all_seeds(seed)
+    old = keras.mixed_precision.global_policy().name; keras.mixed_precision.set_global_policy("float32")
+    try:
+        model = build_fusion(fusion_dims(Xtr))
+        model.compile(optimizer=keras.optimizers.Adam(CFG.FUSION_LR), loss=MaskedBCE(pos_weight))
+        pack = lambda y: pack_ml(np.clip(y, 0, 1).astype(np.float32), y >= 0)
+        cb = [keras.callbacks.EarlyStopping(monitor="val_loss", patience=CFG.FUSION_PATIENCE, restore_best_weights=True)]
+        model.fit(x_list(Xtr), pack(ytr), validation_data=(x_list(Xva), pack(yva)), epochs=epochs or CFG.FUSION_EPOCHS, batch_size=CFG.FUSION_BATCH, callbacks=cb, verbose=0)
+    finally:
+        keras.mixed_precision.set_global_policy(old)
+    return model
+
+
+def subset(X, idx):
+    return {k: v[idx] for k, v in X.items()}
+
+
+def split_groups(groups, frac, rng):
+    ug = np.unique(groups); rng.shuffle(ug); k = max(1, int(len(ug) * frac)); va = set(ug[:k])
+    m = np.array([g in va for g in groups]); return np.where(~m)[0], np.where(m)[0]
+
+
+def fusion_pos_weights(y):
+    pos = (y == 1).sum(0).astype(float); neg = (y == 0).sum(0).astype(float)
+    return [float(np.clip(n / max(p, 1.0), *CFG.POS_WEIGHT_CLIP)) for p, n in zip(pos, neg)]
+
+
+def concat_views(Xs, idx):
+    return {k: np.concatenate([x[k][idx] for x in Xs]) for k in Xs[0]}
+
+
+def crossfit_fusion(Xs, y, groups, variant, seeds=None, folds=None):
+    """Xs = list of 'evidence views' of the SAME rows (e.g. ROI tiers <=1, <=2, <=3), so the fusion learns to cope with fewer regions.
+    Returns (list of OOF logit arrays, one per view, mean over seeds; final model paths). Rows without ANY known label are skipped for fitting but still receive OOF logits."""
+    seeds = seeds or CFG.SEEDS; folds = folds or CFG.FUSION_CV_FOLDS; V = len(Xs)
+    known = (y >= 0).any(axis=1); N = len(y); oof = [np.zeros((N, CFG.N_COND), np.float32) for _ in range(V)]; cnt = np.zeros(N)
+    gkf = GroupKFold(n_splits=min(folds, len(np.unique(groups))))
+    for seed in seeds:
+        rng = np.random.RandomState(seed)
+        for f, (tr, te) in enumerate(gkf.split(np.zeros(N), groups=groups)):
+            tr = tr[known[tr]]; a, b = split_groups(groups[tr], 0.15, rng); itr, iva = tr[a], tr[b]
+            if len(itr) < 20 or len(iva) < 5: continue
+            m = train_one_fusion(concat_views(Xs, itr), np.tile(y[itr], (V, 1)), concat_views(Xs, iva), np.tile(y[iva], (V, 1)), seed, fusion_pos_weights(y[itr]))
+            for v in range(V): oof[v][te] += m.predict(x_list(subset(Xs[v], te)), verbose=0)
+            cnt[te] += 1
+            keras.backend.clear_session()
+    require((cnt > 0).all(), "cross-fitting left some rows without an out-of-fold prediction (too few labelled rows per fold)", gate=True)
+    oof = [o / cnt[:, None] for o in oof]
+    finals = []
+    for seed in seeds:
+        rng = np.random.RandomState(seed); idx = np.where(known)[0]; a, b = split_groups(groups[idx], 0.15, rng)
+        m = train_one_fusion(concat_views(Xs, idx[a]), np.tile(y[idx[a]], (V, 1)), concat_views(Xs, idx[b]), np.tile(y[idx[b]], (V, 1)), seed, fusion_pos_weights(y[idx[a]]))
+        p = os.path.join(CFG.DIRS["fusion"], variant, f"final_seed{seed}.keras"); os.makedirs(os.path.dirname(p), exist_ok=True); m.save(safe_path(p)); finals.append(p)
+        keras.backend.clear_session()
+    return oof, finals
+
+
+def fusion_predict(X, variant, seeds=None):
+    """Mean logit of the final fusion models of `variant` (no refitting)."""
+    seeds = seeds or CFG.SEEDS; outs = []
+    for s in seeds:
+        p = os.path.join(CFG.DIRS["fusion"], variant, f"final_seed{s}.keras")
+        require(os.path.isfile(p), f"final fusion model missing: {p}", gate=True)
+        m = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
+        outs.append(m.predict(x_list(X), verbose=0)); keras.backend.clear_session()
+    return np.mean(outs, axis=0).astype(np.float32)
+
+
+#@@ md
+## 30. Fusion training — run cell by cell
+The next cell prepares the `fusion`-split feature tensors (this needs: trained global model, trained ROI model, YOLO output for those images, verified annotations) and then trains **every variant in `FUSION_RUN`** with cross-fitting. If any prerequisite is missing it stops with the exact reason. Fusion networks are tiny; each variant takes minutes. **>>> THIS CELL TRAINS MODELS <<<**
+
+#@@ code
+FUSION_RUN = ["full", "global_yolo", "global_only", "roi_only", "no_acne_evidence", "no_eczema_evidence", "no_hyper_evidence"]
+FUSION_STATE = {}
+try:
+    gate("annotations_fusion"); gate("yolo_any")
+    require(GLOBAL_SELECTED[0], "no selected global model (Section 22)", gate=True)
+    require(ROI_SELECTED_SEED is not None, "no trained ROI model (Section 27)", gate=True)
+    fdf, fsets = cached_roi_sets("fusion")
+    fdf = fdf.reset_index(drop=True)
+    _b = DF.set_index("image_id").loc[fdf.image_id]
+    yf = _b[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy().copy()
+    yf[~_b.eval_ok.values] = -1                                               # fusion labels = reference standard only
+    gf = fdf.group_id.values
+    require((yf >= 0).any(axis=1).sum() >= CFG.MIN_VERIFIED["fusion"], f"fusion split has fewer than {CFG.MIN_VERIFIED['fusion']} images with verified labels", gate=True)
+    FUSION_STATE = dict(df=fdf, y=yf, groups=gf, oof={}, oof_views={}, X={}, roi_sets=fsets)
+    for var in FUSION_RUN:
+        tiers = (1, 2, 3) if VARIANTS[var]["roi"] else (3,)
+        Xs = [assemble(fdf, fsets, var, max_tier=t)[0] for t in tiers]; gscores = assemble(fdf, fsets, var, max_tier=3)[1]
+        FUSION_STATE["X"][var] = Xs[-1]
+        oofs, finals = crossfit_fusion(Xs, yf, gf, var)
+        FUSION_STATE["oof"][var] = oofs[-1]; FUSION_STATE["oof_views"][var] = dict(zip(tiers, oofs))
+        np.save(safe_path(os.path.join(CFG.DIRS["fusion"], var, "oof_logits.npy")), oofs[-1])
+        print(f"fusion variant '{var}': OOF macro-AP = {macro_ap(yf, 1 / (1 + np.exp(-oofs[-1])))[0]:.4f}  (fusion split, cross-fitted; NOT a test result)")
+    FUSION_STATE["global_scores"] = gscores
+    np.save(safe_path(os.path.join(CFG.DIRS["fusion"], "fusion_split_image_order.npy")), fdf.image_id.values.astype(str))
+    log_event("fusion_trained", variants=FUSION_RUN)
+except GateError as g:
+    print(f"[fusion] BLOCKED - {g}")
+
+#@@ md
+## 31. Calibration, thresholds and selective-prediction preparation (fusion split, out-of-fold only)
+* **Calibration:** per-condition *Platt scaling* of the out-of-fold fusion logit (`p = σ(a·z + b)`), fitted by regularised maximum likelihood on known labels. Skipped (identity, with a visible flag) for a condition with fewer than `MIN_POS_FOR_METRIC` positives or negatives — **no calibration is claimed without enough data**.
+* **Thresholds:** per condition, the threshold on the **calibrated OOF probability** that maximises F1 (grid `THRESHOLD_GRID`); sensitivity/specificity at the threshold are reported with it. No threshold is ever chosen on `test`.
+* **Metrics:** Brier score, ECE, reliability bins (OOF, before and after calibration). Calibration performance on the *test* split is reported later as an honest out-of-sample check.
+
+#@@ code
+from scipy.optimize import minimize
+
+
+def fit_platt(z, y, l2=1e-3):
+    k = y >= 0; zz, yy = z[k].astype(float), y[k].astype(float)
+    if (yy == 1).sum() < CFG.MIN_POS_FOR_METRIC or (yy == 0).sum() < CFG.MIN_POS_FOR_METRIC: return None
+    def nll(p):
+        a, b = p; s = a * zz + b
+        return float(np.mean(np.logaddexp(0, s) - yy * s) + l2 * (a - 1) ** 2)
+    r = minimize(nll, x0=np.array([1.0, 0.0]), method="L-BFGS-B")
+    return dict(a=float(r.x[0]), b=float(r.x[1]))
+
+
+def apply_platt(z, cal):
+    out = np.zeros_like(z, dtype=np.float32)
+    for j in range(z.shape[1]):
+        c = cal[j]
+        out[:, j] = 1 / (1 + np.exp(-(z[:, j] if c is None else c["a"] * z[:, j] + c["b"])))
+    return out
+
+
+def brier_ece(y, p, bins=None):
+    bins = bins or CFG.CALIBRATION_BINS; rows = []
+    for j, c in enumerate(CFG.CONDITIONS):
+        k = y[:, j] >= 0; yy, pp = y[k, j], p[k, j]
+        if len(yy) < 10: rows.append(dict(condition=c, n=len(yy), brier=np.nan, ece=np.nan)); continue
+        rows.append(dict(condition=c, n=int(len(yy)), brier=float(np.mean((pp - yy) ** 2)), ece=float(ece_binary(pp, yy, bins)[0])))
+    return pd.DataFrame(rows)
+
+
+CALIB = {}
+if FUSION_STATE.get("oof"):
+    yf = FUSION_STATE["y"]; rows = []
+    for var, z in FUSION_STATE["oof"].items():
+        cal = [fit_platt(z[:, j], yf[:, j]) for j in range(CFG.N_COND)]
+        pc = apply_platt(z, cal); praw = 1 / (1 + np.exp(-z))
+        thr = []
+        for j in range(CFG.N_COND):
+            k = yf[:, j] >= 0
+            thr.append(best_f1_threshold(yf[k, j], pc[k, j])[0] if ((yf[k, j] == 1).sum() >= CFG.MIN_POS_FOR_METRIC and (yf[k, j] == 0).sum() >= CFG.MIN_POS_FOR_METRIC) else 0.5)
+        CALIB[var] = dict(platt=cal, thresholds=thr, calibrated_conditions=[c for c, x in zip(CFG.CONDITIONS, cal) if x is not None])
+        b0, b1 = brier_ece(yf, praw), brier_ece(yf, pc)
+        for c in CFG.CONDITIONS:
+            rows.append(dict(variant=var, condition=c, brier_raw=float(b0.set_index("condition").brier[c]), brier_calibrated=float(b1.set_index("condition").brier[c]),
+                             ece_raw=float(b0.set_index("condition").ece[c]), ece_calibrated=float(b1.set_index("condition").ece[c]), calibrated=cal[CFG.CONDITIONS.index(c)] is not None,
+                             threshold=thr[CFG.CONDITIONS.index(c)]))
+    CAL_TBL = pd.DataFrame(rows); display(CAL_TBL)
+    write_csv(CAL_TBL, os.path.join(CFG.DIRS["metrics"], "fusion_calibration_oof.csv")); write_json(os.path.join(CFG.DIRS["fusion"], "calibration_thresholds.json"), CALIB)
+    fig, ax = plt.subplots(1, 3, figsize=(14, 4.2))
+    for j, c in enumerate(CFG.CONDITIONS):
+        k = yf[:, j] >= 0
+        if k.sum() >= 30:
+            for lab, p in [("raw", 1 / (1 + np.exp(-FUSION_STATE["oof"]["full"][:, j]))), ("calibrated", apply_platt(FUSION_STATE["oof"]["full"], CALIB["full"]["platt"])[:, j])]:
+                _, rel = ece_binary(p[k], yf[k, j], CFG.CALIBRATION_BINS); ax[j].plot(rel.mean_conf, rel.accuracy, "o-", label=lab)
+            ax[j].plot([0, 1], [0, 1], "k--"); ax[j].set_title(f"{c}: reliability (fusion OOF, 'full')"); ax[j].set_xlabel("predicted probability"); ax[j].set_ylabel("observed frequency"); ax[j].legend()
+    savefig(fig, "fusion_oof_reliability")
+else:
+    print("Calibration/thresholds need the cross-fitted fusion logits (Section 30): not available yet.")

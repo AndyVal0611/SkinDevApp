@@ -1,0 +1,402 @@
+#@@ md
+# Part VIII — Trustworthiness: Quality, OOD, Stage 1, Stage 2, Adaptive Verification, Final Assessment and Abstention
+
+Sections: **(32) Stage 1 · (33) Stage-1 reliability · (34) Stage 2 · (35) adaptive verification controller · (36) unified final result · (37) safe abstention · (38) OOD and input-quality evaluation.**
+
+## Information flow
+```
+image ─▶ validity + quality gate ─▶ OOD score
+      ─▶ STAGE 1: global CNN + 3 YOLO detectors ─▶ (fusion variant "global_yolo", no ROI) ─▶ calibrated per-condition probabilities
+                  ├─ reliability rule (validated on out-of-fold data): no conflict, no near-threshold, quality & OOD fine ─▶ ACCEPT
+                  └─ otherwise ─▶ STAGE 2: YOLO-guided ROI MobileNetV2 + full fusion ("full")
+                                    └─ bounded verification passes; each pass must add NEW evidence
+                                         pass 1: Tier-1 regions (deployed boxes)   pass 2: + Tier-2 candidates   pass 3: + Tier-3 alternative-context crops
+                                         stop: resolved · converged · no new evidence · max passes · time budget · recapture needed
+      ─▶ final structured assessment (conditions, scores, regions, provenance, stage, passes, stop reason) or an explicit abstention
+```
+**Rules that cannot be bypassed.** (1) Re-running the *same* tensor is never a verification action. (2) Probabilities after a pass come from **one fusion forward over the union of evidence** — they are not averaged or compounded, so repeated passes cannot inflate confidence. (3) Unstable decisions across passes ⇒ *uncertain*. (4) Any technical failure ⇒ `INFERENCE_ERROR`, a blocking quality problem ⇒ `RECAPTURE_REQUIRED`; neither is ever reported as Normal. (5) *Absence* is only "supported" when a working detector covers the condition (configurable) **and** the calibrated probability is clearly below its threshold.
+
+**Provisional parameters.** The reliability bands are *selected on out-of-fold data* to meet `TARGET_ACCEPTED_ERROR`; the quality thresholds are heuristics. Neither is a validated clinical criterion; both are re-evaluated on the test split as an honest check and reported with their limitations.
+
+#@@ code
+# 32.1 Result object (one structure for the Results screen, overlays, patient record, dermatologist review, receipt and A4 report) and the state vocabulary.
+STATES = ["FINDINGS_SUPPORTED", "MULTIPLE_FINDINGS_SUPPORTED", "NO_FINDINGS_SUPPORTED", "UNCERTAIN_REVIEW_REQUIRED", "RECAPTURE_REQUIRED", "OUT_OF_SCOPE_REVIEW_REQUIRED", "INFERENCE_ERROR"]
+# NO_FINDINGS_SUPPORTED is an addition to the requested list: a *positively supported absence* (never used for uncertainty or technical failure).
+SCHEMA_VERSION = "lumyvue-final-assessment/1.0"
+
+
+@dataclass
+class FinalAssessment:
+    scan_id: str
+    state: str
+    predicted_conditions: list = field(default_factory=list)
+    condition_scores: dict = field(default_factory=dict)         # per condition: calibrated_probability, threshold, decision (present|absent|uncertain), absence_supported, evidence_state, ...
+    regions: list = field(default_factory=list)                  # localisation regions associated with each condition (normalised coords) + ROI scores
+    evidence_provenance: dict = field(default_factory=dict)
+    detector_availability: dict = field(default_factory=dict)
+    uncertainty: dict = field(default_factory=dict)
+    stage_reached: int = 1
+    verification_passes: int = 0
+    stop_reason: str = ""
+    model_versions: dict = field(default_factory=dict)
+    fusion_config: dict = field(default_factory=dict)
+    original_cnn_scores: dict = field(default_factory=dict)      # raw outputs of the global CNN(s), untouched
+    original_yolo_outputs: dict = field(default_factory=dict)    # every box of the candidate pool, untouched
+    intermediate_results: list = field(default_factory=list)
+    quality: dict = field(default_factory=dict)
+    ood: dict = field(default_factory=dict)
+    recapture_advice: list = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+    created_utc: str = ""
+
+    def to_dict(self):
+        d = asdict(self); assert d["state"] in STATES, f"invalid state {d['state']}"; return d
+
+
+#@@ code
+# 33.1 Input validity + quality screening. Never turns a technical problem into 'Normal'.
+BLOCKING_QUALITY = ["low_resolution", "blur", "underexposed", "overexposed", "face_not_found_or_wrong_crop"]
+ADVICE = {"low_resolution": "Move closer or use a higher-resolution camera setting.", "blur": "Hold still / refocus and retake the photograph.",
+          "underexposed": "Increase the lighting evenly on the face.", "overexposed": "Reduce direct light and avoid reflections.",
+          "uneven_lighting_or_shadow": "Light the face evenly; avoid strong side light and shadows.", "glare": "Avoid shiny reflections on the skin.",
+          "white_balance_cast": "Use neutral white lighting.", "heavy_compression": "Use the original, uncompressed photograph.",
+          "possible_text_or_watermark_overlay": "Use a photograph without text or watermarks.", "face_not_found_or_wrong_crop": "Face the camera with the whole face in the frame.",
+          "face_detector_unavailable": "Face presence could not be checked (no face detector available)."}
+
+
+def validate_input(bgr):
+    """Returns (ok, reason). Invalid images raise INFERENCE_ERROR upstream - they are never silently scored."""
+    if bgr is None: return False, "image could not be decoded"
+    if not isinstance(bgr, np.ndarray) or bgr.ndim != 3 or bgr.shape[2] != 3: return False, f"image must be HxWx3 (got {getattr(bgr, 'shape', None)})"
+    if bgr.dtype != np.uint8: return False, f"image must be 8-bit (got {bgr.dtype})"
+    if min(bgr.shape[:2]) < 32: return False, f"image too small ({bgr.shape[:2]})"
+    return True, ""
+
+
+def assess_quality(bgr):
+    q = image_quality_metrics(bgr, with_face=True); flags = quality_flags(q)
+    blocking = [f for f in flags if f in BLOCKING_QUALITY]
+    return dict(metrics={k: (None if (isinstance(v, float) and not np.isfinite(v)) else v) for k, v in q.items()}, flags=flags, blocking=blocking, advice=[ADVICE[f] for f in flags if f in ADVICE],
+                note="heuristic thresholds (unvalidated); they recommend a re-capture and never certify clinical suitability")
+
+
+#@@ code
+# 38.1 OOD score: Mahalanobis distance of the global embedding to the training distribution (shrinkage covariance). Threshold = OOD_PERCENTILE of
+#      out-of-sample IN-distribution (fusion-split) scores. A flag means 'unlike the training data' - it is NOT recognition of an unknown condition.
+from sklearn.covariance import LedoitWolf
+
+
+class OODModel:
+    def __init__(self): self.mu = None; self.prec = None; self.threshold = None
+    def fit(self, emb_train):
+        lw = LedoitWolf().fit(emb_train.astype(np.float64)); self.mu = lw.location_; self.prec = lw.precision_; return self
+    def score(self, emb):
+        d = emb.astype(np.float64) - self.mu
+        return np.sqrt(np.einsum("ij,jk,ik->i", d, self.prec, d))
+    def set_threshold(self, in_dist_scores, pct): self.threshold = float(np.percentile(in_dist_scores, pct)); return self
+    def save(self, path): np.savez_compressed(safe_path(path), mu=self.mu, prec=self.prec, thr=self.threshold)
+    @classmethod
+    def load(cls, path):
+        z = np.load(path); m = cls(); m.mu, m.prec, m.threshold = z["mu"], z["prec"], float(z["thr"]); return m
+
+
+OOD = None
+try:
+    gate("annotations_train"); gate("annotations_fusion"); require(GLOBAL_SELECTED[0], "no selected global model", gate=True)
+    OOD_PATH = os.path.join(CFG.DIRS["stages"], "ood_model.npz")
+    if os.path.exists(OOD_PATH):
+        OOD = OODModel.load(OOD_PATH)
+    else:
+        tr_df = DF[(DF.split == "train") & DF.train_permitted].sample(frac=1.0, random_state=1).head(3000)
+        OOD = OODModel().fit(global_scores_for(GLOBAL_SELECTED[0], GLOBAL_SELECTED[1], tr_df)["emb"])
+        fus_df = FUSION_STATE["df"] if FUSION_STATE.get("df") is not None else DF[DF.split == "fusion"]
+        OOD.set_threshold(OOD.score(global_scores_for(GLOBAL_SELECTED[0], GLOBAL_SELECTED[1], fus_df)["emb"]), CFG.OOD_PERCENTILE); OOD.save(OOD_PATH)
+    print(f"OOD model ready; threshold (p{CFG.OOD_PERCENTILE:.0f} of in-distribution fusion-split scores) = {OOD.threshold:.2f}")
+except (GateError, KeyError, AttributeError) as e:
+    print("[OOD] not available yet:", str(e)[:160])
+
+#@@ code
+# 33.2 Stage-1 reliability rule: flags (conflict / near-threshold / quality / OOD) and a band selected on OUT-OF-FOLD fusion data to meet TARGET_ACCEPTED_ERROR.
+def stage1_flags(pg, ps1, thr_g, thr_s1, avail, detected, qflags_blocking, qflags_all, ood_flag, band):
+    flags, info = [], []
+    for j, c in enumerate(CFG.CONDITIONS):
+        if avail[j]:
+            if (pg[j] >= thr_g[j]) != bool(detected[j]): flags.append(f"cnn_yolo_conflict_{c}")
+        else:
+            info.append(f"no_detector_{c}")                                          # restricts absence support; does not block a presence decision
+        if abs(ps1[j] - thr_s1[j]) < band: flags.append(f"near_threshold_{c}")
+    if ood_flag: flags.append("ood")
+    flags += [f"quality_{f}" for f in qflags_blocking]
+    warn = [f for f in qflags_all if f not in qflags_blocking and f != "face_detector_unavailable"]
+    if warn: flags.append("quality_warning:" + ",".join(warn))
+    return flags, info
+
+
+def accepted_error(y, pred_present, accepted):
+    """Fraction of accepted images with any KNOWN-condition mismatch."""
+    k = accepted & (y >= 0).any(axis=1)
+    if k.sum() == 0: return np.nan, 0
+    mism = ((pred_present != (y == 1)) & (y >= 0)).any(axis=1)
+    return float(mism[k].mean()), int(k.sum())
+
+
+def select_band(p, thr, y, extra_ok, target, min_cov, grid=None):
+    """Smallest margin band (largest coverage) whose accepted-case error <= target. Returns dict(band, coverage, error) or None."""
+    grid = grid if grid is not None else np.round(np.arange(0.0, 0.46, 0.02), 2)
+    pred = p >= np.asarray(thr)[None, :]; res = None
+    for b in grid:
+        acc = extra_ok & (np.abs(p - np.asarray(thr)[None, :]) >= b).all(axis=1)
+        err, n = accepted_error(y, pred, acc)
+        cov = acc.mean()
+        if n >= 20 and err == err and err <= target and cov >= min_cov:
+            res = dict(band=float(b), coverage=float(cov), error=float(err), n_accepted_known=n); break
+    return res
+
+
+STAGE1 = None
+if CALIB.get("global_yolo") and CALIB.get("global_only") and FUSION_STATE.get("oof"):
+    yf = FUSION_STATE["y"]; fdf = FUSION_STATE["df"]
+    pg = apply_platt(FUSION_STATE["oof"]["global_only"], CALIB["global_only"]["platt"]); ps1 = apply_platt(FUSION_STATE["oof"]["global_yolo"], CALIB["global_yolo"]["platt"])
+    thr_g, thr_s1 = CALIB["global_only"]["thresholds"], CALIB["global_yolo"]["thresholds"]
+    ev = detector_evidence(fdf); avail = ev[:, :, 0] > 0.5; det = ev[:, :, 1] > 0.5
+    conflict = np.array([[avail[i, j] and ((pg[i, j] >= thr_g[j]) != det[i, j]) for j in range(CFG.N_COND)] for i in range(len(fdf))]).any(axis=1)
+    sel = select_band(ps1, thr_s1, yf, ~conflict, CFG.TARGET_ACCEPTED_ERROR, CFG.MIN_ACCEPT_COVERAGE)
+    STAGE1 = dict(band=(sel or {}).get("band"), selection=sel, thr_global=thr_g, thr_stage1=thr_s1, target_error=CFG.TARGET_ACCEPTED_ERROR, min_coverage=CFG.MIN_ACCEPT_COVERAGE,
+                  accepts_nothing=sel is None,
+                  note="band selected on out-of-fold fusion-split data; PROVISIONAL, re-checked on the test split. If accepts_nothing=True every scan escalates to Stage 2.")
+    write_json(os.path.join(CFG.DIRS["stages"], "stage1_rule.json"), STAGE1); print(json.dumps(STAGE1, indent=1, default=str))
+else:
+    print("Stage-1 rule needs the calibrated 'global_only' and 'global_yolo' fusion variants (Sections 30-31): not available yet.")
+
+#@@ md
+## 35. Bounded adaptive verification controller
+The controller is **pure logic** (no models inside), so it can be unit-tested with fake evidence and reused unchanged in the evaluation and in a future C# port. At each pass it asks an *evidence provider* for the next **new** evidence; it never re-scores the same evidence.
+
+| Stop reason | Meaning |
+|---|---|
+| `resolved` | every condition is clearly above/below its threshold (margin ≥ band) and the decisions are stable |
+| `converged` | the calibrated probabilities moved less than `CONVERGENCE_EPS` and decisions did not change, but the result is still uncertain → the extra evidence does not help |
+| `no_new_evidence` | the provider offered fewer than `MIN_NEW_ROIS` genuinely new regions / crops (**redundancy detected — no re-inference**) |
+| `max_passes` / `time_budget` | configured bounds reached |
+| `recapture_needed` | the only remaining useful action is a new controlled capture |
+| `unstable` | decisions flip between passes → treated as uncertain |
+
+#@@ code
+@dataclass
+class VerifyCfg:
+    max_passes: int = CFG.MAX_VERIFICATION_PASSES
+    max_seconds: float = CFG.MAX_VERIFICATION_SECONDS
+    min_new_rois: int = CFG.MIN_NEW_ROIS
+    eps: float = CFG.CONVERGENCE_EPS
+
+
+def verification_cycle(p0, thr, band, provider, vc=None, clock=time.monotonic):
+    """p0: calibrated probabilities after Stage 2's first evidence (array of 3). provider(k, seen) -> dict(action, signatures:set, probs:array or None, recapture:bool) or None when no further action exists.
+    Returns dict(passes=[...], probs, stop_reason, stable). Terminates after at most vc.max_passes provider calls (the pass-1 evidence counts as pass 1)."""
+    vc = vc or VerifyCfg(); thr = np.asarray(thr, float); t0 = clock()
+    seen = set(); passes = []; probs = np.asarray(p0, float)
+    decision = lambda p: tuple((p >= thr).astype(int))
+    certain = lambda p: bool((np.abs(p - thr) >= band).all())
+    passes.append(dict(pass_no=1, action="stage2_initial_regions", new_signatures=None, probs=probs.round(5).tolist(), decision=decision(probs)))
+    stop = None
+    if certain(probs): stop = "resolved"
+    k = 1
+    while stop is None:
+        if k >= vc.max_passes: stop = "max_passes"; break
+        if clock() - t0 > vc.max_seconds: stop = "time_budget"; break
+        k += 1
+        ev = provider(k, set(seen))
+        if ev is None: stop = "no_new_evidence"; break
+        if ev.get("recapture"): stop = "recapture_needed"; passes.append(dict(pass_no=k, action=ev.get("action", "recapture"), new_signatures=0, probs=None, decision=None)); break
+        new = set(ev["signatures"]) - seen
+        if len(new) < vc.min_new_rois or ev.get("probs") is None: stop = "no_new_evidence"; break          # redundancy: do NOT score the same evidence again
+        seen |= new
+        newp = np.asarray(ev["probs"], float)
+        passes.append(dict(pass_no=k, action=ev["action"], new_signatures=len(new), probs=newp.round(5).tolist(), decision=decision(newp)))
+        moved = float(np.abs(newp - probs).max()); same = decision(newp) == decision(probs); probs = newp
+        if certain(probs): stop = "resolved"
+        elif same and moved < vc.eps: stop = "converged"
+    flips = sum(passes[i]["decision"] != passes[i - 1]["decision"] for i in range(1, len(passes)) if passes[i]["decision"] is not None and passes[i - 1]["decision"] is not None)
+    stable = flips < 2
+    if not stable: stop = "unstable"
+    return dict(passes=passes, probs=probs, stop_reason=stop, stable=stable, n_passes=len(passes))
+
+
+#@@ code
+# 36.1 Final decision logic: per-condition decisions + one overall state. Pure function (unit-tested).
+def decide(probs, thr, band, avail, quality, ood_flag, flags, stable=True, error=None, require_all_detectors=None):
+    """Returns dict(state, predicted, per_condition, reasons). probs/thr: arrays over CFG.CONDITIONS; avail: detector availability booleans."""
+    require_all = CFG.ABSENCE_REQUIRES_ALL_DETECTORS if require_all_detectors is None else require_all_detectors
+    if error: return dict(state="INFERENCE_ERROR", predicted=[], per_condition={}, reasons=[f"error: {error}"])
+    if quality and quality.get("blocking"): return dict(state="RECAPTURE_REQUIRED", predicted=[], per_condition={}, reasons=[f"blocking quality: {quality['blocking']}"])
+    if ood_flag: return dict(state="OUT_OF_SCOPE_REVIEW_REQUIRED", predicted=[], per_condition={}, reasons=["input unlike the training distribution (OOD)"])
+    per, predicted, uncertain, absent_ok = {}, [], [], []
+    for j, c in enumerate(CFG.CONDITIONS):
+        p, t = float(probs[j]), float(thr[j])
+        if p >= t + band: dec = "present"
+        elif p < t - band: dec = "absent"
+        else: dec = "uncertain"
+        supp = (dec == "absent") and (bool(avail[j]) or not require_all)
+        per[c] = dict(calibrated_probability=round(p, 5), threshold=round(t, 4), band=round(float(band), 4), decision=dec, absence_supported=supp, detector_available=bool(avail[j]))
+        if dec == "present": predicted.append(c)
+        elif dec == "uncertain": uncertain.append(c)
+        elif not supp: uncertain.append(c)                                              # 'absent' without detector coverage is not a supported absence
+        else: absent_ok.append(c)
+    reasons = []
+    if uncertain: reasons.append(f"uncertain or unsupported-absence for: {uncertain}")
+    if not stable: reasons.append("decisions were unstable across verification passes")
+    if flags: reasons.append(f"unresolved flags: {flags}")
+    if uncertain or not stable or flags:
+        return dict(state="UNCERTAIN_REVIEW_REQUIRED", predicted=predicted, per_condition=per, reasons=reasons)
+    if len(predicted) >= 2: return dict(state="MULTIPLE_FINDINGS_SUPPORTED", predicted=predicted, per_condition=per, reasons=[])
+    if len(predicted) == 1: return dict(state="FINDINGS_SUPPORTED", predicted=predicted, per_condition=per, reasons=[])
+    return dict(state="NO_FINDINGS_SUPPORTED", predicted=[], per_condition=per, reasons=[])
+
+
+def flags_after_stage2(p_cnn_only, thr_g, avail, detected):
+    """Conflicts that REMAIN as information after Stage 2 (they never block the fusion decision by themselves; they are reported)."""
+    return [f"cnn_yolo_conflict_{c}" for j, c in enumerate(CFG.CONDITIONS) if avail[j] and ((p_cnn_only[j] >= thr_g[j]) != bool(detected[j]))]
+
+
+#@@ md
+## 32–36 (batch form). Stage logic on a whole split
+The function below applies the **same** `stage1_flags` / `verification_cycle` / `decide` functions to pre-computed features of a split (global-only, Stage-1 and per-pass full-fusion logits, detector evidence, quality, OOD). It is used for the **fusion-split sanity check** now and for the **test split** in Part IX — one code path, so test results describe exactly the deployed logic. The live single-image reference implementation (`assess_image`, next section) calls the same three functions.
+
+#@@ code
+def batch_stage_logic(df, X_by_var, roi_tier_counts, calib, stage1, band2, quality_list, ood_scores, logits_fn):
+    """df: rows; logits_fn(var, view_tier) -> logits [N,3] from the fusion models (or OOF logits for the fusion split).
+    quality_list: list of assess_quality dicts (or None). Returns DataFrame with one row per image: state, predicted, passes, stop_reason, stage_reached, calibrated probabilities."""
+    N = len(df)
+    pg = apply_platt(logits_fn("global_only", 3), calib["global_only"]["platt"]); ps1 = apply_platt(logits_fn("global_yolo", 3), calib["global_yolo"]["platt"])
+    thr_g, thr_s1, thr_f = calib["global_only"]["thresholds"], calib["global_yolo"]["thresholds"], calib["full"]["thresholds"]
+    ev = detector_evidence(df); avail = ev[:, :, 0] > 0.5; det = ev[:, :, 1] > 0.5
+    rows = []
+    for i in range(N):
+        q = quality_list[i] if quality_list else dict(blocking=[], flags=[])
+        ood_flag = bool(OOD is not None and ood_scores is not None and ood_scores[i] > OOD.threshold)
+        try:
+            s1_band = (stage1 or {}).get("band")
+            flags, info = stage1_flags(pg[i], ps1[i], thr_g, thr_s1, avail[i], det[i], q["blocking"], q["flags"], ood_flag, s1_band if s1_band is not None else 1.0)
+            accepted = (stage1 or {}).get("band") is not None and not flags and not q["blocking"] and not ood_flag
+            if q["blocking"] or ood_flag:
+                d = decide(ps1[i], thr_s1, 0.0, avail[i], q, ood_flag, flags); stage, passes, stop, final_p = 1, 0, "gate_before_inference", ps1[i]
+            elif accepted:
+                d = decide(ps1[i], thr_s1, stage1["band"], avail[i], q, ood_flag, []); stage, passes, stop, final_p = 1, 0, "stage1_accepted", ps1[i]
+            else:
+                views = {t: apply_platt(logits_fn("full", t), calib["full"]["platt"])[i] for t in (1, 2, 3)}
+                counts = roi_tier_counts[i]       # number of ROIs available per tier (1,2,3)
+                def provider(k, seen):
+                    if counts.get(k, 0) == 0: return None
+                    return dict(action={2: "add_tier2_candidate_regions", 3: "add_alternative_context_crops"}[k] if k in (2, 3) else "other",
+                                signatures={f"t{k}_{n}" for n in range(counts[k])}, probs=views[k])
+                vcres = verification_cycle(views[1], thr_f, band2, provider)
+                d = decide(vcres["probs"], thr_f, band2, avail[i], q, ood_flag, [], stable=vcres["stable"])
+                stage, passes, stop, final_p = 2, vcres["n_passes"], vcres["stop_reason"], vcres["probs"]
+            rows.append(dict(image_id=df.image_id.iloc[i], state=d["state"], predicted="|".join(d["predicted"]), stage=stage, passes=passes, stop_reason=stop,
+                             **{f"p_{c}": float(final_p[j]) for j, c in enumerate(CFG.CONDITIONS)}, flags="|".join(flags), reasons=" ; ".join(d["reasons"])))
+        except Exception as ex:                                  # never silently Normal
+            rows.append(dict(image_id=df.image_id.iloc[i], state="INFERENCE_ERROR", predicted="", stage=0, passes=0, stop_reason=f"{type(ex).__name__}", reasons=str(ex)[:120]))
+    return pd.DataFrame(rows)
+
+
+# Stage-2 band (selected like the Stage-1 band, on the FULL variant's out-of-fold probabilities after all passes)
+BAND2 = None
+if CALIB.get("full") and FUSION_STATE.get("oof"):
+    pf = apply_platt(FUSION_STATE["oof"]["full"], CALIB["full"]["platt"])
+    sel2 = select_band(pf, CALIB["full"]["thresholds"], FUSION_STATE["y"], np.ones(len(pf), bool), CFG.TARGET_ACCEPTED_ERROR, CFG.MIN_ACCEPT_COVERAGE)
+    BAND2 = (sel2 or {}).get("band")
+    write_json(os.path.join(CFG.DIRS["stages"], "stage2_rule.json"), dict(band=BAND2, selection=sel2, note="Stage-2 margin band selected on out-of-fold fusion data; if None, Stage 2 can only return supported conditions when margins are 0 (every near-threshold case stays uncertain)."))
+    print("Stage-2 band:", BAND2, sel2)
+    if BAND2 is None: BAND2 = 0.5   # a band of 0.5 can never be satisfied: every case stays UNCERTAIN rather than guessing
+
+#@@ md
+## 36–37. Live single-image reference implementation (`assess_image`) and abstention handling
+`assess_image` runs the **complete pipeline on one image file**: validity → quality → OOD → global CNN → three YOLO detectors → ROI crops → fusion → stages → `FinalAssessment`. It is the *Python reference* that the future C# port must reproduce within numerical tolerance (Section 51). It needs every trained component; it raises a `GateError` (reported as `INFERENCE_ERROR` in the result) when one is missing, and **never** returns a Normal-looking result after a failure.
+
+#@@ code
+class InferenceBundle:
+    """Everything needed for single-image inference. Loading verifies SHA-256 hashes of the original models against the start-of-run fingerprint."""
+    def __init__(self):
+        require(GLOBAL_SELECTED[0] and ROI_SELECTED_SEED is not None and CALIB.get("full") and STAGE1 is not None and OOD is not None, "trained components / calibration / stage rules are not all available yet", gate=True)
+        ok, bad = verify_originals_unchanged(); require(ok, f"original model files changed: {bad}")
+        gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+        self.gfm = embedding_model(gm); self.gmode = EXPERIMENTS[GLOBAL_SELECTED[0]]["mode"]; self.rfm = load_roi_feature_model()
+        self.fus = {}
+        for var in ("global_only", "global_yolo", "full"):
+            self.fus[var] = [keras.models.load_model(os.path.join(CFG.DIRS["fusion"], var, f"final_seed{s}.keras"),
+                             custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False) for s in CFG.SEEDS]
+        self.versions = dict(global_model=GLOBAL_SELECTED, roi_seed=ROI_SELECTED_SEED, yolo_config_hash=YOLO_CONFIG_HASH, v5_onnx_sha256=V5_SHA,
+                             yolo={c: [m.sha256 for m in sp.members] for c, sp in DETECTORS.items()}, schema=SCHEMA_VERSION)
+
+    def global_forward(self, bgr):
+        x = preprocess_global(bgr)[None]; emb, out = self.gfm.predict(x, verbose=0); out = np.asarray(out, np.float32)[0]
+        if self.gmode == "multilabel3": sc, pn = 1 / (1 + np.exp(-out)), np.nan
+        else: sc, pn = out[:3], float(out[3])
+        return emb[0], sc, pn, out
+
+
+def assess_image(bundle, path_or_bgr, scan_id=None):
+    t0 = time.monotonic(); bgr = cv2.imread(path_or_bgr) if isinstance(path_or_bgr, str) else path_or_bgr
+    sid = scan_id or pseudo_id(path_or_bgr if isinstance(path_or_bgr, str) else str(time.time()), "scan")
+    fa = FinalAssessment(scan_id=sid, state="INFERENCE_ERROR", created_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), model_versions=bundle.versions if bundle else {})
+    try:
+        ok, why = validate_input(bgr)
+        if not ok: fa.stop_reason = "invalid_input"; fa.uncertainty = dict(reasons=[why]); return fa
+        q = assess_quality(bgr); fa.quality = q; fa.recapture_advice = q["advice"]
+        emb, sc, pn, raw = bundle.global_forward(bgr); fa.original_cnn_scores = dict(model=GLOBAL_SELECTED, scores_per_condition=dict(zip(CFG.CONDITIONS, sc.round(6).tolist())), p_normal=None if pn != pn else pn, raw_output=raw.round(6).tolist())
+        ood_score = float(OOD.score(emb[None])[0]); ood_flag = ood_score > OOD.threshold; fa.ood = dict(score=ood_score, threshold=OOD.threshold, flagged=bool(ood_flag), note="distance to the training distribution; not unknown-condition recognition")
+        det = detect_all(bgr); fa.detector_availability = {c: det[c] is not None for c in CFG.CONDITIONS}
+        fa.original_yolo_outputs = {c: (None if det[c] is None else det[c]["boxes"]) for c in CFG.CONDITIONS}
+        H, W = bgr.shape[:2]; rows = [b for c in CFG.CONDITIONS if det[c] is not None for b in det[c]["boxes"]]
+        # ---- features exactly as in training --------------------------------------------------------------------------------
+        ev = np.zeros((1, CFG.N_COND, DET_EV_DIM), np.float32)
+        for j, c in enumerate(CFG.CONDITIONS):
+            if det[c] is None: continue
+            dep = [b for b in det[c]["boxes"] if b["deployed"]]; best = max(dep, key=lambda b: b["conf"]) if dep else None
+            ev[0, j] = [1.0, float(bool(dep)), best["conf"] if best else 0.0, max([b["conf"] for b in det[c]["boxes"]] + [0.0]), np.sqrt(best["rel_area"]) if best else 0.0, best["cx"] if best else 0.0, best["cy"] if best else 0.0]
+        cands = build_roi_candidates(rows, W, H); crops, kept = [], []
+        for c in cands:
+            rgb, why2 = crop_roi(bgr, (c["x0"], c["y0"], c["x1"], c["y1"]), CFG.ROI_ALT_MARGIN if c["alt"] else CFG.ROI_MARGIN)
+            if rgb is not None: crops.append(roi_norm(rgb)); kept.append(c)
+        R = CFG.ROI_MAX_TOTAL; feat = np.zeros((1, R, ROI_FEAT_DIM), np.float32); mask = np.zeros((1, R), bool); tier = np.zeros((1, R), np.int8)
+        if crops:
+            remb, rpr = bundle.rfm.predict(np.stack(crops[:R]), verbose=0)
+            for k, c in enumerate(kept[:R]):
+                feat[0, k] = np.concatenate([remb[k], rpr[k], yolo_roi_features(c)]); mask[0, k] = True; tier[0, k] = c["tier"]
+                fa.regions.append(dict(condition=c["condition"], tier=c["tier"], alt_context=c["alt"], detector_confidence=c["conf"], box_norm=[round(c["x0"] / W, 4), round(c["y0"] / H, 4), round(c["x1"] / W, 4), round(c["y1"] / H, 4)],
+                                       roi_scores=dict(zip(CFG.ROI_CLASSES, rpr[k].round(4).tolist()))))
+        g = dict(g_emb=emb[None].astype(np.float32), g_logit=logit(sc)[None], g_extra=np.array([[0.0 if pn != pn else pn, 0.0 if pn != pn else 1.0]], np.float32))
+        def fwd(var, max_tier):
+            v = VARIANTS[var]; m = mask & (tier <= max_tier) & bool(v["roi"]); f = feat * m[..., None]
+            X = dict(g_emb=g["g_emb"] * v["global_"], g_logit=g["g_logit"] * v["global_"], g_extra=g["g_extra"] * v["global_"], det_ev=(ev * v["det"]).reshape(1, -1), roi_feat=f * (v["roi"] or 0), roi_mask=m.astype(np.float32))
+            z = np.mean([mm.predict(x_list(X), verbose=0) for mm in bundle.fus[var]], axis=0)
+            return apply_platt(z, CALIB[var]["platt"])[0]
+        avail = np.array([det[c] is not None for c in CFG.CONDITIONS]); detected = ev[0, :, 1] > 0.5
+        pg, ps1 = fwd("global_only", 3), fwd("global_yolo", 3)
+        flags, info = stage1_flags(pg, ps1, CALIB["global_only"]["thresholds"], CALIB["global_yolo"]["thresholds"], avail, detected, q["blocking"], q["flags"], ood_flag, STAGE1["band"] if STAGE1["band"] is not None else 1.0)
+        fa.uncertainty = dict(stage1_flags=flags, informational=info)
+        fa.intermediate_results.append(dict(stage=1, probs=dict(zip(CFG.CONDITIONS, ps1.round(5).tolist())), cnn_only=dict(zip(CFG.CONDITIONS, pg.round(5).tolist()))))
+        if q["blocking"] or ood_flag:
+            d = decide(ps1, CALIB["global_yolo"]["thresholds"], 0.0, avail, q, ood_flag, flags); fa.stop_reason = "gate_before_inference"; final_p, thr = ps1, CALIB["global_yolo"]["thresholds"]
+        elif STAGE1["band"] is not None and not flags:
+            d = decide(ps1, CALIB["global_yolo"]["thresholds"], STAGE1["band"], avail, q, ood_flag, []); fa.stop_reason = "stage1_accepted"; final_p, thr = ps1, CALIB["global_yolo"]["thresholds"]
+        else:
+            fa.stage_reached = 2; thr = CALIB["full"]["thresholds"]; counts = {t: int(((tier[0] == t) & mask[0]).sum()) for t in (1, 2, 3)}
+            def provider(k, seen):
+                if counts.get(k, 0) == 0: return None
+                return dict(action={2: "add_tier2_candidate_regions", 3: "add_alternative_context_crops"}.get(k, "other"), signatures={f"t{k}_{n}" for n in range(counts[k])}, probs=fwd("full", k))
+            vres = verification_cycle(fwd("full", 1), thr, BAND2, provider)
+            fa.verification_passes = vres["n_passes"]; fa.stop_reason = vres["stop_reason"]; fa.intermediate_results += vres["passes"]; final_p = vres["probs"]
+            d = decide(final_p, thr, BAND2, avail, q, ood_flag, [], stable=vres["stable"])
+        fa.state = d["state"]; fa.predicted_conditions = d["predicted"]; fa.condition_scores = d["per_condition"]
+        fa.uncertainty["reasons"] = d["reasons"]
+        fa.evidence_provenance = dict(global_model=GLOBAL_SELECTED, detectors={c: DETECTORS[c].version for c in CFG.CONDITIONS}, roi_model_seed=ROI_SELECTED_SEED, fusion_variants_used=["global_yolo"] + (["full"] if fa.stage_reached == 2 else []),
+                                      latency_s=round(time.monotonic() - t0, 3))
+        fa.fusion_config = dict(stage1_band=STAGE1["band"], stage2_band=BAND2, thresholds=dict(zip(CFG.CONDITIONS, np.round(thr, 4).tolist())), max_passes=CFG.MAX_VERIFICATION_PASSES)
+    except Exception as ex:                                                  # any failure => explicit error state, details logged, never Normal
+        fa.state = "INFERENCE_ERROR"; fa.stop_reason = f"{type(ex).__name__}"; fa.uncertainty = dict(reasons=[str(ex)[:200]])
+        log_event("inference_error", scan=sid, error=type(ex).__name__)
+    return fa
+
+
+print("assess_image() defined. Single-image reference inference needs the trained components (it reports INFERENCE_ERROR, never Normal, when they are missing).")
