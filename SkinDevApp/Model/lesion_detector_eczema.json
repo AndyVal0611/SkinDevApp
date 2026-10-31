@@ -1,0 +1,47 @@
+{
+  "model": "PrecisionSkin eczema specialist detector",
+  "condition": "eczema",
+  "classes": [
+    "eczema"
+  ],
+  "imgsz": 640,
+  "default_conf": 0.25,
+  "nms_iou": 0.6,
+  "onnx_sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+  "onnx_file": "lesion_detector_eczema.onnx",
+  "source_weights": "WSL ~/runs (YOLOv8n, NA2 seeds 42/43/44 + NA3 seeds 42/43/44, exported to ONNX)",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "run_name": "NA2",
+  "base_model": "yolov8n.pt",
+  "epochs_max": 100,
+  "primary_test": "fresh (39 photos)",
+  "ensemble_test": {
+    "fresh_39": {
+      "mAP50": 0.52,
+      "AP30": 0.708
+    },
+    "r3_test_50": {
+      "mAP50": 0.12,
+      "AP30": 0.334
+    },
+    "dev2_39": {
+      "mAP50": 0.181,
+      "AP30": 0.313
+    }
+  },
+  "test_mAP50_ensemble": 0.52,
+  "versions": {
+    "ultralytics": "8.4.175"
+  },
+  "created": "2026-10-28",
+  "ensemble": [
+    "lesion_detector_eczema.onnx (NA2 seed 42)",
+    "lesion_detector_eczema_m2.onnx (NA2 seed 43)",
+    "lesion_detector_eczema_m3.onnx (NA2 seed 44)"
+  ],
+  "note": "Deployed model: 3-model ensemble (NA2 seeds 42/43/44), weighted box fusion (IoU 0.55). Fresh AP50 0.520, AP30 0.708. The 6-model NA23 (fresh 0.554) is kept as a backup. Labels are one annotator's boxes (same-annotator agreement F1 0.38 at IoU 0.5). Marks candidate patches, not a diagnosis. App threshold: ScanSettings.DetectorThresholdEczema = 0.25."
+}
