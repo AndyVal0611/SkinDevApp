@@ -4,11 +4,11 @@ This folder contains the **complete, unexecuted** V6 training-and-evaluation not
 
 | File | Purpose |
 |---|---|
-| `LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb` | the notebook (137 cells; no stored outputs) |
+| `LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb` | the notebook (142 cells; no stored outputs) |
 | `v6_dataset_config.example.json` | dataset / run configuration (copy, edit, point `LUMYVUE_V6_CONFIG` at it) |
 | `requirements_v6.txt` | dependency versions of the training environment that was inspected |
-| `annotations/*.csv`, `annotations/ANNOTATION_PROTOCOL.md` | annotation and provenance **templates** (headers only; no labels invented) |
-| `docs/` | architecture, checklist, export spec, deployment guide, evaluation methodology, readiness and validation reports |
+| `annotations/*.csv`, `annotations/ANNOTATION_PROTOCOL.md` | annotation, provenance and **dermatologist-review** templates (headers only; no labels invented) |
+| `docs/` | architecture, checklist, export spec, deployment guide, evaluation methodology, **`REVIEW_CONTRACT.md`** (mandatory dermatologist review, sealed AI output, separate findings), readiness and validation reports |
 | `notebook_src/`, `tools/` | the notebook sources (one file per section group), the builder, the static validator and the gated dry-run script |
 
 ## 1. Required inputs (all configurable; nothing is hard-coded to another computer)
@@ -20,7 +20,7 @@ This folder contains the **complete, unexecuted** V6 training-and-evaluation not
 | **Original** full-size images `<Class>/<file>` | `/mnt/c/Users/*/Downloads/PrecisionSkin/Classes/` (auto-discovered) | YOLO and ROI crops at their real resolution (strongly recommended) |
 | V5 ONNX (+ Keras for experiments B/C) | `~/PrecisionSkinV1/runs/facial_only/models/final/` | baseline, parity, fine-tuning |
 | YOLO ONNX models | `/mnt/c/Users/*/source/repos/SkinDevApp/SkinDevApp/Model/` (auto-discovered) | three-detector branch |
-| **Eczema detector** | *not found on the inspected machine* — see "Eczema" below | Eczema localisation, three-detector gates |
+| **Eczema detector** | found in `Downloads` (4 files); **not** in the WPF `Model/` folder — see "Eczema" below | Eczema localisation, three-detector gates |
 | ImageNet MobileNetV2 `no_top` weights | `~/.keras/models/` (already cached) | backbones (`OFFLINE_MODE` blocks downloads) |
 | Verified multilabel annotations | `~/PrecisionSkinV1/v6/annotations/multilabel_annotations.csv` | **all supervised stages** |
 | Verified region annotations | `…/region_annotations.csv` | ROI classifier, localisation metrics |
@@ -49,8 +49,11 @@ Run **top to bottom**, one section at a time. The notebook is safe to interrupt 
 
 Every blocked stage prints the exact shortfall (for example `Acne present 12 < 30 in validation`) and does **not** create data.
 
-## 3. Eczema detector (adjustable, not assumed)
-The inspected WPF `Model/` folder (repository and `bin/Debug`) contains **no Eczema ONNX**; only the 3-class `lesion_detector_v1.onnx` was found outside the app (Downloads, WSL). The notebook registers Eczema from, in order: `LUMYVUE_ECZEMA_ONNX_FILES`/`ECZEMA_META_JSON`/`ECZEMA_THRESHOLD`; `lesion_detector_eczema(.onnx/.json)` in the YOLO folder; the 3-class v1 file. When none is registered, Eczema is `detector_unavailable` (never "no detection"): gates tied to all three detectors stay closed, everything else runs. To add it later, set those keys and re-run from Part V. **Missing for reproducibility:** the Eczema training notebook, dataset fingerprint, seeds, ensemble membership, threshold-selection record and evaluation protocol — none of these is assumed.
+## 3. Eczema detector (verified, adjustable, not assumed)
+The WPF `Model/` folder (repository and `bin/Debug`) does **not** contain the Eczema files (Visual Studio shows the entries as missing). They are in `Downloads`: `lesion_detector_eczema.onnx`, `_m2.onnx`, `_m3.onnx`, `lesion_detector_eczema.json`. Loaded and checked with ONNX Runtime: 3 distinct models, input `[1,3,640,640]`, output `[1,5,8400]`, class map `{0: eczema}`, NMS 0.6, threshold 0.25, JSON hash matches the primary file; the notebook's detector engine ran all three on real images. The notebook registers Eczema from, in order: explicit `LUMYVUE_ECZEMA_ONNX_FILES`/`ECZEMA_META_JSON`/`ECZEMA_THRESHOLD`; `lesion_detector_eczema*` in the WPF `Model/` folder; the folders in `ECZEMA_SEARCH_DIRS` (default: Downloads, read-only — the notebook prints where it found them); then the 3-class v1 file. **Installing them in the application is a separate, application-side step** (see `docs/DEPLOYMENT_INTEGRATION_GUIDE.md` §5). Still missing for reproducibility: the Eczema training notebook/dataset fingerprint; its JSON records heterogeneous small-set results (mAP@0.5 0.52 on 39 photos, 0.12, 0.181) from one annotator and a fusion IoU of 0.55 where the app fuses at 0.5 — none of this is treated as validated.
+
+## 3b. Dermatologist review (mandatory)
+Every AI assessment is issued as `PENDING_DERMATOLOGIST_REVIEW`, sealed (SHA-256) and never edited; the dermatologist's findings are a separate record (`annotations/dermatologist_reviews.csv`, schema in `docs/REVIEW_CONTRACT.md`). Stage 2 is **AI verification, not clinical validation**.
 
 ## 4. What the notebook does **not** do
 No training or evaluation has been run by the author. It does not modify V5/YOLO models, datasets or the WPF app; it does not deploy; it does not upload anything; it makes no regulatory claim. Production security controls (disk encryption, access control, retention, tamper detection, update channel) must be verified in the C# application.

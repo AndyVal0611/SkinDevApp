@@ -8,6 +8,9 @@ Tick each box before moving to the next stage. Every blocked stage prints what i
 - [ ] `ORIGINAL_IMAGE_ROOT` points at the original full-size photos (otherwise YOLO/ROI use 224×224 images and the notebook flags it).
 - [ ] Back up `~/.lumyvue_v6/pseudonym.key` privately.
 
+- [ ] **Eczema detector:** the four files (`lesion_detector_eczema.onnx`, `_m2`, `_m3`, `.json`) are found by the notebook (Downloads is searched read-only). Check the registry table in Part V: Eczema `available = True`, 3 members, imgsz 640, location reported, JSON hash matches. (Installing them in the WPF `Model/` folder is a separate application-side step.)
+- [ ] Understand the review contract: every AI assessment is `PENDING_DERMATOLOGIST_REVIEW`; Stage 2 is AI verification only (`REVIEW_CONTRACT.md`).
+
 ## B. Parts I–III (no annotations needed)
 - [ ] Preflight table: all *required* inputs found. Fingerprint of originals written.
 - [ ] Dataset inventory, integrity, leakage groups built; **frozen split** written (`v6/splits/`). Do not edit it.
@@ -34,6 +37,6 @@ Tick each box before moving to the next stage. Every blocked stage prints what i
 
 ## F. Export and report
 - [ ] Export status reviewed (`FAILED` components fall back to weights JSON). Keras-vs-ONNX differences ≤ 1e-4 or explained.
-- [ ] Unit tests: all pass (skips are listed with reasons).
+- [ ] Unit tests: all pass (37 run, 1 skipped for needing trained components). Schema files `v6_final_assessment.schema.json`, `v6_dermatologist_review.schema.json` exported.
 - [ ] `chapter4_report.md` generated; final cell confirms **originals unchanged** and the **audit chain intact**.
-- [ ] Do **not** copy any export into the WPF `Model/` folder until the C# parity procedure has been run and approved.
+- [ ] Do **not** copy any **V6 export** into the WPF `Model/` folder until the C# parity procedure has been run and approved. (The existing Eczema detector files are not V6 exports; installing them is a separate application-side step.)

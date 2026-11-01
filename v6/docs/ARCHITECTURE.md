@@ -16,11 +16,13 @@ flowchart TD
   RC --> F
   P --> F
   F --> CAL[Per-condition Platt calibration + thresholds]
-  CAL --> S1{Stage 1 reliability rule<br/>selected on out-of-fold data}
-  S1 -- accepted --> OUT[Unified final assessment]
-  S1 -- conflict / near threshold / quality / OOD --> S2[Stage 2: ROI verification]
-  S2 --> V[Bounded verification: new evidence every pass]
+  CAL --> S1{Stage 1 reliability rule<br/>band selected on out-of-fold data}
+  S1 -- AI-accepted --> OUT[Unified final AI assessment<br/>sealed - PENDING_DERMATOLOGIST_REVIEW]
+  S1 -- conflict / near threshold / quality / OOD --> S2[Stage 2: AI verification - NOT clinical validation]
+  S2 --> V[Bounded AI verification: new evidence every pass]
   V --> OUT
+  OUT --> DR[Dermatologist review - required for EVERY assessment<br/>separate record, AI output immutable]
+  DR --> AG[Agreement / disagreement / classification metrics<br/>vs independent clinical findings]
 ```
 A picture of the same diagram is produced by the notebook (`figures/architecture_diagram.png`).
 
@@ -32,13 +34,14 @@ A picture of the same diagram is produced by the notebook (`figures/architecture
 | ROI MobileNetV2 | square context crop of a proposal, 224×224 | 4 scores (3 conditions + background) + 64-d embedding | `train` (labels from **verified** regions; proposals are the real YOLO proposals) | selected on `validation` |
 | Fusion (7 variants) | global group, detector evidence, ROI set + mask | 3 logits | `fusion` split (cross-fitted) | modality dropout; variants implement the ablations |
 | Calibration / thresholds | out-of-fold fusion logits | Platt `(a,b)` + F1 threshold per condition | `fusion` split OOF | skipped with a flag if too few positives/negatives |
-| Stage-1 rule, Stage-2 band | calibrated probabilities, flags | accept / escalate | `fusion` split OOF | targets `TARGET_ACCEPTED_ERROR`; provisional |
-| Verification controller | evidence provider | passes, stop reason | — (logic) | bounded; novelty, convergence, redundancy, time budget |
+| Stage-1 rule, Stage-2 band | calibrated probabilities, flags | AI-accept / escalate | `fusion` split OOF | targets `TARGET_ACCEPTED_ERROR`; provisional |
+| AI-verification controller (Stage 2) | evidence provider | passes, stop reason | — (logic) | bounded; novelty, convergence, redundancy, time budget; **not clinical validation** |
 | Quality / OOD | image, global embedding | flags / distance | heuristics / `train` + `fusion` | unvalidated; never reported as Normal |
-| Final result | all of the above | `FinalAssessment` JSON | — | raw CNN and YOLO outputs preserved |
+| Final result | all of the above | `FinalAssessment` 1.1 JSON, **sealed**, `PENDING_DERMATOLOGIST_REVIEW` | — | raw CNN and YOLO outputs preserved; immutable after issue |
+| Dermatologist review | the sealed AI assessment (by hash) | `DermatologistReview` (separate record) | — | per-condition findings, blinding flags; feeds agreement metrics; never retrains automatically |
 
 ## Why this design
 * **Real information flow:** YOLO selects pixels that a second MobileNetV2 examines; its embedding and scores enter the fusion — YOLO is not merely overlaid on the CNN output.
 * **No YOLO priority:** modality dropout, availability masks, and learning on verified labels; fixed "YOLO-wins" rules exist only as an *ablation baseline*.
 * **Leakage control:** group-disjoint split frozen before annotation; ROI crops derived after the split; fusion trained on images that no CNN has seen; test opened once.
-* **Honest uncertainty:** a calibrated probability within a validated band of its threshold is *uncertain*; absence is only "supported" where a detector covers the condition.
+* **Honest uncertainty:** a calibrated probability within a (held-out-selected, provisional) band of its threshold is *uncertain*; every assessment, certain or not, still goes to a dermatologist; absence is only "supported" where a detector covers the condition.

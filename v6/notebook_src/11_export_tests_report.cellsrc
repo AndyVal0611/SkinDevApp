@@ -115,27 +115,83 @@ else:
     print("Nothing exported yet: verification not run.")
 
 #@@ md
+## 51.5 Export schemas of the final-assessment and dermatologist-review contract
+Two JSON Schemas and a short contract description are written next to the model exports. They are the **data contract the future WPF application must implement**: the AI assessment (schema `1.1`, sealed, always `PENDING_DERMATOLOGIST_REVIEW` at issue, never clinically validated) and the **separate** dermatologist review (findings per condition, blinding flags, link to the reviewed AI version by hash). The notebook validates its own output against them (a small built-in validator; no extra package needed).
+
+#@@ code
+def _json_type(t):
+    return {"string": str, "boolean": bool, "object": dict, "array": list, "number": (int, float), "integer": int, "null": type(None)}[t]
+
+
+def validate_contract_lite(d, schema):
+    """Minimal JSON-Schema subset check (required, type, enum, const, pattern, nested 'properties'). Returns a list of error strings (empty = valid)."""
+    errs = [f"missing required field '{k}'" for k in schema.get("required", []) if k not in d]
+    for k, sp in schema.get("properties", {}).items():
+        if k not in d: continue
+        v = d[k]; types = sp.get("type"); types = [types] if isinstance(types, str) else (types or [])
+        if types and not any(isinstance(v, _json_type(t)) and not (t == "integer" and isinstance(v, bool)) and not (t == "number" and isinstance(v, bool)) for t in types): errs.append(f"'{k}' has type {type(v).__name__}, expected {types}")
+        if "const" in sp and v != sp["const"]: errs.append(f"'{k}' must be {sp['const']!r}, got {v!r}")
+        if "enum" in sp and v not in sp["enum"]: errs.append(f"'{k}' must be one of {sp['enum']}, got {v!r}")
+        if "pattern" in sp and isinstance(v, str) and not re.fullmatch(sp["pattern"], v): errs.append(f"'{k}' does not match {sp['pattern']}")
+        if isinstance(v, dict) and sp.get("properties"): errs += [f"{k}.{e}" for e in validate_contract_lite(v, sp)]
+    return errs
+
+
+_AI_FIELDS = [f.name for f in __import__("dataclasses").fields(FinalAssessment)]
+FINAL_ASSESSMENT_JSON_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "LUMYVUE final AI assessment", "type": "object", "required": _AI_FIELDS,
+    "description": "Sealed AI output. Issued ONLY as PENDING_DERMATOLOGIST_REVIEW; never edited after issue (corrections = a new assessment with a new scan_id). ai_content_sha256 = SHA-256 of the canonical JSON (sorted keys, compact separators) of every other field.",
+    "properties": {
+        "scan_id": {"type": "string"}, "state": {"type": "string", "enum": STATES}, "predicted_conditions": {"type": "array"}, "condition_scores": {"type": "object"}, "regions": {"type": "array"},
+        "detector_availability": {"type": "object"}, "original_cnn_scores": {"type": "object"}, "original_yolo_outputs": {"type": "object", "description": "per condition: list of boxes, or null when the detector was unavailable (null is NOT an empty list)"},
+        "review_status": {"type": "string", "const": REVIEW_STATUS_PENDING}, "requires_dermatologist_review": {"type": "boolean", "const": True},
+        "clinical_status": {"type": "string", "const": CLINICAL_STATUS},
+        "ai_verification": {"type": "object", "properties": {"clinical_validation": {"type": "boolean", "const": False}}, "required": ["clinical_validation", "stage_reached", "verification_passes", "stop_reason", "statement"]},
+        "ai_content_sha256": {"type": "string", "pattern": "[0-9a-f]{64}"}, "schema_version": {"type": "string", "const": SCHEMA_VERSION}, "created_utc": {"type": "string"}}}
+DERMATOLOGIST_REVIEW_JSON_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "LUMYVUE dermatologist review (separate from the AI assessment)", "type": "object",
+    "required": ["review_id", "scan_id", "ai_content_sha256", "review_status", "reviewer_id", "reviewer_role", "reviewed_at_utc", "blinded_to_ai", "ai_shown_before_review", "image_adequate", "findings", "schema_version"],
+    "properties": {"review_id": {"type": "string"}, "scan_id": {"type": "string"}, "ai_content_sha256": {"type": "string", "pattern": "[0-9a-f]{64}"}, "review_status": {"type": "string", "enum": REVIEW_RECORD_STATUSES},
+                   "reviewer_id": {"type": "string"}, "reviewer_role": {"type": "string", "const": "dermatologist"}, "reviewed_at_utc": {"type": "string"}, "blinded_to_ai": {"type": ["boolean", "null"]},
+                   "ai_shown_before_review": {"type": ["boolean", "null"]}, "image_adequate": {"type": "string", "enum": ["yes", "no", "unknown"]},
+                   "findings": {"type": "object", "required": list(CFG.CONDITIONS), "properties": {c: {"type": "string", "enum": list(FINDING_VALUES)} for c in CFG.CONDITIONS}, "description": "independent clinical findings; unknown is never absent"},
+                   "schema_version": {"type": "string", "const": REVIEW_SCHEMA_VERSION}}}
+REVIEW_CONTRACT = dict(
+    rule="Every AI assessment, whatever its state, confidence, stage or findings, is issued as PENDING_DERMATOLOGIST_REVIEW and requires dermatologist review.",
+    ai_assessment=dict(schema=SCHEMA_VERSION, status_at_issue=REVIEW_STATUS_PENDING, immutable_after_issue=True, seal="ai_content_sha256 = SHA-256(canonical JSON of all other fields)", corrections="issue a NEW assessment with a new scan_id; never edit"),
+    dermatologist_review=dict(schema=REVIEW_SCHEMA_VERSION, separate_record=True, statuses=REVIEW_RECORD_STATUSES, links_to="scan_id + ai_content_sha256 (a review for a different AI version is refused)",
+                              findings="present | absent | unknown per condition; blank/unknown is never treated as absent", reviewer_role="dermatologist", blinding_fields=["blinded_to_ai", "ai_shown_before_review"]),
+    ai_verification="Stage 2 and the adaptive verification cycle are AI verification; clinical_validation is always false and the AI statement says so",
+    metrics="agreement, disagreement, Cohen's kappa, PPV, sensitivity, specificity per condition from AI per-condition decisions vs dermatologist findings; AI-uncertain / AI-no-result / dermatologist-unknown are reported separately",
+    states_meaning="state describes how well the AI evidence supports a result; it is not a diagnosis and not clinical confirmation")
+write_json(export_path("final_assessment.schema.json"), FINAL_ASSESSMENT_JSON_SCHEMA); write_json(export_path("dermatologist_review.schema.json"), DERMATOLOGIST_REVIEW_JSON_SCHEMA); write_json(export_path("review_contract.json"), REVIEW_CONTRACT)
+_probe = FinalAssessment(scan_id="schema_probe", state="UNCERTAIN_REVIEW_REQUIRED", created_utc="2026-01-01T00:00:00+00:00"); finalize_assessment(_probe)
+_errs = validate_contract_lite(_probe.to_dict(), FINAL_ASSESSMENT_JSON_SCHEMA)
+require(not _errs, f"the notebook's own assessment output violates its exported schema: {_errs}")
+print("exported: final_assessment.schema.json, dermatologist_review.schema.json, review_contract.json | a freshly issued assessment validates against the schema:", not _errs)
+
+#@@ md
 ## 52. Deployment metadata and C# mapping
 `v6_model_metadata.json` collects everything the application needs: class/condition order, normalisation, tensor schemas, ROI procedure, detector execution order, post-processing, fusion input/output schemas, calibration and thresholds, Stage-1/2 rules, verification limits, versions and hashes. The **future** WPF implementation must use **one shared final-result object** (`FinalAssessment`, schema `lumyvue-final-assessment/1.0`) for the Results screen, localisation overlays, patient record, dermatologist review, thermal receipt and A4 report, keeping original CNN and YOLO outputs accessible. Parameters marked *provisional* must stay configuration, not constants.
 
 #@@ code
 def build_deployment_metadata():
     return dict(
-        schema=SCHEMA_VERSION, created=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, status="EXPERIMENTAL - not validated for deployment; produced by an unexecuted-by-author notebook",
+        schema=SCHEMA_VERSION, review_contract=REVIEW_CONTRACT, created=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, status="EXPERIMENTAL - not validated for deployment; produced by an unexecuted-by-author notebook",
         condition_order=CFG.CONDITIONS, normal_definition="Normal = all three conditions verified Absent (derived; never a model output)", v5_class_order=CFG.V5_CLASS_ORDER,
         global_cnn=dict(experiment=GLOBAL_SELECTED, input="float32 NHWC [N,224,224,3]", preprocessing="BGR->RGB, bilinear (INTER_LINEAR) stretch to 224x224, (p/127.5)-1", outputs=["embedding_128", "logits/probabilities"],
                         note="multilabel3: apply sigmoid; fusion consumes logit(clip(sigmoid(z), 1e-4, 1-1e-4)) i.e. z clipped to +-9.21"),
         yolo=dict(execution_order=CFG.CONDITIONS, preprocessing="letterbox to imgsz (pad 114, bilinear), RGB, /255, NCHW", output="[1,4+nc,N] cx,cy,w,h (letterbox px) + class scores, no objectness",
-                  postprocessing=dict(per_member_nms_iou={c: DETECTORS[c].nms_iou for c in CFG.CONDITIONS}, member_floor=CFG.YOLO_FLOOR, ensemble_fusion_iou=CFG.YOLO_FUSION_IOU, fused_confidence="min(1, sum(conf)/members)",
+                  postprocessing=dict(per_member_nms_iou={c: DETECTORS[c].nms_iou for c in CFG.CONDITIONS}, member_floor=CFG.YOLO_FLOOR, ensemble_fusion_iou={c: DETECTORS[c].fusion_iou for c in CFG.CONDITIONS}, fused_confidence="min(1, sum(conf)/members)",
                                       deployed_thresholds={c: DETECTORS[c].threshold for c in CFG.CONDITIONS}, candidate_pool_min_conf=CFG.YOLO_POOL_MIN_CONF, max_boxes=CFG.YOLO_MAX_BOXES, face_filter="optional (centre inside face box +25%)"),
-                  availability={c: DETECTORS[c].available for c in CFG.CONDITIONS}, versions={c: DETECTORS[c].version for c in CFG.CONDITIONS}, sha256={c: [m.sha256 for m in DETECTORS[c].members] for c in CFG.CONDITIONS}, config_hash=YOLO_CONFIG_HASH,
+                  availability={c: DETECTORS[c].available for c in CFG.CONDITIONS}, location={c: DETECTORS[c].location for c in CFG.CONDITIONS}, versions={c: DETECTORS[c].version for c in CFG.CONDITIONS}, sha256={c: [m.sha256 for m in DETECTORS[c].members] for c in CFG.CONDITIONS}, config_hash=YOLO_CONFIG_HASH,
                   note="Detectors that are not installed are 'unavailable' (availability flag 0), never 'zero detections'."),
         roi=dict(size=ROI_S, margin=CFG.ROI_MARGIN, alt_context_margin=CFG.ROI_ALT_MARGIN, square_window="extend shorter side, shift inside image, no padding", tiers={"1": "deployed boxes (round-robin over detectors, IoU>%.2f suppressed)" % CFG.ROI_OVERLAP_SUPPRESS_IOU, "2": "lower-confidence pool boxes", "3": "alternative wider-context crops of tier-1 boxes"},
                  max_tier1=CFG.ROI_MAX_TIER1, max_total=CFG.ROI_MAX_TOTAL, classes=CFG.ROI_CLASSES, preprocessing="RGB, bilinear, (p/127.5)-1", feature_dim=ROI_FEAT_DIM, yolo_feature_names=YOLO_FEATURE_NAMES),
         fusion=dict(inputs=dict(g_emb=[128], g_logit=[3], g_extra=[2], det_ev=[CFG.N_COND * DET_EV_DIM], roi_feat=[CFG.ROI_MAX_TOTAL, ROI_FEAT_DIM], roi_mask=[CFG.ROI_MAX_TOTAL]), det_ev_layout=["available", "detected", "max_deployed_conf", "max_pool_conf", "sqrt_rel_area", "cx", "cy"],
                     output="[3] logits in CFG.CONDITIONS order", ensemble="mean of per-seed logits", seeds=CFG.SEEDS, calibration=CALIB, variants_used_at_runtime=["global_only", "global_yolo", "full"]),
         stages=dict(stage1_rule=STAGE1, stage2_band=BAND2, verification=dict(max_passes=CFG.MAX_VERIFICATION_PASSES, max_seconds=CFG.MAX_VERIFICATION_SECONDS, min_new_rois=CFG.MIN_NEW_ROIS, convergence_eps=CFG.CONVERGENCE_EPS,
-                    actions=["pass1: tier-1 regions", "pass2: + tier-2 candidates", "pass3: + tier-3 alternative-context crops", "recapture request", "external verifier (if configured)"]),
+                    actions=["pass1: tier-1 regions", "pass2: + tier-2 candidates", "pass3: + tier-3 alternative-context crops", "recapture request", "external AI verifier (if configured)"], nature="AI verification only - not clinical validation"),
                     quality_thresholds=CFG.QUALITY, quality_status="provisional heuristics, unvalidated", ood=dict(method="Mahalanobis on global embedding", percentile=CFG.OOD_PERCENTILE, threshold=(None if OOD is None else OOD.threshold)), states=STATES),
         versions=dict(v5_onnx_sha256=V5_SHA, yolo_config_hash=YOLO_CONFIG_HASH, python=sys.version.split()[0], tensorflow=tf.__version__, onnxruntime=ort.__version__), export_status=EXPORT_STATUS,
         parity_procedure="Run `SkinDevApp.exe --diagnose <image> <dir>` for the C# tensor/probabilities, then Section 15.4; compare per-output differences with the tolerances recorded in v6_keras_vs_onnx_verification.json.",
@@ -153,7 +209,7 @@ Every gate, training phase, test-split opening, export and (when used) inference
 #@@ code
 def log_assessment(fa):
     d = fa.to_dict() if hasattr(fa, "to_dict") else fa
-    return log_event("assessment", scan=d["scan_id"], state=d["state"], stage=d["stage_reached"], passes=d["verification_passes"], stop=d["stop_reason"], predicted=d["predicted_conditions"],
+    return log_event("assessment", scan=d["scan_id"], state=d["state"], review_status=d["review_status"], ai_sha=d.get("ai_content_sha256", "")[:16], stage=d["stage_reached"], passes=d["verification_passes"], stop=d["stop_reason"], predicted=d["predicted_conditions"],
                      model_hash=hashlib.sha256(json.dumps(d["model_versions"], sort_keys=True, default=str).encode()).hexdigest()[:16])
 
 
@@ -367,6 +423,90 @@ class TestV6(unittest.TestCase):
             lines = open(p).read().splitlines(); r1 = json.loads(lines[1]); r1["data"] = {"i": 99}; lines[1] = json.dumps(r1); open(p, "w").write("\n".join(lines) + "\n")
             self.assertFalse(verify_audit_chain(p)[0])
 
+    # ---- dermatologist-review contract -----------------------------------------------------------------------------------------------
+    def _assessment(self, state="FINDINGS_SUPPORTED", scan="scan_t1"):
+        fa = FinalAssessment(scan_id=scan, state=state, predicted_conditions=["Acne"], created_utc="2026-01-01T00:00:00+00:00",
+                             condition_scores={"Acne": dict(decision="present", calibrated_probability=0.9, threshold=0.5), "Hyperpigmentation": dict(decision="absent"), "Eczema": dict(decision="uncertain")},
+                             original_cnn_scores={"s": [0.1, 0.2]}, original_yolo_outputs={"Acne": [dict(conf=0.5)], "Eczema": None})
+        return finalize_assessment(fa)
+
+    def _review(self, ai, **kw):
+        base = dict(review_id="rev_1", scan_id=ai.scan_id, ai_content_sha256=ai.ai_content_sha256, review_status="DERMATOLOGIST_REVIEW_COMPLETED", reviewer_id="derm01", reviewer_role="dermatologist",
+                    reviewed_at_utc="2026-01-02T00:00:00+00:00", blinded_to_ai=True, ai_shown_before_review=False, image_adequate="yes", findings={"Acne": "present", "Hyperpigmentation": "present", "Eczema": "unknown"})
+        base.update(kw); return DermatologistReview(**base)
+
+    def test_every_state_is_issued_pending_review_and_sealed(self):
+        for s in STATES:                                           # including NO_FINDINGS_SUPPORTED, RECAPTURE_REQUIRED and INFERENCE_ERROR: no state waives review
+            fa = self._assessment(s); d = fa.to_dict()
+            self.assertEqual(d["review_status"], REVIEW_STATUS_PENDING); self.assertTrue(d["requires_dermatologist_review"]); self.assertEqual(d["clinical_status"], CLINICAL_STATUS); self.assertTrue(fa.verify_integrity())
+        for bad in [dict(requires_dermatologist_review=False), dict(review_status="DERMATOLOGIST_REVIEW_COMPLETED"), dict(clinical_status="CLINICALLY_VALIDATED")]:
+            with self.assertRaises(AssertionError): FinalAssessment(scan_id="x", state="FINDINGS_SUPPORTED", **bad).to_dict()
+
+    def test_failures_and_abstentions_are_also_pending_review(self):
+        fa = assess_image(None, np.zeros((4, 4), np.uint8)); self.assertEqual((fa.state, fa.review_status), ("INFERENCE_ERROR", REVIEW_STATUS_PENDING)); self.assertTrue(fa.verify_integrity())
+
+    def test_sealed_assessment_is_immutable(self):
+        fa = self._assessment()
+        with self.assertRaises(AttributeError): fa.state = "NO_FINDINGS_SUPPORTED"
+        with self.assertRaises(AttributeError): fa.review_status = "DERMATOLOGIST_REVIEW_COMPLETED"
+        fa.condition_scores["Acne"]["decision"] = "absent"                                       # nested mutation cannot be blocked in Python ...
+        self.assertFalse(fa.verify_integrity())                                                  # ... but it is detected, and compose_case_record refuses it
+        with self.assertRaises(V6Error): compose_case_record(fa)
+
+    def test_review_is_a_separate_record_and_never_changes_the_ai_assessment(self):
+        ai = self._assessment(); h0 = ai.ai_content_sha256; before = copy.deepcopy(ai.to_dict())
+        case = compose_case_record(ai, self._review(ai))
+        self.assertEqual(ai.ai_content_sha256, h0); self.assertTrue(ai.verify_integrity()); self.assertEqual(ai.to_dict(), before)
+        self.assertEqual(case["ai_assessment"]["review_status"], REVIEW_STATUS_PENDING)                  # the AI record still says: pending at issue
+        self.assertEqual(case["review_status"], "DERMATOLOGIST_REVIEW_COMPLETED"); self.assertEqual(case["dermatologist_review"]["findings"]["Hyperpigmentation"], "present")
+        case["ai_assessment"]["state"] = "tampered"; self.assertTrue(ai.verify_integrity() and ai.state == "FINDINGS_SUPPORTED")   # the case record is a deep copy
+        self.assertIsNone(compose_case_record(ai)["dermatologist_review"]); self.assertEqual(compose_case_record(ai)["review_status"], REVIEW_STATUS_PENDING)
+
+    def test_review_validation_rules(self):
+        ai = self._assessment()
+        with self.assertRaises(V6Error): compose_case_record(ai, self._review(ai, ai_content_sha256="0" * 64))        # reviewed a different AI version
+        with self.assertRaises(V6Error): compose_case_record(ai, self._review(ai, scan_id="other"))
+        with self.assertRaises(V6Error): validate_review(self._review(ai, reviewer_role="researcher"))                 # only dermatologists are clinical ground truth
+        with self.assertRaises(V6Error): validate_review(self._review(ai, blinded_to_ai=None))                         # a COMPLETED review must state blinding explicitly
+        with self.assertRaises(V6Error): validate_review(self._review(ai, findings={"Acne": "present", "Hyperpigmentation": "absent"}))
+        with self.assertRaises(V6Error): validate_review(self._review(ai, findings={"Acne": "yes", "Hyperpigmentation": "absent", "Eczema": "absent"}))
+        validate_review(self._review(ai, review_status="DERMATOLOGIST_REVIEW_IN_PROGRESS", blinded_to_ai=None, ai_shown_before_review=None))
+        self.assertEqual(self._review(ai).findings["Eczema"], "unknown")                                               # unknown stays unknown
+
+    def test_agreement_metrics_keep_uncertain_and_unknown_separate(self):
+        ai = np.array([1, 1, 0, 0, 2, -2, 1, 0]); dm = np.array([1, 0, 0, 1, 1, 1, -1, -1]); r = agreement_core(ai, dm)
+        self.assertEqual((r["n_both_decided"], r["agree"], r["disagree"]), (4, 2, 2)); self.assertEqual((r["ai_present_derm_absent"], r["ai_absent_derm_present"]), (1, 1))
+        self.assertEqual((r["ai_uncertain"], r["ai_no_result"], r["derm_unknown"]), (1, 1, 2)); self.assertAlmostEqual(r["agreement"], 0.5); self.assertAlmostEqual(r["cohen_kappa"], 0.0)
+        self.assertAlmostEqual(r["sensitivity"], 0.5); self.assertAlmostEqual(r["specificity"], 0.5); self.assertAlmostEqual(r["ppv"], 0.5)
+        t, ov = agreement_table(np.tile(ai[:, None], (1, 3)), np.tile(dm[:, None], (1, 3))); self.assertEqual(len(t), 3); self.assertEqual(ov["n_all_decided"], 4)
+
+    def test_cases_to_codes_uses_only_completed_reviews_and_their_blinding(self):
+        a1 = self._assessment(scan="s1"); a2 = self._assessment(scan="s2"); a3 = self._assessment(scan="s3")
+        cases = [compose_case_record(a1, self._review(a1, review_id="r1")), compose_case_record(a2, self._review(a2, review_id="r2", blinded_to_ai=False)),
+                 compose_case_record(a3, self._review(a3, review_id="r3", review_status="DERMATOLOGIST_REVIEW_IN_PROGRESS", blinded_to_ai=None, ai_shown_before_review=None))]
+        self.assertEqual(len(cases_to_codes(cases)[0]), 2); self.assertEqual(len(cases_to_codes(cases, blinded_only=True)[0]), 1)
+
+    def test_stage2_is_ai_verification_not_clinical_validation(self):
+        fa = self._assessment(); self.assertIs(fa.ai_verification["clinical_validation"], False); self.assertIn("NOT clinical validation", fa.ai_verification["statement"]); self.assertIn("not a diagnosis", fa.state_meaning)
+        self.assertEqual(fa.ai_verification["performed_by"], "automated AI pipeline (no human involved)")
+
+    def test_exported_contract_schemas(self):
+        fa = self._assessment(); self.assertEqual(validate_contract_lite(fa.to_dict(), FINAL_ASSESSMENT_JSON_SCHEMA), [])
+        bad = fa.to_dict(); bad["review_status"] = "DERMATOLOGIST_REVIEW_COMPLETED"; self.assertTrue(validate_contract_lite(bad, FINAL_ASSESSMENT_JSON_SCHEMA))
+        bad = fa.to_dict(); del bad["ai_content_sha256"]; self.assertTrue(validate_contract_lite(bad, FINAL_ASSESSMENT_JSON_SCHEMA))
+        rv = self._review(fa).to_dict(); self.assertEqual(validate_contract_lite(rv, DERMATOLOGIST_REVIEW_JSON_SCHEMA), [])
+        rv["reviewer_role"] = "researcher"; self.assertTrue(validate_contract_lite(rv, DERMATOLOGIST_REVIEW_JSON_SCHEMA))
+        rv = self._review(fa).to_dict(); rv["findings"]["Acne"] = "maybe"; self.assertTrue(validate_contract_lite(rv, DERMATOLOGIST_REVIEW_JSON_SCHEMA))
+
+    def test_sealed_store_is_append_only(self):
+        p = os.path.join(CFG.DIRS["tests"], "sealed_test.jsonl")
+        if os.path.exists(p): os.remove(p)
+        a = self._assessment(scan="scan_store"); store_sealed_assessment(a, p); store_sealed_assessment(a, p)               # idempotent for identical content
+        self.assertEqual(len(load_sealed_assessments(p)), 1)
+        other = FinalAssessment(scan_id="scan_store", state="NO_FINDINGS_SUPPORTED", created_utc="2026-01-01T00:00:00+00:00"); finalize_assessment(other)
+        with self.assertRaises(V6Error): store_sealed_assessment(other, p)                                                    # same scan id, different content: refused
+        os.remove(p)
+
     # ---- tests that need trained components (skipped, never 'passed', when unavailable) -----------------------------------------------
     def test_end_to_end_reference_parity_with_batch_logic(self):
         if BUNDLE is None or not TEST: self.skipTest("needs all trained components and the evaluated test split")
@@ -434,6 +574,8 @@ add_section("5. Localisation evaluation", [("YOLO registry", "yolo/detector_regi
                                            ("Detector vs verified label (test)", "metrics/test_detector_vs_verified_label.csv", "csv")])
 add_section("6. Fusion system, ablation and verification statistics", [("Ablation", "metrics/test_ablation.csv", "csv"), ("Verification statistics", "metrics/test_verification_statistics.json", "json"), ("Risk-coverage (F)", "metrics/test_risk_coverage_F.csv", "csv"), ("Robustness (global CNN)", "metrics/test_robustness_global_cnn.csv", "csv"),
                                                               ("Latency (Python reference)", "metrics/latency_reference_pipeline.json", "json")])
+add_section("6b. Agreement with the dermatologist reference (AI-uncertain and AI-no-result reported separately; every assessment remains PENDING_DERMATOLOGIST_REVIEW)", [("System G vs reference, per condition", "metrics/test_agreement_with_dermatologist_reference_G.csv", "csv"), ("Overall", "metrics/test_agreement_overall_G.json", "json"),
+                                                                                                                                                  ("Live dermatologist reviews (all completed)", "metrics/live_dermatologist_agreement_all.csv", "csv"), ("Live reviews (blinded only)", "metrics/live_dermatologist_agreement_blinded.csv", "csv")])
 add_section("7. Comparison against V5 and misclassification analysis", [("V5 reported (single-label; NOT comparable)", "v5_comparison/v5_reported_single_label_test_metrics.csv", "csv"), ("V5 vs V6 on the verified test split", "v5_comparison/v5_vs_v6_verified_test.csv", "csv"),
                                                                         ("Misclassification pairs (test)", "metrics/test_misclassification_pairs.csv", "csv"), ("Hyperpigmentation missed as Normal", "v5_comparison/hyperpigmentation_missed_as_normal.json", "json")])
 REPORT.append("\n## 8. Limitations (always applicable)\n" + "\n".join(f"* {t}" for t in [
@@ -444,7 +586,8 @@ REPORT.append("\n## 8. Limitations (always applicable)\n" + "\n".join(f"* {t}" f
     "Eczema localisation depends on the registered Eczema detector; if none was registered, Eczema evidence is `detector_unavailable` and Eczema localisation metrics are not reported.",
     "ROI crops from 224x224 processed images (when originals are missing) carry little detail; check the per-image `source` columns.",
     "Python reference timing is not the C# latency; the C# parity of the new components is **untested** until the parity procedure is run.",
-    "A single test split, small verified sets and many comparisons: unadjusted intervals; non-significance is not equivalence."]))
+    "A single test split, small verified sets and many comparisons: unadjusted intervals; non-significance is not equivalence.",
+    "Every AI assessment requires dermatologist review. 'Supported', 'accepted' and Stage-2 'verification' describe the strength of AI evidence only; none of them is a clinical confirmation."]))
 write_text(os.path.join(CFG.DIRS["report"], "chapter4_report.md"), "\n".join(REPORT)); print("report written:", redact(os.path.join(CFG.DIRS["report"], "chapter4_report.md")), "| sections with data:", sum("**RESULT**" in r for r in REPORT))
 
 #@@ md
@@ -466,6 +609,7 @@ display(BOARD)
 summary = dict(run_id=CFG.RUN_ID, finished=datetime.datetime.now().isoformat(timespec="seconds"), originals_unchanged=ok_orig, changed_originals=bad_orig, audit_chain_intact=ok_chain,
                gates_open=int(BOARD.open.sum()), gates_blocked=int((~BOARD.open).sum()), artifacts=len(ART), unit_tests=TEST_REPORT, test_split_evaluated=os.path.exists(TEST_LOCK),
                trained=dict(global_selected=GLOBAL_SELECTED, roi_seed=ROI_SELECTED_SEED, fusion_variants=list(FUSION_STATE.get("oof", {}).keys())),
+               dermatologist_review_required_for_every_assessment=True, review_status_at_issue=REVIEW_STATUS_PENDING,
                honesty="Values appear only in files produced by this run. Where a stage was blocked, its outputs do not exist and no placeholder was created.")
 write_json(os.path.join(CFG.DIRS["report"], "final_summary.json"), summary); write_csv(ART, os.path.join(CFG.DIRS["report"], "artifact_index.csv")); write_csv(BOARD, os.path.join(CFG.DIRS["report"], "stage_gate_board.csv"))
 print(json.dumps({k: v for k, v in summary.items() if k != "unit_tests"}, indent=1, default=str))

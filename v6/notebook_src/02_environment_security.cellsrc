@@ -49,6 +49,8 @@ _PR = _first_existing([os.environ.get("LUMYVUE_PROJECT_ROOT"), os.path.join(HOME
 _MODEL_DIRS = [os.environ.get("LUMYVUE_YOLO_MODEL_DIR")] + sorted(glob.glob("/mnt/c/Users/*/source/repos/SkinDevApp/SkinDevApp/Model"))
 _ORIG_DIRS = [os.environ.get("LUMYVUE_ORIGINAL_IMAGE_ROOT")] + sorted(glob.glob("/mnt/c/Users/*/Downloads/PrecisionSkin/Classes"))
 _CAPT_DIRS = [os.environ.get("LUMYVUE_CAMERA_CAPTURE_DIR")] + sorted(glob.glob("/mnt/c/Users/*/AppData/Local/LUMYVUE/Captures"))
+# Where an Eczema detector may be found OUTSIDE the WPF Model folder (read-only search; see Part V). The application only loads files that are in its own Model folder.
+_ECZ_DIRS = [d for d in [os.environ.get("LUMYVUE_ECZEMA_SEARCH_DIR"), os.path.join(HOME, "Downloads")] + sorted(glob.glob("/mnt/c/Users/*/Downloads")) if d]
 
 DEFAULTS = dict(
     # ---------------------------------------------------------------- run identity / security
@@ -75,13 +77,15 @@ DEFAULTS = dict(
     ECZEMA_ONNX_FILES=[],            # explicit list of ensemble member files; empty = auto-discover lesion_detector_eczema*.onnx, else 3-class lesion_detector_v1.onnx
     ECZEMA_META_JSON="", ECZEMA_CLASS_NAME="eczema", ECZEMA_CLASS_INDEX=None,     # None = read from the JSON / ONNX output
     ECZEMA_IMGSZ=None, ECZEMA_NMS_IOU=None, ECZEMA_THRESHOLD=0.25,                # None = read from the JSON; threshold default = app's ScanSettings (pilot class)
+    ECZEMA_SEARCH_DIRS=_ECZ_DIRS,    # searched (read-only) for lesion_detector_eczema[_m2..].onnx/.json when none is in YOLO_MODEL_DIR; the location is reported, never assumed to be the app's
+    ECZEMA_FUSION_IOU=None,          # None = the deployed C# value (YOLO_FUSION_IOU, 0.5). The eczema JSON note mentions 0.55 for its own evaluation: NOT applied silently
     YOLO_OVERRIDES={},               # per-condition dict, e.g. {"Acne": {"threshold": 0.275}}; empty = deployed values from JSON/ScanSettings
     # ---------------------------------------------------------------- label space / dataset policy
     CONDITIONS=["Acne", "Hyperpigmentation", "Eczema"],                           # C# ClassPalette order 0..2; Normal is derived (all Absent)
     INCLUDE_AUX_NONFACIAL=False, EXCLUDE_FACIAL_QA=["reject", "manual_review"], NEAR_DUP_MAX_HAMMING=3,   # exact duplicates beyond the first copy are always dropped
     SPLIT_FRACTIONS=dict(train=0.60, validation=0.10, fusion=0.15, test=0.15), SPLIT_SEED=2026,
     # ---------------------------------------------------------------- annotation gates (Section 12)
-    ANNOTATION_CSV="", REGION_CSV="", PROVENANCE_CSV="", REVIEW_QUEUE_CSV="",
+    ANNOTATION_CSV="", REGION_CSV="", PROVENANCE_CSV="", REVIEW_QUEUE_CSV="", DERM_REVIEW_CSV="",      # DERM_REVIEW_CSV: per-scan dermatologist reviews (separate from AI output)
     EVAL_REQUIRES_DERMATOLOGIST=True, TRAIN_ACCEPTED_ROLES=["dermatologist", "researcher"],
     MIN_VERIFIED=dict(train=300, validation=150, fusion=250, test=250),             # fully-known verified photographs per split
     MIN_POSITIVES=dict(train=40, validation=20, fusion=30, test=30),                # verified Present per condition per split
@@ -154,6 +158,7 @@ CFG.ANNOTATION_CSV = CFG.ANNOTATION_CSV or os.path.join(CFG.V6_WORKSPACE, "annot
 CFG.REGION_CSV = CFG.REGION_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "region_annotations.csv")
 CFG.PROVENANCE_CSV = CFG.PROVENANCE_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "dataset_provenance.csv")
 CFG.REVIEW_QUEUE_CSV = CFG.REVIEW_QUEUE_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "hard_example_review_queue.csv")
+CFG.DERM_REVIEW_CSV = CFG.DERM_REVIEW_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "dermatologist_reviews.csv")
 CFG.SPLIT_DIR = os.path.join(CFG.V6_WORKSPACE, "splits")
 CFG.EXP_DIR = os.path.join(CFG.V6_WORKSPACE, "experiments", CFG.RUN_ID)
 CFG.DIRS = {d: os.path.join(CFG.EXP_DIR, d) for d in
@@ -288,7 +293,7 @@ def _norm(p):
 
 def _protected_roots():
     roots = [CFG.V5_RUN_DIR, os.path.dirname(CFG.V5_ONNX), os.path.dirname(CFG.V5_KERAS), CFG.YOLO_MODEL_DIR, CFG.PROCESSED_ROOT, CFG.ORIGINAL_IMAGE_ROOT,
-             os.path.dirname(CFG.V5_MANIFEST), CFG.CAMERA_CAPTURE_DIR, CFG.OOD_REFERENCE_DIR, *CFG.PROTECTED_DIRS]
+             os.path.dirname(CFG.V5_MANIFEST), CFG.CAMERA_CAPTURE_DIR, CFG.OOD_REFERENCE_DIR, *CFG.PROTECTED_DIRS, *CFG.ECZEMA_SEARCH_DIRS]
     if CFG.YOLO_MODEL_DIR:
         roots.append(os.path.dirname(CFG.YOLO_MODEL_DIR))      # the whole WPF project folder
     return [_norm(r) for r in roots if r]
@@ -421,6 +426,8 @@ def original_files():
     if CFG.YOLO_MODEL_DIR and os.path.isdir(CFG.YOLO_MODEL_DIR):
         fs += sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR, "*.onnx")) + glob.glob(os.path.join(CFG.YOLO_MODEL_DIR, "*.json")))
     fs += [f for f in CFG.ECZEMA_ONNX_FILES if f] + ([CFG.ECZEMA_META_JSON] if CFG.ECZEMA_META_JSON else [])
+    for d in CFG.ECZEMA_SEARCH_DIRS:                                           # an eczema detector found outside the app is an ORIGINAL too: fingerprinted, never written
+        fs += sorted(glob.glob(os.path.join(d, "lesion_detector_eczema*.onnx")) + glob.glob(os.path.join(d, "lesion_detector_eczema*.json")))
     return [f for f in dict.fromkeys(fs) if f and os.path.isfile(f)]
 
 

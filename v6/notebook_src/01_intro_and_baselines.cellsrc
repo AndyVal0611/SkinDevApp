@@ -9,6 +9,7 @@
 > * This notebook is the **complete, runnable V6 pipeline**. **You** execute it; it has **not** been run by its author. It contains **no experimental result**: every number, table and figure is produced from files it saves under `…/v6/experiments/<RUN_ID>/` when you run it.
 > * Stages that need verified labels, region annotations or model files that do not exist yet **stop with a `GateError`** that says exactly what is missing. They never invent labels, never treat *Unknown* as *Absent*, and never train on invalid data.
 > * Original V5 and YOLO models, the datasets and the WPF application are **read-only** here: every write goes through `safe_write()` which refuses protected locations, and the notebook fingerprints the originals at the start and re-verifies them at the end.
+> * **Every AI assessment requires dermatologist review**, whatever its state, confidence or stage. It is issued as `PENDING_DERMATOLOGIST_REVIEW`, sealed (SHA-256) and never edited; the dermatologist's findings are recorded in a **separate** record so agreement can be measured. Stage 2 is **AI verification, not clinical validation**.
 > * Nothing here claims that fusion improves accuracy. That is a hypothesis the evaluation sections test on **dermatologist-verified, leakage-controlled** data.
 
 ## 1. Research introduction and objectives
@@ -16,9 +17,10 @@
 2. Create real information flow between all three YOLOv8 detectors (Acne, Eczema, Hyperpigmentation) and MobileNetV2: YOLO boxes → ROI crops → ROI MobileNetV2 → trainable fusion.
 3. Support **several simultaneous conditions** with three independent per-condition outputs; **Normal = verified absence of all three**, never a competing class.
 4. Produce **one consolidated structured assessment per scan**, including calibrated scores, evidence provenance, and honest abstention.
-5. Stage 1 (initial assessment) and Stage 2 (targeted ROI verification) with a **bounded, evidence-driven** verification cycle that terminates.
+5. Stage 1 (initial AI assessment) and Stage 2 (targeted **AI** verification with YOLO-guided regions) with a **bounded, evidence-driven** verification cycle that terminates. Neither stage is clinical validation; **dermatologist review is required for every assessment**.
 6. Calibration, uncertainty, input-quality screening, OOD evaluation, security, privacy and auditability.
 7. Evaluate seven systems (A–G) against **independent dermatologist-verified** findings; agreement between models is never used as proof of correctness.
+8. Keep **AI output immutable** and the **dermatologist's findings in separate fields**, so agreement, disagreement and classification metrics can be computed against independently recorded clinical ground truth.
 
 #@@ md
 ## 2. Review of the existing baselines (facts found by inspecting the project; the notebook recomputes what it can)
@@ -40,19 +42,19 @@
 ### 2.2 YOLOv8 detectors (inspected from the Acne/Hyperpigmentation notebooks, JSON metadata and C# code)
 | Item | Acne | Hyperpigmentation | Eczema |
 |---|---|---|---|
-| Deployed files | `lesion_detector_acne.onnx` + `_m2`, `_m3` (3-seed ensemble), `.json` | `lesion_detector_hyperpigmentation.onnx` + `_m2`, `_m3`, `.json` | **No ONNX file exists in the WPF `Model/` folder on this machine** (neither in the repository nor in `bin/Debug`). The csproj and `LesionEngine` look for `lesion_detector_eczema.onnx/.json` (specialist) and for the 3-class `lesion_detector_v1.onnx/.json`; only the 3-class v1 file was found (Downloads and WSL), **not** in the app |
-| Architecture | YOLOv8s (`yolov8s.pt` start) | YOLOv8s | specialist: unknown (training notebook not available); v1 3-class: YOLOv8n |
-| Training image size | 800 | 800 | specialist: unknown; v1: 640 |
-| Training config (recorded) | 100 epochs, patience 30, batch 8, cosine LR, close_mosaic 10, fliplr .5, degrees 10, scale .5, hsv .015/.5/.35; seeds 42/7/123 | same + AdamW, lr0 0.0005; annotation rule v2; seeds 42/7/123 | **not documented — do not assume the same** |
-| Ensemble / fusion | 3 members, weighted box fusion IoU 0.5, members reported down to conf 0.02, fused confidence = sum/members | same | not applicable until an eczema ONNX is registered |
-| Per-member NMS | IoU 0.6 per class | IoU 0.6 per class | v1: 0.45 |
+| Deployed files | `lesion_detector_acne.onnx` + `_m2`, `_m3` (3-seed ensemble), `.json` | `lesion_detector_hyperpigmentation.onnx` + `_m2`, `_m3`, `.json` | **Not in the WPF `Model/` folder** (Visual Studio shows the entries as missing; neither the repository nor `bin/Debug` has the files). **Found in `Downloads`:** `lesion_detector_eczema.onnx` + `_m2` + `_m3` (three distinct SHA-256 hashes) and `lesion_detector_eczema.json`. The app only loads files in its own `Model/` folder, so they must be installed there (application-side work). The older 3-class `lesion_detector_v1` is also absent from the app |
+| Architecture | YOLOv8s (`yolov8s.pt` start) | YOLOv8s | YOLOv8n (`yolov8n.pt`), 3 seeds (42/43/44) of run NA2, per its JSON; training notebook not available |
+| Training image size | 800 | 800 | 640 (ONNX input `[1,3,640,640]`) |
+| Training config (recorded) | 100 epochs, patience 30, batch 8, cosine LR, close_mosaic 10, fliplr .5, degrees 10, scale .5, hsv .015/.5/.35; seeds 42/7/123 | same + AdamW, lr0 0.0005; annotation rule v2; seeds 42/7/123 | JSON records: ≤ 100 epochs, YOLOv8n, Ultralytics 8.4.175, created 2026-10-28; **other hyper-parameters not documented — do not assume the same** |
+| Ensemble / fusion | 3 members, weighted box fusion IoU 0.5, members reported down to conf 0.02, fused confidence = sum/members | same | 3 members; JSON note: weighted box fusion **IoU 0.55**, whereas the C# application fuses every ensemble at **0.5** (constant). Notebook default = deployed 0.5, overridable (`ECZEMA_FUSION_IOU`) — not changed silently |
+| Per-member NMS | IoU 0.6 per class | IoU 0.6 per class | 0.6 (JSON) |
 | Deployed threshold | 0.275 (chosen on validation) | 0.225 (chosen on validation) | 0.25 (`ScanSettings`, "pilot class") |
-| Reported metrics | test mAP@0.5 ≈ 0.41 (167 hand-boxed photos), F1 ≈ 0.48 | **two figures exist in the repository and have not been reconciled**: 0.341 (full-results document, installed 3-model average, 100 rule-v2 test photos) vs 0.508 (JSON note, "single run"). Do not quote either until the scorer is re-run | v1 3-class test: eczema mAP@0.5 0.368 on **32** test photos (pilot, tiny set) |
-| ONNX I/O | `[1,3,800,800]` → `[1,5,N]` | same | v1: `[1,3,640,640]` → `[1,7,N]` (cx,cy,w,h + 3 class scores, no objectness) |
+| Reported metrics | test mAP@0.5 ≈ 0.41 (167 hand-boxed photos), F1 ≈ 0.48 | **two figures exist in the repository and have not been reconciled**: 0.341 (full-results document, installed 3-model average, 100 rule-v2 test photos) vs 0.508 (JSON note, "single run"). Do not quote either until the scorer is re-run | JSON records, on **different, small** sets: mAP@0.5 0.52 (fresh, 39 photos; AP30 0.708), 0.12 (r3_test_50), 0.181 (dev2_39). One annotator's boxes (same-annotator agreement F1 0.38 at IoU 0.5). A larger 6-model run (NA23) is mentioned but not installed. **Heterogeneous and unreconciled — do not quote one figure as "the" result** |
+| ONNX I/O | `[1,3,800,800]` → `[1,5,N]` | same | `[1,3,640,640]` → `[1,5,8400]` (cx,cy,w,h + 1 class score, no objectness; opset 12; class map `{0: eczema}`) — **verified by loading the files** |
 | C# post-processing | letterbox (pad 114) → RGB → /255 → NCHW; decode; per-class threshold; per-class NMS; ensemble fusion; boxes whose centre is outside the detected face (+25 %) are dropped | same | same code path |
 | Known behaviour (labels unverified) | boxes appear on 54 % of eczema photos, 29 % of hyperpigmentation photos and 15 % of clear-skin photos (acne verdict, V3 check) | boxes appear on about 32 % of clear-skin photos (team's own measurement) | unknown |
 
-**Eczema compatibility policy (this notebook).** The Eczema detector is treated as a *registered, replaceable component*: its ONNX paths, metadata JSON, class index, threshold and ensemble members are plain configuration (`ECZEMA_*`). If no eczema-capable ONNX is registered, eczema evidence is `detector_unavailable` (never "no detection"), every stage that *requires* eczema localisation is gated, and all unrelated stages (global CNN, acne/hyperpigmentation branches) still run. When your teammate provides the training notebook or an installed `lesion_detector_eczema.onnx`, set the config keys and re-run Section 6; nothing else changes. What is missing for reproducibility is listed in the readiness report (training notebook, dataset fingerprint, seeds, evaluation protocol, threshold-selection record, ensemble membership).
+**Eczema compatibility policy (this notebook).** The Eczema detector is treated as a *registered, replaceable component*: its ONNX paths, metadata JSON, class index, threshold and ensemble members are plain configuration (`ECZEMA_*`). If no eczema-capable ONNX is registered, eczema evidence is `detector_unavailable` (never "no detection"), every stage that *requires* eczema localisation is gated, and all unrelated stages (global CNN, acne/hyperpigmentation branches) still run. The notebook also searches (read-only) the folders in `ECZEMA_SEARCH_DIRS` — by default your Downloads folder — and **reports where it found the files**; evidence from files outside the app's `Model/` folder is what the app *would* produce once they are installed there. When your teammate provides the training notebook, add its record; nothing else changes. What is missing for reproducibility is listed in the readiness report (training notebook, dataset fingerprint, seeds, evaluation protocol, threshold-selection record, ensemble membership).
 
 #@@ md
 ## 3. Why V5 fails in the observed cases — hypotheses this notebook tests (none is assumed true)
@@ -83,14 +85,18 @@ flowchart TD
   RC --> F
   P --> F
   F --> CAL[Per-condition calibration + thresholds]
-  CAL --> S1{Stage 1 reliability<br/>rule validated on held-out data}
-  S1 -- reliable --> OUT[Unified final assessment]
-  S1 -- conflict / uncertain --> S2[Stage 2: ROI verification]
-  S2 --> V[Bounded adaptive verification<br/>new evidence each pass]
+  CAL --> S1{Stage 1 reliability<br/>band selected on held-out data}
+  S1 -- AI-accepted --> OUT[Unified final AI assessment<br/>sealed, PENDING_DERMATOLOGIST_REVIEW]
+  S1 -- conflict / uncertain --> S2[Stage 2: AI verification<br/>NOT clinical validation]
+  S2 --> V[Bounded adaptive AI verification<br/>new evidence each pass]
   V --> OUT
-  OUT --> ST[FINDINGS_SUPPORTED · MULTIPLE_FINDINGS_SUPPORTED · NO_FINDINGS_SUPPORTED · UNCERTAIN_REVIEW_REQUIRED · RECAPTURE_REQUIRED · OUT_OF_SCOPE_REVIEW_REQUIRED · INFERENCE_ERROR]
+  OUT --> DR[Dermatologist review - REQUIRED for every assessment<br/>separate record; AI output immutable]
+  DR --> AG[Agreement / disagreement / classification metrics<br/>vs independent clinical findings]
+  OUT --> ST[AI states: FINDINGS_SUPPORTED · MULTIPLE_FINDINGS_SUPPORTED · NO_FINDINGS_SUPPORTED · UNCERTAIN_REVIEW_REQUIRED · RECAPTURE_REQUIRED · OUT_OF_SCOPE_REVIEW_REQUIRED · INFERENCE_ERROR]
 ```
 A matplotlib version of this diagram is generated and saved by a cell in Section 3 so it is available as a figure for the thesis.
+
+**Human-in-the-loop contract (applies to every state, including `NO_FINDINGS_SUPPORTED`, abstentions and technical failures).** (1) An AI assessment is issued as `PENDING_DERMATOLOGIST_REVIEW`, `requires_dermatologist_review = true`, `clinical_status = NOT_CLINICALLY_VALIDATED`, and **sealed** with a SHA-256 of its content; it is never edited (a correction is a new assessment). (2) The dermatologist's findings (`present` / `absent` / `unknown` per condition, reviewer, time, blinding flags, adequacy) are a **separate record** linked to the reviewed AI version by hash. (3) "Supported", "accepted" and Stage-2 "verification" mean *AI evidence strength*, never clinical confirmation. (4) Agreement, disagreement, kappa, PPV, sensitivity and specificity are computed between the AI's per-condition decisions and the independent findings; AI-*uncertain* is not forced into either.
 
 **Leakage-controlled data roles.** Four group-disjoint splits are frozen before any annotation: `train` (global CNN and ROI CNN training), `validation` (CNN/ROI early stopping and model selection), `fusion` (fusion training + calibration + thresholds + Stage-1 rule, with grouped cross-fitting), `test` (opened once). Fusion features for the `fusion` and `test` splits come from CNNs that never saw those images. Features for `train` are never used to fit the fusion model (they would be over-confident).
 

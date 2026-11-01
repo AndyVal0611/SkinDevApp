@@ -12,9 +12,11 @@ Sections: **(39) classification evaluation · (40) YOLO localisation evaluation 
 | **D** | YOLO-guided ROI MobileNetV2 | fusion variant `roi_only`, calibrated, thresholds from fusion split |
 | **E** | global CNN + YOLO evidence fusion | variant `global_yolo` |
 | **F** | global + ROI CNN + three-detector fusion | variant `full` |
-| **G** | full two-stage adaptive verification system | Stage 1 → Stage 2 → bounded verification → abstention; reported **on accepted cases** *and* with abstentions listed |
+| **G** | full two-stage system with adaptive **AI** verification | Stage 1 → Stage 2 (AI verification, not clinical validation) → bounded verification → abstention; reported **on AI-accepted cases** *and* with abstentions listed |
 
 **Test-set discipline.** The test split is opened **once**: a lock file records the first evaluation; a second run raises a `GateError` unless `ALLOW_TEST_REEVALUATION=True` (use only to reproduce a reported number). Nothing computed here feeds back into any model, threshold, calibration or band. Where a number cannot be computed (too few verified positives/negatives, missing labels, missing detector) the cell says so.
+
+**Human review is never replaced.** "Accepted" means *accepted by the AI reliability rule*; it does not mean clinically confirmed. Every assessment of every system is issued as `PENDING_DERMATOLOGIST_REVIEW`. The test split's reference labels are dermatologist-verified annotations recorded **independently** of the AI, so the same agreement computation (Section 39.4) later applies to live reviews.
 
 **Reading the metrics.** Per-condition metrics use only images where that condition's reference label is *Present/Absent* (Unknown excluded); exact-match uses fully-known images. 95 % intervals resample **leakage groups**. *Agreement with another model is not a correctness metric.* Selective-prediction results (system G) are reported with their coverage, so a lower error on accepted cases is never presented without the abstention rate.
 
@@ -170,6 +172,18 @@ if TEST:
     for org, idx in by_origin.items():
         idx = np.array(idx); print(f"image_origin={org}: n={len(idx)} fully verified={int(full[idx].sum())} | F macro-F1 = {macro_f1_dec(yt[idx], S['F_full_fusion']['dec'][idx]):.4f}")
     if len(by_origin) < 2: print("(only one image origin is annotated: camera-vs-source performance cannot be compared; annotate camera captures with image_origin=camera_capture.)")
+
+#@@ code
+# 39.4 Agreement / disagreement of system G with the INDEPENDENT dermatologist reference (test). AI-uncertain and AI-no-result are reported separately; they are not forced into agreement.
+if TEST:
+    G, yt = TEST["GRES"], TEST["y"]
+    assert (G.review_status == REVIEW_STATUS_PENDING).all() and G.requires_dermatologist_review.all(), "every assessment must carry PENDING_DERMATOLOGIST_REVIEW"
+    ai_codes = np.array([[AI_CODE.get(G[f"dec_{c}"].iloc[i], AI_CODE["none"]) for c in CFG.CONDITIONS] for i in range(len(G))]); derm_codes = np.where(yt >= 0, yt, -1)
+    AGREE_T, AGREE_OV = agreement_table(ai_codes, derm_codes); display(AGREE_T.round(4)); print(AGREE_OV)
+    write_csv(AGREE_T, os.path.join(CFG.DIRS["metrics"], "test_agreement_with_dermatologist_reference_G.csv")); write_json(os.path.join(CFG.DIRS["metrics"], "test_agreement_overall_G.json"), AGREE_OV)
+    print("All", len(G), "assessments remain", REVIEW_STATUS_PENDING, "- this table measures the AI against the reference; it does not waive review.")
+else:
+    print("Skipped: test split not evaluated.")
 
 #@@ md
 ## 40. YOLO localisation evaluation (test split)

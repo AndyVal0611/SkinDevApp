@@ -3,6 +3,9 @@
 ## 1. Reference standard
 Independent, dermatologist-verified labels in three states per condition (*Present / Absent / Unknown*) for acne, eczema and hyperpigmentation; *Normal* = all three Absent. Labels are recorded blind to AI output where possible (`blinded_to_ai`). Weak labels (the single V5 class name) are never an evaluation reference and are used only as weak *positives* in training. Region labels (boxes on the original image, normalised) support ROI training and localisation metrics; `exhaustive = yes` marks complete box sets.
 
+### 1b. AI output versus dermatologist review (separate records)
+Every AI assessment is issued as `PENDING_DERMATOLOGIST_REVIEW`, sealed, and never edited. The dermatologist's findings are stored in a separate record linked by hash, so the AI prediction that existed before review can always be recovered and compared. Stage 2 and the adaptive cycle are *AI verification*; they are never counted as clinical validation. See `REVIEW_CONTRACT.md`.
+
 ## 2. Data roles and leakage control
 No subject/session identifiers exist, so groups are built from exact duplicates, mirror-aware perceptual hashes (Hamming ≤ 3) and shared source stems, merged by union-find. Splits are made **by group**, stratified by source class, and **frozen before annotation** (hash-checked): `train` (CNN + ROI training), `validation` (early stopping, model selection), `fusion` (fusion training, calibration, thresholds, Stage-1/2 rules, OOD threshold — all via grouped K-fold cross-fitting), `test` (single evaluation). ROI crops are derived after the split; fusion features for `fusion`/`test` come from CNNs that never saw those images. The limitation that proxies cannot prove patient-level independence is reported.
 
@@ -11,6 +14,9 @@ A V5 · B improved global CNN · C YOLO-only (three detectors; Eczema *not evalu
 
 ## 4. Metrics
 Per condition: precision, recall/sensitivity, specificity, F1, ROC-AUC, PR-AUC (only with ≥ `MIN_POS_FOR_METRIC` positives **and** negatives). Set-level: micro/macro-F1, Hamming loss, exact match (fully-known images only). Calibration: reliability, ECE, Brier. Selective prediction: coverage, accepted-case error, risk–coverage, AURC, abstention/recapture/out-of-scope rates. Localisation: precision, recall, F1 at the deployed threshold, AP50, AP50–95 (computed down to confidence 0.05, so not numerically identical to Ultralytics' 0.001-based mAP), localisation error, FP/FN counts, duplicate/nested analysis. Verification: escalation rate, passes, stop reasons, resolved/unresolved CNN–YOLO disagreements judged against verified labels, false-confidence rate, redundancy, latency. 95 % intervals by **cluster bootstrap over leakage groups**; paired differences by the same resampling.
+
+### 4b. Agreement with the dermatologist reference
+For each condition: pairs, both-decided, agreement, disagreement (AI-present/derm-absent and AI-absent/derm-present), Cohen's κ, PPV, sensitivity, specificity, plus all-conditions exact agreement. **AI-uncertain, AI-no-result and dermatologist-unknown are counted separately and never forced into agreement or disagreement.** Reported on the frozen test split (verified annotation file as the independent reference, §39.4) and, once recorded, on live reviews overall and for **blinded** reviews only (`blinded_to_ai = true`). Reviews are never used to adjust models, thresholds or calibration automatically.
 
 ## 5. Selection discipline
 Thresholds, Platt calibration, fusion hyper-parameters, Stage-1/2 bands (`TARGET_ACCEPTED_ERROR`, `MIN_ACCEPT_COVERAGE`) and the OOD threshold are fitted on out-of-fold `fusion` predictions. The test split is opened once (lock file); nothing computed on it feeds back. Detection thresholds are the deployed values and are **not** tuned.

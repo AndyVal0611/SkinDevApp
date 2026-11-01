@@ -1,5 +1,5 @@
 #@@ md
-# Part VIII — Trustworthiness: Quality, OOD, Stage 1, Stage 2, Adaptive Verification, Final Assessment and Abstention
+# Part VIII — Trustworthiness: Quality, OOD, Stage 1, Stage 2 (AI verification), Final Assessment, Abstention and the Dermatologist-Review Contract
 
 Sections: **(32) Stage 1 · (33) Stage-1 reliability · (34) Stage 2 · (35) adaptive verification controller · (36) unified final result · (37) safe abstention · (38) OOD and input-quality evaluation.**
 
@@ -7,22 +7,37 @@ Sections: **(32) Stage 1 · (33) Stage-1 reliability · (34) Stage 2 · (35) ada
 ```
 image ─▶ validity + quality gate ─▶ OOD score
       ─▶ STAGE 1: global CNN + 3 YOLO detectors ─▶ (fusion variant "global_yolo", no ROI) ─▶ calibrated per-condition probabilities
-                  ├─ reliability rule (validated on out-of-fold data): no conflict, no near-threshold, quality & OOD fine ─▶ ACCEPT
-                  └─ otherwise ─▶ STAGE 2: YOLO-guided ROI MobileNetV2 + full fusion ("full")
-                                    └─ bounded verification passes; each pass must add NEW evidence
+                  ├─ reliability rule (band selected on out-of-fold data): no conflict, no near-threshold, quality & OOD fine ─▶ AI-ACCEPT
+                  └─ otherwise ─▶ STAGE 2 = AI VERIFICATION (not clinical validation): YOLO-guided ROI MobileNetV2 + full fusion ("full")
+                                    └─ bounded AI verification passes; each pass must add NEW evidence
                                          pass 1: Tier-1 regions (deployed boxes)   pass 2: + Tier-2 candidates   pass 3: + Tier-3 alternative-context crops
                                          stop: resolved · converged · no new evidence · max passes · time budget · recapture needed
-      ─▶ final structured assessment (conditions, scores, regions, provenance, stage, passes, stop reason) or an explicit abstention
+      ─▶ final structured AI assessment (conditions, scores, regions, provenance, stage, passes, stop reason) or an explicit abstention, SEALED (SHA-256)
+      ─▶ status PENDING_DERMATOLOGIST_REVIEW for EVERY assessment (any state, any confidence, either stage); the dermatologist records findings in a SEPARATE record
 ```
 **Rules that cannot be bypassed.** (1) Re-running the *same* tensor is never a verification action. (2) Probabilities after a pass come from **one fusion forward over the union of evidence** — they are not averaged or compounded, so repeated passes cannot inflate confidence. (3) Unstable decisions across passes ⇒ *uncertain*. (4) Any technical failure ⇒ `INFERENCE_ERROR`, a blocking quality problem ⇒ `RECAPTURE_REQUIRED`; neither is ever reported as Normal. (5) *Absence* is only "supported" when a working detector covers the condition (configurable) **and** the calibrated probability is clearly below its threshold.
 
 **Provisional parameters.** The reliability bands are *selected on out-of-fold data* to meet `TARGET_ACCEPTED_ERROR`; the quality thresholds are heuristics. Neither is a validated clinical criterion; both are re-evaluated on the test split as an honest check and reported with their limitations.
 
 #@@ code
-# 32.1 Result object (one structure for the Results screen, overlays, patient record, dermatologist review, receipt and A4 report) and the state vocabulary.
+# 32.1 Result object (ONE structure for the Results screen, overlays, patient record, dermatologist review, receipt and A4 report) and the state vocabulary.
+#      EVERY assessment is issued as PENDING_DERMATOLOGIST_REVIEW, whatever its state, confidence, stage or findings, and is SEALED (SHA-256) at issue: the AI output is
+#      immutable afterwards. The dermatologist's findings live in a SEPARATE record (next cell) that points at the AI assessment by its hash.
+import copy
 STATES = ["FINDINGS_SUPPORTED", "MULTIPLE_FINDINGS_SUPPORTED", "NO_FINDINGS_SUPPORTED", "UNCERTAIN_REVIEW_REQUIRED", "RECAPTURE_REQUIRED", "OUT_OF_SCOPE_REVIEW_REQUIRED", "INFERENCE_ERROR"]
-# NO_FINDINGS_SUPPORTED is an addition to the requested list: a *positively supported absence* (never used for uncertainty or technical failure).
-SCHEMA_VERSION = "lumyvue-final-assessment/1.0"
+# These states describe how well the AI EVIDENCE supports a result. They are not diagnoses and not clinical confirmation.
+# NO_FINDINGS_SUPPORTED is an addition to the requested list: a *positively supported absence in the AI evidence* (never used for uncertainty or technical failure).
+REVIEW_STATUS_PENDING = "PENDING_DERMATOLOGIST_REVIEW"
+REVIEW_STATUSES = [REVIEW_STATUS_PENDING, "DERMATOLOGIST_REVIEW_IN_PROGRESS", "DERMATOLOGIST_REVIEW_COMPLETED", "DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS"]   # the first is the only status an AI assessment is ever issued with
+CLINICAL_STATUS = "NOT_CLINICALLY_VALIDATED"
+SCHEMA_VERSION = "lumyvue-final-assessment/1.1"
+REVIEW_SCHEMA_VERSION = "lumyvue-dermatologist-review/1.0"
+AI_VERIFICATION_STATEMENT = ("AI verification: additional automated models (YOLO-guided regions, ROI classifier, fusion) re-examined the image evidence. It is NOT clinical validation, "
+                             "does not confirm a diagnosis, and does not replace dermatologist review, which is required for every assessment.")
+
+
+def canonical_json(obj):
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=_json_default)
 
 
 @dataclass
@@ -46,12 +61,208 @@ class FinalAssessment:
     quality: dict = field(default_factory=dict)
     ood: dict = field(default_factory=dict)
     recapture_advice: list = field(default_factory=list)
+    review_status: str = REVIEW_STATUS_PENDING                   # status AT ISSUE; the live review status is read from the separate review record
+    requires_dermatologist_review: bool = True                   # always True: there is no state, confidence or stage that waives review
+    clinical_status: str = CLINICAL_STATUS
+    ai_verification: dict = field(default_factory=dict)          # what the AI stages did; clinical_validation is always False
+    state_meaning: str = "AI evidence assessment only: not a diagnosis and not a clinical confirmation."
+    ai_content_sha256: str = ""                                  # SHA-256 of every other field, set by seal()
     schema_version: str = SCHEMA_VERSION
     created_utc: str = ""
 
-    def to_dict(self):
-        d = asdict(self); assert d["state"] in STATES, f"invalid state {d['state']}"; return d
+    def __setattr__(self, key, value):
+        if self.__dict__.get("_sealed", False):
+            raise AttributeError(f"This AI assessment is sealed (immutable after issue); cannot set '{key}'. Issue a new assessment (new scan id) instead.")
+        object.__setattr__(self, key, value)
 
+    def to_dict(self):
+        d = asdict(self)
+        assert d["state"] in STATES, f"invalid state {d['state']}"
+        assert d["review_status"] == REVIEW_STATUS_PENDING, "an AI assessment is always issued as PENDING_DERMATOLOGIST_REVIEW (the review status lives in the separate review record)"
+        assert d["requires_dermatologist_review"] is True, "dermatologist review is required for every assessment"
+        assert d["clinical_status"] == CLINICAL_STATUS, "an AI assessment is never clinically validated"
+        assert d["ai_verification"].get("clinical_validation", False) is False, "AI verification is not clinical validation"
+        return d
+
+    def _hash(self):
+        d = asdict(self); d.pop("ai_content_sha256", None)
+        return hashlib.sha256(canonical_json(d).encode("utf-8")).hexdigest()
+
+    def seal(self):
+        self.to_dict()                                           # contract check first
+        h = self._hash(); object.__setattr__(self, "ai_content_sha256", h); object.__setattr__(self, "_sealed", True)
+        return self
+
+    def verify_integrity(self):
+        """True when no field (including nested dicts/lists) changed since seal()."""
+        return bool(self.ai_content_sha256) and self._hash() == self.ai_content_sha256
+
+
+def finalize_assessment(fa):
+    """Last step of EVERY assessment path (success, abstention, technical failure): record what the AI stages did, mark them as not clinical, seal."""
+    if fa.__dict__.get("_sealed", False): return fa
+    fa.ai_verification = dict(performed_by="automated AI pipeline (no human involved)", stage_reached=fa.stage_reached, verification_passes=fa.verification_passes, stop_reason=fa.stop_reason,
+                              clinical_validation=False, statement=AI_VERIFICATION_STATEMENT)
+    return fa.seal()
+
+
+#@@ md
+## 32.2 Dermatologist review contract — AI output and clinical findings are SEPARATE records
+* The **AI assessment** (`FinalAssessment`) is sealed at issue and is never edited — not after review, not after a second review, not to correct a mistake (a correction is a *new* assessment with a new scan id).
+* The **dermatologist review** (`DermatologistReview`) is a different object with its own id, status, reviewer, timestamp, blinding flags and **per-condition findings** `present / absent / unknown` (blank = *unknown*, never *absent*). It points at the AI assessment by `scan_id` **and** `ai_content_sha256`, so it is always clear *which* AI output was reviewed; a review that does not match the hash is refused.
+* `compose_case_record` joins the two **for display only** (deep copies); `agreement_*` functions compute agreement, disagreement and classification metrics between the AI's per-condition decisions and the **independently recorded** dermatologist findings. An AI *uncertain* decision is counted as uncertain — it is not forced into agreement or disagreement.
+* Review status: the AI object always says `PENDING_DERMATOLOGIST_REVIEW` (status at issue); the review record carries `DERMATOLOGIST_REVIEW_IN_PROGRESS`, `DERMATOLOGIST_REVIEW_COMPLETED` or `DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS`.
+* **Stage 2 is AI verification, not clinical validation.** Nothing in this notebook labels any AI output "validated", "confirmed" or "verified by a clinician".
+* Reviews must **not** be used to retrain models automatically; to use them for training they must pass the same annotation protocol (blind, dermatologist, verified) and enter the *annotation file*, never the test split.
+
+#@@ code
+FINDING_VALUES = ("present", "absent", "unknown")
+REVIEW_RECORD_STATUSES = REVIEW_STATUSES[1:]
+REVIEW_COLS = ["review_id", "scan_id", "ai_content_sha256", "review_status", "reviewer_id", "reviewer_role", "blinded_to_ai", "ai_shown_before_review", "reviewed_at", "image_adequate",
+               "acne", "hyperpigmentation", "eczema", "notes"]
+
+
+@dataclass(frozen=True)
+class DermatologistReview:
+    review_id: str
+    scan_id: str
+    ai_content_sha256: str                     # the exact AI assessment that was reviewed
+    review_status: str
+    reviewer_id: str                           # pseudonymous code, never a name
+    reviewer_role: str                         # must be 'dermatologist'
+    reviewed_at_utc: str
+    blinded_to_ai: object                      # True / False / None (not recorded)
+    ai_shown_before_review: object             # True / False / None
+    image_adequate: str                        # yes / no / unknown
+    findings: dict                             # condition -> present | absent | unknown   (independent clinical findings)
+    notes: str = ""
+    schema_version: str = REVIEW_SCHEMA_VERSION
+
+    def to_dict(self):
+        return asdict(self)
+
+
+def validate_review(r):
+    require(r.review_status in REVIEW_RECORD_STATUSES, f"review_status must be one of {REVIEW_RECORD_STATUSES}; got '{r.review_status}'")
+    require(r.reviewer_role == "dermatologist", f"only a dermatologist review is accepted as clinical ground truth (reviewer_role='{r.reviewer_role}')")
+    require(bool(r.reviewer_id) and bool(r.review_id) and bool(r.scan_id), "review_id, scan_id and reviewer_id are required")
+    require(isinstance(r.ai_content_sha256, str) and len(r.ai_content_sha256) == 64, "ai_content_sha256 (64 hex characters) is required: it identifies the AI assessment that was reviewed")
+    require(set(r.findings) == set(CFG.CONDITIONS) and all(v in FINDING_VALUES for v in r.findings.values()), f"findings must give present|absent|unknown for exactly {CFG.CONDITIONS}; got {r.findings}")
+    require(r.image_adequate in ("yes", "no", "unknown"), "image_adequate must be yes | no | unknown")
+    if r.review_status == "DERMATOLOGIST_REVIEW_COMPLETED":
+        require(isinstance(r.blinded_to_ai, bool) and isinstance(r.ai_shown_before_review, bool), "a COMPLETED review must record blinded_to_ai and ai_shown_before_review explicitly (true/false)")
+        require(bool(r.reviewed_at_utc), "a COMPLETED review needs reviewed_at")
+    return r
+
+
+def _ai_checked(ai):
+    """Returns a deep copy of a sealed AI assessment after verifying its hash (FinalAssessment or its dict)."""
+    if isinstance(ai, FinalAssessment):
+        require(ai.verify_integrity(), "AI assessment failed its integrity check (changed after seal?)")
+        return ai.to_dict()
+    d = copy.deepcopy(ai); h = d.get("ai_content_sha256"); d2 = dict(d); d2.pop("ai_content_sha256", None)
+    require(bool(h) and hashlib.sha256(canonical_json(d2).encode("utf-8")).hexdigest() == h, "AI assessment dictionary does not match its sealed hash (modified after issue?)")
+    return d
+
+
+def compose_case_record(ai, review=None):
+    """Display/exchange view: the sealed AI assessment (unchanged) next to the separate dermatologist review. Never modifies either."""
+    a = _ai_checked(ai)
+    if review is not None:
+        validate_review(review)
+        require(review.scan_id == a["scan_id"], "the review belongs to a different scan")
+        require(review.ai_content_sha256 == a["ai_content_sha256"], "the review refers to a DIFFERENT version of the AI assessment; it was not made against this one")
+    return dict(schema="lumyvue-case-record/1.0", ai_assessment=a, dermatologist_review=(review.to_dict() if review else None),
+                review_status=(review.review_status if review else a["review_status"]), note="The AI assessment is sealed and is not changed by the review; the review is a separate record.")
+
+
+# ---- agreement / disagreement / classification metrics vs the independently recorded dermatologist findings --------------------------------------
+AI_CODE = {"present": 1, "absent": 0, "uncertain": 2, "none": -2}          # none = the AI produced no per-condition decision (recapture / out-of-scope / error)
+DERM_CODE = {"present": 1, "absent": 0, "unknown": -1}
+
+
+def agreement_core(ai, derm):
+    """ai codes {1,0,2 uncertain,-2 no result}; derm codes {1,0,-1 unknown}. Agreement/disagreement is counted ONLY where both decided;
+    AI-uncertain, AI-no-result and dermatologist-unknown are reported separately, never forced into agreement or disagreement."""
+    ai = np.asarray(ai); derm = np.asarray(derm); kd = derm >= 0; both = kd & np.isin(ai, [0, 1])
+    tp = int(((ai == 1) & (derm == 1) & both).sum()); fp = int(((ai == 1) & (derm == 0) & both).sum()); fn = int(((ai == 0) & (derm == 1) & both).sum()); tn = int(((ai == 0) & (derm == 0) & both).sum())
+    n = int(both.sum()); po = (tp + tn) / n if n else np.nan
+    pe = ((tp + fp) * (tp + fn) + (fn + tn) * (fp + tn)) / (n * n) if n else np.nan
+    return dict(n_pairs=int(len(ai)), derm_unknown=int((~kd).sum()), ai_uncertain=int(((ai == 2) & kd).sum()), ai_no_result=int(((ai == -2) & kd).sum()), n_both_decided=n, agree=tp + tn, disagree=fp + fn,
+                ai_present_derm_absent=fp, ai_absent_derm_present=fn, agreement=po, cohen_kappa=(po - pe) / (1 - pe) if n and pe == pe and pe < 1 else np.nan,
+                ppv=tp / (tp + fp) if tp + fp else np.nan, sensitivity=tp / (tp + fn) if tp + fn else np.nan, specificity=tn / (tn + fp) if tn + fp else np.nan)
+
+
+def agreement_table(ai_codes, derm_codes):
+    """Per-condition table from arrays [N,3]. Also returns the all-conditions exact-agreement rate over images where every condition is decided on both sides."""
+    ai_codes = np.asarray(ai_codes); derm_codes = np.asarray(derm_codes)
+    t = pd.DataFrame([dict(condition=c, **agreement_core(ai_codes[:, j], derm_codes[:, j])) for j, c in enumerate(CFG.CONDITIONS)])
+    allk = (derm_codes >= 0).all(1) & np.isin(ai_codes, [0, 1]).all(1)
+    return t, dict(n_all_decided=int(allk.sum()), exact_agreement=float((ai_codes[allk] == derm_codes[allk]).all(1).mean()) if allk.any() else np.nan)
+
+
+def cases_to_codes(cases, completed_only=True, blinded_only=False):
+    ai, dm = [], []
+    for c in cases:
+        r = c["dermatologist_review"]
+        if r is None or (completed_only and r["review_status"] != "DERMATOLOGIST_REVIEW_COMPLETED") or (blinded_only and r["blinded_to_ai"] is not True): continue
+        cs = c["ai_assessment"].get("condition_scores", {})
+        ai.append([AI_CODE[cs[k]["decision"]] if k in cs else AI_CODE["none"] for k in CFG.CONDITIONS]); dm.append([DERM_CODE[r["findings"][k]] for k in CFG.CONDITIONS])
+    return np.array(ai).reshape(-1, CFG.N_COND), np.array(dm).reshape(-1, CFG.N_COND)
+
+
+# ---- append-only store of sealed AI assessments + review loader -----------------------------------------------------------------------------------
+SEALED_PATH = os.path.join(CFG.DIRS["predictions"], "sealed_assessments.jsonl")
+
+
+def load_sealed_assessments(path=SEALED_PATH):
+    out = {}
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
+            if line.strip():
+                d = json.loads(line); _ai_checked(d); out[d["scan_id"]] = d                      # every record is re-verified on load
+    return out
+
+
+def store_sealed_assessment(fa, path=SEALED_PATH):
+    """Append-only. The same scan_id can never be stored twice with different content."""
+    require(isinstance(fa, FinalAssessment) and fa.verify_integrity(), "only sealed, intact assessments can be stored")
+    old = load_sealed_assessments(path).get(fa.scan_id)
+    if old is not None:
+        require(old["ai_content_sha256"] == fa.ai_content_sha256, f"scan {fa.scan_id} already stored with different content: AI assessments are immutable; issue a new scan id")
+        return path
+    with open(safe_path(path), "a", encoding="utf-8") as f: f.write(canonical_json(fa.to_dict()) + "\n")
+    return path
+
+
+def load_dermatologist_reviews(path=None):
+    path = path or CFG.DERM_REVIEW_CSV
+    if not os.path.exists(path):
+        write_csv(pd.DataFrame(columns=REVIEW_COLS), path); return []
+    t = pd.read_csv(path, dtype=str).fillna("")
+    require(all(c in t.columns for c in REVIEW_COLS), f"review file lacks columns {[c for c in REVIEW_COLS if c not in t.columns]}")
+    tobool = lambda v: {"true": True, "yes": True, "false": False, "no": False}.get(v.strip().lower())
+    out = [validate_review(DermatologistReview(review_id=r.review_id.strip(), scan_id=r.scan_id.strip(), ai_content_sha256=r.ai_content_sha256.strip().lower(), review_status=r.review_status.strip(),
+                                               reviewer_id=r.reviewer_id.strip(), reviewer_role=r.reviewer_role.strip().lower(), reviewed_at_utc=r.reviewed_at.strip(),
+                                               blinded_to_ai=tobool(r.blinded_to_ai), ai_shown_before_review=tobool(r.ai_shown_before_review), image_adequate=(r.image_adequate.strip().lower() or "unknown"),
+                                               findings={c: (getattr(r, col).strip().lower() or "unknown") for c, col in zip(CFG.CONDITIONS, ["acne", "hyperpigmentation", "eczema"])}, notes=r.notes))
+           for r in t.itertuples()]
+    require(len({r.review_id for r in out}) == len(out), "duplicate review_id values in the review file")
+    return out
+
+
+REVIEWS = load_dermatologist_reviews()
+SEALED = load_sealed_assessments()
+if REVIEWS and SEALED:
+    cases = [compose_case_record(SEALED[r.scan_id], r) for r in REVIEWS if r.scan_id in SEALED]
+    for label, kw in [("all completed reviews", dict()), ("blinded reviews only", dict(blinded_only=True))]:
+        a, d = cases_to_codes(cases, **kw)
+        if len(a):
+            t, ov = agreement_table(a, d); display(t.round(4)); write_csv(t, os.path.join(CFG.DIRS["metrics"], f"live_dermatologist_agreement_{label.split()[0]}.csv")); print(label, ov)
+    print("Every AI assessment remains", REVIEW_STATUS_PENDING, "at issue; these tables use the separate review records.")
+else:
+    print(f"No dermatologist reviews with matching sealed AI assessments yet ({len(REVIEWS)} reviews, {len(SEALED)} stored assessments). Template: {redact(CFG.DERM_REVIEW_CSV)}.")
+print("Review contract active: every AI assessment is issued as", REVIEW_STATUS_PENDING, "and sealed; dermatologist findings are recorded separately.")
 
 #@@ code
 # 33.1 Input validity + quality screening. Never turns a technical problem into 'Normal'.
@@ -169,7 +380,7 @@ else:
     print("Stage-1 rule needs the calibrated 'global_only' and 'global_yolo' fusion variants (Sections 30-31): not available yet.")
 
 #@@ md
-## 35. Bounded adaptive verification controller
+## 35. Bounded adaptive AI-verification controller
 The controller is **pure logic** (no models inside), so it can be unit-tested with fake evidence and reused unchanged in the evaluation and in a future C# port. At each pass it asks an *evidence provider* for the next **new** evidence; it never re-scores the same evidence.
 
 | Stop reason | Meaning |
@@ -293,9 +504,11 @@ def batch_stage_logic(df, X_by_var, roi_tier_counts, calib, stage1, band2, quali
                 d = decide(vcres["probs"], thr_f, band2, avail[i], q, ood_flag, [], stable=vcres["stable"])
                 stage, passes, stop, final_p = 2, vcres["n_passes"], vcres["stop_reason"], vcres["probs"]
             rows.append(dict(image_id=df.image_id.iloc[i], state=d["state"], predicted="|".join(d["predicted"]), stage=stage, passes=passes, stop_reason=stop,
-                             **{f"p_{c}": float(final_p[j]) for j, c in enumerate(CFG.CONDITIONS)}, flags="|".join(flags), reasons=" ; ".join(d["reasons"])))
+                             **{f"p_{c}": float(final_p[j]) for j, c in enumerate(CFG.CONDITIONS)}, **{f"dec_{c}": d["per_condition"].get(c, {}).get("decision", "none") for c in CFG.CONDITIONS},
+                             flags="|".join(flags), reasons=" ; ".join(d["reasons"]), review_status=REVIEW_STATUS_PENDING, requires_dermatologist_review=True))
         except Exception as ex:                                  # never silently Normal
-            rows.append(dict(image_id=df.image_id.iloc[i], state="INFERENCE_ERROR", predicted="", stage=0, passes=0, stop_reason=f"{type(ex).__name__}", reasons=str(ex)[:120]))
+            rows.append(dict(image_id=df.image_id.iloc[i], state="INFERENCE_ERROR", predicted="", stage=0, passes=0, stop_reason=f"{type(ex).__name__}", reasons=str(ex)[:120],
+                             **{f"dec_{c}": "none" for c in CFG.CONDITIONS}, review_status=REVIEW_STATUS_PENDING, requires_dermatologist_review=True))
     return pd.DataFrame(rows)
 
 
@@ -335,7 +548,7 @@ class InferenceBundle:
         return emb[0], sc, pn, out
 
 
-def assess_image(bundle, path_or_bgr, scan_id=None):
+def _assess_image_core(bundle, path_or_bgr, scan_id=None):
     t0 = time.monotonic(); bgr = cv2.imread(path_or_bgr) if isinstance(path_or_bgr, str) else path_or_bgr
     sid = scan_id or pseudo_id(path_or_bgr if isinstance(path_or_bgr, str) else str(time.time()), "scan")
     fa = FinalAssessment(scan_id=sid, state="INFERENCE_ERROR", created_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), model_versions=bundle.versions if bundle else {})
@@ -397,6 +610,12 @@ def assess_image(bundle, path_or_bgr, scan_id=None):
         fa.state = "INFERENCE_ERROR"; fa.stop_reason = f"{type(ex).__name__}"; fa.uncertainty = dict(reasons=[str(ex)[:200]])
         log_event("inference_error", scan=sid, error=type(ex).__name__)
     return fa
+
+
+def assess_image(bundle, path_or_bgr, scan_id=None):
+    """Complete single-image reference pipeline. EVERY result - success, abstention or technical failure - is finalised the same way: marked as AI verification only
+    (clinical_validation = False), issued as PENDING_DERMATOLOGIST_REVIEW and sealed (SHA-256). The caller can store it with store_sealed_assessment()."""
+    return finalize_assessment(_assess_image_core(bundle, path_or_bgr, scan_id))
 
 
 print("assess_image() defined. Single-image reference inference needs the trained components (it reports INFERENCE_ERROR, never Normal, when they are missing).")

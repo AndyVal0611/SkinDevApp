@@ -26,6 +26,7 @@ class Member:
 class DetectorSpec:
     condition: str; kind: str; members: list; imgsz: int; nms_iou: float; threshold: float; floor: float; class_col: dict; available: bool
     version: str = ""; notes: str = ""; meta: dict = field(default_factory=dict)
+    fusion_iou: float = 0.5; location: str = ""; json_sha_matches: object = None       # json_sha_matches: None = JSON has no hash, True/False = JSON onnx_sha256 vs the primary file
 
 
 def _read_json(p):
@@ -62,17 +63,20 @@ def discover_detectors():
         if cond == "Eczema":
             files = files or list(CFG.ECZEMA_ONNX_FILES); meta_p = meta_p or CFG.ECZEMA_META_JSON
         kind = "override" if files else ""
-        if not files and d:
-            spec = os.path.join(d, f"lesion_detector_{key}.onnx")
+        location = "explicit configuration" if files else ""
+        for sd in ([d] if d else []) + (list(CFG.ECZEMA_SEARCH_DIRS) if cond == "Eczema" else []):        # the app's Model folder first; for Eczema also the read-only search folders
+            if files or not sd: continue
+            spec = os.path.join(sd, f"lesion_detector_{key}.onnx")
             if os.path.isfile(spec):
-                files = [spec] + [f for f in (os.path.join(d, f"lesion_detector_{key}_m{k}.onnx") for k in range(2, 7)) if os.path.isfile(f)]
-                meta_p = meta_p or os.path.join(d, f"lesion_detector_{key}.json"); kind = "specialist"
+                files = [spec] + [f for f in (os.path.join(sd, f"lesion_detector_{key}_m{k}.onnx") for k in range(2, 7)) if os.path.isfile(f)]
+                meta_p = meta_p or os.path.join(sd, f"lesion_detector_{key}.json"); kind = "specialist"
+                location = "WPF Model folder" if sd == d else "OUTSIDE the WPF Model folder (found by read-only search; the app will not load it from here)"
         if not files and d:
             v1 = os.path.join(d, "lesion_detector_v1.onnx")
             alt = [p for p in CFG.YOLO_OVERRIDES.get("three_class_onnx", [])] if isinstance(CFG.YOLO_OVERRIDES, dict) else []
             v1 = (alt[0] if alt else v1)
             if os.path.isfile(v1):
-                files = [v1]; meta_p = meta_p or v1.replace(".onnx", ".json"); kind = "three_class"
+                files = [v1]; meta_p = meta_p or v1.replace(".onnx", ".json"); kind = "three_class"; location = "WPF Model folder"
         thr = float(ov.get("threshold", CFG.ECZEMA_THRESHOLD if cond == "Eczema" else CFG.YOLO_THRESHOLDS[cond]))
         if not files:
             specs[cond] = DetectorSpec(cond, "none", [], 0, 0.45, thr, CFG.YOLO_FLOOR, {}, False,
@@ -81,6 +85,7 @@ def discover_detectors():
         try:
             meta = _read_json(meta_p)
             members = [_introspect(f, meta, class_hint=cond) for f in files]
+            jsha = (members[0].sha256 == meta["onnx_sha256"]) if meta.get("onnx_sha256") else None
             cls0 = members[0].class_names
             require(all(m.class_names == cls0 and m.imgsz == members[0].imgsz and m.layout == members[0].layout for m in members), f"{cond}: ensemble members disagree on classes/imgsz/layout")
             idx = ov.get("class_index", CFG.ECZEMA_CLASS_INDEX if cond == "Eczema" else None)
@@ -90,7 +95,10 @@ def discover_detectors():
                 idx = cls0.index(name)
             specs[cond] = DetectorSpec(cond, kind, members, int(ov.get("imgsz") or (CFG.ECZEMA_IMGSZ if cond == "Eczema" and CFG.ECZEMA_IMGSZ else members[0].imgsz)),
                                        float(ov.get("nms_iou") or (CFG.ECZEMA_NMS_IOU if cond == "Eczema" and CFG.ECZEMA_NMS_IOU else meta.get("nms_iou", 0.45))), thr, CFG.YOLO_FLOOR,
-                                       {cond: int(idx)}, True, version=meta.get("model", os.path.basename(files[0])) + (f" ({kind}, {len(members)} member(s))"), meta=meta)
+                                       {cond: int(idx)}, True, version=meta.get("model", os.path.basename(files[0])) + (f" ({kind}, {len(members)} member(s))"), meta=meta,
+                                       fusion_iou=float(ov.get("fusion_iou") or (CFG.ECZEMA_FUSION_IOU if cond == "Eczema" and CFG.ECZEMA_FUSION_IOU else CFG.YOLO_FUSION_IOU)),
+                                       location=location, json_sha_matches=jsha,
+                                       notes=("" if jsha is not False else "JSON onnx_sha256 does NOT match the primary ONNX file (JSON written for another file?) - detector still loaded"))
         except Exception as ex:                                              # a broken/missing detector must be VISIBLE and mean 'unavailable'
             specs[cond] = DetectorSpec(cond, "error", [], 0, 0.45, thr, CFG.YOLO_FLOOR, {}, False, notes=f"{type(ex).__name__}: {str(ex)[:200]}")
     return specs
@@ -102,13 +110,14 @@ else:
     DETECTORS = {c: DetectorSpec(c, "none", [], 0, 0.45, CFG.YOLO_THRESHOLDS[c], CFG.YOLO_FLOOR, {}, False, notes="YOLO_MODEL_DIR not set") for c in CFG.CONDITIONS}
 reg_rows = []
 for c, sp in DETECTORS.items():
-    reg_rows.append(dict(condition=c, available=sp.available, kind=sp.kind, members=len(sp.members), imgsz=sp.imgsz, nms_iou=sp.nms_iou, deployed_threshold=sp.threshold, floor=sp.floor,
+    reg_rows.append(dict(condition=c, available=sp.available, kind=sp.kind, location=redact(sp.location), members=len(sp.members), imgsz=sp.imgsz, nms_iou=sp.nms_iou, fusion_iou=(sp.fusion_iou if len(sp.members) > 1 else None),
+                         deployed_threshold=sp.threshold, floor=sp.floor, json_sha_matches=sp.json_sha_matches,
                          onnx_input=[m.session.get_inputs()[0].shape for m in sp.members][:1], onnx_output=[m.out_shape for m in sp.members][:1], layout=sp.members[0].layout if sp.members else "",
                          classes=sp.members[0].class_names if sp.members else [], sha256=[m.sha256[:12] for m in sp.members], notes=sp.notes))
 REGISTRY = pd.DataFrame(reg_rows); display(REGISTRY)
 YOLO_AVAILABLE = [c for c in CFG.CONDITIONS if DETECTORS[c].available]
 YOLO_UNAVAILABLE = [c for c in CFG.CONDITIONS if not DETECTORS[c].available]
-YOLO_CONFIG_HASH = hashlib.sha256(json.dumps({c: dict(av=sp.available, th=sp.threshold, nms=sp.nms_iou, sz=sp.imgsz, sha=[m.sha256 for m in sp.members], fl=sp.floor, fiou=CFG.YOLO_FUSION_IOU)
+YOLO_CONFIG_HASH = hashlib.sha256(json.dumps({c: dict(av=sp.available, th=sp.threshold, nms=sp.nms_iou, sz=sp.imgsz, sha=[m.sha256 for m in sp.members], fl=sp.floor, fiou=sp.fusion_iou)
                                               for c, sp in DETECTORS.items()}, sort_keys=True).encode()).hexdigest()[:16]
 write_json(os.path.join(CFG.DIRS["yolo"], "detector_registry.json"), dict(config_hash=YOLO_CONFIG_HASH, detectors=json.loads(REGISTRY.assign(onnx_input=REGISTRY.onnx_input.astype(str), onnx_output=REGISTRY.onnx_output.astype(str)).to_json(orient="records"))))
 print("detectors available:", YOLO_AVAILABLE, "| unavailable:", YOLO_UNAVAILABLE, "| config hash:", YOLO_CONFIG_HASH)
@@ -117,7 +126,12 @@ set_gate("yolo_any", len(YOLO_AVAILABLE) > 0, "no YOLO detector could be loaded;
 if YOLO_UNAVAILABLE:
     print(f"\n>>> {YOLO_UNAVAILABLE} will be treated as 'detector_unavailable' (NOT as 'no detection'). Stages that REQUIRE all three detectors are gated;")
     print(">>> everything else (global CNN, the other detectors, the ROI branch for the available detectors, fusion with availability masks) still runs.")
-    print(">>> To add the Eczema detector later: set LUMYVUE_ECZEMA_ONNX_FILES (+ ECZEMA_META_JSON, ECZEMA_THRESHOLD) or install lesion_detector_eczema.onnx/.json, then re-run from this cell.")
+    print(">>> To add the Eczema detector: set LUMYVUE_ECZEMA_ONNX_FILES (+ ECZEMA_META_JSON, ECZEMA_THRESHOLD), put lesion_detector_eczema[_m2..].onnx/.json in a folder listed in ECZEMA_SEARCH_DIRS, or install them in the WPF Model folder, then re-run from this cell.")
+for c_, sp_ in DETECTORS.items():
+    if sp_.available and "OUTSIDE" in sp_.location:
+        print(f">>> NOTE: the {c_} detector was loaded from outside the WPF Model folder ({redact(os.path.dirname(sp_.members[0].path))}). Evidence from it is what the app WOULD produce once the files are installed there; the app does not load it from here.")
+    if sp_.available and sp_.json_sha_matches is False:
+        print(f">>> WARNING: {c_}: the JSON's onnx_sha256 does not match the primary ONNX file. The detector was loaded; reconcile the JSON before quoting its metrics.")
 
 #@@ code
 # 24.1 Deployed-equivalent inference (letterbox -> decode -> per-class NMS -> ensemble fusion). Returns ALL pool boxes with their provenance.
@@ -183,7 +197,7 @@ def detect_condition(spec, bgr, face_box=None):
         for b in sorted([b for pm in per_member for b in pm], key=lambda x: -x[4]):
             hit = None
             for cl in clusters:
-                if iou_xyxy(avg(cl), b) >= CFG.YOLO_FUSION_IOU: hit = cl; break
+                if iou_xyxy(avg(cl), b) >= spec.fusion_iou: hit = cl; break
             if hit is None: clusters.append([b])
             else: hit.append(b)
         fused = [dict(box=tuple(avg(cl)), conf=min(1.0, sum(x[4] for x in cl) / len(spec.members)), support=len({x[5] for x in cl})) for cl in clusters]
@@ -332,7 +346,7 @@ if len(DET):
         ax[0].legend(); ax[0].set_title("IoU of overlapping same-condition deployed boxes"); ax[0].set_xlabel("IoU")
         ax[1].scatter(OV.iou, OV.containment, s=8, c=OV.relation.map({"duplicate": "r", "nested": "orange", "overlap": "gray"})); ax[1].set_xlabel("IoU"); ax[1].set_ylabel("containment of smaller box"); ax[1].set_title("duplicate (red) vs nested (orange)")
     savefig(fig, "yolo_overlap_diagnostics")
-    cfgtbl = pd.DataFrame([dict(condition=c, per_member_nms_iou=sp.nms_iou, fusion_iou=CFG.YOLO_FUSION_IOU if len(sp.members) > 1 else None, members=len(sp.members), deployed_threshold=sp.threshold,
+    cfgtbl = pd.DataFrame([dict(condition=c, per_member_nms_iou=sp.nms_iou, fusion_iou=sp.fusion_iou if len(sp.members) > 1 else None, members=len(sp.members), deployed_threshold=sp.threshold,
                                 post_fusion_nms="none (as deployed)") for c, sp in DETECTORS.items() if sp.available])
     display(cfgtbl); write_csv(cfgtbl, os.path.join(CFG.DIRS["yolo"], "postprocessing_configuration.csv"))
 

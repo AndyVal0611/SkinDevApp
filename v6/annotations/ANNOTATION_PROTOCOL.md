@@ -26,5 +26,8 @@ The notebook appends suspicious images (label/filename conflicts, image-type mis
 ## 4. Provenance — `dataset_provenance.csv`
 One row per `source_key` (`<class>/<origin>`): description, licence/terms, consent basis, `permissible_use` (`research_training` · `evaluation_only` · `not_permitted`), whether faces are identifiable, retention policy, responsible person. Training is blocked until every source is described.
 
+## 4b. Dermatologist reviews of AI assessments — `dermatologist_reviews.csv`
+Separate from the annotation file. One row per review of one **sealed AI assessment**: `review_id`, `scan_id`, `ai_content_sha256` (the exact AI version reviewed), `review_status` (`DERMATOLOGIST_REVIEW_IN_PROGRESS` | `DERMATOLOGIST_REVIEW_COMPLETED` | `DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS`), `reviewer_id`, `reviewer_role` (must be `dermatologist`), `blinded_to_ai` and `ai_shown_before_review` (**true/false, required for a completed review**), `reviewed_at`, `image_adequate`, and `acne` / `hyperpigmentation` / `eczema` = `present` / `absent` / `unknown` (blank = unknown). The AI assessment is never edited by a review. Template: `dermatologist_review_template.csv`. See `docs/REVIEW_CONTRACT.md`.
+
 ## 5. Quality of the reference standard (recommended for Chapter III)
 Re-read a random 10 % blind and report Cohen's κ per condition; record disagreements as `disputed`. Annotate images from the real camera with `image_origin = camera_capture`. Minimum counts per split are configurable (`MIN_VERIFIED`, `MIN_POSITIVES`, `MIN_NEGATIVES`, `MIN_REGION_PER_CLASS`) and **are provisional power-based choices, not guarantees** — larger verified sets give narrower confidence intervals.
