@@ -135,7 +135,7 @@ namespace SkinDevApp.Views
             // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
             // V6 view: "Heat map" and "Both" are V6's own detector-evidence maps (same form as V5's); V5's Grad-CAM++ stays available as "Classifier map (V5)".
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
-            string[] modes = _v6 != null ? new[] { "Original", "V6Heat", "Localization", "V6Both", "Grad-CAM++" } : new[] { "Original", "Grad-CAM++", "Localization", "Combined" };
+            string[] modes = _v6 != null ? new[] { "Original", "V6Heat", "Localization", "V6Both" } : new[] { "Original", "Grad-CAM++", "Localization", "Combined" };
             foreach (string mode in modes)
             {
                 var rb = new RadioButton
@@ -160,21 +160,8 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(toggle);
             if (_v6 != null)
-            {
-                // which condition the heat map shows: the one the unified assessment ranks highest (Auto) or any of the three, as V5 offered a map for every class
-                var which = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-                which.Children.Add(Ui.Text("Condition:", 12, false, Ui.Muted, new Thickness(0, 2, 10, 0)));
-                foreach (string c in new[] { "Auto", "Acne", "Hyperpigmentation", "Eczema" })
-                {
-                    string cc = c;
-                    var crb = new RadioButton { Content = c == "Auto" ? "Highest ranked" : c, GroupName = "v6cond", IsChecked = c == _v6Cond, Margin = new Thickness(0, 0, 14, 0), FontSize = 12 };
-                    crb.Checked += (s, e) => { _v6Cond = cc; RefreshThumbs(); };
-                    which.Children.Add(crb);
-                }
-                sp.Children.Add(which);
-                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence (the same evidence the unified assessment uses). It is an evidence map, not an explanation of the model. \"Classifier map (V5)\" is V5's Grad-CAM++, kept for comparison: it is diffuse and the maps for different conditions look alike.",
+                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence for the condition ranked highest (the same evidence the unified assessment uses). It is an evidence map, not an explanation of the model.",
                                         10.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
-            }
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
             string[] names = _d.Session.ScanMode == "Single" ? new[] { "Single" } : StudyText.Views;

@@ -39,8 +39,8 @@ namespace SkinDevApp.Tests
         {
             UnifiedAssessment a = Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" });
             Assert.Equal("Finding supported: Hyperpigmentation", V6Text.StateHeadline(a));
-            Assert.Contains("Hyperpigmentation: Present (AI support 80%, decision limit 40%; detector marked an area)", a.Conditions.Select(V6Text.ConditionLine));
-            Assert.Contains("Acne: Not found (AI support 10%, decision limit 40%; detector ran: nothing marked)", a.Conditions.Select(V6Text.ConditionLine));
+            Assert.Contains("Hyperpigmentation: Present (AI support 80% (decision limit 40%); detector marked an area)", a.Conditions.Select(V6Text.ConditionLine));
+            Assert.Contains("Acne: Not found (AI support 10% (decision limit 40%); detector ran: nothing marked)", a.Conditions.Select(V6Text.ConditionLine));
             Assert.Equal("Uncertain: review recommended", V6Text.StateHeadline(Make(V6States.UncertainReviewRequired, new string[0])));
             Assert.Equal("The analysis could not be completed", V6Text.StateHeadline(UnifiedAssessment.Failed("x")));
             Assert.Contains("not a diagnosis", V6Text.Disclaimer); Assert.Contains("dermatologist review", V6Text.DisclaimerShort);
@@ -58,6 +58,18 @@ namespace SkinDevApp.Tests
             Assert.Contains(lines, l => l.Contains("unlike the photographs the system was trained on"));
             Assert.Contains(lines, l => l.Contains("retake") || l.Contains("refocus"));
             Assert.Contains(lines, l => l.StartsWith("Detector unavailable for Eczema"));
+        }
+
+        [Fact]
+        public void Review_notes_that_repeat_are_grouped_into_one_sentence_and_close_calls_show_a_decimal()
+        {
+            UnifiedAssessment a = Make(V6States.UncertainReviewRequired, new string[0], new[] { "cnn_yolo_conflict_Acne", "cnn_yolo_conflict_Hyperpigmentation", "cnn_yolo_conflict_Eczema", "near_threshold_Acne", "near_threshold_Eczema" });
+            string[] lines = V6Text.FlagLines(a).ToArray();
+            Assert.Equal("For Acne, Hyperpigmentation and Eczema, the whole-photograph model and the lesion detector point different ways.", lines[0]);
+            Assert.Equal("Acne and Eczema are close to the decision limit.", lines[1]); Assert.Equal(2, lines.Length);
+            var c = new ConditionAssessment { Condition = "Acne", CalibratedProbability = 0.4213, Threshold = 0.42, Status = ConditionStatus.Present, DetectorAvailable = true };
+            Assert.Equal("AI support 42.1% (decision limit 42.0%)", V6Text.SupportText(c));                       // 42% against 42% would look like a tie
+            c.CalibratedProbability = 0.80; Assert.Equal("AI support 80% (decision limit 42%)", V6Text.SupportText(c));
         }
 
         [Fact]
@@ -94,7 +106,7 @@ namespace SkinDevApp.Tests
                 var w = new ReceiptWriter(32); V6ReceiptText.Append(w, s, final);
                 string text = string.Join("\n", w.Lines.Select(l => l.Text));
                 Assert.Contains(final ? "AI ASSESSMENT (ORIGINAL)" : "AI ASSESSMENT", text); Assert.Contains("Finding supported: Hyperpigmentation", text);
-                Assert.Contains("Hyperpigmentation: Present", text); Assert.Contains("Experimental", text); Assert.Contains("do not confirm a diagnosis", text);
+                Assert.Contains("Hyperpigmentation: Present", text); Assert.DoesNotContain("xperimental", text); Assert.Contains("do not confirm a diagnosis", text);
                 Assert.DoesNotContain("Most resembles", text); Assert.DoesNotContain("similarity scores", text); Assert.DoesNotContain("Lesion detectors (separate)", text);
                 Assert.Equal(final, text.Contains("Shown exactly as the AI saved it"));
             }
@@ -117,7 +129,7 @@ namespace SkinDevApp.Tests
                 V6FeatureFlag.Provider = () => true;
                 ReportFindings f = ReportFindings.Build(Session("Single", dir));
                 Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside a V6 result
-                Assert.Contains(f.Lines, l => l.StartsWith("Unified AI assessment (experimental): Uncertain: review recommended"));
+                Assert.Contains(f.Lines, l => l.StartsWith("Unified AI assessment: Uncertain: review recommended"));
                 Assert.Contains(f.Lines, l => l.Contains("Acne: Present")); Assert.Contains(f.Lines, l => l.Contains("dermatologist review"));
                 Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("For Eczema, the whole-photograph model and the lesion detector point different ways"));
                 Assert.Null(f.Interpretation);                                                                              // the V5 interpretation is not built

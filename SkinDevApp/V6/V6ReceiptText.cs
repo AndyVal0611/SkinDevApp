@@ -15,7 +15,7 @@ namespace SkinDevApp.V6
         {
             b.Rule();
             b.Heading(final ? "AI ASSESSMENT (ORIGINAL)" : "AI ASSESSMENT");
-            b.Text("Experimental. One result per photograph from a trained model that combines the whole-photograph model and the lesion detectors.");
+            b.Text("One result per photograph from a trained model that combines the whole-photograph model and the lesion detectors.");
             if (!s.Single) b.Text(s.Headline + ".");
             foreach (V6ViewSummary v in s.Views)
             {

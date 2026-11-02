@@ -320,7 +320,7 @@ namespace SkinDevApp.Views
             if (_f.V6 != null)
             {
                 // V6 flag on: ONE unified assessment replaces the V5 classification, class bars and per-view score table
-                sp.Children.Add(Heading("Unified AI assessment (experimental)"));
+                sp.Children.Add(Heading("Unified AI assessment"));
                 sp.Children.Add(T(_f.V6.Headline, 13, true, Navy, 4));
                 foreach (SkinDevApp.V6.V6ViewSummary v6v in _f.V6.Views)
                 {

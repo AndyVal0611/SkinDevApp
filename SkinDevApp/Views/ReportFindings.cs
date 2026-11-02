@@ -83,12 +83,12 @@ namespace SkinDevApp.Views
             {
                 // V6 flag on: the report states the one unified assessment; the V5 classifier lines and the Grad-CAM++ attribution pages are not part of it
                 f.HasResult = true;
-                f.Lines.Add("Unified AI assessment (experimental): " + f.V6.Headline + ".");
+                f.Lines.Add("Unified AI assessment: " + f.V6.Headline + ".");
                 foreach (SkinDevApp.V6.V6ViewSummary v in f.V6.Views)
                 {
-                    f.Lines.Add(v.Label + ": " + v.Headline);
-                    foreach (string c in v.ConditionLines) f.Lines.Add("   " + c);
-                    f.Lines.Add("   " + v.BoxesLine);
+                    if (!f.V6.Single) f.Lines.Add(v.Label + ": " + v.Headline);              // one photograph: the headline above already says it
+                    foreach (string c in v.ConditionLines) f.Lines.Add(c);
+                    f.Lines.Add(v.BoxesLine);
                     foreach (string flag in v.FlagLines) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + flag);
                     if (v.ReviewRequired && v.FlagLines.Count == 0) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + v.Headline + ".");
                 }

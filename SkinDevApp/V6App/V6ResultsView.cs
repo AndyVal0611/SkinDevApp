@@ -30,6 +30,15 @@ namespace SkinDevApp.V6
         public static string StateHeadline(UnifiedAssessment a) => V6Text.StateHeadline(a);
         public static IEnumerable<string> FlagLines(UnifiedAssessment a) => V6Text.FlagLines(a);
 
+        /// <summary>A verdict pill of one fixed width, so Present / Not found / Uncertain line up in a column.</summary>
+        private static FrameworkElement VerdictPill(ConditionAssessment c, int idx)
+        {
+            Border pill = Ui.Pill(V6Text.VerdictText(c), VerdictBrush(c, idx), "#F6F3EA");
+            pill.MinWidth = 86; pill.HorizontalAlignment = HorizontalAlignment.Left;
+            if (pill.Child is TextBlock tb) tb.HorizontalAlignment = HorizontalAlignment.Center;
+            return pill;
+        }
+
         private static System.Windows.Media.Brush StateBrush(UnifiedAssessment a) =>
             a.State == V6States.FindingsSupported || a.State == V6States.MultipleFindingsSupported ? Ui.Ink :
             a.State == V6States.NoFindingsSupported ? Ui.Good :
@@ -44,7 +53,6 @@ namespace SkinDevApp.V6
             var sp = new StackPanel();
             var head = new WrapPanel();
             head.Children.Add(Ui.Text("Unified AI assessment", 16, true, null, new Thickness(0, 0, 10, 0)));
-            head.Children.Add(Ui.Pill("Experimental", Ui.Warn, "#FBF1DC"));
             sp.Children.Add(head);
             sp.Children.Add(Ui.Text(d.Session.ScanMode == "Single" ? "One result for this photograph, from one trained model that combines the whole-photograph model and the lesion detectors."
                                                                     : "One result per photograph, each from one trained model that combines the whole-photograph model and the lesion detectors. The photographs are not merged into a single verdict.", 12, false, Ui.Muted, new Thickness(0, 2, 0, 8)));
@@ -64,7 +72,7 @@ namespace SkinDevApp.V6
                     for (int j = 0; j < order.Length; j++)
                     {
                         ConditionAssessment c = map[order[j]].Conditions.Length > i ? map[order[j]].Conditions[i] : null;
-                        FrameworkElement cell = c == null ? Ui.Text("-", 12.5) : (FrameworkElement)Ui.Pill(V6Text.VerdictText(c), VerdictBrush(c, i), "#F6F3EA");
+                        FrameworkElement cell = c == null ? Ui.Text("-", 12.5) : VerdictPill(c, i);
                         cell.HorizontalAlignment = HorizontalAlignment.Left; cell.Margin = new Thickness(0, 3, 0, 3);
                         Grid.SetRow(cell, i + 1); Grid.SetColumn(cell, j + 1); grid.Children.Add(cell);
                     }
@@ -102,10 +110,10 @@ namespace SkinDevApp.V6
                 ConditionAssessment c = a.Conditions[i];
                 var row = new Grid { Margin = new Thickness(0, 3, 0, 3) };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 var name = Ui.Text(c.Condition, 13.5, true, Ui.Brush(ClassPalette.Hex[i]), new Thickness(0, 2, 0, 0)); Grid.SetColumn(name, 0); row.Children.Add(name);
-                FrameworkElement pill = Ui.Pill(V6Text.VerdictText(c), VerdictBrush(c, i), "#F6F3EA"); pill.HorizontalAlignment = HorizontalAlignment.Left; Grid.SetColumn(pill, 1); row.Children.Add(pill);
+                FrameworkElement pill = VerdictPill(c, i); Grid.SetColumn(pill, 1); row.Children.Add(pill);
                 var detail = new StackPanel();
                 var bar = new Grid { Height = 7, Margin = new Thickness(0, 6, 0, 3) };
                 double p = Math.Max(0.001, Math.Min(0.999, c.CalibratedProbability));
@@ -114,7 +122,7 @@ namespace SkinDevApp.V6
                 var fill = new Border { Background = Ui.Brush(ClassPalette.Hex[i]), CornerRadius = new CornerRadius(3) }; Grid.SetColumn(fill, 0); bar.Children.Add(fill);
                 var track = new Border { Background = Ui.Brush("#E7E2D3"), CornerRadius = new CornerRadius(3) }; Grid.SetColumn(track, 1); bar.Children.Add(track);
                 detail.Children.Add(bar);
-                detail.Children.Add(Ui.Text("AI support " + V6Text.Pct(c.CalibratedProbability) + " (decision limit " + V6Text.Pct(c.Threshold) + ")  ·  " + V6Text.DetectorText(c), 11, false, Ui.Muted, new Thickness(0)));
+                detail.Children.Add(Ui.Text(V6Text.SupportText(c) + "  ·  " + V6Text.DetectorText(c), 11, false, Ui.Muted, new Thickness(0)));
                 Grid.SetColumn(detail, 2); row.Children.Add(detail);
                 sp.Children.Add(row);
             }
@@ -148,7 +156,6 @@ namespace SkinDevApp.V6
             var sp = new StackPanel();
             var head = new WrapPanel();
             head.Children.Add(Ui.Text("Unified AI assessment", 13, true, Ui.Ink, new Thickness(0, 0, 8, 0)));
-            head.Children.Add(Ui.Pill("Experimental", Ui.Warn, "#FBF1DC"));
             sp.Children.Add(head);
             sp.Children.Add(Ui.Text(s.Headline, 15, true, s.Single ? StateBrush(s.Views[0].Assessment) : (s.ReviewRecommended ? Ui.Warn : Ui.Ink), new Thickness(0, 4, 0, 6)));
             foreach (V6ViewSummary v in s.Views)
@@ -159,7 +166,7 @@ namespace SkinDevApp.V6
                     ConditionAssessment c = v.Assessment.Conditions[i];
                     var line = new WrapPanel();
                     line.Children.Add(Ui.Text(c.Condition + ": ", 12, true, Ui.Brush(ClassPalette.Hex[i]), new Thickness(0)));
-                    line.Children.Add(Ui.Text(V6Text.VerdictText(c) + "  (AI support " + V6Text.Pct(c.CalibratedProbability) + ", decision limit " + V6Text.Pct(c.Threshold) + "; " + V6Text.DetectorText(c) + ")", 12, false, Ui.Ink, new Thickness(0)));
+                    line.Children.Add(Ui.Text(V6Text.VerdictText(c) + "  (" + V6Text.SupportText(c) + "; " + V6Text.DetectorText(c) + ")", 12, false, Ui.Ink, new Thickness(0)));
                     sp.Children.Add(line);
                 }
                 sp.Children.Add(Ui.Text(v.BoxesLine, 11, false, Ui.Muted, new Thickness(0, 3, 0, 0)));
