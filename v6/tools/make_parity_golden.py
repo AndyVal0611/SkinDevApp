@@ -77,12 +77,12 @@ def detect_condition(spec, bgr):
             if iou_xyxy(avg(cl), b) >= spec.fusion_iou: hit = cl; break
         if hit is None: clusters.append([b])
         else: hit.append(b)
-    fused = [dict(box=tuple(avg(cl)), conf=min(1.0, sum(x[4] for x in cl) / len(spec.members))) for cl in clusters]
+    fused = [dict(box=tuple(avg(cl)), conf=min(1.0, sum(x[4] for x in cl) / len(spec.members)), support=len({x[5] for x in cl})) for cl in clusters]
     fused = sorted([f for f in fused if f["conf"] >= POOL_MIN], key=lambda f: -f["conf"])[:MAX_BOXES]
     recs = []
     for f in fused:
         x0, y0, x1, y1 = f["box"]
-        recs.append(dict(conf=round(float(f["conf"]), 5), x0=x0, y0=y0, x1=x1, y1=y1, rel_area=round(((x1 - x0) * (y1 - y0)) / (W * H), 6), cx=round((x0 + x1) / 2 / W, 4), cy=round((y0 + y1) / 2 / H, 4), deployed=bool(f["conf"] >= spec.threshold)))
+        recs.append(dict(conf=round(float(f["conf"]), 5), x0=x0, y0=y0, x1=x1, y1=y1, rel_area=round(((x1 - x0) * (y1 - y0)) / (W * H), 6), cx=round((x0 + x1) / 2 / W, 4), cy=round((y0 + y1) / 2 / H, 4), deployed=bool(f["conf"] >= spec.threshold), ensemble_support=int(f["support"]), ensemble_size=len(spec.members)))
     return recs
 
 def det_ev(pools):

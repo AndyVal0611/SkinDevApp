@@ -35,7 +35,13 @@ namespace SkinDevApp.V6
                 if (_tried) return;
                 _tried = true;
                 string err;
-                if (!V6Inference.TryCreate(DeploymentDir, DeploymentDir, null, out _svc, out err)) _error = err;
+                string variant = V6FeatureFlag.Variant;
+                if (!V6Inference.TryCreate(DeploymentDir, DeploymentDir, null, out _svc, out err, variant))
+                {
+                    if (variant != "global_yolo" && V6Inference.TryCreate(DeploymentDir, DeploymentDir, null, out _svc, out string err2, "global_yolo"))
+                        _error = null;                                       // the full variant could not load: keep working with global_yolo (the assessment records which variant ran)
+                    else _error = err;
+                }
             }
         }
 

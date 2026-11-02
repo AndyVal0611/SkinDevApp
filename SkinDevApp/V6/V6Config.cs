@@ -24,6 +24,12 @@ namespace SkinDevApp.V6
         public double[] Thresholds;
     }
 
+    public sealed class RoiSettings
+    {
+        public int Size, MaxTier1, MaxTotal, FeatureDim;
+        public double Margin, AltMargin, MinSideFrac, OverlapSuppressIou;
+    }
+
     public sealed class ModelFileSpec
     {
         public string File, Sha256;
@@ -33,7 +39,9 @@ namespace SkinDevApp.V6
     {
         public string RunId, FeatureSchemaVersion;
         public ModelFileSpec GlobalFeatures, FusionGlobalYolo, FusionGlobalOnly;
-        public FusionCalibration GlobalYolo, GlobalOnly;
+        public ModelFileSpec FusionFull, RoiFeatures;          // optional: the full variant (Global + YOLO + ROI MobileNetV2)
+        public FusionCalibration GlobalYolo, GlobalOnly, Full;
+        public RoiSettings Roi;
         public double Band;
         public double[] DeployedThresholds;        // detector thresholds, palette order
         public double MemberFloor, PoolMinConf;
@@ -60,6 +68,16 @@ namespace SkinDevApp.V6
                 JsonElement cal = r.GetProperty("calibration");
                 c.GlobalYolo = Calibration(cal.GetProperty("global_yolo"));
                 c.GlobalOnly = Calibration(cal.GetProperty("global_only"));
+                if (m.TryGetProperty("fusion_full", out JsonElement mf) && m.TryGetProperty("roi_features", out JsonElement mr) && cal.TryGetProperty("full", out JsonElement cf) && r.TryGetProperty("roi", out JsonElement ro))
+                {
+                    c.FusionFull = Model(mf); c.RoiFeatures = Model(mr); c.Full = Calibration(cf);
+                    c.Roi = new RoiSettings
+                    {
+                        Size = ro.GetProperty("size").GetInt32(), Margin = ro.GetProperty("margin").GetDouble(), AltMargin = ro.GetProperty("alt_margin").GetDouble(),
+                        MinSideFrac = ro.GetProperty("min_side_frac").GetDouble(), MaxTier1 = ro.GetProperty("max_tier1").GetInt32(), MaxTotal = ro.GetProperty("max_total").GetInt32(),
+                        OverlapSuppressIou = ro.GetProperty("overlap_suppress_iou").GetDouble(), FeatureDim = ro.GetProperty("feature_dim").GetInt32()
+                    };
+                }
                 JsonElement d = r.GetProperty("decision");
                 c.Band = d.GetProperty("band").GetDouble();
                 double[] thr = c.GlobalYolo.Thresholds;

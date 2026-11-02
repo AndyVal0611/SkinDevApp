@@ -42,6 +42,7 @@ namespace SkinDevApp.V6
     {
         public double Conf;
         public double X0, Y0, X1, Y1;
+        public int Support = 1, EnsembleSize = 1;      // ensemble members that agreed on this box (ROI feature support_frac)
     }
 
     /// <summary>Box reduced to the numbers the fusion uses (identical to the training cache after rounding).</summary>

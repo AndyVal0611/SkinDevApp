@@ -26,6 +26,7 @@
     <None Include="..\v6\deployment\v6_deployment_config.json" Link="v6deploy\v6_deployment_config.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\v6\deployment\v6_ood_model.json" Link="v6deploy\v6_ood_model.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\v6\deployment\v6_real_photo_golden.json" Link="v6deploy\v6_real_photo_golden.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\v6\deployment\v6_full_variant_golden.json" Link="v6deploy\v6_full_variant_golden.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

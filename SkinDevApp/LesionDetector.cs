@@ -46,6 +46,11 @@ namespace SkinDevApp.AI
         public float X1 { get; set; }
         public float Y1 { get; set; }
 
+        /// <summary>Ensemble members that contributed to this box (1 for a single model) and the ensemble size. Used by the V6 ROI features.</summary>
+        public int Support { get; set; } = 1;
+        public int EnsembleSize { get; set; } = 1;
+        internal int Member;
+
         public float Width => X1 - X0;
         public float Height => Y1 - Y0;
     }
@@ -163,6 +168,7 @@ namespace SkinDevApp.AI
             double[] low = { EnsembleFloor, EnsembleFloor, EnsembleFloor };
             var members = new List<LesionDetector> { this }; members.AddRange(Peers);
             var sets = members.Select(m => m.DetectSingle(bgr, low)).ToList();
+            for (int mi = 0; mi < sets.Count; mi++) foreach (LesionBox mb in sets[mi].Boxes) mb.Member = mi;
             var fused = new List<LesionBox>();
             foreach (int pal in _paletteOf)
             {
@@ -180,6 +186,7 @@ namespace SkinDevApp.AI
                 foreach (var cl in clusters)
                 {
                     LesionBox a = Average(cl);
+                    a.Support = cl.Select(x => x.Member).Distinct().Count(); a.EnsembleSize = members.Count;
                     a.Confidence = Math.Min(1f, cl.Sum(x => x.Confidence) / members.Count);   // a patch only some members see gets a lower score
                     if (a.Confidence >= thr[pal]) fused.Add(a);
                 }

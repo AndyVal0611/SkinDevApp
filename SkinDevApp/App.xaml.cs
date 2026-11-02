@@ -24,6 +24,7 @@ namespace SkinDevApp
 
             SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
 
+            SkinDevApp.V6.V6FeatureFlag.VariantProvider = () => System.Configuration.ConfigurationManager.AppSettings["V6Variant"] ?? Environment.GetEnvironmentVariable(SkinDevApp.V6.V6FeatureFlag.VariantEnvironmentVariable);
             // V6 unified assessment: ON when App.config says V6Unified=true (or the environment variable LUMYVUE_V6_UNIFIED=1 is set). Otherwise the app is the V5 app, unchanged.
             SkinDevApp.V6.V6FeatureFlag.Provider = () =>
                 string.Equals(System.Configuration.ConfigurationManager.AppSettings["V6Unified"], "true", StringComparison.OrdinalIgnoreCase) ||

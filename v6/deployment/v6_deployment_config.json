@@ -51,6 +51,29 @@
    "file": "v6_fusion_global_only_seed42.onnx",
    "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a",
    "runtime_note": "used only to compute the CNN-vs-YOLO conflict flag; det_ev fed as zeros"
+  },
+  "fusion_full": {
+   "file": "v6_fusion_full_seed42.onnx",
+   "sha256": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7",
+   "inputs": [
+    "g_emb[N,128]",
+    "g_logit[N,3]",
+    "g_extra[N,2]",
+    "det_ev[N,21]",
+    "roi_feat[N,12,83]",
+    "roi_mask[N,12]"
+   ],
+   "output": "Identity:0 -> logits [N,3]",
+   "runtime_note": "g_extra is [0,0]; roi_feat/roi_mask built from the YOLO-guided regions (see 'roi')"
+  },
+  "roi_features": {
+   "file": "v6_roi_features_mobilenetv2.onnx",
+   "sha256": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22",
+   "input": "roi_nhwc_m1p1[N,224,224,3] (RGB, (p/127.5)-1)",
+   "outputs": [
+    "Identity:0 -> embedding [N,64]",
+    "Identity_1:0 -> softmax [N,4] (Acne, Hyperpigmentation, Eczema, Background)"
+   ]
   }
  },
  "calibration": {
@@ -106,7 +129,33 @@
     "Eczema"
    ]
   },
-  "formula": "p = sigmoid(a*z + b) per condition on the fusion logit z"
+  "formula": "p = sigmoid(a*z + b) per condition on the fusion logit z",
+  "full": {
+   "platt": [
+    {
+     "a": 0.5827944047112714,
+     "b": -0.8072235660569566
+    },
+    {
+     "a": 0.628212357860993,
+     "b": -0.2980508596037338
+    },
+    {
+     "a": 0.501094703231593,
+     "b": -1.6623883940716577
+    }
+   ],
+   "thresholds": [
+    0.43,
+    0.34,
+    0.33
+   ],
+   "calibrated_conditions": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+   ]
+  }
  },
  "decision": {
   "rule": "decision per condition from the calibrated global_yolo probability: present if p >= t + band, absent if p < t - band, else uncertain",
@@ -140,7 +189,8 @@
    "OUT_OF_SCOPE_REVIEW_REQUIRED",
    "INFERENCE_ERROR"
   ],
-  "normal_rule": "NO_FINDINGS_SUPPORTED only when all three conditions are 'absent' with absence supported (all detectors available), no flags and no blocking quality problem"
+  "normal_rule": "NO_FINDINGS_SUPPORTED only when all three conditions are 'absent' with absence supported (all detectors available), no flags and no blocking quality problem",
+  "full_note": "full variant: calibration.full thresholds and band 0.0 (no band; the band was only ever selected on global_yolo, which also gave 0.0)"
  },
  "quality": {
   "thresholds": {
@@ -228,5 +278,18 @@
   "v5_onnx_sha256": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
   "yolo_config_hash": "ce6ae3186e771bfe",
   "source_metadata": "astra_runs/open_run02/export/v6_model_metadata.json"
+ },
+ "roi": {
+  "size": 224,
+  "margin": 0.25,
+  "alt_margin": 0.6,
+  "min_side_frac": 0.02,
+  "max_tier1": 6,
+  "max_total": 12,
+  "overlap_suppress_iou": 0.7,
+  "embedding": 64,
+  "classes": 4,
+  "feature_dim": 83,
+  "note": "port of build_roi_candidates / crop_roi / yolo_roi_features in 07_roi_branch.cellsrc"
  }
 }

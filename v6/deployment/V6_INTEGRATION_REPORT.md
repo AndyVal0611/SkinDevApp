@@ -64,3 +64,13 @@ V6 heat maps now exist in the same form as V5's: one tinted map per condition on
 
 ## How to try it
 Set the environment variable `LUMYVUE_V6_UNIFIED=1`, launch the app and run a scan. Scans made with the flag on save `v6_assessment.json` (sealed) and `v6_marked_areas.png` next to `record.json`; the Results page shows the unified card. Without the variable the app is the V5 app.
+
+## Full variant (Global + YOLO + ROI MobileNetV2)
+
+Added after the global_yolo integration. Selected by `V6Variant` in App.config (`full` or `global_yolo`; default `full`; if the full models cannot load the app falls back to `global_yolo`, and every saved assessment records which variant ran).
+
+- Port of `build_roi_candidates`, `crop_roi`, `square_crop_box`, `yolo_roi_features` and `roi_sets_for` (`07_roi_branch.cellsrc`) in `SkinDevApp/V6/V6Roi.cs`; ensemble support counts exposed by `LesionDetector` (`LesionBox.Support`).
+- Calibration `full` (thresholds 0.43 / 0.34 / 0.33), band 0.0, same flags and states as global_yolo. The Global-only fusion is still used for the conflict flag.
+- Parity against the Python reference on the same 13 real photographs (`v6/tools/make_full_golden.py` -> `v6_full_variant_golden.json`): max difference in calibrated probability 1e-6, 0 of 39 decisions flipped.
+- Evidence: on the 132-photo fair set the full variant had macro-F1 0.755 vs 0.737 for V5 and global_yolo, 8 missed hyperpigmentation photos vs 9 / 10; all paired 95% intervals include zero (see `v6/docs/V6_ML_RESULTS_SUMMARY.md`). The ROI branch adding value over global_yolo is NOT established.
+- Cost: about 2 s per photograph on CPU in the parity run (the global_yolo variant was faster).

@@ -19,6 +19,24 @@ namespace SkinDevApp.V6
         /// <summary>Optional application-supplied setting. Null means "use the environment variable".</summary>
         public static Func<bool> Provider { get; set; }
 
+        public const string VariantEnvironmentVariable = "LUMYVUE_V6_VARIANT";
+
+        /// <summary>Optional application-supplied setting for the model variant ("full" or "global_yolo"). Null means the environment variable, then "full".</summary>
+        public static Func<string> VariantProvider { get; set; }
+
+        public static string Variant
+        {
+            get
+            {
+                try
+                {
+                    string v = VariantProvider != null ? VariantProvider() : Environment.GetEnvironmentVariable(VariantEnvironmentVariable);
+                    return string.Equals(v, "global_yolo", StringComparison.OrdinalIgnoreCase) ? "global_yolo" : "full";
+                }
+                catch { return "full"; }
+            }
+        }
+
         public static bool IsEnabled
         {
             get

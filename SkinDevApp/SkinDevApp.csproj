@@ -260,6 +260,7 @@
     <Compile Include="V6\DetectorEvidence.cs" />
     <Compile Include="V6\V6Decision.cs" />
     <Compile Include="V6\V6Inference.cs" />
+    <Compile Include="V6\V6Roi.cs" />
     <Compile Include="V6\V6FeatureFlag.cs" />
     <Compile Include="V6\V6QualityMapper.cs" />
     <Compile Include="V6\V6Archive.cs" />
@@ -387,6 +388,8 @@
     <None Include="Model\V6\v6_global_features_mobilenetv2.onnx" Condition="Exists('Model\V6\v6_global_features_mobilenetv2.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="Model\V6\v6_fusion_global_yolo_seed42.onnx" Condition="Exists('Model\V6\v6_fusion_global_yolo_seed42.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="Model\V6\v6_fusion_global_only_seed42.onnx" Condition="Exists('Model\V6\v6_fusion_global_only_seed42.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_fusion_full_seed42.onnx" Condition="Exists('Model\V6\v6_fusion_full_seed42.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_roi_features_mobilenetv2.onnx" Condition="Exists('Model\V6\v6_roi_features_mobilenetv2.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="Model\precisionskin.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
