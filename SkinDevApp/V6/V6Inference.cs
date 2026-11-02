@@ -180,6 +180,12 @@ namespace SkinDevApp.V6
                     Condition = V6Conditions.Names[j], FusionLogit = zFused[j], CalibratedProbability = pFused[j], Threshold = _cfg.GlobalYolo.Thresholds[j],
                     Status = d.Status[j], AbsenceSupported = d.AbsenceSupported[j], DetectorAvailable = avail[j], DetectorFired = detected[j], GlobalOnlyProbability = pGlobalOnly[j]
                 }).ToArray();
+                var possible = a.Conditions.Where(c => c.Verdict == "possible").Select(c => c.Condition).ToList();
+                if (possible.Count > 0)
+                {
+                    a.Reasons.Add("the lesion detector marked an area for: " + string.Join(", ", possible));
+                    if (a.State == V6States.NoFindingsSupported) a.State = V6States.UncertainReviewRequired;
+                }
                 for (int j = 0; j < pools.Length; j++)
                     if (pools[j] != null && pools[j].Available)
                         foreach (PixelBox b in pools[j].PixelBoxes)

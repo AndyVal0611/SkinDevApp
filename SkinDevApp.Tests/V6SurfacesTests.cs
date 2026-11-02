@@ -174,3 +174,19 @@ namespace SkinDevApp.Tests
         }
     }
 }
+
+namespace SkinDevApp.Tests
+{
+    public class V6DetectorVerdictTests
+    {
+        [Xunit.Theory]
+        [Xunit.InlineData(true, "possible", "Possible")]
+        [Xunit.InlineData(false, "absent", "Not found")]
+        public void AbsentWithDetectorMark_IsPossible_NotFound(bool fired, string verdict, string text)
+        {
+            var c = new SkinDevApp.V6.ConditionAssessment { Condition = "Hyperpigmentation", Status = SkinDevApp.V6.ConditionStatus.Absent, AbsenceSupported = true, DetectorAvailable = true, DetectorFired = fired };
+            Xunit.Assert.Equal(verdict, c.Verdict);
+            Xunit.Assert.Equal(text, SkinDevApp.V6.V6Text.VerdictText(c));
+        }
+    }
+}

@@ -98,10 +98,10 @@ namespace SkinDevApp.V6
         public bool DetectorFired;              // at least one deployed box (information, never used as the decision)
         public double GlobalOnlyProbability;    // calibrated Global-only fusion, used only for the conflict flag
 
-        /// <summary>Wording-safe verdict: an 'Absent' without detector coverage is reported as uncertain.</summary>
+        /// <summary>Wording-safe verdict: an 'Absent' without detector coverage is reported as uncertain, and an 'Absent' where the lesion detector marked an area is "possible", never "not found".</summary>
         public string Verdict =>
             Status == ConditionStatus.Present ? "present" :
-            Status == ConditionStatus.Absent && AbsenceSupported ? "absent" : "uncertain";
+            Status == ConditionStatus.Absent && AbsenceSupported ? (DetectorFired ? "possible" : "absent") : "uncertain";
     }
 
     /// <summary>The one structured V6 result.</summary>

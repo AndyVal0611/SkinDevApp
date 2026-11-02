@@ -32,7 +32,7 @@ namespace SkinDevApp.V6
             }
         }
 
-        public static string VerdictText(ConditionAssessment c) => c.Verdict == "present" ? "Present" : c.Verdict == "absent" ? "Not found" : "Uncertain";
+        public static string VerdictText(ConditionAssessment c) => c.Verdict == "present" ? "Present" : c.Verdict == "absent" ? "Not found" : c.Verdict == "possible" ? "Possible" : "Uncertain";
 
         public static string DetectorText(ConditionAssessment c) =>
             !c.DetectorAvailable ? "detector not available" : c.DetectorFired ? "detector marked an area" : "detector ran: nothing marked";
