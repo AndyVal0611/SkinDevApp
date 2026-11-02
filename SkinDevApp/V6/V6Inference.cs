@@ -182,8 +182,13 @@ namespace SkinDevApp.V6
                 }).ToArray();
                 for (int j = 0; j < pools.Length; j++)
                     if (pools[j] != null && pools[j].Available)
-                        foreach (PixelBox b in pools[j].PixelBoxes.Where(x => x.Conf >= pools[j].DeployedThreshold))
-                            a.Boxes.Add(new V6Box { Condition = V6Conditions.Names[j], Confidence = (float)b.Conf, X0 = (float)b.X0, Y0 = (float)b.Y0, X1 = (float)b.X1, Y1 = (float)b.Y1, Deployed = true });
+                        foreach (PixelBox b in pools[j].PixelBoxes)
+                        {
+                            bool deployed = b.Conf >= pools[j].DeployedThreshold;
+                            var box = new V6Box { Condition = V6Conditions.Names[j], Confidence = (float)b.Conf, X0 = (float)b.X0, Y0 = (float)b.Y0, X1 = (float)b.X1, Y1 = (float)b.Y1, Deployed = deployed };
+                            a.Pool.Add(box);
+                            if (deployed) a.Boxes.Add(box);
+                        }
                 foreach (ConditionPool p in pools.Where(p => p != null && !p.Available))
                     a.Reasons.Add("detector unavailable for " + p.Condition + (p.Error != null ? " (" + p.Error + ")" : ""));
                 a.InferenceMs = sw.Elapsed.TotalMilliseconds;

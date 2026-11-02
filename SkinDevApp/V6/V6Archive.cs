@@ -62,8 +62,11 @@ namespace SkinDevApp.V6
                 File.WriteAllBytes(Path.Combine(folder, FileName), ms.ToArray());
             }
             if (frame != null && !frame.Empty())
+            {
                 using (Mat marked = DrawMarkedAreas(frame, a, faceBox))
                     File.WriteAllBytes(Path.Combine(folder, MarkedFileName), marked.ImEncode(".png"));
+                V6Heatmaps.WriteAll(folder, a, frame, faceBox);              // V6 heat maps (detector evidence), same form as V5's
+            }
         }
 
         /// <summary>Returns the saved assessment, or null with a reason (missing file, wrong schema, hash mismatch, unreadable).</summary>

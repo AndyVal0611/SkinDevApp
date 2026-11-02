@@ -21,6 +21,7 @@ namespace SkinDevApp.Views
         // V6 unified assessment (feature flag, default OFF): saved V6 results by view, or null -> the screen behaves exactly as before
         private Dictionary<string, SkinDevApp.V6.UnifiedAssessment> _v6;
         private List<string> _v6Problems = new List<string>();
+        private string _v6Cond = "Auto";      // which condition the V6 heat map shows: Auto (highest ranked) or Acne / Hyperpigmentation / Eczema
 
         // per-view image holders, so the view toggle (Original / Grad-CAM++ / Localization / Combined) can swap the picture
         private readonly List<KeyValuePair<CaptureViewRow, Border>> _viewThumbs = new List<KeyValuePair<CaptureViewRow, Border>>();
@@ -132,19 +133,23 @@ namespace SkinDevApp.Views
             sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "The photograph" : "Reading of each photograph", 16, true));
 
             // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
+            // V6 view: "Heat map" and "Both" are V6's own detector-evidence maps (same form as V5's); V5's Grad-CAM++ stays available as "Classifier map (V5)".
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
-            foreach (string mode in new[] { "Original", "Grad-CAM++", "Localization", "Combined" })
+            string[] modes = _v6 != null ? new[] { "Original", "V6Heat", "Localization", "V6Both", "Grad-CAM++" } : new[] { "Original", "Grad-CAM++", "Localization", "Combined" };
+            foreach (string mode in modes)
             {
-                if (_v6 != null && mode == "Combined") continue;   // V6 view: "Both" would overlay the V5 predicted class on the boxes, so it is not offered; the heat map itself is (labelled as V5 below)
                 var rb = new RadioButton
                 {
-                    Content = mode == "Grad-CAM++" ? (_v6 != null ? "Heat map (V5)" : "Heat map") : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
+                    Content = mode == "V6Heat" ? "Heat map" : mode == "V6Both" ? "Both" : mode == "Grad-CAM++" ? (_v6 != null ? "Classifier map (V5)" : "Heat map")
+                            : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
                     GroupName = "viewmode",
                     IsChecked = mode == "Original",
                     Margin = new Thickness(0, 0, 18, 0),
                     FontSize = 12.5,
-                    ToolTip = mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
-                            : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the condition the unified assessment ranks highest. It explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
+                    ToolTip = mode == "V6Heat" ? "Where the lesion detectors found evidence for the chosen condition. Colour = the condition, strength = detector confidence. It is one input of the unified assessment, not an explanation of the model."
+                            : mode == "V6Both" ? "The same evidence map with the marked boxes on top."
+                            : mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
+                            : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the chosen condition. Kept from V5 for comparison; it explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
                                                                   : "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map).")
                             : mode == "Localization" ? "Candidate lesion locations from a separate research detector."
                             : "The exact frame that was analysed."
@@ -155,8 +160,21 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(toggle);
             if (_v6 != null)
-                sp.Children.Add(Ui.Text("Heat map (V5): shows what the V5 classifier looked at for the condition ranked highest above. It is not the V6 explanation, it is diffuse, and the maps for different conditions look alike. \"Marked areas\" shows where the detectors found something.",
+            {
+                // which condition the heat map shows: the one the unified assessment ranks highest (Auto) or any of the three, as V5 offered a map for every class
+                var which = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+                which.Children.Add(Ui.Text("Condition:", 12, false, Ui.Muted, new Thickness(0, 2, 10, 0)));
+                foreach (string c in new[] { "Auto", "Acne", "Hyperpigmentation", "Eczema" })
+                {
+                    string cc = c;
+                    var crb = new RadioButton { Content = c == "Auto" ? "Highest ranked" : c, GroupName = "v6cond", IsChecked = c == _v6Cond, Margin = new Thickness(0, 0, 14, 0), FontSize = 12 };
+                    crb.Checked += (s, e) => { _v6Cond = cc; RefreshThumbs(); };
+                    which.Children.Add(crb);
+                }
+                sp.Children.Add(which);
+                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence (the same evidence the unified assessment uses). It is an evidence map, not an explanation of the model. \"Classifier map (V5)\" is V5's Grad-CAM++, kept for comparison: it is diffuse and the maps for different conditions look alike.",
                                         10.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
+            }
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
             string[] names = _d.Session.ScanMode == "Single" ? new[] { "Single" } : StudyText.Views;
@@ -220,13 +238,18 @@ namespace SkinDevApp.Views
             return (present.Count > 0 ? present : a.Conditions.ToList()).OrderByDescending(c => c.CalibratedProbability).First().Condition;
         }
 
+        /// <summary>The condition the V6 heat map shows for this photograph: the reader's choice, or the one the unified assessment ranks highest.</summary>
+        private string V6Chosen(CaptureViewRow v) => _v6Cond != "Auto" ? _v6Cond : V6LeadCondition(v);
+
         private string PathFor(CaptureViewRow v, string mode)
         {
             switch (mode)
             {
+                case "V6Heat": return SkinDevApp.V6.V6Heatmaps.OverlayPath(v.RecordFolder, V6Chosen(v));
+                case "V6Both": return SkinDevApp.V6.V6Heatmaps.CombinedPath(v.RecordFolder, V6Chosen(v));
                 case "Grad-CAM++":
                     string pred = v.Scores != null ? v.Scores.PredictedClass : null;
-                    if (_v6 != null) pred = V6LeadCondition(v) ?? pred;      // V6 view: the saved V5 map of the condition the unified assessment ranks highest (V5 may have predicted Normal)
+                    if (_v6 != null) pred = V6Chosen(v) ?? pred;      // V6 view: V5's saved map of the chosen condition (V5 may have predicted Normal)
                     AttributionMapRow map = v.Maps.FirstOrDefault(x => x.TargetClass == pred);
                     return map != null ? map.OverlayPath : null;
                 case "Localization":
@@ -247,7 +270,7 @@ namespace SkinDevApp.Views
                 var src = path != null ? Ui.LoadImage(path, 480) : null;
                 kv.Value.Child = src != null
                     ? (UIElement)new System.Windows.Controls.Image { Source = src, Stretch = System.Windows.Media.Stretch.Uniform }
-                    : Ui.Text(_viewMode == "Original" ? "image not available" : _viewMode + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));
+                    : Ui.Text(_viewMode == "Original" ? "image not available" : (_viewMode == "V6Heat" ? "Heat map" : _viewMode == "V6Both" ? "Both" : _viewMode) + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));
             }
         }
 

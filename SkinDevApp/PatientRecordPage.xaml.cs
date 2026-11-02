@@ -626,6 +626,20 @@ namespace SkinDevApp
             {
                 var row = new UniformGrid { Columns = 4, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = 700 };
                 row.Children.Add(EvidenceCell("Original", v.AnalysedImagePath ?? v.OriginalImagePath, "#9CA3AF", null, v.OriginalImagePath));
+
+                // V6 flag on and a saved V6 assessment: the same four cells, from the unified assessment's evidence maps (V5's maps stay in the gallery, labelled V5)
+                string v6e_problem;
+                SkinDevApp.V6.UnifiedAssessment v6e = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? SkinDevApp.V6.V6Archive.Read(v.RecordFolder, out v6e_problem) : null;
+                if (v6e != null)
+                {
+                    string lead = SkinDevApp.V6.V6Heatmaps.LeadCondition(v6e); int li = Math.Max(0, SkinDevApp.V6.V6Conditions.IndexOf(lead));
+                    string heatPath = SkinDevApp.V6.V6Heatmaps.OverlayPath(v.RecordFolder, lead), markedPath = SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), bothPath = SkinDevApp.V6.V6Heatmaps.CombinedPath(v.RecordFolder, lead);
+                    row.Children.Add(EvidenceCell("Heat map - " + lead, heatPath, Imaging.ClassPalette.Hex[li], heatPath == null ? "Heat map not available" : "where the detectors found evidence", heatPath));
+                    row.Children.Add(EvidenceCell("Marked areas", markedPath, "#F59E0B", SkinDevApp.V6.V6Text.BoxesLine(v6e), markedPath));
+                    row.Children.Add(EvidenceCell("Heat map and marked areas", bothPath, "#9CA3AF", bothPath == null ? "Not available" : null, bothPath));
+                    tabs.Items.Add(new TabItem { Header = "  " + v.ViewType.ToUpperInvariant() + "  ", Content = row });
+                    continue;
+                }
                 AttributionMapRow m = shownMap(v);
                 string cls = m != null ? m.TargetClass : (v.Scores != null ? v.Scores.PredictedClass : null);
                 double? score = v.Scores == null || cls == null ? (double?)null : v.Scores.AsArray()[Array.IndexOf(StudyText.Classes, cls)];

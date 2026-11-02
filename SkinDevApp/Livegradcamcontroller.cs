@@ -37,6 +37,7 @@ using OpenCvSharp;
 using SkinDevApp.AI;
 using SkinDevApp.Imaging;
 using SkinDevApp.Scanning;
+using SkinDevApp.V6;
 
 namespace SkinDevApp.Explainability
 {
@@ -78,6 +79,13 @@ namespace SkinDevApp.Explainability
         private Task _fastLoop;
         private Task _slowLoop;
         private Task _finalTask;
+
+        // V6 live reading (only when V6FeatureFlag is on): a slower loop that runs the unified V6 assessment on the newest frame. V5's loops still decide when to capture.
+        private Task _v6Loop;
+        private readonly V6LiveReader _v6 = new V6LiveReader();
+        /// <summary>A new V6 live reading is available (raised on a background thread).</summary>
+        public event Action<UnifiedAssessment> V6Updated;
+        public UnifiedAssessment LatestV6 => _v6.Latest;
 
         private readonly FrameQualityAnalyzer _quality = new FrameQualityAnalyzer();
         private readonly PredictionStabilizer _stabilizer;
@@ -222,6 +230,8 @@ namespace SkinDevApp.Explainability
             _machine.HysteresisMargin = _stabilizer.HysteresisMargin;
             _machine.StableFramesRequired = _stabilizer.StableFramesRequired;
             _machine.MinConfidence = _stabilizer.ConfidenceThreshold;
+
+            _v6.Updated += a => V6Updated?.Invoke(a);
         }
 
         /// <summary>
@@ -269,6 +279,7 @@ namespace SkinDevApp.Explainability
 
             _fastLoop = Task.Run(() => FastLoopAsync(ct));
             _slowLoop = Task.Run(() => SlowLoopAsync(ct));
+            if (V6FeatureFlag.IsEnabled) _v6Loop = Task.Run(() => _v6.RunAsync(() => !Enabled || _finalBusy || _machine.IsBusy, ct));
         }
 
         public void Stop()
@@ -276,15 +287,16 @@ namespace SkinDevApp.Explainability
             try
             {
                 _cts?.Cancel();
-                Task[] tasks = { _fastLoop, _slowLoop, _finalTask };
+                Task[] tasks = { _fastLoop, _slowLoop, _finalTask, _v6Loop };
                 foreach (Task t in tasks)
-                    if (t != null) t.Wait(TimeSpan.FromSeconds(3));
+                    if (t != null) t.Wait(TimeSpan.FromSeconds(t == _v6Loop ? 6 : 3));      // a V6 assessment in flight takes about 2 s to finish
             }
             catch (AggregateException) { }
 
             _cts?.Dispose();
             _cts = null;
-            _fastLoop = _slowLoop = _finalTask = null;
+            _fastLoop = _slowLoop = _finalTask = _v6Loop = null;
+            _v6.Clear();
 
             lock (_pendingLock)
             {
@@ -331,6 +343,7 @@ namespace SkinDevApp.Explainability
                 _pending = null;
             }
 
+            _v6.Clear();
             _stabilizer.Reset();
             _quality.Reset();
             _pose.Reset();
@@ -374,6 +387,7 @@ namespace SkinDevApp.Explainability
         public Mat RenderLiveOverlay(Mat frameBgr)
         {
             if (frameBgr == null || frameBgr.Empty()) return null;
+            if (V6FeatureFlag.IsEnabled) return _v6.RenderOverlay(frameBgr, MotionThreshold);       // V6 flag on: the live heat map is V6's evidence map, not V5's Grad-CAM++
 
             using (Mat cur = MotionMeter.MakeThumb(frameBgr))
             {
@@ -492,6 +506,9 @@ namespace SkinDevApp.Explainability
 
                         int displayIdx = Array.IndexOf(PredictionResult.ClassNames, stable.DisplayClass);
                         lock (_stateLock) { _displayIndex = displayIdx; }
+
+                        // ---- V6 live reading: offer the newest frame (clones; V6 flag only) ----
+                        if (V6FeatureFlag.IsEnabled) _v6.Offer(working, thumb, q);
 
                         // ---- offer the frame to the slow loop (latest wins) -------
                         Offer(new PendingFrame
@@ -652,6 +669,14 @@ namespace SkinDevApp.Explainability
                             if (up) SetStatus(true, null);
                         }
                         await Task.Delay(30, ct).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    if (V6FeatureFlag.IsEnabled)
+                    {
+                        // V6 live: the live heat map is V6's, so the V5 Grad-CAM++ service is not asked per frame (it is still used for the saved scan).
+                        pf.Dispose();
+                        await Task.Delay(250, ct).ConfigureAwait(false);
                         continue;
                     }
 

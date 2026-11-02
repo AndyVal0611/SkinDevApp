@@ -63,6 +63,7 @@ namespace SkinDevApp.Views
         private int _framePending;          // 1 while the UI is still drawing the last video frame
         private int _snapPending;           // 1 while a snapshot update is queued on the UI thread
         private LiveSnapshot _latestSnap;
+        private SkinDevApp.V6.UnifiedAssessment _latestV6;      // newest V6 live reading (V6 flag on)
         private bool _serviceOnline;
 
         private ScanResult _lastResult;     // owned by the dashboard
@@ -673,6 +674,7 @@ namespace SkinDevApp.Views
                 ClassPalette.AlphaMax = OpacitySlider.Value;
 
                 _live.FastUpdated += OnFastUpdated;
+                _live.V6Updated += OnV6Updated;
                 _live.CaptureTriggered += OnCaptureTriggered;
                 _live.ScanCompleted += OnScanCompleted;
                 _live.ServiceStatusChanged += OnLiveServiceStatusChanged;
@@ -802,6 +804,7 @@ namespace SkinDevApp.Views
             if (_live != null)
             {
                 _live.FastUpdated -= OnFastUpdated;
+                _live.V6Updated -= OnV6Updated;
                 _live.CaptureTriggered -= OnCaptureTriggered;
                 _live.ScanCompleted -= OnScanCompleted;
                 _live.ServiceStatusChanged -= OnLiveServiceStatusChanged;
@@ -816,6 +819,7 @@ namespace SkinDevApp.Views
             }
 
             Interlocked.Exchange(ref _latestSnap, null);
+            Interlocked.Exchange(ref _latestV6, null);
             LiveStatusTxt.Text = "";
         }
 
@@ -980,7 +984,8 @@ namespace SkinDevApp.Views
             float[] smoothed = (s.Stable != null && s.Stable.SmoothedProbabilities != null
                                 && s.Stable.SmoothedProbabilities.Length == 4)
                 ? s.Stable.SmoothedProbabilities : s.Onnx.Probabilities;
-            SetBars(smoothed);
+            bool v6 = SkinDevApp.V6.V6FeatureFlag.IsEnabled;     // V6 flag on: the live reading is the unified V6 reading (V5 still decides when to capture)
+            if (v6) ApplyV6Bars(); else SetBars(smoothed);
 
             ScanDecision d = s.Decision;
             UpdateStatusPanel(s);
@@ -996,7 +1001,8 @@ namespace SkinDevApp.Views
 
             // ---- verdict (live read) ----------------------------------------------------
             StabilizedResult st = s.Stable;
-            if (st == null || st.IsUncertain)
+            if (v6) ApplyV6Verdict();
+            else if (st == null || st.IsUncertain)
             {
                 VerdictTxt.Text = "Analyzing… keep your face in the oval.";
                 RegionTxt.Text = "";
@@ -1015,17 +1021,58 @@ namespace SkinDevApp.Views
             }
 
             // ---- service line -------------------------------------------------------------
-            if (_serviceOnline && s.HeatmapAvailable)
+            if (v6) LiveStatusTxt.Text = V6LiveStatusText();
+            else if (_serviceOnline && s.HeatmapAvailable)
                 LiveStatusTxt.Text = "● Grad-CAM++ " + s.GradCamMs.ToString("0") + " ms";
             else if (_serviceOnline)
                 LiveStatusTxt.Text = "● Grad-CAM++ connected — waiting for first map";
             else
                 LiveStatusTxt.Text = "○ Grad-CAM++ offline — scores still live, no heatmap";
 
-            LegendPanel.Visibility = s.HeatmapAvailable ? Visibility.Visible : Visibility.Collapsed;
+            LegendPanel.Visibility = (v6 ? (_latestV6 != null && _latestV6.State != SkinDevApp.V6.V6States.InferenceError) : s.HeatmapAvailable) ? Visibility.Visible : Visibility.Collapsed;
 
             if (ResearcherChk.IsChecked == true)
                 ResearcherMetricsTxt.Text = BuildLiveMetrics(s);
+        }
+
+        // ---- V6 live reading (flag on) ---------------------------------------------------------------------------------------------------
+
+        private void OnV6Updated(SkinDevApp.V6.UnifiedAssessment a) => Interlocked.Exchange(ref _latestV6, a);
+
+        private void ApplyV6Bars()
+        {
+            SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
+            ScoresTitleTxt.Text = "Unified AI reading (V6)";
+            ScoresNoteTxt.Text = "AI support for each condition, refreshed every few seconds. Several can be present at once, and Normal is derived from the three, so it has no bar. Not a diagnosis.";
+            NormalRow.Visibility = Visibility.Collapsed; NormalBar.Visibility = Visibility.Collapsed;
+            bool ok = a != null && a.Conditions.Length >= 3 && a.State != SkinDevApp.V6.V6States.InferenceError;
+            double p0 = ok ? a.Conditions[0].CalibratedProbability * 100.0 : 0, p1 = ok ? a.Conditions[1].CalibratedProbability * 100.0 : 0, p2 = ok ? a.Conditions[2].CalibratedProbability * 100.0 : 0;
+            AcneBar.Value = p0; AcneScoreTxt.Text = ok ? p0.ToString("F1") + "%" : "—";
+            HyperBar.Value = p1; HyperScoreTxt.Text = ok ? p1.ToString("F1") + "%" : "—";
+            EczemaBar.Value = p2; EczemaScoreTxt.Text = ok ? p2.ToString("F1") + "%" : "—";
+        }
+
+        private void ApplyV6Verdict()
+        {
+            SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
+            if (a == null)
+            {
+                VerdictTxt.Text = SkinDevApp.V6.V6Service.LastError != null ? "V6 is not available: " + SkinDevApp.V6.V6Service.LastError : "V6 reading starting… keep your face in the oval.";
+                RegionTxt.Text = "";
+                return;
+            }
+            string firstFlag = System.Linq.Enumerable.FirstOrDefault(SkinDevApp.V6.V6Text.FlagLines(a));
+            if (a.State == SkinDevApp.V6.V6States.RecaptureRequired) { VerdictTxt.Text = "Adjusting… " + (firstFlag ?? "check the lighting and position."); RegionTxt.Text = ""; return; }
+            if (a.State == SkinDevApp.V6.V6States.InferenceError) { VerdictTxt.Text = "The V6 reading could not be completed."; RegionTxt.Text = a.Error ?? ""; return; }
+            VerdictTxt.Text = "Live read (V6): " + SkinDevApp.V6.V6Text.StateHeadline(a);
+            RegionTxt.Text = a.Boxes.Count > 0 ? SkinDevApp.V6.V6Text.BoxesLine(a) : (firstFlag ?? "");
+        }
+
+        private string V6LiveStatusText()
+        {
+            SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
+            if (a == null) return SkinDevApp.V6.V6Service.LastError != null ? "○ V6 unavailable" : "● V6 live reading: starting…";
+            return "● V6 live reading · " + a.InferenceMs.ToString("0") + " ms per reading";
         }
 
         private void UpdateGuide(FrameQuality q, ScanDecision d)

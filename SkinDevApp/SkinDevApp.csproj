@@ -263,6 +263,9 @@
     <Compile Include="V6\V6FeatureFlag.cs" />
     <Compile Include="V6\V6QualityMapper.cs" />
     <Compile Include="V6\V6Archive.cs" />
+    <Compile Include="V6\V6Heatmaps.cs" />
+    <Compile Include="V6\V6LiveOverlay.cs" />
+    <Compile Include="V6App\V6LiveReader.cs" />
     <Compile Include="V6\V6SessionLoader.cs" />
     <Compile Include="V6\V6Text.cs" />
     <Compile Include="V6\V6Agreement.cs" />

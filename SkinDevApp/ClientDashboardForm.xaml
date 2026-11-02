@@ -388,9 +388,9 @@
 
                         <DockPanel Margin="0,0,0,2">
                             <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chart}" Foreground="#818263" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Model class scores" FontSize="15" FontWeight="SemiBold" Foreground="#2F3024"/>
+                            <TextBlock x:Name="ScoresTitleTxt" Text="Model class scores" FontSize="15" FontWeight="SemiBold" Foreground="#2F3024"/>
                         </DockPanel>
-                        <TextBlock Text="The model's scores across four mutually exclusive classes. They are not independent disease probabilities."
+                        <TextBlock x:Name="ScoresNoteTxt" Text="The model's scores across four mutually exclusive classes. They are not independent disease probabilities."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,2,0,12"/>
 
                         <!-- Progress Bars for 4 target classes (colours = heatmap colours) -->
@@ -416,7 +416,7 @@
                             </DockPanel>
                             <ProgressBar x:Name="EczemaBar" Style="{StaticResource ScoreBar}" Foreground="#FFBE00"/>
 
-                            <DockPanel>
+                            <DockPanel x:Name="NormalRow">
                                 <Ellipse Style="{StaticResource ScoreDot}" Fill="#00C83C"/>
                                 <TextBlock x:Name="NormalScoreTxt" Text="0.0%" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
                                 <TextBlock Text="Normal" Style="{StaticResource ScoreName}"/>

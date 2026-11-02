@@ -113,6 +113,9 @@ namespace SkinDevApp.V6
         public List<string> Reasons = new List<string>();
         public List<V6Box> Boxes = new List<V6Box>();
 
+        /// <summary>The whole candidate pool the fusion saw (every box with detector confidence >= 0.05; Deployed marks those at or above the deployed threshold). Used only to draw the heat maps.</summary>
+        public List<V6Box> Pool = new List<V6Box>();
+
         /// <summary>Normal is derived, never a model output: true only for NO_FINDINGS_SUPPORTED.</summary>
         public bool NormalSupported => State == V6States.NoFindingsSupported;
 

@@ -70,10 +70,22 @@ namespace SkinDevApp.V6
                     }
                 }
                 sp.Children.Add(grid);
+
+                // as in V5: which of the three photographs were analysed
+                var chips = new WrapPanel { Margin = new Thickness(0, 4, 0, 4) };
+                chips.Children.Add(Ui.Text("Photographs analysed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
+                foreach (string vw in StudyText.Views)
+                {
+                    bool ok = map.ContainsKey(vw);
+                    chips.Children.Add(Ui.Pill((ok ? "✓ " : "✗ ") + vw, ok ? Ui.Good : Ui.Bad, ok ? "#EEF6EC" : "#FDECEC"));
+                }
+                sp.Children.Add(chips);
                 int review = map.Values.Count(a => a.ReviewRequired);
                 if (review > 0) sp.Children.Add(Ui.Callout("Review recommended", review + " of " + map.Count + " photographs need a closer look (see each photograph below).", 1));
                 if (map.Values.Select(a => string.Join("|", a.PresentConditions.OrderBy(x => x))).Distinct().Count() > 1)
                     sp.Children.Add(Ui.Text("The photographs do not all show the same findings. Each photograph is reported on its own below.", 11.5, false, Ui.Warn, new Thickness(0, 4, 0, 0)));
+                else if (map.Count > 1)
+                    sp.Children.Add(Ui.Text("The analysed photographs show the same findings.", 11.5, false, Ui.Good, new Thickness(0, 4, 0, 0)));
             }
             foreach (string p in problems) sp.Children.Add(Ui.Text(p, 11, false, Ui.Bad, new Thickness(0, 4, 0, 0)));
             sp.Children.Add(Ui.Text(Disclaimer, 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));

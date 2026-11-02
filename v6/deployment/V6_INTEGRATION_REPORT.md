@@ -40,6 +40,20 @@ Findings fixed during the run: the raw "Blocking quality: ..." line was repeated
 ## Decision taken (owner, 2026-11-02): face gate
 "Face not found" **blocks a live capture** (retake) but is **only a warning for an uploaded photograph**, because close-up crops never contain a whole face. The warning still raises a review flag, so an upload without a detected face can be assessed per condition but is never called Normal. Everything else (blur, exposure, resolution below 224 px) still blocks uploads. Re-run of the live flow: the hyperpigmentation photograph now reads "Hyperpigmentation: Present" with review recommended; the clean photograph reads "Not found" for all three with review recommended (not Normal); the 216x312 photograph still reads "retake" (resolution). 83 of 83 tests pass.
 
+## V5 feature parity with V6 on (2026-11-02, late)
+V6 heat maps now exist in the same form as V5's: one tinted map per condition on the analysed photograph (same palette, opacity rule, gamma), saved with every scan (`v6_overlay_<Condition>.png`, `v6_heatmap_<Condition>.png`, `v6_overlay_all.png`, `v6_combined_<Condition>.png`). They are **detector-evidence maps** (strength = detector confidence, full strength from 0.70; boxes outside the face region are not drawn), not an attribution of the fusion: a Grad-CAM of the fusion was prototyped and rejected because the maps of different conditions were 95-98 % identical (`v6/tools/v6_attribution*.py`).
+
+| V5 feature | With V6 on |
+|---|---|
+| Results page: result card, per-photograph reading, marked areas, heat map, "Both" | Done. Heat map and "Both" are V6's; a condition chooser (highest ranked / Acne / Hyperpigmentation / Eczema) replaces V5's per-class maps; V5's Grad-CAM stays as "Classifier map (V5)" |
+| Photographs-analysed chips, "photographs agree" message | Done |
+| Comparison gallery | Done: V6 evidence cards first, V5 class maps follow, labelled V5 |
+| Patient record: photographs, heat maps and marked areas | Done (V6 maps) |
+| A4 report: heat-map evidence pages | Done (detector evidence maps, one per photograph) |
+| Receipts, dermatologist review, researcher review (suggested agreement) | Done |
+| Live camera screen: live scores, verdict line and live heat map on the preview | Done (V6 live reading): the full V6 assessment is refreshed about every 2-3 s on the newest frame (first reading about 7 s after start while the models load); the bars show AI support per condition, the verdict line shows the V6 headline, the preview shows the V6 evidence map of the highest-ranked condition (about 13 ms per video frame). V5 still decides when to auto-capture; V5's per-frame Grad-CAM++ requests are paused while V6 is on |
+| Session list columns, statistics and research views | Not done: read the stored V5 class |
+
 ## Not done
 1. A person clicking through the real windows (login, navigation, the print preview dialog, the physical printer). The live run above exercised the same code paths and rendered the real elements, but not the interactive shell.
 2. Still V5-based when the flag is on: the session list columns and statistics in the patient record and research views (they read the stored V5 class from the database, kept as the baseline), the "Compare photographs and heat maps" gallery, and the Grad-CAM++ maps saved with each scan.
