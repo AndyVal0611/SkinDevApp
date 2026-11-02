@@ -1,0 +1,232 @@
+{
+ "created": "2026-11-02T18:36:33",
+ "run_id": "open_run02",
+ "status": "EXPERIMENTAL - development-stage; not clinically validated; every assessment is PENDING_DERMATOLOGIST_REVIEW",
+ "feature_schema_version": "astra-fusion/1",
+ "feature_flag": {
+  "name": "V6UnifiedAssessment",
+  "default": false
+ },
+ "conditions": [
+  "Acne",
+  "Hyperpigmentation",
+  "Eczema"
+ ],
+ "normal_definition": "Normal = all three conditions verified Absent (derived; never a model output)",
+ "models": {
+  "global_features": {
+   "file": "v6_global_features_mobilenetv2.onnx",
+   "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4",
+   "input": {
+    "name": "image_nhwc_m1p1",
+    "dtype": "float32",
+    "shape": [
+     -1,
+     224,
+     224,
+     3
+    ]
+   },
+   "outputs": [
+    "Identity:0 -> embedding [N,128]",
+    "Identity_1:0 -> logits [N,3] (apply sigmoid; fusion consumes logit(clip(sigmoid(z),1e-4,1-1e-4)))"
+   ],
+   "preprocessing": "BGR->RGB, bilinear (INTER_LINEAR) stretch to 224x224, (p/127.5)-1"
+  },
+  "fusion_global_yolo": {
+   "file": "v6_fusion_global_yolo_seed42.onnx",
+   "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97",
+   "inputs": [
+    "g_emb[N,128]",
+    "g_logit[N,3]",
+    "g_extra[N,2]",
+    "det_ev[N,21]",
+    "roi_feat[N,12,83]",
+    "roi_mask[N,12]"
+   ],
+   "output": "Identity:0 -> logits [N,3]",
+   "runtime_note": "roi_feat and roi_mask are fed as ZEROS (the global_yolo variant has no ROI branch); g_extra is [0,0] for the multilabel Global model"
+  },
+  "fusion_global_only": {
+   "file": "v6_fusion_global_only_seed42.onnx",
+   "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a",
+   "runtime_note": "used only to compute the CNN-vs-YOLO conflict flag; det_ev fed as zeros"
+  }
+ },
+ "calibration": {
+  "global_yolo": {
+   "platt": [
+    {
+     "a": 0.7297918985761983,
+     "b": -0.6806363571042584
+    },
+    {
+     "a": 0.7619317641649174,
+     "b": -0.546835840466286
+    },
+    {
+     "a": 0.5355513342654367,
+     "b": -1.7331056613640594
+    }
+   ],
+   "thresholds": [
+    0.42,
+    0.37,
+    0.27
+   ],
+   "calibrated_conditions": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+   ]
+  },
+  "global_only": {
+   "platt": [
+    {
+     "a": 0.7935146005956473,
+     "b": -0.48752706922769473
+    },
+    {
+     "a": 0.8798338759914927,
+     "b": -0.4562666466105268
+    },
+    {
+     "a": 0.5938522075601034,
+     "b": -1.9048337721467055
+    }
+   ],
+   "thresholds": [
+    0.51,
+    0.39,
+    0.25
+   ],
+   "calibrated_conditions": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+   ]
+  },
+  "formula": "p = sigmoid(a*z + b) per condition on the fusion logit z"
+ },
+ "decision": {
+  "rule": "decision per condition from the calibrated global_yolo probability: present if p >= t + band, absent if p < t - band, else uncertain",
+  "band": 0.0,
+  "thresholds": [
+   0.42,
+   0.37,
+   0.27
+  ],
+  "absence_requires_detector_available": true,
+  "stage1_selection": {
+   "band": 0.0,
+   "coverage": 0.4083333333333333,
+   "error": 0.05442176870748299,
+   "n_accepted_known": 147
+  },
+  "note": "band 0.0 was selected on out-of-fold fusion data; PROVISIONAL. Stage 2 (ROI) is NOT part of this deployment: a flagged scan becomes UNCERTAIN_REVIEW_REQUIRED instead of escalating.",
+  "flags": [
+   "cnn_yolo_conflict_<condition> (global_only calibrated p vs detector 'detected', only when that detector is available)",
+   "near_threshold_<condition>",
+   "ood",
+   "quality_<blocking flag>",
+   "quality_warning"
+  ],
+  "states": [
+   "FINDINGS_SUPPORTED",
+   "MULTIPLE_FINDINGS_SUPPORTED",
+   "NO_FINDINGS_SUPPORTED",
+   "UNCERTAIN_REVIEW_REQUIRED",
+   "RECAPTURE_REQUIRED",
+   "OUT_OF_SCOPE_REVIEW_REQUIRED",
+   "INFERENCE_ERROR"
+  ],
+  "normal_rule": "NO_FINDINGS_SUPPORTED only when all three conditions are 'absent' with absence supported (all detectors available), no flags and no blocking quality problem"
+ },
+ "quality": {
+  "thresholds": {
+   "min_side_px": 224,
+   "blur_laplacian_min": 40.0,
+   "dark_mean_max": 45.0,
+   "bright_mean_min": 215.0,
+   "over_exposed_frac_max": 0.08,
+   "under_exposed_frac_max": 0.2,
+   "uneven_lr_ratio_max": 0.35,
+   "glare_frac_max": 0.02,
+   "gray_world_dev_max": 0.25,
+   "jpeg_blockiness_max": 1.8,
+   "overlay_edge_frac_max": 0.12,
+   "face_required": true
+  },
+  "status": "provisional heuristics, unvalidated"
+ },
+ "ood": {
+  "file": "v6_ood_model.json",
+  "threshold": 14.743049920269426
+ },
+ "detectors": {
+  "source": "the 9 ONNX files installed in the WPF Model folder (3 per condition: <name>.onnx, _m2, _m3)",
+  "per_condition": {
+   "Acne": {
+    "imgsz": 800,
+    "deployed_threshold": 0.275,
+    "member_nms_iou": 0.6,
+    "ensemble_fusion_iou": 0.5,
+    "member_sha256": [
+     "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+     "f00c6e6bb3330b5574fb6e969e3d0cdc8037139fcf20767974d58121cacf4c92",
+     "6dfb0969cf5c0b987cfb31dfc6c002c90621dbc4a6b58619871b48edea9d88cb"
+    ],
+    "json_onnx_sha256_matches_primary_onnx": true
+   },
+   "Hyperpigmentation": {
+    "imgsz": 800,
+    "deployed_threshold": 0.225,
+    "member_nms_iou": 0.6,
+    "ensemble_fusion_iou": 0.5,
+    "member_sha256": [
+     "f27affb73061ddff8a2f27463a117a79b3eba97655dca7c2099409971918f501",
+     "ed821543c9bc84ff2f24960c8e932017f821f490c68c6f11c9b486607a72d63e",
+     "2a6fa1afa61f4eeed11d15f87421c9429c9de07864f0608bcdb5921ce205a165"
+    ],
+    "json_onnx_sha256_matches_primary_onnx": false
+   },
+   "Eczema": {
+    "imgsz": 640,
+    "deployed_threshold": 0.25,
+    "member_nms_iou": 0.6,
+    "ensemble_fusion_iou": 0.5,
+    "member_sha256": [
+     "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+     "8fbf857b316986f485a8fdb599866e8292ad7faffc32fc781c0b02596aea41fe",
+     "b5a6b50b9c50c1f8d5c47379d9317bb62cdc0af4ba0328280daa805de581fdde"
+    ],
+    "json_onnx_sha256_matches_primary_onnx": true
+   }
+  },
+  "member_floor": 0.02,
+  "candidate_pool_min_conf": 0.05,
+  "max_boxes_per_condition": 60,
+  "fused_confidence": "min(1, sum(conf)/members)",
+  "preprocessing": "letterbox to imgsz (pad 114, bilinear), RGB, /255, NCHW",
+  "face_filter_for_evidence": false,
+  "face_filter_note": "Training evidence was computed WITHOUT the face filter (CFG.YOLO_FACE_FILTER=False). The evidence builder must use unfiltered detections; the app's face filter may only affect what is drawn."
+ },
+ "evidence_vector": {
+  "layout": [
+   "available",
+   "detected",
+   "max_deployed_conf",
+   "max_pool_conf",
+   "sqrt_rel_area",
+   "cx",
+   "cy"
+  ],
+  "order": "Acne, Hyperpigmentation, Eczema (7 numbers each = 21)",
+  "unavailable_detector": "all 7 numbers zero, including available=0 (a missing detector is NOT 'no detection')"
+ },
+ "versions": {
+  "v5_onnx_sha256": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+  "yolo_config_hash": "ce6ae3186e771bfe",
+  "source_metadata": "astra_runs/open_run02/export/v6_model_metadata.json"
+ }
+}

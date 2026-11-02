@@ -125,6 +125,14 @@ namespace SkinDevApp.Views
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Summary of the scan", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
 
+            // V6 flag on and a saved V6 assessment: ONE unified assessment replaces the V5 classifier, its percentages and the separate detector lines
+            SkinDevApp.V6.V6SessionSummary v6 = SkinDevApp.V6.V6SessionSummary.For(_d);
+            if (v6 != null)
+            {
+                sp.Children.Add(SkinDevApp.V6.V6ResultsView.SummaryPanel(v6));
+                return Ui.Card(sp, new Thickness(0, 0, 0, 12));
+            }
+
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
                 sp.Children.Add(Ui.Text("No usable result for this scan.", 15, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
@@ -177,6 +185,7 @@ namespace SkinDevApp.Views
 
         private UIElement PerViewTable()
         {
+            if (SkinDevApp.V6.V6SessionSummary.For(_d) != null) return new StackPanel();    // V6: each photograph's reading is already in the summary above
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Reading of each photograph", 15, true));
             var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };

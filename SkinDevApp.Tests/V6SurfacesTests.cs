@@ -1,0 +1,164 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using SkinDevApp.Data;
+using SkinDevApp.Printing;
+using SkinDevApp.V6;
+using SkinDevApp.Views;
+using Xunit;
+
+namespace SkinDevApp.Tests
+{
+    /// <summary>
+    /// Unification tests: the wording, receipt block, report findings and agreement suggestion that replace the V5 classifier + separate detector text
+    /// when the V6 flag is on, and the guarantee that with the flag off (or for a scan saved without V6) nothing changes.
+    /// </summary>
+    [Collection("V6Flag")]
+    public class V6SurfacesTests
+    {
+        private static UnifiedAssessment Make(string state, string[] present, string[] flags = null, bool allDetectors = true)
+        {
+            var a = new UnifiedAssessment { State = state, RunId = "open_run02" };
+            a.Conditions = V6Conditions.Names.Select((n, i) => new ConditionAssessment
+            {
+                Condition = n, CalibratedProbability = present.Contains(n) ? 0.8 : 0.1, Threshold = 0.4, Status = present.Contains(n) ? ConditionStatus.Present : ConditionStatus.Absent,
+                AbsenceSupported = !present.Contains(n) && allDetectors, DetectorAvailable = allDetectors, DetectorFired = present.Contains(n)
+            }).ToArray();
+            if (flags != null) a.Flags.AddRange(flags);
+            foreach (string p in present) a.Boxes.Add(new V6Box { Condition = p, Confidence = 0.7f, X0 = 1, Y0 = 1, X1 = 9, Y1 = 9, Deployed = true });
+            return a;
+        }
+
+        private static Dictionary<string, UnifiedAssessment> Map(params KeyValuePair<string, UnifiedAssessment>[] items) => items.ToDictionary(k => k.Key, k => k.Value);
+        private static KeyValuePair<string, UnifiedAssessment> Kv(string k, UnifiedAssessment a) => new KeyValuePair<string, UnifiedAssessment>(k, a);
+
+        // ------------------------------------------------------------------ wording and summary
+        [Fact]
+        public void Condition_lines_and_state_headlines_are_plain_and_cautious()
+        {
+            UnifiedAssessment a = Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" });
+            Assert.Equal("Finding supported: Hyperpigmentation", V6Text.StateHeadline(a));
+            Assert.Contains("Hyperpigmentation: Present (AI support 80%, decision limit 40%; detector marked an area)", a.Conditions.Select(V6Text.ConditionLine));
+            Assert.Contains("Acne: Not found (AI support 10%, decision limit 40%; detector ran: nothing marked)", a.Conditions.Select(V6Text.ConditionLine));
+            Assert.Equal("Uncertain: review recommended", V6Text.StateHeadline(Make(V6States.UncertainReviewRequired, new string[0])));
+            Assert.Equal("The analysis could not be completed", V6Text.StateHeadline(UnifiedAssessment.Failed("x")));
+            Assert.Contains("not a diagnosis", V6Text.Disclaimer); Assert.Contains("dermatologist review", V6Text.DisclaimerShort);
+        }
+
+        [Fact]
+        public void Flags_are_explained_in_plain_language_and_an_unavailable_detector_is_stated()
+        {
+            UnifiedAssessment a = Make(V6States.UncertainReviewRequired, new string[0], new[] { "cnn_yolo_conflict_Acne", "ood", "quality_blur" }, allDetectors: false);
+            a.Reasons.Add("detector unavailable for Eczema (detector not installed)");
+            a.Reasons.Add("blocking quality: blur");                                     // the plain advice already covers it: the raw reason must not be repeated
+            string[] lines = V6Text.FlagLines(a).ToArray();
+            Assert.DoesNotContain(lines, l => l.ToLowerInvariant().StartsWith("blocking quality"));
+            Assert.Contains(lines, l => l.Contains("For Acne, the whole-photograph model and the lesion detector point different ways"));
+            Assert.Contains(lines, l => l.Contains("unlike the photographs the system was trained on"));
+            Assert.Contains(lines, l => l.Contains("retake") || l.Contains("refocus"));
+            Assert.Contains(lines, l => l.StartsWith("Detector unavailable for Eczema"));
+        }
+
+        [Fact]
+        public void Session_summary_reports_each_photograph_and_never_merges_them()
+        {
+            var map = Map(Kv("Front", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" })), Kv("Left", Make(V6States.UncertainReviewRequired, new string[0], new[] { "cnn_yolo_conflict_Eczema" })),
+                          Kv("Right", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" })));
+            V6SessionSummary s = V6SessionSummary.From(map, single: false);
+            Assert.False(s.Single); Assert.Equal(new[] { "Front", "Left", "Right" }, s.Views.Select(v => v.View).ToArray());
+            Assert.Equal("Unified AI assessment for each photograph: 1 of 3 need a closer look", s.Headline);
+            Assert.True(s.ReviewRecommended); Assert.Equal(new[] { "Hyperpigmentation" }, s.PresentUnion); Assert.False(s.AllNoFindings);
+            Assert.Contains(s.Notes, n => n.Contains("not merged")); Assert.Contains(s.Notes, n => n.Contains("do not all show the same findings"));
+            Assert.Equal("V6: Hyperpigmentation", s.ShortLabel);
+            Assert.Equal("Left view", s.Views[1].Label); Assert.Single(s.Views[1].FlagLines);
+        }
+
+        [Fact]
+        public void Single_photograph_summary_uses_the_state_headline_and_a_short_receipt_label()
+        {
+            Assert.Equal("V6: no findings", V6SessionSummary.From(Map(Kv("Single", Make(V6States.NoFindingsSupported, new string[0]))), true).ShortLabel);
+            V6SessionSummary two = V6SessionSummary.From(Map(Kv("Single", Make(V6States.MultipleFindingsSupported, new[] { "Acne", "Eczema" }))), true);
+            Assert.Equal("Several findings supported: Acne, Eczema", two.Headline); Assert.Equal("V6: Acne+Eczema", two.ShortLabel); Assert.False(two.ReviewRecommended);
+            Assert.Equal("V6: review required", V6SessionSummary.From(Map(Kv("Single", Make(V6States.UncertainReviewRequired, new string[0]))), true).ShortLabel);
+            Assert.Equal("V6: not completed", V6SessionSummary.From(Map(Kv("Single", UnifiedAssessment.Failed("x"))), true).ShortLabel);
+        }
+
+        // ------------------------------------------------------------------ receipt
+        [Fact]
+        public void Receipt_block_states_one_assessment_and_has_no_v5_classification_lines()
+        {
+            V6SessionSummary s = V6SessionSummary.From(Map(Kv("Single", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" }, allDetectors: true))), true);
+            foreach (bool final in new[] { false, true })
+            {
+                var w = new ReceiptWriter(32); V6ReceiptText.Append(w, s, final);
+                string text = string.Join("\n", w.Lines.Select(l => l.Text));
+                Assert.Contains(final ? "AI ASSESSMENT (ORIGINAL)" : "AI ASSESSMENT", text); Assert.Contains("Finding supported: Hyperpigmentation", text);
+                Assert.Contains("Hyperpigmentation: Present", text); Assert.Contains("Experimental", text); Assert.Contains("do not confirm a diagnosis", text);
+                Assert.DoesNotContain("Most resembles", text); Assert.DoesNotContain("similarity scores", text); Assert.DoesNotContain("Lesion detectors (separate)", text);
+                Assert.Equal(final, text.Contains("Shown exactly as the AI saved it"));
+            }
+        }
+
+        // ------------------------------------------------------------------ report findings
+        private static SessionDetail Session(string mode, string folder) => new SessionDetail
+        {
+            Session = new ScanSessionRow { ScanMode = mode },
+            Views = new List<CaptureViewRow> { new CaptureViewRow { ViewType = "Single", RecordFolder = folder } }
+        };
+
+        [Fact]
+        public void Report_findings_use_the_v6_assessment_when_the_flag_is_on_and_do_not_when_it_is_off()
+        {
+            Func<bool> keep = V6FeatureFlag.Provider; string dir = Path.Combine(Path.GetTempPath(), "v6rep_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);
+            try
+            {
+                V6Archive.Write(dir, Make(V6States.UncertainReviewRequired, new[] { "Acne" }, new[] { "cnn_yolo_conflict_Eczema" }), null, null);
+                V6FeatureFlag.Provider = () => true;
+                ReportFindings f = ReportFindings.Build(Session("Single", dir));
+                Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside a V6 result
+                Assert.Contains(f.Lines, l => l.StartsWith("Unified AI assessment (experimental): Uncertain: review recommended"));
+                Assert.Contains(f.Lines, l => l.Contains("Acne: Present")); Assert.Contains(f.Lines, l => l.Contains("dermatologist review"));
+                Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("For Eczema, the whole-photograph model and the lesion detector point different ways"));
+                Assert.Null(f.Interpretation);                                                                              // the V5 interpretation is not built
+                V6FeatureFlag.Provider = () => false;
+                ReportFindings off = ReportFindings.Build(Session("Single", dir));
+                Assert.Null(off.V6); Assert.False(off.HasResult); Assert.Contains("No view produced a usable AI result", off.Lines[0]);   // original behaviour
+            }
+            finally { V6FeatureFlag.Provider = keep; Directory.Delete(dir, true); }
+        }
+
+        // ------------------------------------------------------------------ researcher agreement suggestion
+        [Fact]
+        public void Agreement_suggestion_compares_the_reviewer_with_the_v6_assessment()
+        {
+            V6SessionSummary acne = V6SessionSummary.From(Map(Kv("Single", Make(V6States.FindingsSupported, new[] { "Acne" }))), true);
+            V6SessionSummary both = V6SessionSummary.From(Map(Kv("Single", Make(V6States.MultipleFindingsSupported, new[] { "Acne", "Eczema" }))), true);
+            V6SessionSummary normal = V6SessionSummary.From(Map(Kv("Single", Make(V6States.NoFindingsSupported, new string[0]))), true);
+            V6SessionSummary unsure = V6SessionSummary.From(Map(Kv("Single", Make(V6States.UncertainReviewRequired, new string[0]))), true);
+            Assert.Null(V6Agreement.Suggest(new string[0], acne));
+            Assert.Equal("Agree", V6Agreement.Suggest(new[] { "Acne" }, acne)); Assert.Equal("Disagree", V6Agreement.Suggest(new[] { "Eczema" }, acne));
+            Assert.Equal("Partially agree", V6Agreement.Suggest(new[] { "Acne" }, both)); Assert.Equal("Agree", V6Agreement.Suggest(new[] { "Eczema", "Acne" }, both));
+            Assert.Equal("Agree", V6Agreement.Suggest(new[] { "Normal" }, normal)); Assert.Equal("Disagree", V6Agreement.Suggest(new[] { "Acne" }, normal));
+            Assert.Equal("Disagree", V6Agreement.Suggest(new[] { "Normal" }, acne));
+            Assert.Equal("Uncertain", V6Agreement.Suggest(new[] { "Acne" }, unsure));                                       // the AI did not decide: nothing to agree with
+            Assert.Equal("Uncertain", V6Agreement.Suggest(new[] { "Other / uncertain" }, acne)); Assert.Equal("Uncertain", V6Agreement.Suggest(new[] { "Unusable image" }, normal));
+        }
+
+        [Fact]
+        public void Summary_is_null_when_the_flag_is_off_or_the_scan_has_no_v6_files()
+        {
+            Func<bool> keep = V6FeatureFlag.Provider; string dir = Path.Combine(Path.GetTempPath(), "v6sum_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);
+            try
+            {
+                V6Archive.Write(dir, Make(V6States.FindingsSupported, new[] { "Acne" }), null, null);
+                V6FeatureFlag.Provider = () => false; Assert.Null(V6SessionSummary.For(Session("Single", dir)));            // flag off: every screen shows what it always showed
+                V6FeatureFlag.Provider = () => true;
+                string empty = Path.Combine(dir, "older_scan"); Directory.CreateDirectory(empty);
+                Assert.Null(V6SessionSummary.For(Session("Single", empty)));                                                // older scan, no V6 file: unchanged
+                Assert.NotNull(V6SessionSummary.For(Session("Single", dir)));
+            }
+            finally { V6FeatureFlag.Provider = keep; Directory.Delete(dir, true); }
+        }
+    }
+}

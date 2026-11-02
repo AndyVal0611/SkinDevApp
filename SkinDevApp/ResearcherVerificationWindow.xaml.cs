@@ -66,6 +66,24 @@ namespace SkinDevApp
 
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("What the computer found (read-only)", 16, true));
+            SkinDevApp.V6.V6SessionSummary v6 = SkinDevApp.V6.V6SessionSummary.For(_d);    // V6 flag on and a saved V6 assessment: one unified assessment instead of the V5 classifier
+            if (v6 != null)
+            {
+                sp.Children.Add(SkinDevApp.V6.V6ResultsView.SummaryPanel(v6));
+                var photos = new UniformGrid { Columns = Math.Max(1, _d.Views.Count), Margin = new Thickness(0, 10, 0, 0) };
+                foreach (CaptureViewRow pv in _d.Views)
+                {
+                    var pc = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
+                    pc.Children.Add(Ui.Text(pv.ViewType, 12.5, true));
+                    Border pt = Ui.Thumb(SkinDevApp.V6.V6ResultsView.MarkedAreasPath(pv) ?? pv.AnalysedImagePath ?? pv.OriginalImagePath, 120, "#E5E7EB");
+                    pt.Cursor = System.Windows.Input.Cursors.Hand; pt.ToolTip = "Open the original image";
+                    string pOriginal = pv.OriginalImagePath; pt.MouseLeftButtonUp += (o, e) => OpenFile(pOriginal);
+                    pc.Children.Add(pt); photos.Children.Add(pc);
+                }
+                sp.Children.Add(photos);
+            }
+            else
+            {
             sp.Children.Add(Ui.InfoRows(new[]
             {
                 Ui.KV("Overall result", s.OverallPredictedClass == null ? "No usable result" : ClinicalText.Name(s.OverallPredictedClass) + " — " + ClinicalText.Strength(s.OverallScore ?? 0) + " match (" + s.ScoreText + ")"),
@@ -94,6 +112,7 @@ namespace SkinDevApp
                 row.Children.Add(col);
             }
             sp.Children.Add(row);
+            }
 
             var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
             bool hasFolder = !string.IsNullOrEmpty(s.SessionFolder) && System.IO.Directory.Exists(s.SessionFolder);
@@ -105,7 +124,7 @@ namespace SkinDevApp
             buttons.Children.Add(folder);
             sp.Children.Add(buttons);
 
-            sp.Children.Add(Ui.Text(ClinicalText.HowToReadScores, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
+            if (v6 == null) sp.Children.Add(Ui.Text(ClinicalText.HowToReadScores, 10.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
             AiColumn.Children.Add(Ui.Card(sp));
         }
 
@@ -154,6 +173,8 @@ namespace SkinDevApp
         /// <summary>Suggested agreement from the chosen labels vs the AI's overall class (the user can change it).</summary>
         private string SuggestAgreement(List<string> labels)
         {
+            SkinDevApp.V6.V6SessionSummary v6s = SkinDevApp.V6.V6SessionSummary.For(_d);       // V6 flag on: compare with the unified assessment, not the V5 class
+            if (v6s != null) return SkinDevApp.V6.V6Agreement.Suggest(labels, v6s);
             string ai = _d.Session.OverallPredictedClass;
             if (labels.Count == 0 || ai == null) return null;
             if (labels.Count == 1 && labels[0] == ai) return "Agree";

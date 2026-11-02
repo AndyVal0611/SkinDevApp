@@ -90,7 +90,7 @@ namespace SkinDevApp.Printing
             var st = new ReceiptState();
             ScanSessionRow s = d.Session;
             if (!s.Finalized) st.NotSavedReason = "The scan is still being saved. Receipts become available once it is finished.";
-            else if (string.IsNullOrEmpty(s.OverallPredictedClass)) st.NotSavedReason = "No AI result was saved for this scan, so there is nothing to print.";
+            else if (string.IsNullOrEmpty(s.OverallPredictedClass) && SkinDevApp.V6.V6SessionSummary.For(d) == null) st.NotSavedReason = "No AI result was saved for this scan, so there is nothing to print.";
             st.Saved = st.NotSavedReason == null;
 
             // Validations are newest first: the latest COMPLETED assessment is the one a final receipt reflects
@@ -146,6 +146,7 @@ namespace SkinDevApp.Printing
             ScanSessionRow s = d.Session;
             bool final = type == ReceiptKinds.Final;
             int width = Math.Max(24, Math.Min(48, ps.CharsPerLine));
+            SkinDevApp.V6.V6SessionSummary v6 = SkinDevApp.V6.V6SessionSummary.For(d);     // null unless the V6 flag is on and this scan has a saved V6 assessment
             var draft = new ReceiptDraft
             {
                 ScanSessionID = s.ScanSessionID,
@@ -153,7 +154,7 @@ namespace SkinDevApp.Printing
                 ReceiptType = type,
                 ReviewStatus = final ? "Completed" : "Pending",
                 ValidationID = final ? st.Review.ValidationID : (long?)null,
-                AIClass = s.OverallPredictedClass,
+                AIClass = v6 != null ? v6.ShortLabel : s.OverallPredictedClass,
                 Width = width,
                 Styles = ps.Styles
             };
@@ -172,6 +173,9 @@ namespace SkinDevApp.Printing
             draft.Head = h.Lines;
 
             var b = new ReceiptWriter(width);
+            if (v6 != null) SkinDevApp.V6.V6ReceiptText.Append(b, v6, final);      // V6 flag on: one unified assessment replaces the V5 classifier and the separate detector lines
+            else
+            {
             b.Rule();
             b.Heading(final ? "AI CLASSIFICATION (ORIGINAL)" : "AI CLASSIFICATION");
             b.Pair("Most resembles", Plain(s.OverallPredictedClass).ToUpperInvariant());
@@ -186,6 +190,7 @@ namespace SkinDevApp.Printing
             if (final) b.Text("Shown exactly as the AI saved it. The review below does not change it.");
 
             ReceiptInterpretation.Append(b, SessionInterpretation.For(d));
+            }
 
             b.Rule();
             b.Heading("DERMATOLOGIST REVIEW");

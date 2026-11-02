@@ -20,6 +20,12 @@
     <Compile Include="..\SkinDevApp\LesionDetector.cs" Link="Linked\LesionDetector.cs" />
     <Compile Include="..\SkinDevApp\ClassPalette.cs" Link="Linked\ClassPalette.cs" />
     <Compile Include="..\SkinDevApp\DetectionDiagnostics.cs" Link="Linked\DetectionDiagnostics.cs" />
+    <!-- V6 unified assessment (feature flag off by default); fixtures come from v6/deployment -->
+    <Compile Include="..\SkinDevApp\V6\*.cs" Link="Linked\V6\%(Filename)%(Extension)" />
+    <None Include="..\v6\deployment\v6_test_vectors.json" Link="v6deploy\v6_test_vectors.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\v6\deployment\v6_deployment_config.json" Link="v6deploy\v6_deployment_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\v6\deployment\v6_ood_model.json" Link="v6deploy\v6_ood_model.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\v6\deployment\v6_real_photo_golden.json" Link="v6deploy\v6_real_photo_golden.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

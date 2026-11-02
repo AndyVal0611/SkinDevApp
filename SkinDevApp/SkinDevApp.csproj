@@ -255,6 +255,21 @@
       <DependentUpon>ResearcherVerificationWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ScanPipeline.cs" />
+    <Compile Include="V6\V6Types.cs" />
+    <Compile Include="V6\V6Config.cs" />
+    <Compile Include="V6\DetectorEvidence.cs" />
+    <Compile Include="V6\V6Decision.cs" />
+    <Compile Include="V6\V6Inference.cs" />
+    <Compile Include="V6\V6FeatureFlag.cs" />
+    <Compile Include="V6\V6QualityMapper.cs" />
+    <Compile Include="V6\V6Archive.cs" />
+    <Compile Include="V6\V6SessionLoader.cs" />
+    <Compile Include="V6\V6Text.cs" />
+    <Compile Include="V6\V6Agreement.cs" />
+    <Compile Include="V6\V6SessionSummary.cs" />
+    <Compile Include="V6\V6ReceiptText.cs" />
+    <Compile Include="V6App\V6Service.cs" />
+    <Compile Include="V6App\V6ResultsView.cs" />
     <Compile Include="ScanStateMachine.cs" />
     <Compile Include="ScanView.cs" />
     <Compile Include="ViewPoseEstimator.cs" />
@@ -363,6 +378,12 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <!-- V6 unified assessment models and deployment files (used only when the V6 feature flag is on; V5 files above are untouched) -->
+    <None Include="Model\V6\v6_deployment_config.json" Condition="Exists('Model\V6\v6_deployment_config.json')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_ood_model.json" Condition="Exists('Model\V6\v6_ood_model.json')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_global_features_mobilenetv2.onnx" Condition="Exists('Model\V6\v6_global_features_mobilenetv2.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_fusion_global_yolo_seed42.onnx" Condition="Exists('Model\V6\v6_fusion_global_yolo_seed42.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="Model\V6\v6_fusion_global_only_seed42.onnx" Condition="Exists('Model\V6\v6_fusion_global_only_seed42.onnx')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="Model\precisionskin.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

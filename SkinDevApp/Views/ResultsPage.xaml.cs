@@ -18,6 +18,10 @@ namespace SkinDevApp.Views
         private readonly string _sessionId;
         private SessionDetail _d;
 
+        // V6 unified assessment (feature flag, default OFF): saved V6 results by view, or null -> the screen behaves exactly as before
+        private Dictionary<string, SkinDevApp.V6.UnifiedAssessment> _v6;
+        private List<string> _v6Problems = new List<string>();
+
         // per-view image holders, so the view toggle (Original / Grad-CAM++ / Localization / Combined) can swap the picture
         private readonly List<KeyValuePair<CaptureViewRow, Border>> _viewThumbs = new List<KeyValuePair<CaptureViewRow, Border>>();
         private string _viewMode = "Original";
@@ -57,7 +61,8 @@ namespace SkinDevApp.Views
                                "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (_d.Model != null ? _d.Model.ShortLabel : "Unknown model") +
                                "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalised)");
 
-            MainColumn.Children.Add(OverallCard());
+            _v6 = SkinDevApp.V6.V6ResultsView.Load(_d, out _v6Problems);
+            MainColumn.Children.Add(_v6 != null ? SkinDevApp.V6.V6ResultsView.OverallCard(_d, _v6, _v6Problems) : OverallCard());
             MainColumn.Children.Add(PerViewCard());
             BuildSide();
         }
@@ -130,6 +135,7 @@ namespace SkinDevApp.Views
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
             foreach (string mode in new[] { "Original", "Grad-CAM++", "Localization", "Combined" })
             {
+                if (_v6 != null && (mode == "Grad-CAM++" || mode == "Combined")) continue;   // V6 view: the heat map explains the V5 classifier, so it is not shown beside a V6 result
                 var rb = new RadioButton
                 {
                     Content = mode == "Grad-CAM++" ? "Heat map" : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
@@ -160,7 +166,13 @@ namespace SkinDevApp.Views
                 col.Children.Add(thumb);
                 if (v != null) _viewThumbs.Add(new KeyValuePair<CaptureViewRow, Border>(v, thumb));
 
-                if (v?.Scores != null)
+                if (_v6 != null)
+                {
+                    SkinDevApp.V6.UnifiedAssessment v6a;
+                    if (_v6.TryGetValue(v?.ViewType ?? name, out v6a)) col.Children.Add(SkinDevApp.V6.V6ResultsView.ViewColumn(v6a));
+                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No V6 assessment was saved for this photograph.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
+                }
+                else if (v?.Scores != null)
                 {
                     ViewReading rd = ClinicalText.Readings(_d).First(x => x.View == v.ViewType);
                     col.Children.Add(Ui.Text(ClinicalText.Top(rd), 13, true,
@@ -185,6 +197,7 @@ namespace SkinDevApp.Views
                 grid.Children.Add(col);
             }
             sp.Children.Add(grid);
+            if (_v6 == null)   // the V6 card carries its own wording (Disclaimer); the V5 note compares the classifier bars with box confidence
                         sp.Children.Add(Ui.Text("Marked areas are places that may contain lesions (acne red, hyperpigmentation blue, eczema orange). " +
                                     "Some lesions may be missed or mislabelled, so the boxes are not a lesion count, not a measure of severity and not a diagnosis. " +
                                     "Box confidence (detector) and the percentage bars (classifier) are different measures and are not comparable.",
@@ -203,6 +216,7 @@ namespace SkinDevApp.Views
                     AttributionMapRow map = v.Maps.FirstOrDefault(x => x.TargetClass == pred);
                     return map != null ? map.OverlayPath : null;
                 case "Localization":
+                    if (_v6 != null) return SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v);       // the V6 picture: boxes that supported the unified assessment
                     return v.Localization != null && v.Localization.Status == "OK" ? v.Localization.OverlayPath : null;
                 case "Combined":
                     return v.Localization != null && v.Localization.Status == "OK" ? v.Localization.CombinedPath : null;

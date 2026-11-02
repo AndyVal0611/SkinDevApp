@@ -203,7 +203,9 @@ namespace SkinDevApp.Views
                 SummaryBody(),
                 OriginalsBody()
             };
-            if (_d.Views.Any(v => v.Localization != null && v.Localization.Status == "OK"))
+            if (_f.V6 != null)
+                bodies.Add(V6MarkedAreasBody());         // V6 flag on: the boxes that supported the unified assessment
+            else if (_d.Views.Any(v => v.Localization != null && v.Localization.Status == "OK"))
                 bodies.Add(LocalizationBody());          // candidate lesion boxes (separate detector), same frames
             bodies.AddRange(EvidenceBodies());
             bodies.Add(FormBody(true));      // licensed dermatologist first
@@ -315,6 +317,22 @@ namespace SkinDevApp.Views
             sp.Children.Add(two);
             sp.Children.Add(Rule(10, 0));
 
+            if (_f.V6 != null)
+            {
+                // V6 flag on: ONE unified assessment replaces the V5 classification, class bars and per-view score table
+                sp.Children.Add(Heading("Unified AI assessment (experimental)"));
+                sp.Children.Add(T(_f.V6.Headline, 13, true, Navy, 4));
+                foreach (SkinDevApp.V6.V6ViewSummary v6v in _f.V6.Views)
+                {
+                    sp.Children.Add(T(v6v.Label + ": " + v6v.Headline, 9.5, true, TextInk, 2));
+                    foreach (string cl in v6v.ConditionLines) sp.Children.Add(T("   " + cl, 8.5, false, TextInk, 1));
+                    sp.Children.Add(T("   " + v6v.BoxesLine, 8, false, Muted, 4));
+                }
+                foreach (string n6 in _f.V6.Notes) sp.Children.Add(T(n6, 8.5, false, Muted, 2));
+                sp.Children.Add(T(_f.V6.Disclaimer, 7.5, false, Muted, 4));
+            }
+            else
+            {
             // overall result
             sp.Children.Add(Heading(s.ScanMode == "Single" ? "AI result" : "Overall multi-view AI result"));
             var res = new Grid();
@@ -383,10 +401,11 @@ namespace SkinDevApp.Views
                 }
                 sp.Children.Add(g);
             }
+            }
 
             // status
             sp.Children.Add(Heading("Consistency and review status"));
-            if (s.ScanMode != "Single")
+            if (_f.V6 == null && s.ScanMode != "Single")
             {
                 if (_f.ReviewRecommended)
                 {
@@ -403,6 +422,7 @@ namespace SkinDevApp.Views
                 foreach (string flag in _f.Flags) w.Children.Add(T("•  " + flag, 8.5, false, WarnInk, 2));
                 sp.Children.Add(Panel(w, WarnBg, WarnLine, 8));
             }
+            else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised by the unified assessment. Every assessment still waits for dermatologist review.", 8.5, false, TextInk, 2));
 
             ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
@@ -421,7 +441,7 @@ namespace SkinDevApp.Views
                 Children =
                 {
                     T("Research prototype disclaimer", 8.5, true, Navy, 2),
-                    T(StudyText.PrototypeNotice + " " + StudyText.ScoresNote + " " + StudyText.AttributionNote, 8, false, TextInk, 0)
+                    T(StudyText.PrototypeNotice + " " + (_f.V6 != null ? SkinDevApp.V6.V6Text.Disclaimer : StudyText.ScoresNote + " " + StudyText.AttributionNote), 8, false, TextInk, 0)
                 }
             }));
             if (m != null && !string.IsNullOrEmpty(m.OnnxSha256))
@@ -465,7 +485,14 @@ namespace SkinDevApp.Views
             string path = v == null ? null : (!string.IsNullOrEmpty(v.OriginalImagePath) && System.IO.File.Exists(v.OriginalImagePath) ? v.OriginalImagePath : v.AnalysedImagePath);
             cell.Children.Add(ImageBox(path, v == null ? viewName + " view was not captured" : "image not available on disk", imgH));
             cell.Children.Add(T(viewName == "Single" ? "Captured image" : viewName + " View", 9.5, true, Navy, 1));
-            if (v?.Scores != null)
+            if (_f.V6 != null)
+            {
+                // V6 flag on: no V5 predicted class or Model Class Score under the photograph, only the capture quality and the unified headline
+                if (v != null && !string.IsNullOrEmpty(v.QualityStatus)) cell.Children.Add(T("Capture quality: " + v.QualityStatus, 8.5, false, v.QualityStatus == "Good" ? TextInk : WarnInk, 1));
+                SkinDevApp.V6.V6ViewSummary vs = _f.V6.Views.FirstOrDefault(x => x.View == (v?.ViewType ?? viewName));
+                cell.Children.Add(T(vs != null ? vs.Headline : "No V6 assessment was saved for this photograph", 8.5, false, vs != null && vs.ReviewRequired ? WarnInk : TextInk, 0));
+            }
+            else if (v?.Scores != null)
             {
                 string q = v.QualityStatus ?? "—";
                 cell.Children.Add(T("Capture quality: " + q, 8.5, false, q == "Good" ? TextInk : WarnInk, 1));
@@ -578,6 +605,47 @@ namespace SkinDevApp.Views
             return sp;
         }
 
+        private FrameworkElement V6MarkedAreasBody()
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(T("Marked Areas (Unified AI Assessment)", 17, true, Navy, 0));
+            sp.Children.Add(T("Possible lesion locations that supported the unified assessment, on the frame that was analysed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+
+            var cells = new List<FrameworkElement>();
+            foreach (SkinDevApp.V6.V6ViewSummary vs in _f.V6.Views)
+            {
+                CaptureViewRow v = _d.View(vs.View) ?? _d.Views.FirstOrDefault();
+                var cell = new StackPanel { Width = ImgW };
+                cell.Children.Add(ImageBox(SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), "marked-areas image not available", OriginalH, "#6B7280"));
+                cell.Children.Add(T(vs.View == "Single" ? "Captured image" : vs.Label, 9.5, true, Navy, 1));
+                cell.Children.Add(T(vs.BoxesLine, 8.5, false, TextInk, 0));
+                cells.Add(cell);
+            }
+            var note = new StackPanel();
+            note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
+            note.Children.Add(T("•  Candidate locations only: not lesion segmentation, not a diagnosis, not a lesion count.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  Lesions can be missed and boxes can be wrong. Eczema is a pilot class (smallest training set).", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  The detector boxes are one input of the unified assessment (the model also weighs the whole photograph). A missing box is never treated as proof that a condition is absent.", 8.5, false, TextInk, 4));
+            var nb = Panel(note, PanelBg, null, 10);
+            nb.Width = ImgW; nb.VerticalAlignment = VerticalAlignment.Top; nb.MinHeight = OriginalH;
+            cells.Add(nb);
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (i % 2 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                cells[i].Margin = new Thickness(0, 0, 0, 12);
+                Grid.SetRow(cells[i], i / 2);
+                Grid.SetColumn(cells[i], i % 2 == 0 ? 0 : 2);
+                grid.Children.Add(cells[i]);
+            }
+            sp.Children.Add(grid);
+            return sp;
+        }
+
         private FrameworkElement FindingsBox()
         {
             var sp = new StackPanel();
@@ -596,6 +664,7 @@ namespace SkinDevApp.Views
         private List<FrameworkElement> EvidenceBodies()
         {
             var pages = new List<FrameworkElement>();
+            if (_f.V6 != null) return pages;       // V6 flag on: the Grad-CAM++ pages explain the V5 classifier, so they are not part of the unified report
             List<EvidenceItem> items = _f.Evidence;
 
             if (items.Count == 0)
@@ -750,7 +819,7 @@ namespace SkinDevApp.Views
                 Ui.KV("Patient ID", FirstUnlinked(s)),
                 Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Date / time of scan", s.StartedAt),
-                Ui.KV("AI result (for reference)", (s.OverallPredictedClass == null ? "no usable result" : Lbl(s.OverallPredictedClass)) + (s.OverallScore.HasValue ? "  (" + s.ScoreText + ")" : ""))
+                Ui.KV("AI result (for reference)", _f.V6 != null ? _f.V6.Headline : (s.OverallPredictedClass == null ? "no usable result" : Lbl(s.OverallPredictedClass)) + (s.OverallScore.HasValue ? "  (" + s.ScoreText + ")" : ""))
             }, 130, 9));
             sp.Children.Add(Rule(4, 6));
             sp.Children.Add(T(dermatologist

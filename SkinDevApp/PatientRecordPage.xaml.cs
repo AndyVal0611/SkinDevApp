@@ -220,11 +220,13 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            string overall = string.IsNullOrEmpty(s.OverallPredictedClass) ? "No result"
+            SkinDevApp.V6.V6SessionSummary v6l = null;      // V6 flag on and a saved V6 assessment: one unified assessment instead of the V5 class and match strength
+            if (SkinDevApp.V6.V6FeatureFlag.IsEnabled) { try { v6l = SkinDevApp.V6.V6SessionSummary.For(StudyRepository.GetSessionDetail(s.ScanSessionID)); } catch { v6l = null; } }
+            string overall = v6l != null ? v6l.Headline : string.IsNullOrEmpty(s.OverallPredictedClass) ? "No result"
                 : ClinicalText.Name(s.OverallPredictedClass) + (s.OverallScore.HasValue ? " — " + ClinicalText.Strength(s.OverallScore.Value) + " match" : "");
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("Overall result", overall), Ui.KV("Match strength", s.OverallScore.HasValue ? s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%" : "—") }, 120, 12.5),
+                Ui.InfoRows(new[] { Ui.KV("Overall result", overall), v6l != null ? Ui.KV("Review", v6l.ReviewRecommended ? "Recommended" : "No flags raised") : Ui.KV("Match strength", s.OverallScore.HasValue ? s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%" : "—") }, 120, 12.5),
                 Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", s.ModelLabel) }, 100, 12.5)));
             return Ui.Card(sp);
         }
@@ -538,7 +540,8 @@ namespace SkinDevApp
 
             List<ViewReading> readings = ClinicalText.Readings(d);
             bool single = s.ScanMode == "Single";
-            string overall = string.IsNullOrEmpty(s.OverallPredictedClass) ? "No usable result"
+            SkinDevApp.V6.V6SessionSummary v6 = SkinDevApp.V6.V6SessionSummary.For(d);     // V6 flag on and a saved V6 assessment: one unified assessment instead of the V5 classifier
+            string overall = v6 != null ? v6.Headline : string.IsNullOrEmpty(s.OverallPredictedClass) ? "No usable result"
                 : ClinicalText.Name(s.OverallPredictedClass) + (s.OverallScore.HasValue
                     ? " — " + ClinicalText.Strength(s.OverallScore.Value) + " match (" + s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%)" : "");
 
@@ -556,6 +559,12 @@ namespace SkinDevApp
                 Ui.KV("Researcher notes", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
                 Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + dv.ValidationStatus.ToLowerInvariant())
             }, 160, 12.5));
+
+            if (v6 != null)
+            {
+                sp.Children.Add(SkinDevApp.V6.V6ResultsView.SummaryPanel(v6));
+                return Ui.Card(sp);
+            }
 
             string headline, detail; int level;
             ClinicalText.Agreement(readings, single, out headline, out detail, out level);

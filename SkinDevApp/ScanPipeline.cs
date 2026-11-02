@@ -78,6 +78,14 @@ namespace SkinDevApp.Scanning
                     }
                 }
 
+                // ---- V6 unified assessment (feature flag V6FeatureFlag, default OFF): same frozen frame, saved next to record.json, never changes the V5 outputs above ----
+                SkinDevApp.V6.UnifiedAssessment v6 = null;
+                if (SkinDevApp.V6.V6FeatureFlag.IsEnabled)
+                {
+                    try { v6 = await Task.Run(() => SkinDevApp.V6.V6Service.Assess(req.Working, req.Quality, req.Trigger == "upload")).ConfigureAwait(false); }
+                    catch (Exception v6ex) { v6 = SkinDevApp.V6.UnifiedAssessment.Failed(v6ex.GetType().Name + ": " + v6ex.Message); }
+                }
+
                 CaptureRecord record = null;
                 ClassHeatmapSet setForSave = set;
                 string err = gradcamError;
@@ -89,6 +97,13 @@ namespace SkinDevApp.Scanning
                     record = rec;
                     return f;
                 }).ConfigureAwait(false);
+
+                if (v6 != null)
+                {
+                    try { SkinDevApp.V6.V6Archive.Write(folder, v6, req.Working, req.Quality != null ? req.Quality.FaceBox : (Rect?)null); }
+                    catch (Exception wex) { v6.Reasons.Add("the V6 assessment could not be saved: " + wex.Message); }
+                    result.V6 = v6;
+                }
 
                 result.Maps = set;
                 result.Detections = det;

@@ -1,0 +1,60 @@
+{
+ "created": "2026-11-02T18:36:33",
+ "purpose": "Supersedes the pass/fail flags in v6_keras_vs_onnx_verification.json, which compared Keras on the GPU with ONNX on the CPU. This record compares CPU with CPU.",
+ "versions": {
+  "tensorflow": "2.21.0",
+  "onnxruntime": "1.30.0",
+  "numpy": "2.5.3"
+ },
+ "files": {
+  "global_features": {
+   "path": "v6/astra_runs/open_run02/export/v6_global_features_mobilenetv2.onnx",
+   "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4"
+  },
+  "fusion_global_yolo": {
+   "path": "v6/astra_runs/open_run02/export/v6_fusion_global_yolo_seed42.onnx",
+   "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97"
+  },
+  "fusion_global_only": {
+   "path": "v6/astra_runs/open_run02/export/v6_fusion_global_only_seed42.onnx",
+   "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a"
+  }
+ },
+ "tolerance_logits": 0.0001,
+ "fusion_global_yolo": {
+  "method": "400 inputs: real Global embeddings/logits from the run, synthetic detector evidence (unavailable / no box / detected), ROI inputs zero",
+  "max_abs_logit_diff": 1.9073486328125e-06,
+  "max_abs_probability_diff": 1.634481672230237e-07,
+  "decisions_compared": 1200,
+  "decisions_flipped": 0,
+  "within_tolerance": true
+ },
+ "global_features": {
+  "source": "export/v6_global_features_parity_check.csv (notebook follow-up, 160 real validation photos)",
+  "rows": [
+   {
+    "pair": "Keras GPU vs Keras CPU",
+    "max_abs_diff_embedding": "0.05240654945373535",
+    "max_abs_diff_logits": "0.0695643424987793",
+    "decisions_flipped_at_0_5": "0",
+    "decisions_flipped_at_tuned_thresholds": "1"
+   },
+   {
+    "pair": "Keras CPU vs ONNX CPU",
+    "max_abs_diff_embedding": "4.470348358154297e-05",
+    "max_abs_diff_logits": "5.459785461425781e-05",
+    "decisions_flipped_at_0_5": "0",
+    "decisions_flipped_at_tuned_thresholds": "0"
+   },
+   {
+    "pair": "Keras GPU vs ONNX CPU",
+    "max_abs_diff_embedding": "0.05243659019470215",
+    "max_abs_diff_logits": "0.06959915161132812",
+    "decisions_flipped_at_0_5": "0",
+    "decisions_flipped_at_tuned_thresholds": "1"
+   }
+  ],
+  "note": "Keras CPU vs ONNX CPU row is the deployment-relevant one; GPU rows show GPU numeric noise."
+ },
+ "conclusion": "CPU Keras and CPU ONNX agree within tolerance for the Global features model and the global_yolo fusion; the earlier 'outside tolerance' flag was GPU-vs-CPU numeric noise."
+}

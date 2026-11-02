@@ -76,6 +76,8 @@ namespace SkinDevApp.Scanning
         public ClassHeatmapSet Maps { get; set; }
         /// <summary>Candidate lesion boxes from the separate detector (null when disabled or unavailable).</summary>
         public SkinDevApp.AI.LesionDetectionSet Detections { get; set; }
+        /// <summary>V6 unified assessment (null unless the V6 feature flag was on for this scan).</summary>
+        public SkinDevApp.V6.UnifiedAssessment V6 { get; set; }
         public CaptureRecord Record { get; set; }
         public string Folder { get; set; }
 

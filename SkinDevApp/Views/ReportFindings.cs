@@ -60,6 +60,9 @@ namespace SkinDevApp.Views
         /// <summary>How the classifier and the separate detectors relate (same object the Results page and receipt use). Never stored.</summary>
         public ScanInterpretation Interpretation { get; private set; }
 
+        /// <summary>Saved V6 unified assessment (null unless the V6 flag is on and the scan has one). When set, the findings are the V6 ones and no Grad-CAM++ evidence is selected.</summary>
+        public SkinDevApp.V6.V6SessionSummary V6 { get; private set; }
+
         public static string Label(string cls) => cls == "Normal" ? "Normal Skin" : cls;
 
         private static double Score(CaptureViewRow v, string cls) =>
@@ -74,6 +77,26 @@ namespace SkinDevApp.Views
             f.Single = s.ScanMode == "Single";
             f.OverallClass = s.OverallPredictedClass;
             f.OverallScore = s.OverallScore;
+
+            f.V6 = SkinDevApp.V6.V6SessionSummary.For(d);
+            if (f.V6 != null)
+            {
+                // V6 flag on: the report states the one unified assessment; the V5 classifier lines and the Grad-CAM++ attribution pages are not part of it
+                f.HasResult = true;
+                f.Lines.Add("Unified AI assessment (experimental): " + f.V6.Headline + ".");
+                foreach (SkinDevApp.V6.V6ViewSummary v in f.V6.Views)
+                {
+                    f.Lines.Add(v.Label + ": " + v.Headline);
+                    foreach (string c in v.ConditionLines) f.Lines.Add("   " + c);
+                    f.Lines.Add("   " + v.BoxesLine);
+                    foreach (string flag in v.FlagLines) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + flag);
+                    if (v.ReviewRequired && v.FlagLines.Count == 0) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + v.Headline + ".");
+                }
+                foreach (string n in f.V6.Notes) f.Lines.Add(n);
+                foreach (string p in f.V6.Problems) f.Flags.Add(p);
+                f.Lines.Add(SkinDevApp.V6.V6Text.DisclaimerShort);
+                return f;
+            }
 
             List<CaptureViewRow> views = d.Views.Where(v => v.Scores != null).ToList();
             f.HasResult = f.OverallClass != null && views.Count > 0;
