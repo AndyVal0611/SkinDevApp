@@ -1,0 +1,21 @@
+{
+  "synthetic_only": true,
+  "scratch": "/tmp/astra_SYNTHETIC_SETUP_umm7ix86",
+  "status": "PASS",
+  "cells": [
+    2,
+    10,
+    11,
+    12,
+    13,
+    15,
+    16,
+    18,
+    19,
+    20
+  ],
+  "gpu": [
+    "PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')"
+  ],
+  "run_contract": "441ad7169126e7bc03a332f96950bf16b4112de5a4391cc3d4a9913fd951b522"
+}

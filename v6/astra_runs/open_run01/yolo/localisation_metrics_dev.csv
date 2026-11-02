@@ -1,0 +1,4 @@
+condition,status
+Acne,no verified region annotations or no detections
+Hyperpigmentation,no verified region annotations or no detections
+Eczema,no verified region annotations or no detections

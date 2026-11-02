@@ -1,0 +1,7 @@
+candidate,vs,metric,difference,ci_lo,ci_hi,excludes_zero
+N_no_eczema_evidence,A_v5_argmax,macro_f1,-0.02513367559498425,-0.14092091038134813,0.07887742040615561,False
+N_no_eczema_evidence,A_v5_argmax,hp_missed_rate,-0.04255319148936171,-0.10422207446808512,0.0,False
+N_no_eczema_evidence,A_v5_argmax,false_alarm_rate,0.038461538461538464,0.0,0.13636363636363635,False
+N_no_eczema_evidence,F_full_fusion,macro_f1,-0.043711302342960945,-0.10060352235877901,0.007412860895415399,False
+N_no_eczema_evidence,F_full_fusion,hp_missed_rate,-0.021276595744680854,-0.07550798258345429,0.0,False
+N_no_eczema_evidence,F_full_fusion,false_alarm_rate,0.0,0.0,0.0,False

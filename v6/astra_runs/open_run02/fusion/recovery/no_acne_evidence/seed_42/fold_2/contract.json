@@ -1,0 +1,1016 @@
+{
+  "sha256": "9065fe5da7f10271afadb405323c926b38b54fd44676ebcfa3bf8d2db034a6ce",
+  "identity": {
+    "schema": "astra-training/1",
+    "stage": "fusion",
+    "phase": "no_acne_evidence/seed_42/fold_2",
+    "seed": 42,
+    "configuration": "904e857d49ab2da4b3bc636f57e237c11e799239415f566c476725239a1005ec",
+    "code": "f9051faac1cd694bc5be7fe5cf610c2745cb136620fcb7d85398b3366a38cab6",
+    "inputs": {
+      "V5_MANIFEST": "a251affca0169790ef4aaf6ea7c4fe41246d8d1748f034ff456d6eb740915b04",
+      "ANNOTATION_CSV": "310d81a71c879a509c33f5e5ca0eddde1213149a631ec0edd26439711043db21",
+      "REGION_CSV": "7666c2c6dd6cfe03bf3b44b9535fd37471a15e8411736d521c551d5d4ac8db87",
+      "PROVENANCE_CSV": "3a3cd46d254d482fd6999bc1ab5802ea3579f9cfdc17c1c0c77d9f11cd22cd4e",
+      "V5_KERAS": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+      "frozen_split": "f05380e784652895947a7b5234384ff5967e3629ec9200ac399aa37aa827e7b8",
+      "detectors": {
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne.onnx": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne_m2.onnx": "f00c6e6bb3330b5574fb6e969e3d0cdc8037139fcf20767974d58121cacf4c92",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne_m3.onnx": "6dfb0969cf5c0b987cfb31dfc6c002c90621dbc4a6b58619871b48edea9d88cb",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema.onnx": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema_m2.onnx": "8fbf857b316986f485a8fdb599866e8292ad7faffc32fc781c0b02596aea41fe",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema_m3.onnx": "b5a6b50b9c50c1f8d5c47379d9317bb62cdc0af4ba0328280daa805de581fdde",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation.onnx": "f27affb73061ddff8a2f27463a117a79b3eba97655dca7c2099409971918f501",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation_m2.onnx": "ed821543c9bc84ff2f24960c8e932017f821f490c68c6f11c9b486607a72d63e",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation_m3.onnx": "2a6fa1afa61f4eeed11d15f87421c9429c9de07864f0608bcdb5921ce205a165",
+        "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/precisionskin.onnx": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746"
+      }
+    },
+    "data": "c58127c56f83d24f610e6975f4771986babd3a8305fe4baeb47f1bf2afaa10ff",
+    "conditions": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema"
+    ],
+    "roi_classes": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema",
+      "Background"
+    ],
+    "tensorflow": "2.21.0",
+    "keras": "3.15.1",
+    "stochastic_resume": "epoch_boundary_not_bitwise_exact",
+    "model": {
+      "module": "keras.src.models.functional",
+      "class_name": "Functional",
+      "config": {
+        "name": "lumyvue_fusion",
+        "trainable": true,
+        "layers": [
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                128
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "g_emb",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "g_emb",
+            "inbound_nodes": []
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                12,
+                83
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "roi_feat",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "roi_feat",
+            "inbound_nodes": []
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                12
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "roi_mask",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "roi_mask",
+            "inbound_nodes": []
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dropout",
+            "config": {
+              "name": "dropout",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "rate": 0.3,
+              "seed": null,
+              "noise_shape": null
+            },
+            "registered_name": null,
+            "name": "dropout",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        128
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "g_emb",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {
+                  "training": false
+                }
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                21
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "det_ev",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "det_ev",
+            "inbound_nodes": []
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dense",
+            "config": {
+              "name": "roi_proj",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "units": 64,
+              "activation": "relu",
+              "use_bias": true,
+              "kernel_initializer": {
+                "module": "keras.initializers",
+                "class_name": "GlorotUniform",
+                "config": {
+                  "seed": null,
+                  "input_axes": null,
+                  "output_axes": null
+                },
+                "registered_name": null
+              },
+              "bias_initializer": {
+                "module": "keras.initializers",
+                "class_name": "Zeros",
+                "config": {},
+                "registered_name": null
+              },
+              "kernel_regularizer": null,
+              "bias_regularizer": null,
+              "kernel_constraint": null,
+              "bias_constraint": null,
+              "quantization_config": null
+            },
+            "registered_name": null,
+            "build_config": {
+              "input_shape": [
+                null,
+                12,
+                83
+              ]
+            },
+            "name": "roi_proj",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        12,
+                        83
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "roi_feat",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": null,
+            "class_name": "ModalityDropout",
+            "config": {
+              "name": "roi_modality_dropout",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "rate": 0.25
+            },
+            "registered_name": "lumyvue>ModalityDropout",
+            "build_config": {
+              "input_shape": [
+                null,
+                12
+              ]
+            },
+            "name": "roi_modality_dropout",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        12
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "roi_mask",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dense",
+            "config": {
+              "name": "g_proj",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "units": 64,
+              "activation": "relu",
+              "use_bias": true,
+              "kernel_initializer": {
+                "module": "keras.initializers",
+                "class_name": "GlorotUniform",
+                "config": {
+                  "seed": null,
+                  "input_axes": null,
+                  "output_axes": null
+                },
+                "registered_name": null
+              },
+              "bias_initializer": {
+                "module": "keras.initializers",
+                "class_name": "Zeros",
+                "config": {},
+                "registered_name": null
+              },
+              "kernel_regularizer": null,
+              "bias_regularizer": null,
+              "kernel_constraint": null,
+              "bias_constraint": null,
+              "quantization_config": null
+            },
+            "registered_name": null,
+            "build_config": {
+              "input_shape": [
+                null,
+                128
+              ]
+            },
+            "name": "g_proj",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        128
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "dropout",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                3
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "g_logit",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "g_logit",
+            "inbound_nodes": []
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "InputLayer",
+            "config": {
+              "batch_shape": [
+                null,
+                2
+              ],
+              "dtype": "float32",
+              "sparse": false,
+              "ragged": false,
+              "name": "g_extra",
+              "optional": false
+            },
+            "registered_name": null,
+            "name": "g_extra",
+            "inbound_nodes": []
+          },
+          {
+            "module": null,
+            "class_name": "ModalityDropout",
+            "config": {
+              "name": "det_modality_dropout",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "rate": 0.25
+            },
+            "registered_name": "lumyvue>ModalityDropout",
+            "build_config": {
+              "input_shape": [
+                null,
+                21
+              ]
+            },
+            "name": "det_modality_dropout",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        21
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "det_ev",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": null,
+            "class_name": "MaskedAttentionPool",
+            "config": {
+              "name": "roi_attention_pool",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "heads": 3
+            },
+            "registered_name": "lumyvue>MaskedAttentionPool",
+            "build_config": {
+              "input_shape": [
+                [
+                  null,
+                  12,
+                  64
+                ],
+                [
+                  null,
+                  12
+                ]
+              ]
+            },
+            "name": "roi_attention_pool",
+            "inbound_nodes": [
+              {
+                "args": [
+                  [
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          12,
+                          64
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "roi_proj",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          12
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "roi_modality_dropout",
+                          0,
+                          0
+                        ]
+                      }
+                    }
+                  ]
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": null,
+            "class_name": "MaskFraction",
+            "config": {
+              "name": "roi_fraction",
+              "activity_regularizer": null,
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "autocast": true
+            },
+            "registered_name": "lumyvue>MaskFraction",
+            "build_config": {
+              "input_shape": [
+                null,
+                12
+              ]
+            },
+            "name": "roi_fraction",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        12
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "roi_modality_dropout",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Concatenate",
+            "config": {
+              "name": "fusion_concat",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "axis": -1
+            },
+            "registered_name": null,
+            "build_config": {
+              "input_shape": [
+                [
+                  null,
+                  64
+                ],
+                [
+                  null,
+                  3
+                ],
+                [
+                  null,
+                  2
+                ],
+                [
+                  null,
+                  21
+                ],
+                [
+                  null,
+                  192
+                ],
+                [
+                  null,
+                  1
+                ]
+              ]
+            },
+            "name": "fusion_concat",
+            "inbound_nodes": [
+              {
+                "args": [
+                  [
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          64
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "g_proj",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          3
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "g_logit",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          2
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "g_extra",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          21
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "det_modality_dropout",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          192
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "roi_attention_pool",
+                          0,
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "class_name": "__keras_tensor__",
+                      "config": {
+                        "shape": [
+                          null,
+                          1
+                        ],
+                        "dtype": "float32",
+                        "keras_history": [
+                          "roi_fraction",
+                          0,
+                          0
+                        ]
+                      }
+                    }
+                  ]
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dense",
+            "config": {
+              "name": "fusion_hidden",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "units": 64,
+              "activation": "relu",
+              "use_bias": true,
+              "kernel_initializer": {
+                "module": "keras.initializers",
+                "class_name": "GlorotUniform",
+                "config": {
+                  "seed": null,
+                  "input_axes": null,
+                  "output_axes": null
+                },
+                "registered_name": null
+              },
+              "bias_initializer": {
+                "module": "keras.initializers",
+                "class_name": "Zeros",
+                "config": {},
+                "registered_name": null
+              },
+              "kernel_regularizer": {
+                "module": "keras.regularizers",
+                "class_name": "L2",
+                "config": {
+                  "l2": 0.0001
+                },
+                "registered_name": null
+              },
+              "bias_regularizer": null,
+              "kernel_constraint": null,
+              "bias_constraint": null,
+              "quantization_config": null
+            },
+            "registered_name": null,
+            "build_config": {
+              "input_shape": [
+                null,
+                283
+              ]
+            },
+            "name": "fusion_hidden",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        283
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "fusion_concat",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dropout",
+            "config": {
+              "name": "dropout",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "rate": 0.3,
+              "seed": null,
+              "noise_shape": null
+            },
+            "registered_name": null,
+            "name": "dropout",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        64
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "fusion_hidden",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {
+                  "training": false
+                }
+              }
+            ]
+          },
+          {
+            "module": "keras.layers",
+            "class_name": "Dense",
+            "config": {
+              "name": "fusion_logits",
+              "trainable": true,
+              "dtype": {
+                "module": "keras",
+                "class_name": "DTypePolicy",
+                "config": {
+                  "name": "float32"
+                },
+                "registered_name": null
+              },
+              "units": 3,
+              "activation": "linear",
+              "use_bias": true,
+              "kernel_initializer": {
+                "module": "keras.initializers",
+                "class_name": "GlorotUniform",
+                "config": {
+                  "seed": null,
+                  "input_axes": null,
+                  "output_axes": null
+                },
+                "registered_name": null
+              },
+              "bias_initializer": {
+                "module": "keras.initializers",
+                "class_name": "Zeros",
+                "config": {},
+                "registered_name": null
+              },
+              "kernel_regularizer": null,
+              "bias_regularizer": null,
+              "kernel_constraint": null,
+              "bias_constraint": null,
+              "quantization_config": null
+            },
+            "registered_name": null,
+            "build_config": {
+              "input_shape": [
+                null,
+                64
+              ]
+            },
+            "name": "fusion_logits",
+            "inbound_nodes": [
+              {
+                "args": [
+                  {
+                    "class_name": "__keras_tensor__",
+                    "config": {
+                      "shape": [
+                        null,
+                        64
+                      ],
+                      "dtype": "float32",
+                      "keras_history": [
+                        "dropout",
+                        0,
+                        0
+                      ]
+                    }
+                  }
+                ],
+                "kwargs": {}
+              }
+            ]
+          }
+        ],
+        "input_layers": [
+          [
+            "g_emb",
+            0,
+            0
+          ],
+          [
+            "g_logit",
+            0,
+            0
+          ],
+          [
+            "g_extra",
+            0,
+            0
+          ],
+          [
+            "det_ev",
+            0,
+            0
+          ],
+          [
+            "roi_feat",
+            0,
+            0
+          ],
+          [
+            "roi_mask",
+            0,
+            0
+          ]
+        ],
+        "output_layers": [
+          "fusion_logits",
+          0,
+          0
+        ]
+      },
+      "registered_name": "Functional",
+      "build_config": {
+        "input_shape": null
+      },
+      "compile_config": {
+        "optimizer": {
+          "module": "keras.optimizers",
+          "class_name": "Adam",
+          "config": {
+            "name": "adam",
+            "learning_rate": 0.0010000000474974513,
+            "weight_decay": null,
+            "clipnorm": null,
+            "global_clipnorm": null,
+            "clipvalue": null,
+            "use_ema": false,
+            "ema_momentum": 0.99,
+            "ema_overwrite_frequency": null,
+            "loss_scale_factor": null,
+            "gradient_accumulation_steps": null,
+            "beta_1": 0.9,
+            "beta_2": 0.999,
+            "epsilon": 1e-07,
+            "amsgrad": false
+          },
+          "registered_name": null
+        },
+        "loss": {
+          "module": null,
+          "class_name": "MaskedBCE",
+          "config": {
+            "name": "masked_bce",
+            "reduction": "sum_over_batch_size",
+            "pos_weight": [
+              2.051282051282051,
+              1.8452380952380953,
+              8.0
+            ]
+          },
+          "registered_name": "lumyvue>MaskedBCE"
+        },
+        "loss_weights": null,
+        "metrics": null,
+        "weighted_metrics": null,
+        "run_eagerly": false,
+        "steps_per_execution": 1,
+        "jit_compile": false
+      }
+    },
+    "optimizer": {
+      "module": "keras.optimizers",
+      "class_name": "Adam",
+      "config": {
+        "name": "adam",
+        "learning_rate": 0.0010000000474974513,
+        "weight_decay": null,
+        "clipnorm": null,
+        "global_clipnorm": null,
+        "clipvalue": null,
+        "use_ema": false,
+        "ema_momentum": 0.99,
+        "ema_overwrite_frequency": null,
+        "loss_scale_factor": null,
+        "gradient_accumulation_steps": null,
+        "beta_1": 0.9,
+        "beta_2": 0.999,
+        "epsilon": 1e-07,
+        "amsgrad": false
+      },
+      "registered_name": null
+    },
+    "epochs": 150,
+    "monitor": "val_loss",
+    "mode": "min",
+    "patience": 20,
+    "use_plateau": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "rule": "Every AI assessment, whatever its state, confidence, stage or findings, is issued as PENDING_DERMATOLOGIST_REVIEW and requires dermatologist review.",
+  "ai_assessment": {
+    "schema": "lumyvue-final-assessment/1.1",
+    "status_at_issue": "PENDING_DERMATOLOGIST_REVIEW",
+    "immutable_after_issue": true,
+    "seal": "ai_content_sha256 = SHA-256(canonical JSON of all other fields)",
+    "corrections": "issue a NEW assessment with a new scan_id; never edit"
+  },
+  "dermatologist_review": {
+    "schema": "lumyvue-dermatologist-review/1.0",
+    "separate_record": true,
+    "statuses": [
+      "DERMATOLOGIST_REVIEW_IN_PROGRESS",
+      "DERMATOLOGIST_REVIEW_COMPLETED",
+      "DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS"
+    ],
+    "links_to": "scan_id + ai_content_sha256 (a review for a different AI version is refused)",
+    "findings": "present | absent | unknown per condition; blank/unknown is never treated as absent",
+    "reviewer_role": "dermatologist",
+    "blinding_fields": [
+      "blinded_to_ai",
+      "ai_shown_before_review"
+    ]
+  },
+  "ai_verification": "Stage 2 and the adaptive verification cycle are AI verification; clinical_validation is always false and the AI statement says so",
+  "metrics": "agreement, disagreement, Cohen's kappa, PPV, sensitivity, specificity per condition from AI per-condition decisions vs dermatologist findings; AI-uncertain / AI-no-result / dermatologist-unknown are reported separately",
+  "states_meaning": "state describes how well the AI evidence supports a result; it is not a diagnosis and not clinical confirmation"
+}

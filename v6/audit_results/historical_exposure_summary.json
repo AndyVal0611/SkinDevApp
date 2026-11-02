@@ -1,0 +1,24 @@
+{
+  "v5": {
+    "fusion": {
+      "v5_train_same_manifest_image": 1041,
+      "v5_train_exact_md5": 1041,
+      "v5_train_proxy_group": 1203
+    },
+    "test": {
+      "v5_train_same_manifest_image": 1074,
+      "v5_train_exact_md5": 1074,
+      "v5_train_proxy_group": 1246
+    },
+    "validation": {
+      "v5_train_same_manifest_image": 669,
+      "v5_train_exact_md5": 669,
+      "v5_train_proxy_group": 783
+    }
+  },
+  "yolo_manifest_candidates": 6,
+  "limitations": [
+    "V5 overlap is manifest/hash/proxy evidence, not patient identity.",
+    "YOLO args candidates require linkage to installed model hashes and original historical dataset snapshots; current paths alone cannot prove training membership."
+  ]
+}

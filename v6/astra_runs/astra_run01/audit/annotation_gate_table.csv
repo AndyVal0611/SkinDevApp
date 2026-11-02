@@ -1,0 +1,5 @@
+split,images,verified_full,present_Acne,present_Hyperpigmentation,present_Eczema,absent_Acne,absent_Hyperpigmentation,absent_Eczema,gate_ok,missing
+train,5873,0,0,0,0,0,0,0,False,verified photos 0 < 300; Acne present 0 < 40; Acne absent 0 < 40; Hyperpigmentation present 0 < 40; Hyperpigmentation absent 0 < 40; Eczema present 0 < 40; Eczema absent 0 < 40
+validation,979,0,0,0,0,0,0,0,False,verified photos 0 < 150; Acne present 0 < 20; Acne absent 0 < 20; Hyperpigmentation present 0 < 20; Hyperpigmentation absent 0 < 20; Eczema present 0 < 20; Eczema absent 0 < 20
+fusion,1469,0,0,0,0,0,0,0,False,verified photos 0 < 250; Acne present 0 < 30; Acne absent 0 < 30; Hyperpigmentation present 0 < 30; Hyperpigmentation absent 0 < 30; Eczema present 0 < 30; Eczema absent 0 < 30
+test,1468,0,0,0,0,0,0,0,False,verified photos 0 < 250; Acne present 0 < 30; Acne absent 0 < 30; Hyperpigmentation present 0 < 30; Hyperpigmentation absent 0 < 30; Eczema present 0 < 30; Eczema absent 0 < 30

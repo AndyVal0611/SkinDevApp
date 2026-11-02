@@ -1,0 +1,27 @@
+{
+  "attempt": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/checkpoints/D_multilabel3/seed_42/recovery_A/attempt_0001",
+  "reused": true,
+  "epoch": 12,
+  "latest": "epoch_00012.keras",
+  "best": "epoch_00010.keras",
+  "history": "epoch_00012.history.csv",
+  "best_metric": 0.753139562376575,
+  "complete": true,
+  "early": {
+    "wait": 2,
+    "best": 0.753139562376575,
+    "stopped_epoch": 0
+  },
+  "plateau": {
+    "wait": 2,
+    "best": 0.753139562376575,
+    "cooldown_counter": 0
+  },
+  "hashes": {
+    "epoch_00012.keras": "382eea2cedb0a978143e09c47021ec03ca4ae4b85625a127b124d6c7dc66319f",
+    "epoch_00010.keras": "aa06e0154fd8bf399ce471f34c5482c2c8684ab16d3c6ea7b5d39a13f95f4e3b",
+    "epoch_00012.history.csv": "a6f6d24f531d1a61c5ec3c1d752bd779f9e29023f634faa08f09ee7605d36a01",
+    "selected.keras": "5f0239b08a4120169cd28c4838f25133ea80834dd9782ae2cd359fb3671ae06c"
+  },
+  "selected": "selected.keras"
+}

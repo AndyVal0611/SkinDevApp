@@ -1,0 +1,9 @@
+verified_truth,v5_predicted,n,of_truth_class
+none,Hyperpigmentation,18,521
+Hyperpigmentation,Normal,42,538
+Hyperpigmentation,Eczema,16,538
+Eczema,Hyperpigmentation,8,313
+Acne,Eczema,39,383
+Eczema,Acne,20,313
+mixed (>=2 conditions),one single class,72,72
+mixed: V5 single class is one of the true conditions,(partial credit),68,72

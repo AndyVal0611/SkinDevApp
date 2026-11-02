@@ -1,0 +1,99 @@
+{
+  "candidates": {
+    "D_multilabel3": {
+      "best_seed": 42,
+      "val_macro_ap": 0.7963939929356001,
+      "delta_f1_vs_A": {
+        "Acne": -0.0948,
+        "Hyperpigmentation": -0.0127,
+        "Eczema": -0.0527
+      },
+      "regression": [
+        "Acne",
+        "Eczema"
+      ]
+    },
+    "E_v5_backbone_multilabel3": {
+      "best_seed": 42,
+      "val_macro_ap": 0.8634127577818869,
+      "delta_f1_vs_A": {
+        "Acne": 0.005,
+        "Hyperpigmentation": 0.0141,
+        "Eczema": 0.0012
+      },
+      "regression": []
+    }
+  },
+  "selected": "E_v5_backbone_multilabel3",
+  "selected_seed": 42,
+  "selected_has_regression": false,
+  "d_vs_e": {
+    "all_validation": {
+      "D_multilabel3": {
+        "macro_ap": 0.7963939929356001,
+        "macro_f1": 0.7228267044391514,
+        "hp_pos": 230,
+        "hp_missed_as_no_target": 33,
+        "all_neg": 168,
+        "all_neg_flagged_hp": 19
+      },
+      "E_v5_backbone_multilabel3": {
+        "macro_ap": 0.8634127577818869,
+        "macro_f1": 0.7830105978394287,
+        "hp_pos": 230,
+        "hp_missed_as_no_target": 32,
+        "all_neg": 168,
+        "all_neg_flagged_hp": 10
+      },
+      "e_minus_d_macro_ap_ci95": [
+        0.04549775424567642,
+        0.0910810146309694
+      ]
+    },
+    "not_trained_by_v5": {
+      "D_multilabel3": {
+        "macro_ap": 0.810124517371129,
+        "macro_f1": 0.6918049270990448,
+        "hp_pos": 47,
+        "hp_missed_as_no_target": 9,
+        "all_neg": 26,
+        "all_neg_flagged_hp": 2
+      },
+      "E_v5_backbone_multilabel3": {
+        "macro_ap": 0.8494774756161151,
+        "macro_f1": 0.7320384757676656,
+        "hp_pos": 47,
+        "hp_missed_as_no_target": 10,
+        "all_neg": 26,
+        "all_neg_flagged_hp": 3
+      },
+      "e_minus_d_macro_ap_ci95": [
+        0.0016820990309305507,
+        0.07620585524358933
+      ]
+    },
+    "v5_test_split_only": {
+      "D_multilabel3": {
+        "macro_ap": 0.6991614918421467,
+        "macro_f1": 0.5891405342624855,
+        "hp_pos": 23,
+        "hp_missed_as_no_target": 3,
+        "all_neg": 11,
+        "all_neg_flagged_hp": 0
+      },
+      "E_v5_backbone_multilabel3": {
+        "macro_ap": 0.7676475338639683,
+        "macro_f1": 0.7097409483411604,
+        "hp_pos": 23,
+        "hp_missed_as_no_target": 3,
+        "all_neg": 11,
+        "all_neg_flagged_hp": 1
+      },
+      "e_minus_d_macro_ap_ci95": [
+        -0.005743277197732433,
+        0.20350505486474962
+      ]
+    }
+  },
+  "d_vs_e_selection_basis": "macro AP on validation images not trained on by V5, no per-condition regression preferred"
+}

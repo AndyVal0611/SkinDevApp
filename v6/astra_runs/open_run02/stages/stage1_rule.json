@@ -1,0 +1,23 @@
+{
+  "band": 0.0,
+  "selection": {
+    "band": 0.0,
+    "coverage": 0.4083333333333333,
+    "error": 0.05442176870748299,
+    "n_accepted_known": 147
+  },
+  "thr_global": [
+    0.51,
+    0.39,
+    0.25
+  ],
+  "thr_stage1": [
+    0.42,
+    0.37,
+    0.27
+  ],
+  "target_error": 0.1,
+  "min_coverage": 0.3,
+  "accepts_nothing": false,
+  "note": "band selected on out-of-fold fusion-split data; PROVISIONAL, re-checked on the test split. If accepts_nothing=True every scan escalates to Stage 2."
+}

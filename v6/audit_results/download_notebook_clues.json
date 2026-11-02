@@ -1,0 +1,22 @@
+[
+  {
+    "path": "C:\\Users\\Bautista\\Downloads\\LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb",
+    "cell": 22,
+    "line": "    tmpl = pd.DataFrame({\"source_key\": keys, \"description\": \"\", \"license_or_terms\": \"\", \"consent_basis\": \"\", \"permissible_use\": \"\","
+  },
+  {
+    "path": "C:\\Users\\Bautista\\Downloads\\LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training_FIXED.ipynb",
+    "cell": 22,
+    "line": "    tmpl = pd.DataFrame({\"source_key\": keys, \"description\": \"\", \"license_or_terms\": \"\", \"consent_basis\": \"\", \"permissible_use\": \"\","
+  },
+  {
+    "path": "C:\\Users\\Bautista\\Downloads\\Pipeline_V1.ipynb",
+    "cell": 0,
+    "line": "    raw_sources_dir: str = \"{RAW_SOURCES_DIR_PLACEHOLDER}\"       # one subfolder per licensed source"
+  },
+  {
+    "path": "C:\\Users\\Bautista\\Downloads\\Pipeline_V1.ipynb",
+    "cell": 4,
+    "line": "# multiple licensed dermatology sources \u2014 the same public reference image"
+  }
+]

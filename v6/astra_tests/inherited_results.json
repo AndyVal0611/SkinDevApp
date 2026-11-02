@@ -1,0 +1,13 @@
+{
+  "synthetic_fixtures_only": true,
+  "run": 37,
+  "passed": 36,
+  "failures": [],
+  "errors": [],
+  "skipped": [
+    [
+      "test_end_to_end_reference_parity_with_batch_logic (astra_isolated_definitions.TestV6.test_end_to_end_reference_parity_with_batch_logic)",
+      "needs all trained components and the evaluated test split"
+    ]
+  ]
+}

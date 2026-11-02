@@ -1,0 +1,10 @@
+system,vs,metric,difference,ci_lo,ci_hi,better_when,excludes_zero
+B_global_E,A_v5_argmax,macro_f1,-0.0034083480515917364,-0.09307126004126667,0.0826098276037721,higher,False
+B_global_E,A_v5_argmax,hp_missed_rate,0.021276595744680854,-0.046520712209302324,0.1053101503759398,lower,False
+B_global_E,A_v5_argmax,false_alarm_rate,0.07692307692307693,0.0,0.2001724137931033,lower,False
+E_global_plus_yolo,A_v5_argmax,macro_f1,0.0006804042311748804,-0.08358268408578005,0.07423717611522024,higher,False
+E_global_plus_yolo,A_v5_argmax,hp_missed_rate,0.021276595744680854,0.0,0.07550798258345426,lower,False
+E_global_plus_yolo,A_v5_argmax,false_alarm_rate,0.038461538461538464,-0.08113738738738739,0.18518518518518517,lower,False
+F_full_fusion,A_v5_argmax,macro_f1,0.018577626747976694,-0.0857803549824226,0.11246177453486886,higher,False
+F_full_fusion,A_v5_argmax,hp_missed_rate,-0.021276595744680854,-0.09260335917312663,0.05263157894736842,lower,False
+F_full_fusion,A_v5_argmax,false_alarm_rate,0.038461538461538464,0.0,0.13636363636363635,lower,False

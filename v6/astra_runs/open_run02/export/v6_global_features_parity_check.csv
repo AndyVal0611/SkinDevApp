@@ -1,0 +1,4 @@
+pair,max_abs_diff_embedding,max_abs_diff_logits,decisions_flipped_at_0_5,decisions_flipped_at_tuned_thresholds
+Keras GPU vs Keras CPU,0.05240654945373535,0.0695643424987793,0,1
+Keras CPU vs ONNX CPU,4.470348358154297e-05,5.459785461425781e-05,0,0
+Keras GPU vs ONNX CPU,0.05243659019470215,0.06959915161132812,0,1

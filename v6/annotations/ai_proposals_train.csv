@@ -1,0 +1,501 @@
+image_id,acne,hyperpigmentation,eczema,confidence,note
+img_002135,present,absent,absent,high,papules cheek
+img_018143,absent,absent,absent,medium,reclining portrait clear
+img_008651,unknown,present,absent,medium,hyperpigmented cheeks with scars
+img_016951,absent,present,absent,low,freckles closeup
+img_018334,absent,absent,absent,medium,stock profile
+img_012317,absent,absent,present,low,faint scaly patch nostril
+img_012809,absent,absent,present,medium,round scaly plaque nummular-like
+img_015028,absent,absent,present,low,periocular redness flaking
+img_012091,absent,present,absent,high,brown patches near eye
+img_009846,absent,present,absent,low,dark patch cheek grainy
+img_012169,absent,absent,present,medium,perioral cheilitis scaly
+img_002145,present,absent,absent,medium,few red papules forehead
+img_017187,absent,absent,absent,low,selfie
+img_015029,absent,absent,present,medium,eyelid dermatitis
+img_015935,absent,absent,absent,low,device portrait
+img_013898,absent,absent,present,high,child red scaly cheeks
+img_005649,present,absent,absent,medium,pale papules pustules crop
+img_015165,present,absent,absent,low,small red lesions chin
+img_006462,absent,absent,unknown,low,grainy lips nose
+img_012678,absent,absent,present,low,diffuse erythema closeup
+img_015305,absent,absent,present,high,infant red crusted cheek
+img_010209,absent,present,absent,high,brown patches forehead
+img_013238,unknown,unknown,unknown,low,neck ear scarring
+img_019621,absent,absent,absent,low,woman in car
+img_012465,absent,absent,absent,low,hypopigmented patches forehead
+img_012304,absent,absent,present,high,child red scaly cheeks
+img_011730,absent,present,absent,medium,brown patches nose cheek
+img_013924,unknown,unknown,unknown,low,dark skin patch hair
+img_013484,unknown,unknown,unknown,low,dark skin small papules
+img_016779,absent,absent,absent,low,woman with cloth
+img_011616,absent,present,absent,low,freckles man
+img_021140,absent,absent,absent,low,selfie
+img_013933,unknown,unknown,unknown,low,crusted lesions nose cheek older
+img_017827,absent,absent,absent,medium,portrait
+img_018472,absent,absent,absent,medium,man shaving
+img_003937,present,absent,absent,high,crop papules pustules
+img_000221,present,absent,absent,low,small profile red marks
+img_010639,absent,present,absent,medium,melasma freckles grainy
+img_006427,unknown,present,absent,low,grainy nose red dark spots
+img_006614,absent,present,absent,low,red-brown mottling cheek
+img_007943,unknown,unknown,unknown,low,brows scarring
+img_013492,absent,absent,present,medium,red scaly patches cheeks chin
+img_019934,absent,absent,absent,low,selfie
+img_019813,absent,absent,absent,low,lying selfie
+img_017891,unknown,unknown,unknown,low,non-facial armpit
+img_021032,absent,absent,absent,low,selfie
+img_016631,absent,absent,absent,low,selfie
+img_013413,absent,absent,present,low,crop red scaly papules
+img_012311,absent,absent,present,low,scaly plaque dark skin
+img_015810,absent,absent,absent,low,portrait slight redness
+img_014018,absent,absent,present,low,red patch crop
+img_000599,present,absent,absent,high,teen profile acne
+img_000409,present,unknown,absent,medium,small face scars red marks
+img_017893,absent,absent,absent,medium,cheeks closed eyes
+img_012810,absent,absent,present,medium,round scaly plaque
+img_017770,absent,absent,absent,medium,stock tech overlay
+img_013072,absent,absent,present,low,child red cheeks
+img_004762,present,absent,absent,low,red skin white papules crop
+img_011578,absent,present,absent,high,brown streaks melasma
+img_012712,unknown,present,unknown,low,erythema red papules sun damage
+img_012982,absent,absent,present,low,scaly patch near nose
+img_007952,absent,present,absent,medium,red-brown patches
+img_010770,absent,present,absent,medium,melasma cheeks censored
+img_010463,absent,present,absent,high,brown patchy cheek grainy
+img_014654,absent,unknown,absent,low,older cheek lip mild pigment
+img_014803,absent,absent,present,high,severe scaling flaking face
+img_015334,absent,present,absent,medium,periorbital pigmentation
+img_007457,unknown,unknown,unknown,low,forehead hair purple tone
+img_001066,absent,absent,present,low,scaly wrinkled red crop
+img_016827,absent,absent,absent,medium,stock portrait
+img_009649,absent,present,absent,high,brown cheek patches censored
+img_014694,absent,absent,present,medium,infant red cheeks
+img_010948,absent,present,absent,low,mild brown mottling grainy
+img_015651,absent,absent,present,medium,perioral red scaly
+img_003849,absent,absent,present,low,inflamed skin crop
+img_013996,absent,absent,absent,low,pale bright face crop
+img_021171,absent,absent,absent,low,small selfie
+img_015160,absent,absent,present,low,scattered red papules patches
+img_005988,absent,absent,present,high,dry scaly red periocular
+img_013318,absent,absent,present,medium,red scaly patch child cheek
+img_005958,absent,present,absent,low,spots redness cheeks nose grainy
+img_019077,absent,absent,absent,low,smiling woman
+img_009227,absent,present,absent,high,pigmentation older woman
+img_013697,absent,absent,present,low,crusted vesicles around eyes
+img_010912,present,unknown,absent,low,red face chin papules
+img_008632,absent,present,absent,high,dark brown patchy cheek
+img_018740,absent,absent,absent,low,lying portrait
+img_013326,unknown,unknown,unknown,low,infant temple purple spots crusts
+img_018678,absent,absent,absent,medium,stock portrait
+img_010702,absent,present,absent,medium,sun spots older woman grainy
+img_014455,absent,absent,present,medium,erosion with scale crop
+img_001391,unknown,unknown,unknown,low,pink grainy crop stubble
+img_010495,absent,present,absent,medium,freckles nose
+img_016592,absent,absent,absent,low,makeup removal
+img_014558,absent,absent,present,high,hand scaly erythema non-facial
+img_012568,absent,absent,present,low,circular scaly plaque
+img_021006,absent,absent,absent,medium,stock woman
+img_020290,absent,absent,absent,low,selfie smiling eyes closed
+img_009456,absent,present,absent,low,freckles curly red hair
+img_004578,present,absent,absent,low,few red papules cheek
+img_011649,absent,present,absent,low,dark hairline forehead
+img_013425,unknown,unknown,unknown,low,fine follicular papules arm
+img_020548,absent,absent,absent,low,stock pink
+img_012900,absent,present,absent,low,extensive dark patches dark skin
+img_020154,absent,absent,unknown,low,malar redness man
+img_004975,present,absent,absent,low,papules crust lip area
+img_013231,absent,absent,present,high,infant dark skin scaly face
+img_020981,absent,absent,absent,medium,stock nurse
+img_013912,absent,absent,present,low,eyelid margin redness
+img_017229,absent,absent,absent,low,selfie
+img_013070,unknown,unknown,unknown,low,hairline redness crop
+img_004196,present,absent,absent,high,selfie papules red cheeks forehead
+img_018058,absent,absent,absent,medium,stock lower face
+img_000486,present,absent,absent,high,forehead papules pustules
+img_001901,present,absent,absent,medium,red lesions chin
+img_017085,absent,absent,absent,low,eye patches
+img_019638,absent,absent,absent,medium,stock man
+img_011288,absent,unknown,absent,low,dark skin cheek uniform
+img_018798,absent,absent,absent,low,pouting portrait
+img_012439,unknown,unknown,unknown,low,dark skin mark
+img_005474,absent,absent,present,low,red patches crop
+img_012652,absent,absent,present,high,child allergic contact dermatitis
+img_009752,absent,present,absent,medium,spots cheek closed eyes
+img_018591,absent,absent,absent,low,selfie
+img_015512,absent,absent,present,low,red patch crop
+img_015067,unknown,absent,unknown,low,older woman red cheeks
+img_003257,present,absent,absent,high,pustule crop
+img_000283,unknown,unknown,unknown,low,dark smudges on red skin
+img_018682,absent,absent,absent,low,social post selfie
+img_021858,absent,absent,absent,low,selfie
+img_003478,unknown,unknown,unknown,low,red patch scar line crop
+img_017164,unknown,unknown,unknown,low,tiny face
+img_008277,absent,present,absent,low,spots cheek small image
+img_013519,absent,absent,present,low,red eyelid small bumps
+img_002259,present,absent,absent,low,faint inflamed nodule crop
+img_000861,unknown,unknown,unknown,low,bright forehead crop
+img_011164,absent,present,absent,medium,brown patch with hair nevus-like
+img_012052,absent,absent,absent,low,pale grainy cheek
+img_014692,present,absent,absent,low,widespread red papules non-facial
+img_017911,absent,absent,absent,low,primer ad portrait
+img_020988,absent,absent,absent,low,closed eyes mild
+img_016893,absent,absent,absent,low,filtered portrait
+img_002982,present,absent,absent,high,pustular acne
+img_014961,absent,absent,present,low,red patches crop
+img_014056,absent,absent,present,high,eyelid scaly thickened
+img_007029,absent,present,absent,high,dark patches grainy face
+img_007470,absent,absent,absent,low,nose small pale bumps
+img_006243,absent,present,absent,high,brown patch dermnet
+img_009317,unknown,present,absent,high,melasma cheeks upper lip
+img_008252,absent,present,absent,high,lentigines closeup
+img_005829,absent,unknown,absent,low,freckles woman covering face
+img_006445,absent,present,absent,high,melasma cheek
+img_019335,absent,absent,absent,low,headband selfie
+img_011163,absent,present,absent,medium,perioral nasolabial hyperpigmentation
+img_012556,absent,absent,present,low,pink scaly excoriated lines
+img_019212,absent,absent,absent,low,selfie
+img_021741,absent,absent,absent,low,annotated selfie
+img_001530,absent,present,absent,low,scar brown marks crop
+img_001756,unknown,unknown,unknown,low,pale skin crop
+img_012654,absent,absent,present,medium,red patchy rash arm
+img_007243,absent,present,absent,high,brown patches nose cheek grainy
+img_016480,absent,absent,absent,low,selfie
+img_013139,absent,absent,present,low,red-brown papules scattered
+img_015523,absent,absent,present,high,infant severe erythroderma scaling
+img_007711,unknown,unknown,unknown,low,grainy pink cheek
+img_006754,present,present,absent,high,melasma with acne spots
+img_013074,absent,absent,present,low,scattered red papules patches
+img_015415,absent,absent,present,low,erythematous patch
+img_019491,absent,absent,absent,low,smiling portrait
+img_009929,absent,unknown,absent,low,grainy portrait freckles
+img_020763,absent,absent,absent,low,sheet mask selfie
+img_005393,present,absent,absent,medium,yellow pustule crop
+img_010500,absent,present,absent,low,freckled woman
+img_012998,present,absent,absent,low,chin papules
+img_016300,absent,absent,absent,low,man selfie
+img_019774,absent,absent,absent,low,selfie
+img_008477,absent,present,absent,high,extensive melasma
+img_016063,absent,absent,absent,low,older selfie
+img_007632,absent,present,absent,high,brown patch closeup
+img_008755,absent,unknown,absent,low,nose mouth faint marks
+img_001804,present,present,absent,medium,whiteheads and brownish crop
+img_020856,absent,absent,absent,low,grayscale selfie
+img_020080,absent,absent,absent,low,skincare selfie
+img_013583,absent,absent,absent,low,eyelid cyst xanthelasma-like
+img_020090,absent,absent,absent,low,woman with cream
+img_010247,absent,present,absent,medium,brown mottled skin
+img_010670,absent,unknown,absent,low,upside-down face mild freckles
+img_018784,absent,absent,absent,low,selfie blonde
+img_016141,absent,absent,absent,medium,man with cream
+img_013988,absent,absent,present,medium,red patch arm
+img_011215,absent,present,absent,high,brown patch cheek
+img_020077,absent,absent,absent,low,woman with product
+img_011347,absent,present,absent,high,sun spots older woman
+img_011898,absent,present,absent,medium,brown patch grainy dark cheek
+img_005209,unknown,unknown,unknown,low,tiny man lesions
+img_007437,absent,present,absent,medium,same brown patch cheek duplicate
+img_018679,present,absent,absent,medium,forehead papules
+img_011910,absent,present,absent,medium,orange grainy brown patches
+img_009066,absent,present,absent,high,mottled brown melasma
+img_012182,present,absent,absent,medium,beard folliculitis pustule
+img_015768,absent,absent,absent,low,selfie red cheeks
+img_014214,absent,absent,present,high,scaly crusty plaque
+img_001037,present,absent,absent,high,forehead acne
+img_014872,absent,absent,present,low,scaly erosions
+img_015469,absent,present,absent,low,freckles red cheeks AI-looking
+img_012279,absent,absent,present,medium,red scaly patches cheek
+img_012700,unknown,unknown,unknown,low,dark hairline
+img_015095,present,absent,absent,low,few red marks cheek
+img_012417,absent,absent,present,medium,round scaly patch
+img_020605,absent,absent,absent,low,small man portrait
+img_010503,absent,present,absent,high,lentigines older man
+img_015858,absent,absent,absent,low,reclining woman mild freckles
+img_013315,absent,absent,present,medium,eyelid white scaling
+img_002163,present,absent,absent,low,erythema papules scars cheek
+img_021199,absent,absent,absent,low,sheet mask selfie
+img_009727,absent,present,absent,medium,freckles lentigines cheek
+img_006387,absent,present,absent,high,dark cheek patches
+img_017411,absent,absent,absent,low,headband selfie
+img_002365,present,absent,absent,high,pustules papules crop
+img_011773,absent,present,absent,high,dark melasma cheek
+img_014997,absent,absent,present,high,toddler red scaly plaques
+img_013788,absent,absent,present,low,eyelid redness
+img_013710,unknown,unknown,unknown,low,red flushed crop
+img_015319,unknown,unknown,unknown,low,nose cheek erythema telangiectasia
+img_014073,absent,absent,present,medium,cheek erythema with scaling
+img_018026,absent,unknown,absent,low,ad freckled woman
+img_014429,absent,absent,present,low,red papules with scale
+img_015740,absent,absent,absent,low,car selfie
+img_001227,absent,absent,present,low,lip area dermatitis
+img_008608,absent,present,absent,medium,brown spots cheek grainy
+img_020797,absent,absent,absent,medium,man applying cream
+img_005980,absent,present,absent,high,melasma lentigines older woman
+img_006663,present,present,absent,high,melasma with acne
+img_019064,absent,absent,absent,low,selfie
+img_016452,absent,absent,absent,medium,stock portrait
+img_012663,absent,absent,present,high,red scaly periocular forehead
+img_013061,present,present,absent,medium,papules scars dark skin
+img_020357,absent,absent,absent,low,man selfie
+img_008443,absent,present,absent,high,sun-damaged freckles melasma
+img_009763,absent,unknown,absent,low,mottled grainy skin
+img_016687,absent,absent,absent,medium,stock hands on forehead
+img_021002,absent,absent,absent,low,selfie
+img_000828,present,absent,absent,high,cheek acne papules
+img_013443,unknown,absent,present,low,crusted round lesions
+img_005324,present,absent,absent,medium,red papules crop
+img_016003,absent,absent,absent,low,selfie blonde
+img_013415,absent,absent,present,high,toddler red scaly cheeks chin
+img_016342,absent,absent,absent,low,beard side face
+img_001701,present,absent,absent,medium,back red papules non-facial
+img_013194,present,absent,absent,low,few red dots cheek
+img_018101,absent,absent,absent,low,smiling woman
+img_021890,absent,absent,absent,medium,stock portrait
+img_013161,unknown,absent,unknown,low,red patches cheek nose selfie
+img_017651,absent,absent,absent,low,selfie
+img_019709,absent,absent,absent,medium,stock curly
+img_007520,absent,absent,present,medium,round scaly erythematous plaque
+img_012340,absent,absent,present,medium,eyelid erythema scaling
+img_007983,absent,present,absent,high,melasma temple cheek grainy
+img_015348,absent,absent,present,low,small red spots skin
+img_005805,absent,present,absent,high,melasma grainy
+img_012625,unknown,absent,unknown,low,older woman red face rosacea-like
+img_014734,absent,absent,absent,low,red cheek flush
+img_012534,absent,absent,present,low,red papular dermatitis crop
+img_005751,absent,absent,absent,low,older portrait mild
+img_012907,absent,absent,present,medium,red crusted ear lesions
+img_007667,absent,present,absent,medium,before photo freckles melasma
+img_012433,unknown,absent,present,medium,periocular red crusted papules
+img_013347,absent,present,absent,medium,periocular dark patch
+img_013107,unknown,unknown,unknown,low,eyelid skin closeup
+img_003783,present,absent,absent,high,pustules cheek
+img_001442,present,absent,absent,high,forehead acne scars
+img_016345,absent,absent,absent,low,skincare collage
+img_006024,absent,present,absent,medium,ephelides under eyes
+img_014766,absent,absent,present,low,erythematous scaly cheeks
+img_010535,absent,present,absent,medium,brown mottling grainy profile
+img_012754,absent,absent,present,high,elderly facial erythema crusts
+img_007008,absent,unknown,absent,low,dark skin mild patchy tone
+img_015230,absent,absent,present,low,red papule and plaque
+img_010622,absent,absent,present,medium,red flaky skin around nose chin
+img_012418,present,absent,unknown,low,beard area crusted red
+img_001620,present,absent,absent,high,cheek papules
+img_005890,absent,present,absent,high,melasma cheek older woman
+img_000074,unknown,unknown,unknown,low,dark red bruise-like crop
+img_013705,absent,absent,present,low,red streaky erythema
+img_009564,absent,unknown,absent,low,portrait mild spots
+img_020554,absent,absent,absent,low,product ad
+img_002168,present,absent,absent,medium,two pimples crop
+img_005709,present,absent,absent,high,nodular acne scars
+img_012572,absent,absent,present,low,red papular patch
+img_008136,unknown,unknown,unknown,low,eyelid small dark papules
+img_018934,absent,unknown,absent,low,forehead freckles
+img_005350,unknown,unknown,unknown,low,lip piercing perioral
+img_014030,absent,absent,absent,low,older cheek redness
+img_000833,present,absent,absent,low,pale skin small dots scars
+img_012713,absent,absent,present,high,toddler red patches cheek
+img_001817,present,absent,absent,high,papules purple marks
+img_016277,unknown,unknown,unknown,low,tiny man
+img_021273,absent,absent,absent,low,selfie
+img_019920,absent,absent,absent,low,selfie girl
+img_000975,present,absent,absent,medium,red cheek papules
+img_017916,absent,absent,absent,low,woman with cap
+img_012976,unknown,unknown,unknown,low,skin closeup mild roughness
+img_019008,absent,present,absent,low,freckled child
+img_020350,absent,absent,absent,low,headband selfie
+img_018439,absent,absent,absent,low,selfie
+img_009536,absent,absent,present,low,dry crusty red-brown nose
+img_020295,absent,absent,absent,low,bearded selfie
+img_013270,absent,absent,present,low,pale papules arm
+img_015030,absent,absent,present,medium,dry scaly ichthyosis-like skin
+img_012161,absent,absent,present,high,infant red plaques cheek
+img_014500,absent,absent,present,high,eyelid dermatitis
+img_016895,absent,absent,absent,low,selfie
+img_018939,absent,absent,absent,low,woman with cream
+img_006735,absent,present,absent,high,melasma cheek
+img_003033,present,absent,absent,high,selfie acne cheek jaw
+img_013854,absent,absent,present,medium,dry cracked skin
+img_012393,absent,absent,present,medium,red scaly periocular patch
+img_009987,absent,present,absent,medium,melasma censored
+img_020419,absent,absent,absent,low,beach selfie vitiligo arms
+img_014430,absent,absent,present,high,infant erythema scaling face
+img_019604,absent,absent,absent,low,older woman selfie
+img_001259,absent,absent,present,low,pink red patches crop
+img_005471,present,absent,absent,high,perioral papules pustules man
+img_020355,absent,absent,absent,low,selfie flushed
+img_011581,absent,present,absent,high,melasma brown cheek
+img_019799,absent,absent,absent,medium,stock portrait
+img_016927,absent,absent,absent,medium,stock curly
+img_002510,present,absent,absent,low,red papules excoriated cheek
+img_001048,present,absent,absent,high,acne papules cheek
+img_009932,absent,present,absent,medium,melasma censored grainy
+img_012387,absent,absent,present,low,forehead red patches older
+img_007239,absent,present,absent,high,brown freckles melasma grainy
+img_018928,absent,absent,absent,low,selfie
+img_012258,absent,absent,present,high,face neck erythematous scaly man
+img_003458,absent,present,absent,low,brown bruise-like patch crop
+img_006426,present,absent,absent,low,dark skin cheek small papules
+img_003706,absent,absent,present,low,faint red patch crop
+img_021408,absent,absent,absent,medium,stock curly
+img_013782,absent,absent,present,high,infant crusted scaly face
+img_016846,absent,absent,absent,low,selfie
+img_009484,absent,present,absent,medium,before photo freckles
+img_002223,present,absent,absent,high,large whitehead pustule crop
+img_001617,present,absent,absent,high,pimple crop
+img_008883,absent,present,absent,medium,mottled brown cheeks grainy
+img_018741,absent,absent,absent,medium,stock Asian woman
+img_014379,absent,absent,present,medium,scaly xerotic skin
+img_009030,absent,present,absent,medium,brown patches redness grainy
+img_014951,unknown,unknown,unknown,low,dark skin faint purple mark
+img_014965,absent,absent,present,medium,infant face red papules
+img_008588,absent,present,absent,high,melasma dark skin
+img_013043,absent,absent,present,medium,erythema scaling edge
+img_018923,absent,absent,absent,low,selfie
+img_000933,present,absent,absent,high,teen profile acne papules
+img_014999,unknown,absent,present,low,moustache area red crusted
+img_007449,absent,present,absent,high,brown macule freckles cheek
+img_015663,present,absent,absent,medium,forehead red papules
+img_021101,absent,absent,absent,low,selfie
+img_003750,absent,absent,present,low,red flushed crop
+img_016507,absent,absent,absent,medium,stock bathroom
+img_009162,absent,present,absent,medium,brown patches censored grainy
+img_009200,absent,present,absent,high,lentigines brown patches cheek
+img_009687,absent,present,absent,high,melasma forehead grainy
+img_003834,unknown,unknown,unknown,low,faint scars crop
+img_007958,absent,present,absent,medium,before after melasma
+img_012205,absent,absent,present,low,child red cheek
+img_003873,present,absent,absent,medium,selfie lesions chin
+img_008562,absent,absent,absent,low,grainy cheek eyelash
+img_021628,absent,absent,absent,medium,toddler apple
+img_014888,absent,absent,present,medium,scaly forehead older
+img_014131,absent,absent,present,medium,widespread red papules collar
+img_006680,absent,present,absent,medium,brown patches forehead grainy
+img_021815,absent,absent,absent,medium,stock woman
+img_012969,absent,absent,present,medium,red swollen ear lesion
+img_012775,absent,absent,present,low,red papules skin
+img_004726,present,absent,absent,medium,acne scars and pimple cheek
+img_018956,absent,absent,absent,low,smiling portrait
+img_015176,absent,absent,present,medium,red scaly patches arm
+img_015927,absent,absent,absent,low,selfie
+img_008931,present,absent,absent,medium,cheek red papules
+img_021677,absent,absent,absent,low,selfie
+img_013967,absent,absent,present,medium,arm red papular rash
+img_005925,absent,present,absent,medium,brown spots grainy woman
+img_011755,absent,present,absent,medium,freckles melasma closed eyes
+img_013251,absent,absent,present,low,lip corner crusts
+img_007192,absent,present,unknown,low,dark scaling cheek poikiloderma-like
+img_018084,absent,absent,absent,low,selfie
+img_014530,absent,absent,absent,low,faint redness skin
+img_008884,absent,unknown,absent,low,uniform tan forehead
+img_012949,absent,absent,present,low,red patch crop
+img_020585,absent,absent,absent,low,selfie
+img_014140,absent,absent,present,high,infant red crusted cheek
+img_013130,absent,absent,present,high,intense red patches periocular cheek
+img_005334,present,absent,absent,medium,chin papules
+img_017382,absent,absent,absent,medium,stock portrait
+img_018795,absent,absent,absent,medium,stock portrait
+img_010504,present,absent,absent,low,few red marks cheek
+img_019672,absent,absent,absent,low,towel selfie
+img_012859,absent,absent,present,medium,red scaly patch
+img_012238,absent,absent,present,high,weeping crusted face rash
+img_013105,unknown,unknown,unknown,low,dark hairline
+img_017322,absent,absent,absent,low,curly selfie
+img_013850,absent,absent,present,high,toddler perioral red patches
+img_016047,absent,absent,absent,low,selfie
+img_013278,absent,absent,present,high,scaly red plaque nummular
+img_012343,absent,absent,present,high,infant red scaly cheeks
+img_011977,absent,present,absent,high,melasma nose cheek
+img_006606,absent,absent,present,low,red-orange facial erythema
+img_018866,unknown,unknown,unknown,low,masked woman
+img_015088,unknown,unknown,unknown,low,child generalised scaling ichthyosis-like
+img_003426,present,absent,absent,medium,cheek papules
+img_021048,absent,absent,absent,low,man in uniform
+img_006648,absent,absent,absent,low,grainy cheek
+img_012456,absent,absent,present,medium,dry cracked scaling skin
+img_018817,absent,absent,absent,low,selfie
+img_000799,present,absent,absent,high,papules pustules cheek
+img_004937,unknown,unknown,present,low,scaly nose open comedones
+img_012915,absent,absent,present,low,eyelid skin thickened
+img_013358,absent,absent,present,medium,red scaly patch dark crop
+img_013015,absent,absent,present,high,infant perioral red cheeks
+img_012664,absent,absent,absent,low,older periocular wrinkles
+img_010214,absent,present,absent,medium,pale skin brown patch
+img_018810,absent,absent,absent,low,towel selfie
+img_005040,present,absent,absent,high,cheek papules
+img_017480,absent,absent,absent,medium,stock pink
+img_014920,absent,absent,present,high,weeping crusted cheek eczema
+img_006845,absent,present,absent,low,before melasma mild
+img_017089,absent,absent,absent,medium,stock curly
+img_013058,absent,absent,present,medium,round crusted red lesions
+img_006963,absent,present,absent,high,periorbital melasma older
+img_018328,absent,present,absent,low,freckles woman cream
+img_017271,absent,absent,absent,low,stock curly freckles
+img_009068,absent,present,absent,high,melasma lentigines cheek
+img_020451,absent,present,absent,low,freckles woman
+img_007401,absent,present,absent,high,melasma lentigines and acne scars
+img_014472,unknown,unknown,unknown,low,red papules macro skin
+img_008046,absent,unknown,absent,low,stretched older face
+img_017470,absent,present,absent,low,freckles young woman
+img_013738,absent,absent,present,medium,infant red cheeks
+img_020781,absent,absent,absent,low,selfie
+img_006784,absent,present,absent,high,melasma patches cheek
+img_016297,absent,absent,absent,low,flushed selfie
+img_018298,absent,absent,absent,low,towel selfie
+img_016208,absent,absent,absent,medium,stock mature woman
+img_015243,absent,absent,present,medium,severe red crusted forehead
+img_006984,absent,absent,absent,low,shiny grainy profile
+img_017257,absent,absent,absent,medium,product ad
+img_001771,present,absent,absent,high,cheek pustules papules
+img_016060,absent,present,absent,low,freckles woman
+img_013118,absent,absent,present,low,pink papular patch cheek
+img_010928,absent,absent,absent,low,woman side face
+img_002418,present,absent,absent,low,tiny crop papules
+img_007377,present,absent,absent,medium,forehead red lesion
+img_009228,absent,absent,present,low,pinkish patches cheek
+img_021549,absent,absent,absent,low,hair swept selfie
+img_000397,present,absent,absent,medium,forehead bumps dark skin
+img_015297,absent,absent,present,medium,red crusted lesions
+img_016844,absent,absent,absent,low,video selfie
+img_000288,present,absent,absent,high,cheek acne
+img_012883,present,absent,absent,medium,red papules widespread
+img_017067,absent,absent,absent,medium,stock hair
+img_016967,absent,absent,absent,medium,stock portrait
+img_019650,absent,absent,absent,medium,man with cap
+img_017173,absent,absent,absent,low,selfie
+img_009196,absent,present,absent,medium,dark spots upper lip cheek
+img_018975,absent,absent,absent,low,woman portrait
+img_018693,absent,absent,absent,medium,studio portrait
+img_007413,absent,present,absent,high,melasma nose cheeks
+img_012941,unknown,unknown,unknown,low,dark skin small papules masked
+img_015868,absent,present,absent,medium,hyperpigmented face towel
+img_012102,absent,present,absent,low,freckles woman
+img_011231,absent,present,absent,low,mild brown spots temple
+img_020332,absent,absent,absent,low,selfie
+img_007620,absent,present,absent,low,mild brown spots cheek
+img_012743,absent,absent,present,medium,perioral cracking scaling
+img_016344,absent,absent,absent,medium,influencer with tube
+img_006960,absent,present,absent,high,freckles mottled pigmentation
+img_020572,absent,absent,absent,medium,man with oil
+img_010054,unknown,unknown,unknown,low,eyelid small papules
+img_009918,absent,present,absent,high,freckles dark spots cheek
+img_004883,present,absent,absent,high,large whitehead pustule
+img_007368,absent,absent,absent,low,eyelid small dark papules syringoma-like
+img_006192,absent,present,absent,high,brown macule patch
+img_015783,absent,absent,absent,low,filtered selfie
+img_011320,absent,present,absent,high,melasma cheek grainy
+img_009588,absent,present,absent,high,brown patch forehead temple
+img_016525,absent,absent,absent,medium,man applying cream
+img_014635,absent,present,absent,high,heavy freckling periocular
+img_010829,absent,present,absent,high,dark melasma cheek
+img_017596,absent,absent,absent,low,woman looking down
+img_020027,absent,present,absent,low,freckled blonde
+img_000375,present,absent,absent,low,faint red papules cheek crop
+img_019742,absent,absent,absent,medium,man mask spa
+img_013112,absent,absent,present,low,red papules scattered
+img_017210,absent,absent,absent,medium,shirtless man non-facial
+img_018983,absent,absent,absent,medium,cream on cheek grimace
+img_016355,absent,absent,absent,low,collage freckles
+img_011979,present,present,absent,medium,brown patches with red papules chin
+img_021830,absent,present,absent,low,freckles closeup
+img_012341,absent,absent,present,low,malar erythema
+img_005902,absent,present,absent,low,mild mottled tone grainy

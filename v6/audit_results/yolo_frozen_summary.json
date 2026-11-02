@@ -1,0 +1,41 @@
+{
+  "exact_candidate_images_by_split": [
+    {
+      "split": "fusion",
+      "candidate_dataset": "acne_installed_metadata_dataset",
+      "images": 130
+    },
+    {
+      "split": "fusion",
+      "candidate_dataset": "hyperpigmentation_candidate_v2_train",
+      "images": 87
+    },
+    {
+      "split": "test",
+      "candidate_dataset": "acne_installed_metadata_dataset",
+      "images": 135
+    },
+    {
+      "split": "test",
+      "candidate_dataset": "hyperpigmentation_candidate_v2_train",
+      "images": 87
+    },
+    {
+      "split": "validation",
+      "candidate_dataset": "acne_installed_metadata_dataset",
+      "images": 94
+    },
+    {
+      "split": "validation",
+      "candidate_dataset": "hyperpigmentation_candidate_v2_train",
+      "images": 50
+    }
+  ],
+  "proxy_group_images_by_split": {
+    "fusion": 395,
+    "test": 398,
+    "validation": 227
+  },
+  "patient_identity": "unknown",
+  "lineage": "Current-folder candidates; historical snapshots and model linkage still require verification."
+}

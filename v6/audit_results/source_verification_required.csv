@@ -1,0 +1,13 @@
+source_key,purpose,reasons
+Acne/aug,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Acne/other,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Acne/roboflow_export,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Eczema/aug,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Eczema/other,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Eczema/roboflow_export,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Hyperpigmentation/aug,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Hyperpigmentation/other,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Hyperpigmentation/roboflow_export,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Normal/aug,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Normal/other,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training
+Normal/roboflow_export,training,missing description; missing license_or_terms; missing consent_basis; missing retention_policy; missing responsible_person; identifiable-face status unresolved; use not authorized for training

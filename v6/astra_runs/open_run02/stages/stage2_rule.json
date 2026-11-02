@@ -1,0 +1,10 @@
+{
+  "band": 0.14,
+  "selection": {
+    "band": 0.14,
+    "coverage": 0.8416666666666667,
+    "error": 0.09900990099009901,
+    "n_accepted_known": 303
+  },
+  "note": "Stage-2 margin band selected on out-of-fold fusion data; None disables supported decisions and produces explicit abstention."
+}

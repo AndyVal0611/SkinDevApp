@@ -1,0 +1,64 @@
+{
+  "synthetic_only": true,
+  "scratch": "/tmp/lumyvue_SYNTHETIC_TRAIN_xj9fuh72",
+  "tests": [
+    {
+      "name": "actual_global_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "FAIL",
+      "error": "AssertionError('Backbone weights did not update')"
+    },
+    {
+      "name": "actual_ROI_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "PASS",
+      "seconds": 33.77,
+      "details": {
+        "loss": 0.5753193497657776,
+        "output_shape": [
+          1,
+          4
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:GPU:0",
+        "checkpoint": "/tmp/lumyvue_SYNTHETIC_TRAIN_xj9fuh72/roi.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true
+      }
+    },
+    {
+      "name": "actual_fusion_forward_backward_optimizer_masking_resume",
+      "status": "PASS",
+      "seconds": 4.54,
+      "details": {
+        "loss": 1.8121185302734375,
+        "output_shape": [
+          2,
+          3
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:GPU:0",
+        "checkpoint": "/tmp/lumyvue_SYNTHETIC_TRAIN_xj9fuh72/fusion.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true,
+        "full_size_roi_input": [
+          12,
+          83
+        ]
+      }
+    }
+  ],
+  "started": 1793503757.479921,
+  "gpu_devices": [
+    "PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')"
+  ],
+  "policy": "mixed_float16",
+  "gpu_memory": {
+    "current": 75207168,
+    "peak": 297191936
+  },
+  "original_models_unchanged": true,
+  "passed": 2,
+  "failed": 1,
+  "elapsed_seconds": 128.19,
+  "tensorflow": "2.21.0",
+  "keras": "3.15.1"
+}

@@ -1,0 +1,186 @@
+#@@ md
+## Checkpoint contracts and recovery (all supervised stages)
+Every phase/fold has a schema-versioned identity including configuration, source code, model/optimizer configuration, source manifests, annotation versions and data/features. Changed identities require a **new RUN_ID**. Completed jobs are restored, not fitted again. Global/ROI recovery restores optimizer and epoch/controller state at an epoch boundary; random shuffling and device kernels are **not guaranteed bitwise identical** after a fresh kernel. Fusion conservatively restarts only an incomplete fold in a new attempt directory; completed folds/seeds are reused after hash verification. No claim of exact stochastic mid-epoch continuation is made.
+
+#@@ code
+import pathlib
+
+def content_digest(value):
+    h = hashlib.sha256()
+    def visit(x):
+        h.update((type(x).__name__+':').encode())
+        if isinstance(x, dict):
+            for k in sorted(x): h.update(json.dumps(str(k)).encode()); visit(x[k])
+        elif isinstance(x, (list, tuple)):
+            for v in x: visit(v)
+        elif isinstance(x, np.ndarray):
+            h.update(str((x.shape, str(x.dtype))).encode())
+            if x.dtype.kind in 'OUS':
+                for v in x.flat: visit(str(v))
+            else: h.update(np.ascontiguousarray(x).tobytes())
+        elif isinstance(x, str) and os.path.isfile(x):
+            h.update(json.dumps(x).encode()); h.update(sha256_file(x).encode())
+        else: h.update(json.dumps(x, sort_keys=True, default=str).encode())
+    visit(value)
+    return h.hexdigest()
+
+
+def training_identity(stage, phase, seed, data):
+    sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR, '*.cellsrc')))
+    require(sources, 'Astra sources missing; retain astra_training_src beside the notebook', gate=True)
+    records = {k: sha256_file(getattr(CFG,k)) if os.path.isfile(getattr(CFG,k,'')) else None
+               for k in ['V5_MANIFEST','ANNOTATION_CSV','REGION_CSV','PROVENANCE_CSV','V5_KERAS']}
+    records['frozen_split'] = sha256_file(os.path.join(CFG.SPLIT_DIR,'v6_split_manifest.csv'))
+    records['detectors'] = {p:sha256_file(p) for p in sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR,'*.onnx')))}
+    return dict(schema='astra-training/1', stage=stage, phase=phase, seed=int(seed),
+                configuration=content_digest(vars(CFG)), code=content_digest(sources), inputs=records,
+                data=content_digest(data), conditions=CFG.CONDITIONS, roi_classes=CFG.ROI_CLASSES,
+                tensorflow=tf.__version__, keras=keras.__version__, stochastic_resume='epoch_boundary_not_bitwise_exact')
+
+
+def atomic_record(path, data):
+    temp = safe_path(str(path) + '.tmp')
+    with open(temp, 'w', encoding='utf-8') as stream: json.dump(data, stream, indent=2, default=str)
+    os.replace(temp, safe_path(str(path)))
+
+
+def recovery_fit(model, train, validation, directory, identity, epochs, monitor='val_loss', mode='min',
+                 metric_callbacks=None, restart_incomplete=False, patience=None, use_plateau=True, **fit_kwargs):
+    """Real fit controller; caller supplies gated real data OR explicit synthetic fixtures."""
+    directory = safe_path(directory); os.makedirs(directory, exist_ok=True)
+    contract_path = os.path.join(directory, 'contract.json')
+    identity = dict(identity, model=json.loads(model.to_json()), optimizer=keras.optimizers.serialize(model.optimizer),
+                    epochs=int(epochs), monitor=monitor, mode=mode, patience=patience, use_plateau=use_plateau)
+    # Optimizer compile config contains initial LR, never the checkpoint's plateau-reduced LR.
+    def canonical(value):
+        if isinstance(value,dict): return {k:canonical(v) for k,v in value.items()}
+        if isinstance(value,list): return [canonical(v) for v in value]
+        if isinstance(value,str): return re.sub(r'(?<=[a-z])_\d+(?=$|/)', '', value)
+        return value
+    identity['model'] = canonical(identity['model'])
+    digest = content_digest(identity)
+    if os.path.exists(contract_path):
+        require(json.load(open(contract_path))['sha256'] == digest,
+                f'Incompatible checkpoint contract at {directory}; use a NEW RUN_ID (configuration/data/labels/code/model changed)', gate=True)
+    else:
+        require(not os.listdir(directory), f'Unversioned checkpoint files at {directory}; preserve them and use a NEW RUN_ID', gate=True)
+        atomic_record(contract_path, dict(sha256=digest, identity=identity))
+    attempts = sorted(glob.glob(os.path.join(directory, 'attempt_*')))
+    attempt = attempts[-1] if attempts else os.path.join(directory, 'attempt_0001')
+    state_path = os.path.join(attempt, 'state.json')
+    state = json.load(open(state_path)) if os.path.isfile(state_path) else {}
+    for name, expected in state.get('hashes', {}).items():
+        require(os.path.isfile(os.path.join(attempt, name)) and sha256_file(os.path.join(attempt, name)) == expected,
+                f'Checkpoint artifact integrity failure: {name}', gate=True)
+    if state.get('complete'):
+        return keras.models.load_model(os.path.join(attempt, state['selected'])), dict(attempt=attempt, reused=True, **state)
+    if attempts and not state.get('complete') and restart_incomplete:
+        previous = attempt
+        attempt = os.path.join(directory, f'attempt_{len(attempts)+1:04d}')
+        state = {}; state_path = os.path.join(attempt, 'state.json')
+        log_event('incomplete_fold_restart', previous=previous, new_attempt=attempt, reason='exact stochastic continuation not claimed')
+    os.makedirs(attempt, exist_ok=True)
+    early = keras.callbacks.EarlyStopping(monitor=monitor, mode=mode, patience=patience if patience is not None else CFG.EARLY_STOP_PATIENCE, restore_best_weights=False)
+    plateau = keras.callbacks.ReduceLROnPlateau(monitor=monitor, mode=mode, patience=CFG.LR_PATIENCE, factor=CFG.LR_FACTOR, min_lr=CFG.MIN_LR)
+    start = int(state.get('epoch', 0))
+    if state:
+        model = keras.models.load_model(os.path.join(attempt, state['latest']))
+    class Recovery(keras.callbacks.Callback):
+        def on_train_begin(self, logs=None):
+            # Restore callback controllers after their own on_train_begin reset.
+            for cb, key in [(early, 'early'), (plateau, 'plateau')]:
+                for k,v in state.get(key, {}).items(): setattr(cb, k, v)
+        def on_epoch_end(self, epoch, logs=None):
+            logs = dict(logs or {}); value = float(logs[monitor])
+            require(np.isfinite(value), f'Non-finite monitored metric {monitor}; checkpoint not committed')
+            better = not current or (value > current['best_metric'] if mode == 'max' else value < current['best_metric'])
+            latest = f'epoch_{epoch+1:05d}.keras'
+            self.model.save(safe_path(os.path.join(attempt, latest)))
+            if better:
+                best = latest
+            else: best = current['best']
+            history.append(dict(epoch=epoch+1, **{k:float(v) for k,v in logs.items()}))
+            history_name = f'epoch_{epoch+1:05d}.history.csv'
+            pd.DataFrame(history).to_csv(safe_path(os.path.join(attempt, history_name)), index=False)
+            record = dict(epoch=epoch+1, latest=latest, best=best, history=history_name,
+                          best_metric=value if better else current['best_metric'], complete=False,
+                          early={k:getattr(early,k) for k in ('wait','best','stopped_epoch') if hasattr(early,k)},
+                          plateau={k:getattr(plateau,k) for k in ('wait','best','cooldown_counter') if hasattr(plateau,k)},
+                          hashes={n:sha256_file(os.path.join(attempt,n)) for n in (latest,best,history_name)})
+            atomic_record(state_path, record)
+            keep = set(record['hashes'])
+            for old in glob.glob(os.path.join(attempt,'epoch_*')):
+                if os.path.basename(old) not in keep: os.remove(safe_path(old))
+            current.clear(); current.update(record)
+    current = dict(state)
+    history = pd.read_csv(os.path.join(attempt,state['history'])).to_dict('records') if state else []
+    try:
+        # EarlyStopping/plateau run before Recovery so committed controller state matches that epoch.
+        if start < epochs and not (state.get('early',{}).get('stopped_epoch',0)):
+            model.fit(train, validation_data=validation, epochs=epochs, initial_epoch=start,
+                      callbacks=list(metric_callbacks or [])+[early]+([plateau] if use_plateau else [])+[Recovery()], **fit_kwargs)
+    except tf.errors.ResourceExhaustedError as ex:
+        raise V6Error('GPU/RAM exhausted. Keep checkpoints. Do not silently change batch size under this RUN_ID; use a new run definition.') from ex
+    require(current, 'No epoch checkpoint was committed; inspect input pipeline/fit logs')
+    # Keep optimizer/latest generation for resume, but return/export validation-best weights.
+    model = keras.models.load_model(os.path.join(attempt, current['best']))
+    final = 'selected.keras'; model.save(safe_path(os.path.join(attempt, final)))
+    current.update(complete=True, selected=final)
+    current['hashes'].update({final:sha256_file(os.path.join(attempt,final))})
+    atomic_record(state_path, current)
+    return model, dict(attempt=attempt, reused=False, **current)
+
+
+def save_selected_model(model, path):
+    if os.path.exists(path):
+        previous = keras.models.load_model(path, compile=False)
+        require(content_digest(previous.get_weights()) == content_digest(model.get_weights()),
+                f'Completed selected model differs at {path}; use a new RUN_ID', gate=True)
+        return
+    model.save(safe_path(path))
+
+#@@ code
+def astra_require_action(action):
+    """A one-use token: Run All stops before any expensive research operation."""
+    global ASTRA_ACTION
+    if ASTRA_ACTION != action:
+        raise GateError(f'Researcher-controlled cell: set ASTRA_ACTION = {action!r} in a separate cell, then run this cell. Read the guide first.')
+    ASTRA_ACTION = None
+    log_event('researcher_action', action=action)
+
+def astra_phase_record(model, rec, directory, phase):
+    """Compatibility artifacts for existing plots/selection; recovery stays authoritative."""
+    model.save_weights(safe_path(os.path.join(directory, f'phase{phase}_best.weights.h5')))
+    shutil.copyfile(os.path.join(rec['attempt'],rec['history']), safe_path(os.path.join(directory,f'phase{phase}_history.csv')))
+    write_json(os.path.join(directory,f'phase{phase}_state.json'),rec)
+
+def astra_select_phase(directory, metric='val_sel'):
+    """B wins exact ties, matching the established ROI rule. Missing files fail."""
+    records = {p:json.load(open(os.path.join(directory,f'phase{p}_state.json'))) for p in 'AB'}
+    a,b = (float(records[p]['best_metric']) for p in 'AB')
+    require(np.isfinite([a,b]).all(),'Non-finite phase-selection metric',gate=True)
+    phase = 'B' if b >= a else 'A'
+    rec = records[phase]
+    selected = os.path.join(rec['attempt'],rec['selected'])
+    require(os.path.isfile(selected),'Missing selected checkpoint: '+selected,gate=True)
+    require(sha256_file(selected)==rec['hashes'][rec['selected']],'Selected checkpoint hash mismatch',gate=True)
+    model = keras.models.load_model(selected)
+    write_json(os.path.join(directory,'phase_selection.json'),dict(phase=phase,criterion=metric,phase_a=a,phase_b=b,
+        tie_rule='B',checkpoint=selected,sha256=sha256_file(selected),optimizer_note='selected epoch optimizer preserved'))
+    return model,phase
+
+#@@ code
+# Pin the entire run before any research data cache is reused.
+_astra_inputs = {k:sha256_file(getattr(CFG,k)) if os.path.isfile(getattr(CFG,k,'')) else None
+                 for k in ['V5_MANIFEST','ANNOTATION_CSV','REGION_CSV','PROVENANCE_CSV','V5_KERAS','V5_ONNX']}
+_astra_inputs['split'] = sha256_file(os.path.join(CFG.SPLIT_DIR,'v6_split_manifest.csv'))
+_astra_inputs['detectors'] = {p:sha256_file(p) for p in sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR,'*.onnx')))}
+_astra_sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR,'*.cellsrc'))) + sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR,'*.cellpy')))
+_astra_contract = dict(config=vars(CFG),inputs=_astra_inputs,code=content_digest(_astra_sources),tensorflow=tf.__version__,keras=keras.__version__)
+_astra_contract_path = os.path.join(CFG.DIRS['config'],'astra_run_contract.json')
+_astra_digest = content_digest(_astra_contract)
+if os.path.exists(_astra_contract_path):
+    require(json.load(open(_astra_contract_path))['sha256']==_astra_digest,'Run inputs/configuration/source changed: use a NEW RUN_ID',gate=True)
+else:
+    atomic_record(_astra_contract_path,dict(sha256=_astra_digest,identity=_astra_contract))
+print('Astra run contract:',_astra_digest)

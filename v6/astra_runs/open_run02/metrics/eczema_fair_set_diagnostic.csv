@@ -1,0 +1,133 @@
+image_id,origin,truth,v5_score,full_score,v5_says,full_says
+img_000082,source_dataset,no eczema,0.001,0.007,False,False
+img_000139,source_dataset,eczema,0.092,0.746,False,True
+img_000240,source_dataset,no eczema,0.006,0.113,False,False
+img_000438,source_dataset,no eczema,0.055,0.05,False,False
+img_000480,source_dataset,no eczema,0.004,0.02,False,False
+img_000650,source_dataset,no eczema,0.021,0.029,False,False
+img_000678,source_dataset,no eczema,0.307,0.297,False,False
+img_000742,source_dataset,no eczema,0.003,0.086,False,False
+img_000810,source_dataset,eczema,0.668,0.179,True,False
+img_000899,source_dataset,no eczema,0.0,0.022,False,False
+img_001073,source_dataset,eczema,0.874,0.629,True,True
+img_001204,source_dataset,no eczema,0.001,0.059,False,False
+img_001320,source_dataset,no eczema,0.001,0.011,False,False
+img_001372,source_dataset,no eczema,0.001,0.015,False,False
+img_001459,source_dataset,no eczema,0.001,0.057,False,False
+img_001472,source_dataset,no eczema,0.001,0.053,False,False
+img_001573,source_dataset,no eczema,0.001,0.021,False,False
+img_001575,source_dataset,no eczema,0.034,0.096,False,False
+img_001698,source_dataset,no eczema,0.008,0.052,False,False
+img_001989,source_dataset,no eczema,0.031,0.041,False,False
+img_002000,source_dataset,no eczema,0.017,0.133,False,False
+img_002010,source_dataset,no eczema,0.004,0.016,False,False
+img_002083,source_dataset,no eczema,0.001,0.05,False,False
+img_002112,source_dataset,no eczema,0.032,0.048,False,False
+img_002160,source_dataset,no eczema,0.008,0.013,False,False
+img_002164,source_dataset,no eczema,0.004,0.054,False,False
+img_002196,source_dataset,no eczema,0.029,0.129,False,False
+img_002238,source_dataset,eczema,0.0,0.04,False,False
+img_002341,source_dataset,no eczema,0.001,0.023,False,False
+img_002562,source_dataset,no eczema,0.0,0.076,False,False
+img_002584,source_dataset,no eczema,0.003,0.043,False,False
+img_002594,source_dataset,no eczema,0.001,0.05,False,False
+img_002601,source_dataset,eczema,0.451,0.529,False,True
+img_002635,source_dataset,no eczema,0.015,0.084,False,False
+img_002885,source_dataset,no eczema,0.055,0.06,False,False
+img_003365,source_dataset,no eczema,0.075,0.076,False,False
+img_003487,source_dataset,no eczema,0.001,0.013,False,False
+img_003562,source_dataset,no eczema,0.015,0.036,False,False
+img_003733,source_dataset,no eczema,0.001,0.061,False,False
+img_003872,source_dataset,no eczema,0.038,0.249,False,False
+img_003987,source_dataset,no eczema,0.001,0.021,False,False
+img_004163,source_dataset,no eczema,0.517,0.221,True,False
+img_004179,source_dataset,no eczema,0.001,0.009,False,False
+img_004222,source_dataset,eczema,0.001,0.105,False,False
+img_004478,source_dataset,no eczema,0.595,0.71,True,True
+img_004670,source_dataset,no eczema,0.4,0.156,False,False
+img_004881,source_dataset,no eczema,0.001,0.01,False,False
+img_004968,source_dataset,no eczema,0.023,0.027,False,False
+img_005038,source_dataset,no eczema,0.891,0.481,True,True
+img_005234,source_dataset,no eczema,0.004,0.038,False,False
+img_005419,source_dataset,no eczema,0.0,0.032,False,False
+img_005422,source_dataset,no eczema,0.024,0.023,False,False
+img_005478,source_dataset,no eczema,0.007,0.066,False,False
+img_005521,source_dataset,no eczema,0.07,0.182,False,False
+img_005567,source_dataset,eczema,0.872,0.711,True,True
+img_005704,source_dataset,no eczema,0.011,0.086,False,False
+img_005712,source_dataset,no eczema,0.087,0.09,False,False
+img_006187,source_dataset,no eczema,0.008,0.072,False,False
+img_006319,source_dataset,no eczema,0.001,0.021,False,False
+img_006745,source_dataset,no eczema,0.001,0.037,False,False
+img_006862,source_dataset,no eczema,0.005,0.1,False,False
+img_006975,source_dataset,no eczema,0.002,0.018,False,False
+img_007232,source_dataset,no eczema,0.0,0.028,False,False
+img_007296,source_dataset,no eczema,0.0,0.011,False,False
+img_008066,source_dataset,no eczema,0.027,0.073,False,False
+img_008135,source_dataset,no eczema,0.495,0.556,True,True
+img_008142,source_dataset,no eczema,0.0,0.03,False,False
+img_008411,source_dataset,no eczema,0.001,0.037,False,False
+img_008504,source_dataset,no eczema,0.003,0.051,False,False
+img_008524,source_dataset,no eczema,0.003,0.057,False,False
+img_008556,source_dataset,no eczema,0.145,0.062,False,False
+img_008763,source_dataset,no eczema,0.002,0.053,False,False
+img_008791,source_dataset,no eczema,0.001,0.049,False,False
+img_009036,source_dataset,no eczema,0.0,0.014,False,False
+img_009039,source_dataset,no eczema,0.009,0.13,False,False
+img_009435,source_dataset,no eczema,0.002,0.088,False,False
+img_009453,source_dataset,no eczema,0.837,0.297,True,False
+img_009562,source_dataset,no eczema,0.004,0.081,False,False
+img_010278,source_dataset,no eczema,0.003,0.04,False,False
+img_010310,source_dataset,no eczema,0.003,0.045,False,False
+img_011117,source_dataset,no eczema,0.002,0.03,False,False
+img_011167,source_dataset,no eczema,0.008,0.057,False,False
+img_011373,source_dataset,no eczema,0.001,0.027,False,False
+img_011449,source_dataset,no eczema,0.019,0.038,False,False
+img_011865,source_dataset,no eczema,0.059,0.078,False,False
+img_012133,source_dataset,no eczema,0.0,0.019,False,False
+img_012271,source_dataset,eczema,0.999,0.874,True,True
+img_012516,source_dataset,no eczema,0.374,0.077,False,False
+img_012831,source_dataset,eczema,0.979,0.582,True,True
+img_012879,source_dataset,eczema,0.969,0.21,True,False
+img_013049,source_dataset,eczema,0.991,0.563,True,True
+img_013087,source_dataset,eczema,0.541,0.15,True,False
+img_013555,source_dataset,eczema,0.957,0.664,True,True
+img_013783,source_dataset,no eczema,0.998,0.221,True,False
+img_013837,source_dataset,eczema,0.806,0.836,True,True
+img_014033,source_dataset,eczema,0.47,0.274,True,False
+img_014106,source_dataset,eczema,0.939,0.22,True,False
+img_014238,source_dataset,eczema,0.904,0.237,True,False
+img_014661,source_dataset,eczema,0.866,0.355,True,True
+img_014698,source_dataset,no eczema,0.99,0.257,True,False
+img_016024,source_dataset,no eczema,0.001,0.027,False,False
+img_016159,source_dataset,no eczema,0.001,0.022,False,False
+img_016187,source_dataset,no eczema,0.0,0.03,False,False
+img_016301,source_dataset,no eczema,0.0,0.013,False,False
+img_016518,source_dataset,no eczema,0.0,0.009,False,False
+img_016621,source_dataset,no eczema,0.0,0.021,False,False
+img_016659,source_dataset,no eczema,0.005,0.034,False,False
+img_017157,source_dataset,no eczema,0.0,0.019,False,False
+img_017160,source_dataset,no eczema,0.01,0.025,False,False
+img_017217,source_dataset,no eczema,0.001,0.016,False,False
+img_017284,source_dataset,no eczema,0.031,0.123,False,False
+img_017306,source_dataset,no eczema,0.0,0.02,False,False
+img_017365,source_dataset,no eczema,0.001,0.015,False,False
+img_017530,source_dataset,no eczema,0.031,0.051,False,False
+img_017830,source_dataset,no eczema,0.027,0.031,False,False
+img_018215,source_dataset,no eczema,0.0,0.028,False,False
+img_018652,source_dataset,no eczema,0.0,0.016,False,False
+img_018763,source_dataset,no eczema,0.0,0.043,False,False
+img_019406,source_dataset,no eczema,0.003,0.042,False,False
+img_019463,source_dataset,no eczema,0.054,0.027,False,False
+img_019883,source_dataset,no eczema,0.001,0.03,False,False
+img_020030,source_dataset,no eczema,0.0,0.033,False,False
+img_020529,source_dataset,no eczema,0.0,0.017,False,False
+img_021049,source_dataset,no eczema,0.0,0.027,False,False
+img_021084,source_dataset,no eczema,0.003,0.023,False,False
+img_021164,source_dataset,no eczema,0.0,0.015,False,False
+img_021204,source_dataset,no eczema,0.0,0.027,False,False
+img_021336,source_dataset,no eczema,0.0,0.009,False,False
+img_021591,source_dataset,no eczema,0.002,0.02,False,False
+img_021635,source_dataset,no eczema,0.011,0.066,False,False
+img_021663,source_dataset,no eczema,0.001,0.027,False,False
+img_021686,source_dataset,no eczema,0.001,0.033,False,False

@@ -464,6 +464,9 @@ def set_gate(name, ok, why=""):
 
 
 def gate(name):
+    if name.startswith(("annotations_", "regions_")):
+        split = name.split("_", 1)[1]
+        require_source_permission([split], "training" if split in ("train", "validation", "fusion") else "evaluation")
     g = GATES.get(name)
     if g is None:
         raise GateError(f"Gate '{name}' has not been evaluated yet: run the section that defines it first.")

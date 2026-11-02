@@ -1,0 +1,60 @@
+{
+  "conditions": [
+    {
+      "condition": "Acne",
+      "catalog_images": 3000,
+      "frozen_images": 3000,
+      "verified_ai_training_permission": 0,
+      "unresolved_frozen": 3000,
+      "confirmed_restricted": 0,
+      "possible_dermnet_catalog": 0,
+      "possible_dermnet_frozen": 0,
+      "dermnet_filename_hints_frozen": 0,
+      "dermnet_group_or_hash_only_frozen": 0
+    },
+    {
+      "condition": "Eczema",
+      "catalog_images": 1063,
+      "frozen_images": 789,
+      "verified_ai_training_permission": 0,
+      "unresolved_frozen": 789,
+      "confirmed_restricted": 0,
+      "possible_dermnet_catalog": 3,
+      "possible_dermnet_frozen": 3,
+      "dermnet_filename_hints_frozen": 3,
+      "dermnet_group_or_hash_only_frozen": 0
+    },
+    {
+      "condition": "Hyperpigmentation",
+      "catalog_images": 3000,
+      "frozen_images": 3000,
+      "verified_ai_training_permission": 0,
+      "unresolved_frozen": 3000,
+      "confirmed_restricted": 0,
+      "possible_dermnet_catalog": 0,
+      "possible_dermnet_frozen": 0,
+      "dermnet_filename_hints_frozen": 0,
+      "dermnet_group_or_hash_only_frozen": 0
+    },
+    {
+      "condition": "Normal",
+      "catalog_images": 3000,
+      "frozen_images": 3000,
+      "verified_ai_training_permission": 0,
+      "unresolved_frozen": 3000,
+      "confirmed_restricted": 0,
+      "possible_dermnet_catalog": 0,
+      "possible_dermnet_frozen": 0,
+      "dermnet_filename_hints_frozen": 0,
+      "dermnet_group_or_hash_only_frozen": 0
+    }
+  ],
+  "frozen_split_counts": {
+    "fusion": 1469,
+    "test": 1468,
+    "train": 5873,
+    "validation": 979
+  },
+  "verified_subset_meets_training_gate": false,
+  "status": "No substantiated image-linked AI-training grants found. Possible DermNet flags are clues, not proven origin or adjudicated restrictions."
+}

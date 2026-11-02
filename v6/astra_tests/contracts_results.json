@@ -1,0 +1,10 @@
+{
+  "synthetic_only": true,
+  "scratch": "/tmp/astra_SYNTHETIC_contracts_2op2joc1",
+  "run": 24,
+  "passed": 24,
+  "failures": [],
+  "errors": [],
+  "skipped": [],
+  "gpu": []
+}

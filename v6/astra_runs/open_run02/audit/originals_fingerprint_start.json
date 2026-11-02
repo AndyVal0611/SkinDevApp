@@ -1,0 +1,70 @@
+{
+  "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/precisionskin_best.keras": {
+    "sha256": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+    "bytes": 46434440
+  },
+  "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/precisionskin.onnx": {
+    "sha256": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+    "bytes": 5386421
+  },
+  "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/labels.json": {
+    "sha256": "f987fcc55e3d43201186f969daf3bb3e617e49957f757b80939f47758faf51d9",
+    "bytes": 305
+  },
+  "/home/bautista/PrecisionSkinV1/metadata/metadata/split_manifest.csv": {
+    "sha256": "a251affca0169790ef4aaf6ea7c4fe41246d8d1748f034ff456d6eb740915b04",
+    "bytes": 7935465
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne.json": {
+    "sha256": "06be400b39016e29a4caf1224e4f85701552a8662aa0b2673b707b3fb98e1f36",
+    "bytes": 1931
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne.onnx": {
+    "sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+    "bytes": 44841043
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne_m2.onnx": {
+    "sha256": "f00c6e6bb3330b5574fb6e969e3d0cdc8037139fcf20767974d58121cacf4c92",
+    "bytes": 44841042
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_acne_m3.onnx": {
+    "sha256": "6dfb0969cf5c0b987cfb31dfc6c002c90621dbc4a6b58619871b48edea9d88cb",
+    "bytes": 44841041
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema.json": {
+    "sha256": "8b0dabb13ff3849f2a44d69e919353ebfcf9247a110845dcab00e1190194bde6",
+    "bytes": 1475
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema.onnx": {
+    "sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+    "bytes": 12773204
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema_m2.onnx": {
+    "sha256": "8fbf857b316986f485a8fdb599866e8292ad7faffc32fc781c0b02596aea41fe",
+    "bytes": 12773204
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_eczema_m3.onnx": {
+    "sha256": "b5a6b50b9c50c1f8d5c47379d9317bb62cdc0af4ba0328280daa805de581fdde",
+    "bytes": 12773204
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation.json": {
+    "sha256": "0184bbd681005ede14c06e170759e951f7f40ec316a7ba4ee47fa2e257fcec8a",
+    "bytes": 908
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation.onnx": {
+    "sha256": "f27affb73061ddff8a2f27463a117a79b3eba97655dca7c2099409971918f501",
+    "bytes": 44841058
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation_m2.onnx": {
+    "sha256": "ed821543c9bc84ff2f24960c8e932017f821f490c68c6f11c9b486607a72d63e",
+    "bytes": 44841044
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/lesion_detector_hyperpigmentation_m3.onnx": {
+    "sha256": "2a6fa1afa61f4eeed11d15f87421c9429c9de07864f0608bcdb5921ce205a165",
+    "bytes": 44841046
+  },
+  "/mnt/c/Users/Bautista/source/repos/SkinDevApp/SkinDevApp/Model/precisionskin.onnx": {
+    "sha256": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+    "bytes": 5386421
+  }
+}

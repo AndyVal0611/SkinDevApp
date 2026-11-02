@@ -1,0 +1,135 @@
+#@@ md
+## Astra development evaluation and derived Normal — researcher initiated
+Fusion OOF results are development estimates: the same development labels select calibration and reliability rules. They are **not independent performance estimates**. Validation images also selected the CNN checkpoints. Stage comparisons below preserve abstentions and report corrected/introduced errors only on paired accepted, fully reviewed references.
+
+#@@ code
+def astra_normal_metrics(y,states):
+    y=np.asarray(y);states=np.asarray(states)
+    eligible=(y>=0).all(1);accepted=np.isin(states,['FINDINGS_SUPPORTED','MULTIPLE_FINDINGS_SUPPORTED','NO_FINDINGS_SUPPORTED'])
+    truth=(y==0).all(1);pred=states=='NO_FINDINGS_SUPPORTED';k=eligible & accepted
+    tp=int((k & truth & pred).sum());fp=int((k & ~truth & pred).sum());fn=int((k & truth & ~pred).sum());tn=int((k & ~truth & ~pred).sum())
+    ratio=lambda a,b:float(a/b) if b else None
+    return dict(reference_n=int(eligible.sum()),accepted_n=int(k.sum()),tp=tp,fp=fp,fn=fn,tn=tn,
+        precision=ratio(tp,tp+fp),recall_accepted=ratio(tp,tp+fn),recall_all_references=ratio(tp,int((eligible & truth).sum())),
+        specificity=ratio(tn,tn+fp),f1=ratio(2*tp,2*tp+fp+fn),false_normal=fp,missed_condition_called_normal=fp,
+        incorrect_disease_on_normal=fn,uncertain_normal_candidates=int((eligible & truth & ~accepted).sum()),
+        abstention_rate=ratio(int((eligible & ~accepted).sum()),int(eligible.sum())),confusion_matrix=[[tn,fp],[fn,tp]])
+
+
+def astra_paired_stages(df,y,quality,ood_scores,logits_fn,final,prefix):
+    ev=detector_evidence(df);pg=apply_platt(logits_fn('global_only',3),CALIB['global_only']['platt'])
+    ps=apply_platt(logits_fn('global_yolo',3),CALIB['global_yolo']['platt']);thresholds=CALIB['global_yolo']['thresholds']
+    states=[];dec=[]
+    for i in range(len(df)):
+        avail=ev[i,:,0]>0.5;det=ev[i,:,1]>0.5;q=quality[i]
+        oo=bool(OOD is not None and ood_scores is not None and ood_scores[i]>OOD.threshold)
+        band=STAGE1.get('band');flags,_=stage1_flags(pg[i],ps[i],CALIB['global_only']['thresholds'],thresholds,avail,det,q['blocking'],q['flags'],oo,band if band is not None else float('inf'))
+        d=decide(ps[i],thresholds,band if band is not None else float('inf'),avail,q,oo,flags)
+        states.append(d['state']);dec.append([int(c in d['predicted']) for c in CFG.CONDITIONS])
+    before=np.array(dec);after=np.array([[int(c in str(p).split('|')) for c in CFG.CONDITIONS] for p in final.predicted])
+    accepted=lambda s:np.isin(s,['FINDINGS_SUPPORTED','MULTIPLE_FINDINGS_SUPPORTED','NO_FINDINGS_SUPPORTED'])
+    a1=accepted(states);a2=accepted(final.state.values);known=(y>=0).all(1);paired=known&a1&a2
+    e1=(before!=y).any(1);e2=(after!=y).any(1)
+    summary=dict(n=len(df),paired_accepted_reference_n=int(paired.sum()),stage2_triggered=int((final.stage==2).sum()),
+        errors_corrected=int((paired&e1&~e2).sum()),errors_introduced=int((paired&~e1&e2).sum()),
+        additional_cases_resolved_correct=int((known&~a1&a2&~e2).sum()),additional_cases_resolved_wrong=int((known&~a1&a2&e2).sum()),
+        stage1_abstentions=int((~a1).sum()),final_abstentions=int((~a2).sum()),passes=final.passes.value_counts().to_dict(),
+        stage1_normal=astra_normal_metrics(y,states),final_normal=astra_normal_metrics(y,final.state.values))
+    records=pd.DataFrame(dict(image_id=df.image_id.values,stage1_state=states,final_state=final.state.values,
+        fully_reviewed=known,stage1_wrong=e1,final_wrong=e2,paired_accepted=paired,passes=final.passes.values))
+    write_csv(records,os.path.join(CFG.DIRS['metrics'],prefix+'_paired_stage_cases.csv'))
+    write_json(os.path.join(CFG.DIRS['metrics'],prefix+'_paired_stages_normal.json'),summary)
+    frames=[]
+    for label,p,d,a in [('stage1',ps,before,a1),('final',final[[f'p_{c}' for c in CFG.CONDITIONS]].to_numpy(float),after,a2)]:
+        frames.append(metrics_dec(y,p,np.where(a[:,None],d,np.nan)).assign(stage=label))
+    write_csv(pd.concat(frames),os.path.join(CFG.DIRS['metrics'],prefix+'_stage_per_condition.csv'))
+    fig,axs=plt.subplots(1,2,figsize=(9,4))
+    for ax,key in zip(axs,['stage1_normal','final_normal']):
+        cm=np.array(summary[key]['confusion_matrix']);ax.imshow(cm,cmap='Blues');ax.set_title(key+' (accepted only)')
+        ax.set_xticks([0,1],['condition','no target']);ax.set_yticks([0,1],['condition','no target']);ax.set_xlabel('prediction');ax.set_ylabel('reviewed reference')
+        for r in range(2):
+            for c in range(2):ax.text(c,r,str(cm[r,c]),ha='center',va='center')
+    savefig(fig,prefix+'_normal_confusion')
+    return summary
+
+
+def astra_development_evaluation():
+    require_source_permission(['validation','fusion'],'training')
+    gate('annotations_fusion');require(FUSION_STATE.get('oof') and STAGE1 is not None and OOD is not None,'Complete models, calibration and stage rules required',gate=True)
+    df=FUSION_STATE['df'];y=FUSION_STATE['y'];sets=FUSION_STATE['roi_sets']
+    def logits(var,t):return FUSION_STATE['oof_views'][var].get(t,FUSION_STATE['oof'][var])
+    q=[assess_quality(cv2.imread(r.orig_path if r.has_orig else r.proc_path)) for r in df.itertuples()]
+    oo=OOD.score(global_inputs(df)['emb'])
+    counts=[{t:int(((sets['tier'][i]==t)&sets['mask'][i]).sum()) for t in (1,2,3)} for i in range(len(df))]
+    start=time.perf_counter();final=batch_stage_logic(df,None,counts,CALIB,STAGE1,BAND2,q,oo,logits);elapsed=time.perf_counter()-start
+    summary=astra_paired_stages(df,y,q,oo,logits,final,'development_oof')
+    summary['cached_batch_decision_seconds']=elapsed
+    summary['runtime_scope']='Decision logic on precomputed evidence; not end-to-end latency or Stage 2 acquisition overhead.'
+    write_json(os.path.join(CFG.DIRS['metrics'],'development_oof_summary.json'),summary)
+    for var,z in FUSION_STATE['oof'].items():
+        p=apply_platt(z,CALIB[var]['platt']);d=(p>=CALIB[var]['thresholds']).astype(float)
+        write_csv(metrics_dec(y,p,d),os.path.join(CFG.DIRS['metrics'],f'development_{var}_per_condition.csv'))
+        write_json(os.path.join(CFG.DIRS['metrics'],f'development_{var}_multilabel.json'),set_metrics_dec(y,d))
+    display(summary)
+
+#@@ code
+astra_require_action('development_evaluation')
+astra_development_evaluation()
+
+#@@ md
+## Astra runtime profiling — optional researcher-controlled validation images
+Call `astra_profile_runtime(path)` on an eligible development image. It times actual model forwards and reports wall-clock overhead separately. It does not alter thresholds. The reference computes ROI evidence before deciding whether Stage 2 is needed, so current ROI precomputation is part of initial latency.
+#@@ code
+def astra_profile_runtime(path):
+    require_source_permission(['validation'],'training')
+    allowed=DF[DF.split=='validation']
+    require(path in set(allowed.proc_path)|set(allowed.orig_path),'Use a validation image only',gate=True)
+    bundle=InferenceBundle()
+    timings={}
+    class TimedPredict:
+        def __init__(self,model,label):self.model,self.label=model,label
+        def predict(self,*args,**kwargs):
+            t=time.perf_counter()
+            try:return self.model.predict(*args,**kwargs)
+            finally:timings[self.label]=timings.get(self.label,0.0)+time.perf_counter()-t
+    bundle.gfm=TimedPredict(bundle.gfm,'global_cnn')
+    bundle.rfm=TimedPredict(bundle.rfm,'roi_precomputation')
+    for var,models in bundle.fus.items():bundle.fus[var]=[TimedPredict(m,'fusion_'+var) for m in models]
+    start=time.perf_counter();result=assess_image(bundle,path);elapsed=time.perf_counter()-start
+    out=dict(wall_seconds=elapsed,state=result.state,stage=result.stage_reached,passes=result.verification_passes,
+        model_forward_seconds=timings,additional_stage2_fusion_seconds=timings.get('fusion_full',0.0),
+        scope='Full reference with eager ROI precomputation; additional_stage2_fusion_seconds excludes already paid ROI and detector costs',assessment=asdict(result))
+    write_json(os.path.join(CFG.DIRS['metrics'],'development_runtime_'+pseudo_id(path)+'.json'),out)
+    return out
+
+#@@ md
+## Astra ROI validation report — development data, researcher initiated
+Four-class region performance is separate from the three-condition image outcome. These references selected the ROI checkpoint; this is a development report, not independent evaluation.
+#@@ code
+def astra_roi_validation():
+    from sklearn.metrics import confusion_matrix,precision_recall_fscore_support,roc_curve,precision_recall_curve
+    require_source_permission(['validation'],'training');gate('regions_validation')
+    require(ROI_SELECTED_SEED is not None,'Selected ROI model required',gate=True)
+    table=ROI_TABLES['validation'];y=table.label.to_numpy()
+    model=keras.models.load_model(os.path.join(CFG.DIRS['checkpoints'],'ROI',f'seed_{ROI_SELECTED_SEED}','final_best.keras'),compile=False)
+    ds=make_roi_ds(table.path.values,y,None,False)
+    p=model.predict(ds.map(lambda x,y,w:x),verbose=0);pred=p.argmax(1)
+    cm=confusion_matrix(y,pred,labels=range(4));pr,rc,f1,support=precision_recall_fscore_support(y,pred,labels=range(4),zero_division=0)
+    rows=[];fig,axs=plt.subplots(1,2,figsize=(11,4))
+    for j,c in enumerate(CFG.ROI_CLASSES):
+        truth=y==j;tp=cm[j,j];fn=cm[j].sum()-tp;fp=cm[:,j].sum()-tp;tn=cm.sum()-tp-fn-fp
+        valid=truth.any() and (~truth).any()
+        rows.append(dict(region_class=c,support=int(support[j]),precision=pr[j],recall=rc[j],specificity=float(tn/(tn+fp)) if tn+fp else None,f1=f1[j],
+            roc_auc=float(roc_auc_score(truth,p[:,j])) if valid else None,pr_auc=float(average_precision_score(truth,p[:,j])) if valid else None,brier=float(np.mean((p[:,j]-truth)**2))))
+        if valid:
+            x,t,_=roc_curve(truth,p[:,j]);axs[0].plot(x,t,label=c)
+            pp,rr,_=precision_recall_curve(truth,p[:,j]);axs[1].plot(rr,pp,label=c)
+    axs[0].set(xlabel='false positive rate',ylabel='true positive rate',title='ROI validation ROC')
+    axs[1].set(xlabel='recall',ylabel='precision',title='ROI validation PR')
+    for ax in axs:ax.legend()
+    savefig(fig,'roi_validation_curves');write_csv(pd.DataFrame(rows),os.path.join(CFG.DIRS['metrics'],'roi_validation_per_class.csv'))
+    write_json(os.path.join(CFG.DIRS['metrics'],'roi_validation_summary.json'),dict(confusion_matrix=cm.tolist(),accuracy=float((pred==y).mean()),macro_f1=float(np.mean(f1)),loss=float(-np.log(np.clip(p[np.arange(len(y)),y],1e-7,1)).mean())))
+    return pd.DataFrame(rows)
+
+astra_require_action('roi_validation')
+display(astra_roi_validation())

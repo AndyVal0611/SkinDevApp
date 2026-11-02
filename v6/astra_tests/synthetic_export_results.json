@@ -1,0 +1,67 @@
+{
+  "synthetic_only": true,
+  "components": [
+    {
+      "status": "exported",
+      "path": "/tmp/astra_SYNTHETIC_contracts_v1so9kfy/synthetic_exports/SYNTHETIC_global.onnx",
+      "sha256": "5a6b2b37984b4f0a30b78c44b8572a4ca8a6aadd2464efc67b88f19c4a71387f",
+      "attempt": "from_function",
+      "component": "global",
+      "max_abs_diff": [
+        1.1920928955078125e-06
+      ],
+      "tolerance": 0.0001,
+      "parity_pass": true
+    },
+    {
+      "status": "exported",
+      "path": "/tmp/astra_SYNTHETIC_contracts_v1so9kfy/synthetic_exports/SYNTHETIC_global_features.onnx",
+      "sha256": "81ac238a0bebb64bae1d1a52c78a3169da5ce8b4bafcdeace0aa42e7b2842636",
+      "attempt": "from_function",
+      "component": "global_features",
+      "max_abs_diff": [
+        4.5299530029296875e-06,
+        8.940696716308594e-07
+      ],
+      "tolerance": 0.0001,
+      "parity_pass": true
+    },
+    {
+      "status": "exported",
+      "path": "/tmp/astra_SYNTHETIC_contracts_v1so9kfy/synthetic_exports/SYNTHETIC_roi.onnx",
+      "sha256": "a24743e8b0aabcfb004eeddd2ffe9e9886b7e0510b49e677d34f161cc3c8002e",
+      "attempt": "from_function",
+      "component": "roi",
+      "max_abs_diff": [
+        5.364418029785156e-07
+      ],
+      "tolerance": 0.0001,
+      "parity_pass": true
+    },
+    {
+      "status": "exported",
+      "path": "/tmp/astra_SYNTHETIC_contracts_v1so9kfy/synthetic_exports/SYNTHETIC_roi_features.onnx",
+      "sha256": "93b15b730809a70e137fbd0befe673ca7558d1cec8acf5a8588d022cb35f5215",
+      "attempt": "from_function",
+      "component": "roi_features",
+      "max_abs_diff": [
+        3.337860107421875e-06,
+        4.76837158203125e-07
+      ],
+      "tolerance": 0.0001,
+      "parity_pass": true
+    },
+    {
+      "status": "exported",
+      "path": "/tmp/astra_SYNTHETIC_contracts_v1so9kfy/synthetic_exports/SYNTHETIC_fusion.onnx",
+      "sha256": "8d7d9e648e94e82d52f706be3c2a58099cc64f99199466840163016f0e904b4a",
+      "attempt": "from_function",
+      "component": "fusion",
+      "max_abs_diff": [
+        2.086162567138672e-07
+      ],
+      "tolerance": 0.0001,
+      "parity_pass": true
+    }
+  ]
+}

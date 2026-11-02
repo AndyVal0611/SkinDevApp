@@ -1,0 +1,73 @@
+{
+  "n": 360,
+  "paired_accepted_reference_n": 12,
+  "stage2_triggered": 67,
+  "errors_corrected": 0,
+  "errors_introduced": 0,
+  "additional_cases_resolved_correct": 57,
+  "additional_cases_resolved_wrong": 5,
+  "stage1_abstentions": 348,
+  "final_abstentions": 286,
+  "passes": {
+    "0": 293,
+    "1": 60,
+    "2": 5,
+    "3": 2
+  },
+  "stage1_normal": {
+    "reference_n": 347,
+    "accepted_n": 12,
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "tn": 1,
+    "precision": 1.0,
+    "recall_accepted": 1.0,
+    "recall_all_references": 0.10891089108910891,
+    "specificity": 1.0,
+    "f1": 1.0,
+    "false_normal": 0,
+    "missed_condition_called_normal": 0,
+    "incorrect_disease_on_normal": 0,
+    "uncertain_normal_candidates": 90,
+    "abstention_rate": 0.9654178674351584,
+    "confusion_matrix": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        11
+      ]
+    ]
+  },
+  "final_normal": {
+    "reference_n": 347,
+    "accepted_n": 74,
+    "tp": 41,
+    "fp": 1,
+    "fn": 0,
+    "tn": 32,
+    "precision": 0.9761904761904762,
+    "recall_accepted": 1.0,
+    "recall_all_references": 0.40594059405940597,
+    "specificity": 0.9696969696969697,
+    "f1": 0.9879518072289156,
+    "false_normal": 1,
+    "missed_condition_called_normal": 1,
+    "incorrect_disease_on_normal": 0,
+    "uncertain_normal_candidates": 60,
+    "abstention_rate": 0.7867435158501441,
+    "confusion_matrix": [
+      [
+        32,
+        1
+      ],
+      [
+        0,
+        41
+      ]
+    ]
+  }
+}

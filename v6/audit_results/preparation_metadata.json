@@ -1,0 +1,202 @@
+{
+  "raw_manifest_images": {
+    "Acne": 3000,
+    "Eczema": 3000,
+    "Hyperpigmentation": 3000,
+    "Normal": 3000
+  },
+  "catalog_facial_images": {
+    "Acne": 3000,
+    "Eczema": 1063,
+    "Hyperpigmentation": 3000,
+    "Normal": 3000
+  },
+  "frozen_images": {
+    "Acne": 3000,
+    "Eczema": 789,
+    "Hyperpigmentation": 3000,
+    "Normal": 3000
+  },
+  "frozen_split_class_counts": {
+    "fusion": {
+      "Acne": 450,
+      "Eczema": 119,
+      "Hyperpigmentation": 450,
+      "Normal": 450
+    },
+    "test": {
+      "Acne": 450,
+      "Eczema": 118,
+      "Hyperpigmentation": 450,
+      "Normal": 450
+    },
+    "train": {
+      "Acne": 1800,
+      "Eczema": 473,
+      "Hyperpigmentation": 1800,
+      "Normal": 1800
+    },
+    "validation": {
+      "Acne": 300,
+      "Eczema": 79,
+      "Hyperpigmentation": 300,
+      "Normal": 300
+    }
+  },
+  "source_counts_catalog": {
+    "Acne/aug": 555,
+    "Acne/other": 857,
+    "Acne/roboflow_export": 1588,
+    "Eczema/aug": 68,
+    "Eczema/other": 911,
+    "Eczema/roboflow_export": 84,
+    "Hyperpigmentation/aug": 278,
+    "Hyperpigmentation/other": 121,
+    "Hyperpigmentation/roboflow_export": 2601,
+    "Normal/aug": 107,
+    "Normal/other": 478,
+    "Normal/roboflow_export": 2415
+  },
+  "source_counts_frozen": {
+    "Acne/aug": 555,
+    "Acne/other": 857,
+    "Acne/roboflow_export": 1588,
+    "Eczema/aug": 68,
+    "Eczema/other": 639,
+    "Eczema/roboflow_export": 82,
+    "Hyperpigmentation/aug": 278,
+    "Hyperpigmentation/other": 121,
+    "Hyperpigmentation/roboflow_export": 2601,
+    "Normal/aug": 107,
+    "Normal/other": 478,
+    "Normal/roboflow_export": 2415
+  },
+  "manifest_source_values": {
+    "local": 12000
+  },
+  "original_filepath_prefixes": {
+    "/kaggle/input/datasets/elaizaclaire/precisionskin/PrecisionSkin/Classes/": 12000
+  },
+  "image_types": {
+    "Acne": {
+      "close_up_facial": 1049,
+      "full_face": 111,
+      "lesion_region_facial": 1249,
+      "partial_face": 591
+    },
+    "Eczema": {
+      "close_up_facial": 182,
+      "full_face": 55,
+      "lesion_region_facial": 332,
+      "partial_face": 220
+    },
+    "Hyperpigmentation": {
+      "close_up_facial": 359,
+      "full_face": 220,
+      "lesion_region_facial": 1801,
+      "partial_face": 620
+    },
+    "Normal": {
+      "close_up_facial": 230,
+      "full_face": 910,
+      "lesion_region_facial": 90,
+      "partial_face": 1770
+    }
+  },
+  "subject_values": {
+    "unknown": 12000
+  },
+  "annotation_status": {
+    "unverified": 9789
+  },
+  "annotation_rows": 9789,
+  "region_rows": 0,
+  "mixed_filename_hints": {
+    "acne_names_pigment": 418,
+    "acne_names_eczema_dermatitis": 24
+  },
+  "confirmed_export_links_frozen": [
+    {
+      "source_key": "Eczema/aug",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 15
+    },
+    {
+      "source_key": "Eczema/other",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 234
+    },
+    {
+      "source_key": "Eczema/roboflow_export",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 37
+    },
+    {
+      "source_key": "Hyperpigmentation/roboflow_export",
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 304
+    }
+  ],
+  "linked_box_candidates_by_frozen_split": [
+    {
+      "split": "fusion",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 39
+    },
+    {
+      "split": "fusion",
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 47
+    },
+    {
+      "split": "test",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 39
+    },
+    {
+      "split": "test",
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 49
+    },
+    {
+      "split": "train",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 170
+    },
+    {
+      "split": "train",
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 181
+    },
+    {
+      "split": "validation",
+      "source_export": "eczema_corrected.yolov8",
+      "images": 38
+    },
+    {
+      "split": "validation",
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 27
+    }
+  ],
+  "candidate_no_identified_exposure_by_source_class": {
+    "fusion": {
+      "Acne": 89,
+      "Eczema": 28,
+      "Hyperpigmentation": 37,
+      "Normal": 86
+    },
+    "test": {
+      "Acne": 75,
+      "Eczema": 23,
+      "Hyperpigmentation": 38,
+      "Normal": 56
+    },
+    "validation": {
+      "Acne": 51,
+      "Eczema": 19,
+      "Hyperpigmentation": 33,
+      "Normal": 58
+    }
+  }
+}

@@ -26,6 +26,7 @@ TEST_LOCK = os.path.join(CFG.DIRS["metrics"], "test_evaluated.lock.json")
 
 
 def open_test_once():
+    require_source_permission(["test"], "evaluation")
     if os.path.exists(TEST_LOCK) and not CFG.ALLOW_TEST_REEVALUATION:
         raise GateError(f"The test split was already evaluated ({json.load(open(TEST_LOCK))['when']}). Re-evaluating would let you tune against it. "
                         "Set LUMYVUE_ALLOW_TEST_REEVALUATION=true ONLY to reproduce a reported number.")

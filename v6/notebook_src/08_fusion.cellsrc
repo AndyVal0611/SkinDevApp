@@ -104,9 +104,15 @@ class MaskedAttentionPool(keras.layers.Layer):
         super().__init__(**kw); self.heads = heads; self.score = keras.layers.Dense(heads, name="att_score")
     def call(self, inputs):
         h, m = inputs
-        s = self.score(h) + (1.0 - m[..., None]) * -1e9
-        a = tf.nn.softmax(s, axis=1) * m[..., None]
-        pooled = tf.einsum("brk,brh->bkh", a, h)
+        # Calculate masked softmax in float32 even when a preceding cell enables mixed precision.
+        # A -1e9 sentinel becomes -inf in float16; an entirely masked row then yields NaNs.
+        h32 = tf.cast(h, tf.float32)
+        mask32 = tf.cast(m, tf.float32)
+        scores = tf.cast(self.score(h), tf.float32)
+        scores = tf.where(mask32[..., None] > 0, scores, tf.constant(-1e4, tf.float32))
+        weights = tf.nn.softmax(scores, axis=1) * mask32[..., None]
+        weights = tf.math.divide_no_nan(weights, tf.reduce_sum(weights, axis=1, keepdims=True))
+        pooled = tf.einsum("brk,brh->bkh", weights, h32)
         return tf.reshape(pooled, [tf.shape(h)[0], self.heads * h.shape[-1]])
     def get_config(self):
         c = super().get_config(); c.update(heads=self.heads); return c
@@ -314,6 +320,7 @@ def brier_ece(y, p, bins=None):
 
 CALIB = {}
 if FUSION_STATE.get("oof"):
+    require_source_permission(["fusion"], "training")
     yf = FUSION_STATE["y"]; rows = []
     for var, z in FUSION_STATE["oof"].items():
         cal = [fit_platt(z[:, j], yf[:, j]) for j in range(CFG.N_COND)]

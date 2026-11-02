@@ -1,0 +1,1164 @@
+[
+  {
+    "cell": 1,
+    "type": "markdown",
+    "source": "bootstrap",
+    "heading": "# LUMYVUE V6 Astra \u2014 Complete Independent Training Pipeline",
+    "action": null
+  },
+  {
+    "cell": 2,
+    "type": "code",
+    "source": "bootstrap",
+    "heading": "# Astra bootstrap \u2014 paths only; no training or imports of TensorFlow",
+    "action": null
+  },
+  {
+    "cell": 3,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "# LUMYVUE V6 \u2014 Three-Detector YOLOv8-Guided MobileNetV2 with Trainable Multilabel Fusion, Two-Stage Adaptive Verification, Calibration, Abstention and Integrity Controls",
+    "action": null
+  },
+  {
+    "cell": 4,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "## 2. Review of the existing baselines (facts found by inspecting the project; the notebook recomputes what it can)",
+    "action": null
+  },
+  {
+    "cell": 5,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "## 3. Why V5 fails in the observed cases \u2014 hypotheses this notebook tests (none is assumed true)",
+    "action": null
+  },
+  {
+    "cell": 6,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "## 4. Architecture and information flow",
+    "action": null
+  },
+  {
+    "cell": 7,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "## 5. Evaluation methodology (Chapters III\u2013IV)",
+    "action": null
+  },
+  {
+    "cell": 8,
+    "type": "markdown",
+    "source": "01_intro_and_baselines.cellsrc",
+    "heading": "## 6. Security, privacy and integrity scope (read before running)",
+    "action": null
+  },
+  {
+    "cell": 9,
+    "type": "markdown",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# Part I \u2014 Environment, Reproducibility, Dependencies and Integrity Controls",
+    "action": null
+  },
+  {
+    "cell": 10,
+    "type": "code",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# 3.1 Package check (set INSTALL_MISSING=True only if you want this cell to pip-install what is missing).",
+    "action": null
+  },
+  {
+    "cell": 11,
+    "type": "code",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# 6.1 Experiment configuration. Override order (later wins): defaults < JSON file ($LUMYVUE_V6_CONFIG) < environment LUMYVUE_<NAME>.",
+    "action": null
+  },
+  {
+    "cell": 12,
+    "type": "code",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# 3.2 / 4.1 / 6.2  Imports, seeds, GPU setup (memory growth, optional cap, mixed precision), hardware + software metadata, experiment folders.",
+    "action": null
+  },
+  {
+    "cell": 13,
+    "type": "code",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# Experiment folders (0700), safe writing, hashing, originals fingerprint, redaction, pseudonyms, hash-chained audit log, gates.",
+    "action": null
+  },
+  {
+    "cell": 14,
+    "type": "markdown",
+    "source": "02_environment_security.cellsrc",
+    "heading": "## 7. Dataset path configuration and preflight",
+    "action": null
+  },
+  {
+    "cell": 15,
+    "type": "code",
+    "source": "02_environment_security.cellsrc",
+    "heading": "# 7.1 Preflight: required vs optional inputs, and which later stages each unlocks.",
+    "action": null
+  },
+  {
+    "cell": 16,
+    "type": "code",
+    "source": "02b_architecture_diagram.cellsrc",
+    "heading": "# 3.3 Architecture diagram (matplotlib), saved for the thesis as figures/architecture_diagram.png.",
+    "action": null
+  },
+  {
+    "cell": 17,
+    "type": "markdown",
+    "source": "02c_training_recovery.cellsrc",
+    "heading": "## Checkpoint contracts and recovery (all supervised stages)",
+    "action": null
+  },
+  {
+    "cell": 18,
+    "type": "code",
+    "source": "02c_training_recovery.cellsrc",
+    "heading": "import pathlib",
+    "action": null
+  },
+  {
+    "cell": 19,
+    "type": "code",
+    "source": "02c_training_recovery.cellsrc",
+    "heading": "def astra_require_action(action):",
+    "action": null
+  },
+  {
+    "cell": 20,
+    "type": "code",
+    "source": "02c_training_recovery.cellsrc",
+    "heading": "# Pin the entire run before any research data cache is reused.",
+    "action": null
+  },
+  {
+    "cell": 21,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# Part II \u2014 Dataset Inventory, Integrity, Leakage Control, Annotation and Provenance",
+    "action": null
+  },
+  {
+    "cell": 22,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 8.1 Load the V5 manifest, apply the dataset policy, resolve image paths (processed 224x224 and, when present, the original full-size photo).",
+    "action": null
+  },
+  {
+    "cell": 23,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 8.2 Inventory: class balance, image types, sources; charts saved for the thesis.",
+    "action": null
+  },
+  {
+    "cell": 24,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 9.1 Integrity: every processed image must decode, be 224x224 RGB, not be (near-)constant; originals are checked when present.",
+    "action": null
+  },
+  {
+    "cell": 25,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 10.1 Duplicate and source-overlap detection -> leakage GROUPS.",
+    "action": null
+  },
+  {
+    "cell": 26,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "### 10.2 Frozen leakage-controlled split (train / validation / fusion / test)",
+    "action": null
+  },
+  {
+    "cell": 27,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "SPLIT_PATH = os.path.join(CFG.SPLIT_DIR, \"v6_split_manifest.csv\")",
+    "action": null
+  },
+  {
+    "cell": 28,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "### 10.3 Dataset provenance and permissible-use record (security / research integrity)",
+    "action": null
+  },
+  {
+    "cell": 29,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "\"\"\"Pure, fail-closed source policy shared by notebook and bounded tests.",
+    "action": null
+  },
+  {
+    "cell": 30,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "## 11. Annotation protocol, templates and loading (Present / Absent / Unknown)",
+    "action": null
+  },
+  {
+    "cell": 31,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "rng_t = np.random.RandomState(CFG.SPLIT_SEED + 1)",
+    "action": null
+  },
+  {
+    "cell": 32,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 11.2 / 12.1  Load + validate annotations -> label matrix with -1 = Unknown. Hard errors for malformed files; nothing is guessed.",
+    "action": null
+  },
+  {
+    "cell": 33,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 12.2 Training-label policy and annotation gates per split. TRAIN labels: verified/partial rows from accepted roles; optional WEAK positive = V5 class name.",
+    "action": null
+  },
+  {
+    "cell": 34,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 12.3 Class balance, co-occurrence of VERIFIED labels, and V5-label vs verified-label disagreement (label-noise indicator). Charts saved.",
+    "action": null
+  },
+  {
+    "cell": 35,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "## 13. ROI (region) annotation validation (boxes for the ROI classifier and for localisation metrics)",
+    "action": null
+  },
+  {
+    "cell": 36,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "REG_LABELS = {\"acne\": 0, \"hyperpigmentation\": 1, \"eczema\": 2, \"background_false_positive\": 3}",
+    "action": null
+  },
+  {
+    "cell": 37,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 11.3 Optional annotation helper (needs ipywidgets). It only WRITES the rows you decide; it never pre-fills labels from any model.",
+    "action": null
+  },
+  {
+    "cell": 38,
+    "type": "markdown",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "## 14. Image preprocessing contract, domain-shift, quality and skin-tone audit",
+    "action": null
+  },
+  {
+    "cell": 39,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "def preprocess_global(bgr, size=None):",
+    "action": null
+  },
+  {
+    "cell": 40,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 14.2 Audit on a stratified sample of training images vs application captures (domain shift), saved as tables and a figure.",
+    "action": null
+  },
+  {
+    "cell": 41,
+    "type": "code",
+    "source": "03_dataset_audit.cellsrc",
+    "heading": "# 14.3 Reviewer queue (static signals): suspicious labels, possible multi-condition images, domain outliers. Proposals only - labels are never rewritten.",
+    "action": null
+  },
+  {
+    "cell": 42,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# Part III \u2014 Deployment Parity, V5 Baseline Inference, Error Analysis and Hard-Example Mining",
+    "action": null
+  },
+  {
+    "cell": 43,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "## 15. Deployment preprocessing parity (notebook \u2194 C# WPF)",
+    "action": null
+  },
+  {
+    "cell": 44,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 15.1 Static contract: expected preprocessing vs the C# source (if the source is reachable).",
+    "action": null
+  },
+  {
+    "cell": 45,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 15.3 Level 2: Python reference vs the probabilities the C# app saved (record.json + analysed.png) for every available capture.",
+    "action": null
+  },
+  {
+    "cell": 46,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 15.4 Level 3: identical-tensor comparison from `SkinDevApp.exe --diagnose` folders (cnn_diagnostic.json + input_224_nhwc_float32.bin).",
+    "action": null
+  },
+  {
+    "cell": 47,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "## 16. V5 baseline inference (the deployed ONNX model, unchanged)",
+    "action": null
+  },
+  {
+    "cell": 48,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "V5_PROBS_PATH = os.path.join(CFG.DIRS[\"predictions\"], \"v5_probs_all.csv\")",
+    "action": "baseline_development"
+  },
+  {
+    "cell": 49,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "## 17. V5 error and confusion analysis (development splits only)",
+    "action": null
+  },
+  {
+    "cell": 50,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 17.1 Part A - source-label disagreement (dev splits).",
+    "action": null
+  },
+  {
+    "cell": 51,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 17.2 Part B - verified misclassification (needs verified labels in the dev splits; Unknown is never counted as an error).",
+    "action": null
+  },
+  {
+    "cell": 52,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "# 17.3 V5 calibration behaviour on the historical protocol (max-softmax vs agreement with the source label) and a per-class view.",
+    "action": null
+  },
+  {
+    "cell": 53,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "## 18. Hard-example mining (train split only; the test set is never consulted)",
+    "action": null
+  },
+  {
+    "cell": 54,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "def mine_hard_examples(df, probs4, yolo_flags=None):",
+    "action": null
+  },
+  {
+    "cell": 55,
+    "type": "markdown",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "## 19. Annotation-review queue",
+    "action": null
+  },
+  {
+    "cell": 56,
+    "type": "code",
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "heading": "def build_review_queue(extra_flags=None):",
+    "action": null
+  },
+  {
+    "cell": 57,
+    "type": "markdown",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# Part IV \u2014 Improved Global MobileNetV2: Controlled Experiments",
+    "action": null
+  },
+  {
+    "cell": 58,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# Metrics used by callbacks and by every evaluation section (defined once). y has -1 for Unknown and is never counted.",
+    "action": null
+  },
+  {
+    "cell": 59,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# 20.1 Data pipeline: decode -> (train only) dermatology-safe augmentation -> (p/127.5)-1. Batch-level augmentation keeps the CPU pipeline fast.",
+    "action": null
+  },
+  {
+    "cell": 60,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# 20.2 Masked BCE loss, backbone, head, builders. The loss is registered so .keras checkpoints reload.",
+    "action": null
+  },
+  {
+    "cell": 61,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# 21.1 Experiment definitions and training-table construction (labels, masks, weights). Gated: needs verified annotations + provenance.",
+    "action": null
+  },
+  {
+    "cell": 62,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# 21.2 Validation-metric callback (VERIFIED validation images only) + checkpoint/resume machinery. `val_sel` = macro AP if computable else -val_loss.",
+    "action": null
+  },
+  {
+    "cell": 63,
+    "type": "markdown",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "## 21. Global classifier training \u2014 run cell by cell",
+    "action": null
+  },
+  {
+    "cell": 64,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "# Global training controls and independent phase entry points",
+    "action": null
+  },
+  {
+    "cell": 65,
+    "type": "markdown",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "## Astra Global Phase A \u2014 EXPENSIVE, researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 66,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "astra_require_action('global_A')",
+    "action": "global_A"
+  },
+  {
+    "cell": 67,
+    "type": "markdown",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "## Astra Global Phase B and phase selection \u2014 EXPENSIVE, researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 68,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "astra_require_action('global_B')",
+    "action": "global_B"
+  },
+  {
+    "cell": 69,
+    "type": "markdown",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "## 22. Selecting the global model on validation data, with a regression check",
+    "action": null
+  },
+  {
+    "cell": 70,
+    "type": "code",
+    "source": "05_global_cnn.cellsrc",
+    "heading": "def global_scores_for(exp, seed, df, tag=\"final_best.keras\"):",
+    "action": null
+  },
+  {
+    "cell": 71,
+    "type": "markdown",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# Part V \u2014 Three YOLOv8 Detectors: Loading, Deployed-Equivalent Inference, Diagnostics and Localisation Evaluation",
+    "action": null
+  },
+  {
+    "cell": 72,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 23.1 Detector registry: discovery follows the C# LesionEngine naming (lesion_detector_<class>.onnx [+ _m2.._m6], .json; else the 3-class lesion_detector_v1.onnx).",
+    "action": null
+  },
+  {
+    "cell": 73,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.1 Deployed-equivalent inference (letterbox -> decode -> per-class NMS -> ensemble fusion). Returns ALL pool boxes with their provenance.",
+    "action": null
+  },
+  {
+    "cell": 74,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.2 Run the detectors over the dataset images that matter (annotated images + region-annotated images), with append-only caching and resume.",
+    "action": "yolo_evidence"
+  },
+  {
+    "cell": 75,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.3 Flatten to tables: DET (all pool boxes) and EVID (per image x condition: detector state + summary). States:",
+    "action": null
+  },
+  {
+    "cell": 76,
+    "type": "markdown",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "## 24.4 Detection diagnostics: duplicates, nesting, false-positive and missed regions",
+    "action": null
+  },
+  {
+    "cell": 77,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "def overlap_relation(a, b):",
+    "action": null
+  },
+  {
+    "cell": 78,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.5 False-positive / missed-region statistics on VERIFIED data only (dev splits here; the test split is evaluated later, once).",
+    "action": null
+  },
+  {
+    "cell": 79,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.6 Localisation metrics against VERIFIED region boxes (precision, recall, F1 at the deployed threshold; AP50 and AP50-95; localisation error; FP/FN counts).",
+    "action": null
+  },
+  {
+    "cell": 80,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "# 24.7 Example gallery of detections on annotated development images (box colour = condition; solid = deployed, dashed = pool-only). Saved for the thesis.",
+    "action": null
+  },
+  {
+    "cell": 81,
+    "type": "code",
+    "source": "06_yolo_three_detectors.cellsrc",
+    "heading": "def astra_refresh_detector_tables():",
+    "action": null
+  },
+  {
+    "cell": 82,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "# Part VI \u2014 YOLO-Guided Regions of Interest and the ROI MobileNetV2",
+    "action": null
+  },
+  {
+    "cell": 83,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "# 25.1 Square, context-preserving crop and the ROI candidate builder.",
+    "action": null
+  },
+  {
+    "cell": 84,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "# 25.2 ROI visualisation on a few annotated development images (Tier 1 solid, Tier 2 dashed-look thin, Tier 3 = wider context window).",
+    "action": null
+  },
+  {
+    "cell": 85,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "## 26. ROI training-set preparation (verified regions \u2192 labelled proposals)",
+    "action": null
+  },
+  {
+    "cell": 86,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "ROI_DIR = CFG.DIRS[\"roi\"]; CROP_DIR = os.path.join(ROI_DIR, \"crops\"); os.makedirs(CROP_DIR, exist_ok=True)",
+    "action": null
+  },
+  {
+    "cell": 87,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "# 27.1 ROI MobileNetV2 (separate encoder, 4 classes: Acne / Hyperpigmentation / Eczema / Background) + resumable staged training.",
+    "action": null
+  },
+  {
+    "cell": 88,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "## 27. ROI classifier training \u2014 run cell by cell",
+    "action": null
+  },
+  {
+    "cell": 89,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "ROI_RESULTS = {}",
+    "action": null
+  },
+  {
+    "cell": 90,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "## Astra ROI Phase A \u2014 EXPENSIVE, researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 91,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "astra_require_action('roi_A')",
+    "action": "roi_A"
+  },
+  {
+    "cell": 92,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "## Astra ROI Phase B and phase selection \u2014 EXPENSIVE, researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 93,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "astra_require_action('roi_B')",
+    "action": "roi_B"
+  },
+  {
+    "cell": 94,
+    "type": "markdown",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "## 28. ROI feature aggregation for fusion",
+    "action": null
+  },
+  {
+    "cell": 95,
+    "type": "code",
+    "source": "07_roi_branch.cellsrc",
+    "heading": "ROI_FEAT_DIM = CFG.ROI_EMB + len(CFG.ROI_CLASSES) + len(YOLO_FEATURE_NAMES)",
+    "action": null
+  },
+  {
+    "cell": 96,
+    "type": "markdown",
+    "source": "08_fusion.cellsrc",
+    "heading": "# Part VII \u2014 Trainable Multilabel Fusion, Cross-Fitting, Calibration and Thresholds",
+    "action": null
+  },
+  {
+    "cell": 97,
+    "type": "code",
+    "source": "08_fusion.cellsrc",
+    "heading": "# 29.1 Feature assembly. A missing detector is encoded by available=0 (never by 'detected=0').",
+    "action": null
+  },
+  {
+    "cell": 98,
+    "type": "code",
+    "source": "08_fusion.cellsrc",
+    "heading": "# 29.2 Fusion network (float32 inside; mixed precision is switched off while it is built because the inputs are tiny and numerically sensitive).",
+    "action": null
+  },
+  {
+    "cell": 99,
+    "type": "code",
+    "source": "08_fusion.cellsrc",
+    "heading": "# 30.1 Grouped K-fold cross-fitting on the `fusion` split -> out-of-fold logits; final models trained with a grouped inner validation holdout from fusion data (one per seed).",
+    "action": null
+  },
+  {
+    "cell": 100,
+    "type": "markdown",
+    "source": "08_fusion.cellsrc",
+    "heading": "## 30. Fusion training \u2014 run cell by cell",
+    "action": null
+  },
+  {
+    "cell": 101,
+    "type": "code",
+    "source": "08_fusion.cellsrc",
+    "heading": "astra_require_action('fusion_train')",
+    "action": "fusion_train"
+  },
+  {
+    "cell": 102,
+    "type": "markdown",
+    "source": "08_fusion.cellsrc",
+    "heading": "## 31. Calibration, thresholds and selective-prediction preparation (fusion split, out-of-fold only)",
+    "action": null
+  },
+  {
+    "cell": 103,
+    "type": "code",
+    "source": "08_fusion.cellsrc",
+    "heading": "from scipy.optimize import minimize",
+    "action": "calibration"
+  },
+  {
+    "cell": 104,
+    "type": "markdown",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# Part VIII \u2014 Trustworthiness: Quality, OOD, Stage 1, Stage 2 (AI verification), Final Assessment, Abstention and the Dermatologist-Review Contract",
+    "action": null
+  },
+  {
+    "cell": 105,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# 32.1 Result object (ONE structure for the Results screen, overlays, patient record, dermatologist review, receipt and A4 report) and the state vocabulary.",
+    "action": null
+  },
+  {
+    "cell": 106,
+    "type": "markdown",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "## 32.2 Dermatologist review contract \u2014 AI output and clinical findings are SEPARATE records",
+    "action": null
+  },
+  {
+    "cell": 107,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "FINDING_VALUES = (\"present\", \"absent\", \"unknown\")",
+    "action": null
+  },
+  {
+    "cell": 108,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# 33.1 Input validity + quality screening. Never turns a technical problem into 'Normal'.",
+    "action": null
+  },
+  {
+    "cell": 109,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# 38.1 OOD score: Mahalanobis distance of the global embedding to the training distribution (shrinkage covariance). Threshold = OOD_PERCENTILE of",
+    "action": null
+  },
+  {
+    "cell": 110,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# 33.2 Stage-1 reliability rule: flags (conflict / near-threshold / quality / OOD) and a band selected on OUT-OF-FOLD fusion data to meet TARGET_ACCEPTED_ERROR.",
+    "action": "stage_rules"
+  },
+  {
+    "cell": 111,
+    "type": "markdown",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "## 35. Bounded adaptive AI-verification controller",
+    "action": null
+  },
+  {
+    "cell": 112,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "@dataclass",
+    "action": null
+  },
+  {
+    "cell": 113,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "# 36.1 Final decision logic: per-condition decisions + one overall state. Pure function (unit-tested).",
+    "action": null
+  },
+  {
+    "cell": 114,
+    "type": "markdown",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "## 32\u201336 (batch form). Stage logic on a whole split",
+    "action": null
+  },
+  {
+    "cell": 115,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "def batch_stage_logic(df, X_by_var, roi_tier_counts, calib, stage1, band2, quality_list, ood_scores, logits_fn):",
+    "action": null
+  },
+  {
+    "cell": 116,
+    "type": "markdown",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "## 36\u201337. Live single-image reference implementation (`assess_image`) and abstention handling",
+    "action": null
+  },
+  {
+    "cell": 117,
+    "type": "code",
+    "source": "09_stages_trust.cellsrc",
+    "heading": "class InferenceBundle:",
+    "action": null
+  },
+  {
+    "cell": 118,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# Part IX \u2014 Evaluation of Systems A\u2013G on the Frozen Test Split, Ablations, Robustness and Visualisations",
+    "action": null
+  },
+  {
+    "cell": 119,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 39.1 Test lock + helpers for decision-based metrics (decisions may be NaN where a condition cannot be evaluated, e.g. Eczema for YOLO-only).",
+    "action": null
+  },
+  {
+    "cell": 120,
+    "type": "markdown",
+    "source": "astra_evaluation.cellpy",
+    "heading": "## Astra development evaluation and derived Normal \u2014 researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 121,
+    "type": "code",
+    "source": "astra_evaluation.cellpy",
+    "heading": "def astra_normal_metrics(y,states):",
+    "action": null
+  },
+  {
+    "cell": 122,
+    "type": "code",
+    "source": "astra_evaluation.cellpy",
+    "heading": "astra_require_action('development_evaluation')",
+    "action": "development_evaluation"
+  },
+  {
+    "cell": 123,
+    "type": "markdown",
+    "source": "astra_evaluation.cellpy",
+    "heading": "## Astra runtime profiling \u2014 optional researcher-controlled validation images",
+    "action": null
+  },
+  {
+    "cell": 124,
+    "type": "code",
+    "source": "astra_evaluation.cellpy",
+    "heading": "def astra_profile_runtime(path):",
+    "action": null
+  },
+  {
+    "cell": 125,
+    "type": "markdown",
+    "source": "astra_evaluation.cellpy",
+    "heading": "## Astra ROI validation report \u2014 development data, researcher initiated",
+    "action": null
+  },
+  {
+    "cell": 126,
+    "type": "code",
+    "source": "astra_evaluation.cellpy",
+    "heading": "def astra_roi_validation():",
+    "action": "roi_validation"
+  },
+  {
+    "cell": 127,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 39. Classification evaluation (opens the test split once)",
+    "action": null
+  },
+  {
+    "cell": 128,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "astra_require_action('final_test')",
+    "action": "final_test"
+  },
+  {
+    "cell": 129,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 39.2 Paired comparisons (cluster bootstrap of the macro-F1 difference): is F better than A, B, C, E; is G's accepted-case behaviour different from F?",
+    "action": null
+  },
+  {
+    "cell": 130,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 39.3 Single / mixed / none subsets, misclassification pairs (Normal vs Hyperpigmentation, Hyperpigmentation vs Eczema, Acne vs Eczema), mixed combinations, camera vs source.",
+    "action": null
+  },
+  {
+    "cell": 131,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 39.4 Agreement / disagreement of system G with the INDEPENDENT dermatologist reference (test). AI-uncertain and AI-no-result are reported separately; they are not forced into agreement.",
+    "action": null
+  },
+  {
+    "cell": 132,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 40. YOLO localisation evaluation (test split)",
+    "action": null
+  },
+  {
+    "cell": 133,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "if TEST:",
+    "action": null
+  },
+  {
+    "cell": 134,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 41. Fusion ablation studies",
+    "action": null
+  },
+  {
+    "cell": 135,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "if TEST:",
+    "action": null
+  },
+  {
+    "cell": 136,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 42. Stage 1 vs Stage 2, verification statistics and robustness",
+    "action": null
+  },
+  {
+    "cell": 137,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "if TEST:",
+    "action": null
+  },
+  {
+    "cell": 138,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 42.2 Robustness of the global CNN to perturbations (sensitivity only) + latency of the reference pipeline.",
+    "action": null
+  },
+  {
+    "cell": 139,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 43. Grad-CAM++ explanations (attribution, not segmentation)",
+    "action": null
+  },
+  {
+    "cell": 140,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "def _head_f32(layers, x):",
+    "action": null
+  },
+  {
+    "cell": 141,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 44\u201348. Learning curves, confusion matrices, ROC / PR curves, threshold plots, calibration and example galleries",
+    "action": null
+  },
+  {
+    "cell": 142,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 44.1 Training and validation curves (loss; precision / recall / F1) for every trained global experiment and the ROI model.",
+    "action": null
+  },
+  {
+    "cell": 143,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 45.1 Threshold-vs-F1 (fusion OOF), ROC and PR curves, per-condition multilabel confusion matrices and reliability on the TEST split.",
+    "action": null
+  },
+  {
+    "cell": 144,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 46.1 Galleries: correct predictions, incorrect predictions, multi-condition predictions (test; images are shown only after the single evaluation).",
+    "action": null
+  },
+  {
+    "cell": 145,
+    "type": "markdown",
+    "source": "10_evaluation.cellsrc",
+    "heading": "## 49. V5 versus V6 \u2014 what can and cannot be compared",
+    "action": null
+  },
+  {
+    "cell": 146,
+    "type": "code",
+    "source": "10_evaluation.cellsrc",
+    "heading": "# 49.1 V5 original reported metrics (read from the V5 logs; NOT comparable to V6) + V5-vs-V6 on the verified test split, all images and V5-unseen only.",
+    "action": null
+  },
+  {
+    "cell": 147,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "# Part X \u2014 ONNX Export, Deployment Metadata, Audit Logging, Automated Tests and Thesis Report",
+    "action": null
+  },
+  {
+    "cell": 148,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "# 50.1 Export helpers (guarded) + contract checks used by the export verification and by the unit tests.",
+    "action": null
+  },
+  {
+    "cell": 149,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 50. Export of the newly trained components",
+    "action": null
+  },
+  {
+    "cell": 150,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "astra_require_action('export')",
+    "action": "export"
+  },
+  {
+    "cell": 151,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 51. Keras-versus-ONNX verification (and the Python reference for C# parity)",
+    "action": null
+  },
+  {
+    "cell": 152,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "PARITY_EXPORT = {}",
+    "action": null
+  },
+  {
+    "cell": 153,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 51.5 Export schemas of the final-assessment and dermatologist-review contract",
+    "action": null
+  },
+  {
+    "cell": 154,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "def _json_type(t):",
+    "action": null
+  },
+  {
+    "cell": 155,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 52. Deployment metadata and C# mapping",
+    "action": null
+  },
+  {
+    "cell": 156,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "def build_deployment_metadata():",
+    "action": null
+  },
+  {
+    "cell": 157,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 53. Structured audit logging",
+    "action": null
+  },
+  {
+    "cell": 158,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "def log_assessment(fa):",
+    "action": null
+  },
+  {
+    "cell": 159,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 54. Automated unit and integration tests",
+    "action": null
+  },
+  {
+    "cell": 160,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "import unittest, tempfile, copy",
+    "action": null
+  },
+  {
+    "cell": 161,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 55. Chapter IV tables and visualisations \u2014 built **only** from saved artifacts",
+    "action": null
+  },
+  {
+    "cell": 162,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "def md_table(df, floatfmt=\"{:.4f}\"):",
+    "action": null
+  },
+  {
+    "cell": 163,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## 56. Final experiment and artifact summary",
+    "action": null
+  },
+  {
+    "cell": 164,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "ok_orig, bad_orig = verify_originals_unchanged()",
+    "action": null
+  },
+  {
+    "cell": 165,
+    "type": "markdown",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "## Astra export run manifest",
+    "action": null
+  },
+  {
+    "cell": 166,
+    "type": "code",
+    "source": "11_export_tests_report.cellsrc",
+    "heading": "_exports={os.path.basename(p):sha256_file(p) for p in glob.glob(os.path.join(CFG.DIRS['export'],'*')) if os.path.isfile(p) and not p.endswith('run_manifest.json')}",
+    "action": null
+  }
+]

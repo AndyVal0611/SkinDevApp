@@ -1,0 +1,11 @@
+{
+  "per_seed": {
+    "42": {
+      "frozen_backbone_val_macro_f1": 0.7270343989942278,
+      "partial_finetune_val_macro_f1": 0.7773202615083622,
+      "chosen": "B"
+    }
+  },
+  "selected_seed": 42,
+  "init": "imagenet"
+}

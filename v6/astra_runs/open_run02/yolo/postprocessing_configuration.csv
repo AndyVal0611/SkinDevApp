@@ -1,0 +1,4 @@
+condition,per_member_nms_iou,fusion_iou,members,deployed_threshold,post_fusion_nms
+Acne,0.6,0.5,3,0.275,none (as deployed)
+Hyperpigmentation,0.6,0.5,3,0.225,none (as deployed)
+Eczema,0.6,0.5,3,0.25,none (as deployed)

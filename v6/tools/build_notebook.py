@@ -1,8 +1,29 @@
 """Assemble the V6 notebook from notebook_src/*.cellsrc ('#@@ md' / '#@@ code' separators). Pure assembly: nothing is executed.
 Usage: python build_notebook.py [output.ipynb]"""
 import glob, os, sys, hashlib
-import nbformat
-from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
+try:
+    import nbformat
+    from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
+except ImportError:
+    # Assembly needs only JSON; validation remains available when nbformat is installed.
+    import json
+    class Record(dict):
+        __getattr__ = dict.__getitem__
+        __setattr__ = dict.__setitem__
+    def new_notebook():
+        return Record(cells=[], metadata={}, nbformat=4, nbformat_minor=5)
+    def new_markdown_cell(text):
+        return Record(cell_type='markdown', source=text, metadata={})
+    def new_code_cell(text):
+        return Record(cell_type='code', source=text, metadata={}, outputs=[], execution_count=None)
+    class nbformat:
+        @staticmethod
+        def validate(nb):
+            assert nb['nbformat'] == 4 and all(c['cell_type'] in ('code','markdown') for c in nb['cells'])
+        @staticmethod
+        def write(nb, path):
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(nb, f, indent=1, ensure_ascii=False)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "notebook_src")

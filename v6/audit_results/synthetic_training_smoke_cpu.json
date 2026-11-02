@@ -1,0 +1,70 @@
+{
+  "synthetic_only": true,
+  "scratch": "/tmp/lumyvue_SYNTHETIC_TRAIN_1tvsvj2a",
+  "tests": [
+    {
+      "name": "actual_global_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "PASS",
+      "seconds": 23.29,
+      "details": {
+        "loss": 0.3070295751094818,
+        "output_shape": [
+          1,
+          3
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:CPU:0",
+        "checkpoint": "/tmp/lumyvue_SYNTHETIC_TRAIN_1tvsvj2a/global.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true
+      }
+    },
+    {
+      "name": "actual_ROI_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "PASS",
+      "seconds": 17.92,
+      "details": {
+        "loss": 2.5388734340667725,
+        "output_shape": [
+          1,
+          4
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:CPU:0",
+        "checkpoint": "/tmp/lumyvue_SYNTHETIC_TRAIN_1tvsvj2a/roi.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true
+      }
+    },
+    {
+      "name": "actual_fusion_forward_backward_optimizer_masking_resume",
+      "status": "PASS",
+      "seconds": 2.92,
+      "details": {
+        "loss": 0.6312952041625977,
+        "output_shape": [
+          2,
+          3
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:CPU:0",
+        "checkpoint": "/tmp/lumyvue_SYNTHETIC_TRAIN_1tvsvj2a/fusion.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true,
+        "full_size_roi_input": [
+          12,
+          83
+        ]
+      }
+    }
+  ],
+  "started": 1793503645.4578614,
+  "gpu_devices": [],
+  "policy": "float32",
+  "original_models_unchanged": true,
+  "passed": 3,
+  "failed": 0,
+  "elapsed_seconds": 67.78,
+  "tensorflow": "2.21.0",
+  "keras": "3.15.1"
+}

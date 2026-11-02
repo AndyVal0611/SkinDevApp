@@ -95,6 +95,20 @@ namespace SkinDevApp.Views
                 foreach (string n in f.V6.Notes) f.Lines.Add(n);
                 foreach (string p in f.V6.Problems) f.Flags.Add(p);
                 f.Lines.Add(SkinDevApp.V6.V6Text.DisclaimerShort);
+
+                // Heat maps: the saved V5 Grad-CAM++ map of the condition the unified assessment ranks highest, per photograph. They explain the V5 classifier (labelled so in the report).
+                foreach (SkinDevApp.V6.V6ViewSummary vs in f.V6.Views)
+                {
+                    CaptureViewRow cv = d.View(vs.View) ?? d.Views.FirstOrDefault();
+                    if (cv == null || cv.Scores == null || vs.Assessment.Conditions.Length == 0) continue;
+                    var cands = vs.Assessment.Conditions.Where(c => c.Status == SkinDevApp.V6.ConditionStatus.Present).ToList();
+                    string lead = (cands.Count > 0 ? cands : vs.Assessment.Conditions.ToList()).OrderByDescending(c => c.CalibratedProbability).First().Condition;
+                    AttributionMapRow m = cv.Maps.FirstOrDefault(x => x.TargetClass == lead && !string.IsNullOrEmpty(x.OverlayPath));
+                    if (m == null) { if (!f.ViewsWithoutMaps.Contains(cv.ViewType)) f.ViewsWithoutMaps.Add(cv.ViewType); continue; }
+                    if (f.Evidence.Count >= MaxEvidence) { f.Omitted++; continue; }
+                    f.Evidence.Add(new EvidenceItem { View = cv, Map = m, ClassName = lead, Score = Score(cv, lead), IsPrimary = f.Evidence.Count == 0,
+                                                      Reason = "V5 classifier attribution for the condition the unified assessment ranks highest (" + lead + "); not the V6 explanation" });
+                }
                 return f;
             }
 

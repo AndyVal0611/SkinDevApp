@@ -1,0 +1,8 @@
+{
+  "candidate_unexposed_to_both_proxy_groups": {
+    "fusion": 240,
+    "test": 192,
+    "validation": 161
+  },
+  "limitation": "Absence of identified proxy exposure is not proven patient independence or complete historical model non-exposure."
+}

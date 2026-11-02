@@ -1,0 +1,19 @@
+{
+  "groups": 6515,
+  "groups_crossing_v5_splits": 885,
+  "v5_test_images": 1556,
+  "v5_test_images_with_sibling_elsewhere": 696,
+  "by_class": {
+    "Hyperpigmentation": 296,
+    "Normal": 249,
+    "Acne": 119,
+    "Eczema": 32
+  },
+  "subject_ids_available": false,
+  "group_stats": {
+    "md5_links": 274,
+    "stem_links": 3062,
+    "near_links": 1635,
+    "bucket_overflow_skips": 0
+  }
+}

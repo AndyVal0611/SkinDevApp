@@ -1,0 +1,6 @@
+expected preprocessing element,found in OnnxInference.cs
+BGR->RGB,True
+bilinear resize,True
+image size 224,True
+normalisation (p/127.5)-1,True
+"NHWC tensor [1,224,224,3]",True

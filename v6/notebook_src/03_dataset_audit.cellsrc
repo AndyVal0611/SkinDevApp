@@ -268,6 +268,47 @@ DF = DF.reset_index(drop=True)
 Every image source needs a **provenance record** (origin, terms, consent basis, permissible use, retention). The template is written once (never overwritten); training is gated until each `source_key` has `permissible_use` ∈ {`research_training`}. Evaluation-only sources may be used for evaluation but never for training. Fill this in from your dataset documentation — the notebook cannot know it.
 
 #@@ code
+"""Pure, fail-closed source policy shared by notebook and bounded tests.
+
+These fields record evidence supplied by humans; their presence does not prove
+legal permission. No default value grants permission.
+"""
+REQUIRED = ('description', 'license_or_terms', 'consent_basis',
+            'retention_policy', 'responsible_person')
+USES = {'research_training', 'evaluation_only', 'not_permitted'}
+
+def source_issues(records, keys, purpose):
+    if purpose not in {'training', 'evaluation'}:
+        raise ValueError('Unknown source-policy purpose')
+    result = []
+    for key in sorted(set(keys)):
+        rows = [r for r in records if r.get('source_key') == key]
+        reasons = []
+        if len(rows) != 1:
+            reasons.append('missing or duplicate source record')
+        else:
+            row = rows[0]
+            reasons += ['missing ' + f for f in REQUIRED if not str(row.get(f, '')).strip()]
+            if row.get('contains_identifiable_faces') not in {'yes', 'no'}:
+                reasons.append('identifiable-face status unresolved')
+            use = row.get('permissible_use', '')
+            allowed = {'research_training'} if purpose == 'training' else {'research_training', 'evaluation_only'}
+            if use not in allowed:
+                reasons.append('use not authorized for ' + purpose)
+        if reasons:
+            result.append({'source_key': key, 'purpose': purpose, 'reasons': '; '.join(reasons)})
+    return result
+
+
+def require_source_permission(splits, purpose):
+    # Reload at every boundary: stale caches/flags cannot grant permission.
+    records = pd.read_csv(CFG.PROVENANCE_CSV, dtype=str).fillna("").to_dict("records")
+    keys = DF.loc[DF.split.isin(splits), "source_key"].unique()
+    issues = source_issues(records, keys, purpose)
+    if issues:
+        raise GateError(f"Source permission blocked {purpose} for {splits}: {issues}")
+    return True
+
 PERMITTED_TRAIN = {"research_training"}
 PERMITTED_EVAL = {"research_training", "evaluation_only"}
 keys = sorted(DF.source_key.unique())
@@ -280,9 +321,10 @@ PROV = pd.read_csv(CFG.PROVENANCE_CSV, dtype=str).fillna("")
 miss = [k for k in keys if k not in set(PROV.source_key)]
 bad_use = PROV[~PROV.permissible_use.isin(PERMITTED_EVAL | {"not_permitted"})].source_key.tolist()
 not_train = set(PROV[~PROV.permissible_use.isin(PERMITTED_TRAIN)].source_key) | set(miss)
-prov_ok = (not miss) and (not bad_use)
-set_gate("provenance_defined", prov_ok or not CFG.REQUIRE_PROVENANCE_FOR_TRAINING,
-         f"provenance missing for {len(miss)} source keys / invalid permissible_use for {len(bad_use)}: fill {CFG.PROVENANCE_CSV}")
+prov_issues = source_issues(PROV.to_dict("records"), keys, "evaluation")
+prov_ok = (not miss) and (not bad_use) and not prov_issues
+set_gate("provenance_defined", prov_ok,
+         f"provenance missing for {len(miss)} source keys / invalid permissible_use for {len(bad_use)} / unresolved evidence for {len(prov_issues)}: fill {CFG.PROVENANCE_CSV}")
 _valid = [k for k in keys if k in set(PROV[PROV.permissible_use.isin(PERMITTED_EVAL | {"not_permitted"})].source_key)]
 print("sources:", len(keys), "| with a valid permissible_use:", len(_valid), "| NOT permitted for training (missing, blank or not research_training):", len(not_train))
 DF["train_permitted"] = ~DF.source_key.isin(not_train)

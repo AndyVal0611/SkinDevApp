@@ -1,0 +1,25 @@
+{
+  "epoch": 29,
+  "latest": "epoch_00029.keras",
+  "best": "epoch_00009.keras",
+  "history": "epoch_00029.history.csv",
+  "best_metric": 0.17343725264072418,
+  "complete": true,
+  "early": {
+    "wait": 20,
+    "best": 0.17343725264072418,
+    "stopped_epoch": 28
+  },
+  "plateau": {
+    "wait": 0,
+    "best": null,
+    "cooldown_counter": 0
+  },
+  "hashes": {
+    "epoch_00029.keras": "e688b1b22f77e82a4bb2be0c0441394383da7f0787035822912d28a0818cb0fb",
+    "epoch_00009.keras": "f8dff89c592279b8f3fc6d8e3c89e240e72595c41cf8483713204e874c2eb745",
+    "epoch_00029.history.csv": "4f2f2989eabfdf6a27a6606f0bb9d217d22c3bf1ba3c20043ea1eeaead7add72",
+    "selected.keras": "52b2ce032d0c5f12e786f8c2f7bf580aceb2d078c4a191989cfdab5f432ed91b"
+  },
+  "selected": "selected.keras"
+}

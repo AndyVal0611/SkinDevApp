@@ -1,0 +1,12 @@
+{
+  "ran": 37,
+  "failures": [],
+  "errors": [],
+  "skipped": [
+    [
+      "test_end_to_end_reference_parity_with_batch_logic (__main__.TestV6.test_end_to_end_reference_parity_with_batch_logic)",
+      "needs all trained components and the evaluated test split"
+    ]
+  ],
+  "passed": 36
+}

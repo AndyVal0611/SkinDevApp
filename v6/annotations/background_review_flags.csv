@@ -1,0 +1,23 @@
+image_id,split,detector,conf,note,flagged_at
+img_021628,train,Acne,0.682,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:08
+img_005474,train,Hyperpigmentation,0.602,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:15
+img_005474,train,Eczema,0.678,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:16
+img_016621,validation,Hyperpigmentation,0.579,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:33
+img_015768,train,Acne,0.463,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:53
+img_018101,train,Hyperpigmentation,0.421,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:36:55
+img_013555,validation,Eczema,0.61,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:37:09
+img_016075,validation,Acne,0.482,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:37:14
+img_018352,train,Hyperpigmentation,0.388,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:37:16
+img_019482,validation,Hyperpigmentation,0.435,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:37:55
+img_013555,validation,Eczema,0.535,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:38:00
+img_018101,train,Eczema,0.295,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:38:25
+img_020951,train,Hyperpigmentation,0.31,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:38:32
+img_017596,train,Hyperpigmentation,0.292,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:39:02
+img_012906,validation,Eczema,0.414,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:39:42
+img_018652,validation,Hyperpigmentation,0.332,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:40:03
+img_021677,train,Hyperpigmentation,0.263,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:40:07
+img_012465,train,Hyperpigmentation,0.255,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:40:18
+img_015927,train,Hyperpigmentation,0.236,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:40:37
+img_016035,validation,Eczema,0.362,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:40:38
+img_006249,validation,Hyperpigmentation,0.261,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:42:19
+img_006249,validation,Hyperpigmentation,0.23,reviewer says this box is a real lesion although the image is labelled with no condition,2026-11-02T00:42:51

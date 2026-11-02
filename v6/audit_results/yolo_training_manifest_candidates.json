@@ -1,0 +1,44 @@
+[
+  {
+    "run": "acne_final_960_lowlr_seed123",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed123/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed123/data.yaml"
+    ]
+  },
+  {
+    "run": "acne_final_960_lowlr_seed7",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed7/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed7/data.yaml"
+    ]
+  },
+  {
+    "run": "H25_v2human_all_pub",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_v2human_all_pub/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_v2human_all_pub/data.yaml"
+    ]
+  },
+  {
+    "run": "H25_s123",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_s123/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_s123/data.yaml"
+    ]
+  },
+  {
+    "run": "acne_final_960_lowlr_seed42",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed42/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/acne_final_960_lowlr_seed42/data.yaml"
+    ]
+  },
+  {
+    "run": "H25_s7",
+    "args": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_s7/args.yaml",
+    "data_lines": [
+      "data: /home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_s7/data.yaml"
+    ]
+  }
+]

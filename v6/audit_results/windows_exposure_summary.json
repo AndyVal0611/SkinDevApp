@@ -1,0 +1,9 @@
+{
+  "dataset_files": {
+    "acne_installed_metadata_dataset": 1145,
+    "hyperpigmentation_candidate_v2_train": 794
+  },
+  "matches": 2014,
+  "exact": 2014,
+  "limitations": "Matches concern the original image pool, not confirmed V6 evaluation membership. Hyperpigmentation folder is a candidate; historical run snapshot and installed weight linkage remain unverified. No patient identifiers available."
+}

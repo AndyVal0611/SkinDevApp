@@ -1,0 +1,599 @@
+{
+  "run_id": "open_run02",
+  "config_sha256": "64d0982994a3475bb51559d24f5f219e5040dcb009b331c667a4f8d2ca55a3ed",
+  "artifacts": {
+    "v6_dermatologist_review.schema.json": "7a6e2b995ceb4bb2429bb045e0e709fb3356ddcf883bd642c6a43ad81a93435f",
+    "v6_export_status.json": "91537d49a933d24e884edf188953f492dccbf92f8a7c8c565d645abca95ad53d",
+    "v6_final_assessment.schema.json": "712312cfc6c7c12d7f8f92f87bffc9adc62bc07a3d8e9c8e604b4a4b642fa2d4",
+    "v6_fusion_full_seed42.onnx": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7",
+    "v6_fusion_full_seed42_weights.json": "44c52febc11cd8ba8569d44e5fb68ff35c5ff0f3ecfd06628843ee11e366830e",
+    "v6_fusion_global_only_seed42.onnx": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a",
+    "v6_fusion_global_only_seed42_weights.json": "c33473701ac4640b31483fe81fee99de5c0db06d9cc947f838da4884b7325a19",
+    "v6_fusion_global_yolo_seed42.onnx": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97",
+    "v6_fusion_global_yolo_seed42_weights.json": "beab4f02a4241bc8aa16bb52f671c4e0b70af7ab0cfde163234de6b8ea5f5e0d",
+    "v6_global_features.keras": "f445b05fe236c3cb8ac9a8b4a2cd02f068c5cc0d7d67b8bf91be4db98e81912a",
+    "v6_global_features_mobilenetv2.onnx": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4",
+    "v6_global_selected.keras": "9ea98521dfa60f4ade998257dcdfcef5484382fa55ede952c1a37a25e53c3da0",
+    "v6_keras_vs_onnx_verification.json": "39ae039fed3330a51e773bfbf98abdcf95aa6a74e5ea2028019995bcea34accd",
+    "v6_labels.json": "d39a9322ed0d44b0eb8232a90e91c797fa16d1b3a112f4e518069ede361c24b2",
+    "v6_model_metadata.json": "035680268c57d46baab535363565d61da104224ce91a15ff17687fb0cda55621",
+    "v6_review_contract.json": "e5194074c489d4fb14949aeda207b890af3fde88b8411b9e03d4435f94b37041",
+    "v6_roi_features.keras": "5efc6b31b33ba98ecde35d32927166455b76afa12b8ede079f864bd8d564bb02",
+    "v6_roi_features_mobilenetv2.onnx": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22",
+    "v6_roi_selected.keras": "897fa2cf5e6c8bb272b45e24f8026fb11695e69066324b50d0c1ea9ff41705c0"
+  },
+  "keras_onnx_parity": {
+    "global_features": {
+      "status": "compared",
+      "max_abs_diff_per_output": [
+        0.0425724983215332,
+        0.03326225280761719
+      ],
+      "within_tolerance": false,
+      "onnx_inputs": [
+        [
+          "image_nhwc_m1p1",
+          [
+            "unk__657",
+            224,
+            224,
+            3
+          ]
+        ]
+      ],
+      "onnx_outputs": [
+        [
+          "Identity:0",
+          [
+            "unk__658",
+            128
+          ]
+        ],
+        [
+          "Identity_1:0",
+          [
+            "unk__659",
+            3
+          ]
+        ]
+      ],
+      "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4"
+    },
+    "roi_features": {
+      "status": "compared",
+      "max_abs_diff_per_output": [
+        0.05155324935913086,
+        0.019429385662078857
+      ],
+      "within_tolerance": false,
+      "onnx_inputs": [
+        [
+          "roi_nhwc_m1p1",
+          [
+            "unk__1314",
+            224,
+            224,
+            3
+          ]
+        ]
+      ],
+      "onnx_outputs": [
+        [
+          "Identity:0",
+          [
+            "unk__1315",
+            64
+          ]
+        ],
+        [
+          "Identity_1:0",
+          [
+            "unk__1316",
+            4
+          ]
+        ]
+      ],
+      "sha256": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22"
+    },
+    "fusion_global_only_seed42": {
+      "status": "compared",
+      "max_abs_diff_per_output": [
+        0.000469207763671875
+      ],
+      "within_tolerance": false,
+      "onnx_inputs": [
+        [
+          "g_emb",
+          [
+            "unk__1442",
+            128
+          ]
+        ],
+        [
+          "g_logit",
+          [
+            "unk__1443",
+            3
+          ]
+        ],
+        [
+          "g_extra",
+          [
+            "unk__1444",
+            2
+          ]
+        ],
+        [
+          "det_ev",
+          [
+            "unk__1445",
+            21
+          ]
+        ],
+        [
+          "roi_feat",
+          [
+            "unk__1446",
+            12,
+            83
+          ]
+        ],
+        [
+          "roi_mask",
+          [
+            "unk__1447",
+            12
+          ]
+        ]
+      ],
+      "onnx_outputs": [
+        [
+          "Identity:0",
+          [
+            "unk__1448",
+            3
+          ]
+        ]
+      ],
+      "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a"
+    },
+    "fusion_global_yolo_seed42": {
+      "status": "compared",
+      "max_abs_diff_per_output": [
+        0.0005065202713012695
+      ],
+      "within_tolerance": false,
+      "onnx_inputs": [
+        [
+          "g_emb",
+          [
+            "unk__1574",
+            128
+          ]
+        ],
+        [
+          "g_logit",
+          [
+            "unk__1575",
+            3
+          ]
+        ],
+        [
+          "g_extra",
+          [
+            "unk__1576",
+            2
+          ]
+        ],
+        [
+          "det_ev",
+          [
+            "unk__1577",
+            21
+          ]
+        ],
+        [
+          "roi_feat",
+          [
+            "unk__1578",
+            12,
+            83
+          ]
+        ],
+        [
+          "roi_mask",
+          [
+            "unk__1579",
+            12
+          ]
+        ]
+      ],
+      "onnx_outputs": [
+        [
+          "Identity:0",
+          [
+            "unk__1580",
+            3
+          ]
+        ]
+      ],
+      "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97"
+    },
+    "fusion_full_seed42": {
+      "status": "compared",
+      "max_abs_diff_per_output": [
+        0.0005545616149902344
+      ],
+      "within_tolerance": false,
+      "onnx_inputs": [
+        [
+          "g_emb",
+          [
+            "unk__1706",
+            128
+          ]
+        ],
+        [
+          "g_logit",
+          [
+            "unk__1707",
+            3
+          ]
+        ],
+        [
+          "g_extra",
+          [
+            "unk__1708",
+            2
+          ]
+        ],
+        [
+          "det_ev",
+          [
+            "unk__1709",
+            21
+          ]
+        ],
+        [
+          "roi_feat",
+          [
+            "unk__1710",
+            12,
+            83
+          ]
+        ],
+        [
+          "roi_mask",
+          [
+            "unk__1711",
+            12
+          ]
+        ]
+      ],
+      "onnx_outputs": [
+        [
+          "Identity:0",
+          [
+            "unk__1712",
+            3
+          ]
+        ]
+      ],
+      "sha256": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7"
+    }
+  },
+  "calibration": {
+    "full": {
+      "platt": [
+        {
+          "a": 0.5827944047112714,
+          "b": -0.8072235660569566
+        },
+        {
+          "a": 0.628212357860993,
+          "b": -0.2980508596037338
+        },
+        {
+          "a": 0.501094703231593,
+          "b": -1.6623883940716577
+        }
+      ],
+      "thresholds": [
+        0.43,
+        0.34,
+        0.33
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "global_yolo": {
+      "platt": [
+        {
+          "a": 0.7297918985761983,
+          "b": -0.6806363571042584
+        },
+        {
+          "a": 0.7619317641649174,
+          "b": -0.546835840466286
+        },
+        {
+          "a": 0.5355513342654367,
+          "b": -1.7331056613640594
+        }
+      ],
+      "thresholds": [
+        0.42,
+        0.37,
+        0.27
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "global_only": {
+      "platt": [
+        {
+          "a": 0.7935146005956473,
+          "b": -0.48752706922769473
+        },
+        {
+          "a": 0.8798338759914927,
+          "b": -0.4562666466105268
+        },
+        {
+          "a": 0.5938522075601034,
+          "b": -1.9048337721467055
+        }
+      ],
+      "thresholds": [
+        0.51,
+        0.39,
+        0.25
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "roi_only": {
+      "platt": [
+        {
+          "a": 0.8168179336930687,
+          "b": -0.631990091427639
+        },
+        {
+          "a": 0.7977973511480135,
+          "b": -0.45406062620865384
+        },
+        {
+          "a": 0.5917430660369379,
+          "b": -1.9097443788467345
+        }
+      ],
+      "thresholds": [
+        0.46,
+        0.5,
+        0.24
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "no_acne_evidence": {
+      "platt": [
+        {
+          "a": 0.7261238114254489,
+          "b": -0.7672606363910796
+        },
+        {
+          "a": 0.6483600160536619,
+          "b": -0.49988510632428684
+        },
+        {
+          "a": 0.5867209773302999,
+          "b": -1.7336472818809132
+        }
+      ],
+      "thresholds": [
+        0.4,
+        0.32,
+        0.18
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "no_eczema_evidence": {
+      "platt": [
+        {
+          "a": 0.5485327430822354,
+          "b": -0.2945123879987037
+        },
+        {
+          "a": 0.49960570498461265,
+          "b": -0.4088048815519022
+        },
+        {
+          "a": 0.37860955664727247,
+          "b": -1.879964218553207
+        }
+      ],
+      "thresholds": [
+        0.3,
+        0.4,
+        0.36
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    },
+    "no_hyper_evidence": {
+      "platt": [
+        {
+          "a": 0.6366788001249072,
+          "b": -0.758623408678779
+        },
+        {
+          "a": 0.5701822378483404,
+          "b": -0.2801021991813536
+        },
+        {
+          "a": 0.3894833817912891,
+          "b": -1.8939374497346417
+        }
+      ],
+      "thresholds": [
+        0.38,
+        0.39,
+        0.26
+      ],
+      "calibrated_conditions": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ]
+    }
+  },
+  "conditions": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+  ],
+  "roi_classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Background"
+  ],
+  "detector_feature_order": [
+    "Acne:available",
+    "Acne:detected",
+    "Acne:max_deployed_conf",
+    "Acne:max_pool_conf",
+    "Acne:sqrt_rel_area",
+    "Acne:cx",
+    "Acne:cy",
+    "Hyperpigmentation:available",
+    "Hyperpigmentation:detected",
+    "Hyperpigmentation:max_deployed_conf",
+    "Hyperpigmentation:max_pool_conf",
+    "Hyperpigmentation:sqrt_rel_area",
+    "Hyperpigmentation:cx",
+    "Hyperpigmentation:cy",
+    "Eczema:available",
+    "Eczema:detected",
+    "Eczema:max_deployed_conf",
+    "Eczema:max_pool_conf",
+    "Eczema:sqrt_rel_area",
+    "Eczema:cx",
+    "Eczema:cy"
+  ],
+  "roi_feature_order": [
+    "embedding_0",
+    "embedding_1",
+    "embedding_2",
+    "embedding_3",
+    "embedding_4",
+    "embedding_5",
+    "embedding_6",
+    "embedding_7",
+    "embedding_8",
+    "embedding_9",
+    "embedding_10",
+    "embedding_11",
+    "embedding_12",
+    "embedding_13",
+    "embedding_14",
+    "embedding_15",
+    "embedding_16",
+    "embedding_17",
+    "embedding_18",
+    "embedding_19",
+    "embedding_20",
+    "embedding_21",
+    "embedding_22",
+    "embedding_23",
+    "embedding_24",
+    "embedding_25",
+    "embedding_26",
+    "embedding_27",
+    "embedding_28",
+    "embedding_29",
+    "embedding_30",
+    "embedding_31",
+    "embedding_32",
+    "embedding_33",
+    "embedding_34",
+    "embedding_35",
+    "embedding_36",
+    "embedding_37",
+    "embedding_38",
+    "embedding_39",
+    "embedding_40",
+    "embedding_41",
+    "embedding_42",
+    "embedding_43",
+    "embedding_44",
+    "embedding_45",
+    "embedding_46",
+    "embedding_47",
+    "embedding_48",
+    "embedding_49",
+    "embedding_50",
+    "embedding_51",
+    "embedding_52",
+    "embedding_53",
+    "embedding_54",
+    "embedding_55",
+    "embedding_56",
+    "embedding_57",
+    "embedding_58",
+    "embedding_59",
+    "embedding_60",
+    "embedding_61",
+    "embedding_62",
+    "embedding_63",
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Background",
+    "cond_acne",
+    "cond_hyper",
+    "cond_eczema",
+    "conf",
+    "rel_area",
+    "cx",
+    "cy",
+    "w_rel",
+    "h_rel",
+    "aspect_log",
+    "deployed",
+    "support_frac",
+    "tier1",
+    "tier2",
+    "tier3_alt"
+  ],
+  "mask": {
+    "shape": [
+      null,
+      12
+    ],
+    "valid": 1,
+    "padding": 0,
+    "empty_allowed": true
+  },
+  "fusion_seed_aggregation": "mean logits, then Platt calibration",
+  "deployment": "pending separate C# parity and workflow validation"
+}

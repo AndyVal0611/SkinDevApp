@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LUMYVUE final AI assessment",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "state",
+    "predicted_conditions",
+    "condition_scores",
+    "regions",
+    "evidence_provenance",
+    "detector_availability",
+    "uncertainty",
+    "stage_reached",
+    "verification_passes",
+    "stop_reason",
+    "model_versions",
+    "fusion_config",
+    "original_cnn_scores",
+    "original_yolo_outputs",
+    "intermediate_results",
+    "quality",
+    "ood",
+    "recapture_advice",
+    "review_status",
+    "requires_dermatologist_review",
+    "clinical_status",
+    "ai_verification",
+    "state_meaning",
+    "ai_content_sha256",
+    "schema_version",
+    "created_utc"
+  ],
+  "description": "Sealed AI output. Issued ONLY as PENDING_DERMATOLOGIST_REVIEW; never edited after issue (corrections = a new assessment with a new scan_id). ai_content_sha256 = SHA-256 of the canonical JSON (sorted keys, compact separators) of every other field.",
+  "properties": {
+    "scan_id": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "FINDINGS_SUPPORTED",
+        "MULTIPLE_FINDINGS_SUPPORTED",
+        "NO_FINDINGS_SUPPORTED",
+        "UNCERTAIN_REVIEW_REQUIRED",
+        "RECAPTURE_REQUIRED",
+        "OUT_OF_SCOPE_REVIEW_REQUIRED",
+        "INFERENCE_ERROR"
+      ]
+    },
+    "predicted_conditions": {
+      "type": "array"
+    },
+    "condition_scores": {
+      "type": "object"
+    },
+    "regions": {
+      "type": "array"
+    },
+    "detector_availability": {
+      "type": "object"
+    },
+    "original_cnn_scores": {
+      "type": "object"
+    },
+    "original_yolo_outputs": {
+      "type": "object",
+      "description": "per condition: list of boxes, or null when the detector was unavailable (null is NOT an empty list)"
+    },
+    "review_status": {
+      "type": "string",
+      "const": "PENDING_DERMATOLOGIST_REVIEW"
+    },
+    "requires_dermatologist_review": {
+      "type": "boolean",
+      "const": true
+    },
+    "clinical_status": {
+      "type": "string",
+      "const": "NOT_CLINICALLY_VALIDATED"
+    },
+    "ai_verification": {
+      "type": "object",
+      "properties": {
+        "clinical_validation": {
+          "type": "boolean",
+          "const": false
+        }
+      },
+      "required": [
+        "clinical_validation",
+        "stage_reached",
+        "verification_passes",
+        "stop_reason",
+        "statement"
+      ]
+    },
+    "ai_content_sha256": {
+      "type": "string",
+      "pattern": "[0-9a-f]{64}"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "lumyvue-final-assessment/1.1"
+    },
+    "created_utc": {
+      "type": "string"
+    }
+  }
+}

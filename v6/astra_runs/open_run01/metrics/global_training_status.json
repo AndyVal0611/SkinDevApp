@@ -1,0 +1,58 @@
+{
+  "D_multilabel3": {
+    "status": "trained",
+    "info": {
+      "experiment": "D_multilabel3",
+      "pos_weight": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "known_labels_train": [
+        891,
+        893,
+        894
+      ],
+      "positives_train": [
+        174,
+        260,
+        242
+      ],
+      "negatives_train": [
+        717,
+        633,
+        652
+      ],
+      "n_train": 896,
+      "n_val": 596
+    }
+  },
+  "E_v5_backbone_multilabel3": {
+    "status": "trained",
+    "info": {
+      "experiment": "E_v5_backbone_multilabel3",
+      "pos_weight": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "known_labels_train": [
+        891,
+        893,
+        894
+      ],
+      "positives_train": [
+        174,
+        260,
+        242
+      ],
+      "negatives_train": [
+        717,
+        633,
+        652
+      ],
+      "n_train": 896,
+      "n_val": 596
+    }
+  }
+}

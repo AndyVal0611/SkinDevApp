@@ -1,0 +1,4 @@
+step,rows
+manifest rows,12000
+after excluding non-facial auxiliary training images (INCLUDE_AUX_NONFACIAL=False),10367
+"after excluding facial_qa_status in ['reject', 'manual_review']",10063

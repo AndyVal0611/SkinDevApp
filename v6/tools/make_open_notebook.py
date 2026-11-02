@@ -1,0 +1,336 @@
+"""Derive the 'Open' training notebook from the Astra notebook (nothing is executed).
+
+The Open notebook is Astra with exactly these researcher-governance blocks removed:
+  1. the one-use ASTRA_ACTION tokens (astra_require_action becomes a logged no-op),
+  2. the source-permission / provenance check (require_source_permission is a logged no-op, every source counts as train-permitted,
+     the 'provenance_defined' gate is set true),
+  2b. the blinded_to_ai=yes requirement for evaluation-grade rows (AI-proposed fusion labels are marked blinded_to_ai=no),
+  3. the empty-evaluation-scope requirement (a development note is pre-filled and is written into the test lock / exports).
+Everything else is untouched: leakage/split checks, the one-time test lock, label rules (Unknown is never negative), minimum-count gates,
+checkpoint identities. Counts that cannot be met without data (fusion/test labels, region boxes) still stop the stages that need them.
+
+  python make_open_notebook.py            -> v6/LUMYVUE_V6_Training_Pipeline_Open.ipynb
+"""
+import json, os, re, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+V6 = os.path.dirname(HERE)
+SRC = os.path.join(V6, "LUMYVUE_V6_Complete_Training_Pipeline_Astra.ipynb")
+OUT = os.path.join(V6, "LUMYVUE_V6_Training_Pipeline_Open.ipynb")
+
+nb = json.load(open(SRC, encoding="utf-8"))
+log = []
+
+
+def cell_with(marker):
+    hits = [c for c in nb["cells"] if c["cell_type"] == "code" and marker in "".join(c["source"])]
+    if len(hits) != 1:
+        sys.exit(f"expected exactly one cell containing {marker!r}, found {len(hits)}")
+    return hits[0]
+
+
+def set_src(cell, text):
+    lines = text.split("\n")
+    cell["source"] = [l + "\n" for l in lines[:-1]] + ([lines[-1]] if lines[-1] else [])
+
+
+def patch(marker, old, new, what, regex=False):
+    c = cell_with(marker)
+    s = "".join(c["source"])
+    if regex:
+        s2, n = re.subn(old, lambda m: new, s, count=1, flags=re.S)
+        ok = n == 1
+    else:
+        ok = s.count(old) == 1
+        s2 = s.replace(old, new)
+    if not ok:
+        sys.exit(f"patch failed: {what}")
+    set_src(c, s2)
+    log.append(what)
+
+
+# 1. action tokens
+patch("def astra_require_action(action):",
+      "    if ASTRA_ACTION != action:\n        raise GateError(f'Researcher-controlled cell: set ASTRA_ACTION = {action!r} in a separate cell, then run this cell. Read the guide first.')\n"
+      "    ASTRA_ACTION = None\n    log_event('researcher_action', action=action)",
+      "    # Open notebook: no one-use token, but expensive stages stay off until OPEN_TRAINING_ENABLED is set, and the locked test has its own switch.\n"
+      "    if action == 'final_test' and not OPEN_ALLOW_FINAL_TEST:\n        raise GateError('Locked test evaluation is off: set OPEN_ALLOW_FINAL_TEST = True in a separate cell only when the evaluation cohort is ready.')\n"
+      "    if action != 'baseline_development' and not OPEN_TRAINING_ENABLED:  # V5 baseline inference trains nothing and later audit cells need it\n        raise GateError(f'Expensive stage {action!r} is off: set OPEN_TRAINING_ENABLED = True in a separate cell to run it. Nothing was started.')\n"
+      "    ASTRA_ACTION = None\n    log_event('researcher_action', action=action, token_required=False)",
+      "ASTRA_ACTION tokens replaced by one training switch plus a separate final-test switch")
+
+# 2. source permission
+patch("def require_source_permission(splits, purpose):",
+      r"    # Reload at every boundary.*?    return True",
+      "    # Open notebook: source permission is NOT enforced here (recorded for traceability only).\n"
+      "    log_event('source_permission_not_enforced', splits=list(splits), purpose=purpose)\n    return True",
+      "require_source_permission is a logged no-op", regex=True)
+patch('DF["train_permitted"] = ~DF.source_key.isin(not_train)',
+      'DF["train_permitted"] = ~DF.source_key.isin(not_train)',
+      'DF["train_permitted"] = True  # Open notebook: every source counts as train-permitted',
+      "all sources train-permitted")
+patch('set_gate("provenance_defined", prov_ok,', 'set_gate("provenance_defined", prov_ok,', 'set_gate("provenance_defined", True,',
+      "provenance_defined gate set true")
+
+# 2b. blinding requirement for evaluation-grade rows (AI-proposed rows reviewed by the researcher are marked blinded_to_ai=no)
+patch("a['eval_ok'] &= documented & a.blinded_to_ai",
+      "a['eval_ok'] &= documented & a.blinded_to_ai.str.strip().str.lower().isin(['yes','true','1'])",
+      "a['eval_ok'] &= documented  # Open notebook: rows reviewed with AI proposals shown (blinded_to_ai=no) are accepted",
+      "blinded_to_ai=yes not required for eval_ok")
+
+# 3. bootstrap defaults + development note
+patch("Astra bootstrap", "os.environ.setdefault('LUMYVUE_RUN_ID', 'astra_run01')", "os.environ.setdefault('LUMYVUE_RUN_ID', 'open_run02')", "default RUN_ID open_run02")
+# (Astra already defaults to v6_open_training_config.json, so no config patch is needed here)
+patch("Astra bootstrap", "ASTRA_EVALUATION_NOTE = ''  # researcher/adviser decision: limited historical cohort or approved independent cohort",
+      "ASTRA_EVALUATION_NOTE = 'DEVELOPMENT RUN (open notebook): source-permission, action-token and dermatologist-only gates are not enforced; not thesis evidence until provenance and dermatologist review are documented.'",
+      "development evaluation note pre-filled")
+
+patch("Astra bootstrap", "ASTRA_ACTION = None\n",
+      "ASTRA_ACTION = None\nOPEN_TRAINING_ENABLED = True  # overnight mode: Run All trains straight through to the locked test; set False to make every expensive stage stop and ask first\nOPEN_ALLOW_FINAL_TEST = False  # the locked test split has its own switch\n",
+      "safeguard switches added to bootstrap")
+
+# 4. Experiment E: V5-initialised backbone + new three-condition multilabel head. B, C, D, D2 are not changed.
+patch("def build_global(mode, init):",
+      '    base = pretrained_backbone(); base.trainable = False\n',
+      '    # v5_backbone builds the same architecture with no weights; V5 tensors are copied after the head exists, so the head draws the same random numbers as D.\n'
+      '    base = keras.applications.MobileNetV2(input_shape=(IMG_PX, IMG_PX, 3), include_top=False, weights=None) if init == "v5_backbone" else pretrained_backbone()\n'
+      '    base.trainable = False\n',
+      "build_global: v5_backbone builds an empty MobileNetV2")
+patch("def build_global(mode, init):",
+      '    return keras.Model(inp, out, name=f"lumyvue_global_{mode}"), base\n',
+      '    if init == "v5_backbone":\n'
+      '        require(mode == "multilabel3", "v5_backbone initialisation is only defined for the multilabel3 head")\n'
+      '        write_json(os.path.join(CFG.DIRS["metrics"], "v5_transfer_report.json"), transfer_v5_backbone(base))\n'
+      '    return keras.Model(inp, out, name=f"lumyvue_global_{mode}"), base\n',
+      "build_global: v5_backbone copies and verifies V5 weights")
+patch("def build_global(mode, init):", """init: 'imagenet' | 'v5_full'.""", """init: 'imagenet' | 'v5_full' | 'v5_backbone'.""", "build_global docstring")
+patch('"D2_multilabel3_hard":    dict(',
+      '    "D2_multilabel3_hard":    dict(mode="multilabel3", init="imagenet", data="all_masked", balance=True, hard=True, mixed_oversample=CFG.MIXED_OVERSAMPLE, phase_a_lr=None),\n',
+      '    "D2_multilabel3_hard":    dict(mode="multilabel3", init="imagenet", data="all_masked", balance=True, hard=True, mixed_oversample=CFG.MIXED_OVERSAMPLE, phase_a_lr=None),\n'
+      '    "E_v5_backbone_multilabel3": dict(mode="multilabel3", init="v5_backbone", data="all_masked", balance=False, hard=False, mixed_oversample=1, phase_a_lr=None),  # identical to D except init\n',
+      "experiment E_v5_backbone_multilabel3 registered")
+patch("def astra_global_phase(phase):", "epochs=(CFG.PHASE_A_EPOCHS if e['init']=='imagenet' else",
+      "epochs=(CFG.PHASE_A_EPOCHS if e['init'] in ('imagenet','v5_backbone') else",
+      "E gets the same Phase A budget as D (a new head needs the full budget)")
+patch("class ValMetrics(keras.callbacks.Callback):",
+      '        ap = m.ap.dropna()\n',
+      '        for r in m.itertuples():  # per-condition history, so no condition can be hidden by a macro average\n'
+      '            for k in ("precision", "recall", "f1", "ap"): logs[f"val_{r.condition}_{k}"] = float(getattr(r, k))\n'
+      '        ap = m.ap.dropna()\n',
+      "per-condition validation metrics added to the training history")
+patch("def training_identity(stage, phase, seed, data):",
+      "sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR, '*.cellsrc')))\n",
+      "sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR, '*.cellsrc'))) + [str(ASTRA_V6_DIR/'tools'/'make_open_notebook.py')]  # Open patches are part of the checkpoint identity\n",
+      "checkpoint identity covers the Open patches")
+
+TRANSFER_MD = """## 20.3 V5 backbone transfer for Experiment E (no training)
+`E_v5_backbone_multilabel3` reuses the trained V5 MobileNetV2 backbone with a **new** three-condition head. V5's four-class head (and its Dense/BatchNorm layers) is not copied, and the V5 file is only read. The verification cell compares every tensor with V5, compares backbone outputs on the same input, checks the head, the output shapes and the freezing logic, and saves `metrics/v5_transfer_verification.json`. A mismatch raises an error; layers are never skipped silently.
+
+**Known limit of this transfer.** V5 fine-tuned only the upper backbone with BatchNorm frozen, so most V5 backbone tensors equal ImageNet (the report counts them). D and E therefore start close together; any difference between them has to be shown, not assumed.
+"""
+TRANSFER_CODE = """# 20.3 V5 -> V6 backbone transfer and its verification. Reads the V5 file only; trains nothing.
+def v5_input_contract():
+    meta = json.load(open(CFG.V5_LABELS_JSON, encoding="utf-8"))
+    require(str(meta.get("channel_order", "")).upper() == "RGB", f"V5 channel order is not RGB: {meta.get('channel_order')}", gate=True)
+    require(meta.get("normalization") == "(pixel / 127.5) - 1.0", f"V5 normalisation differs from V6: {meta.get('normalization')}", gate=True)
+    require(list(meta.get("input_size", []))[:2] == [IMG_PX, IMG_PX], f"V5 input size differs from V6: {meta.get('input_size')}", gate=True)
+    return {k: meta.get(k) for k in ("channel_order", "normalization", "input_size", "classes")}
+
+
+def transfer_v5_backbone(target):
+    \"\"\"Copies V5's backbone weights into `target`, position by position. Any architecture mismatch stops; nothing is skipped silently.\"\"\"
+    require(os.path.isfile(CFG.V5_KERAS), f"V5 Keras model not found: {CFG.V5_KERAS} (needed for experiment E)", gate=True)
+    contract = v5_input_contract()
+    before = sha256_file(CFG.V5_KERAS)
+    v5 = keras.models.load_model(CFG.V5_KERAS, compile=False)
+    src = find_backbone(v5)
+    require(len(src.layers) == len(target.layers), f"V5 backbone has {len(src.layers)} layers, V6 has {len(target.layers)}", gate=True)
+    renamed, n_layers = [], 0
+    for s, t in zip(src.layers, target.layers):
+        require(type(s) is type(t), f"layer type differs: {s.name} {type(s).__name__} vs {t.name} {type(t).__name__}", gate=True)
+        sw = s.get_weights()
+        require([w.shape for w in sw] == [w.shape for w in t.get_weights()], f"weight shapes differ at layer {s.name}", gate=True)
+        if s.name != t.name:
+            require(not sw, f"a weighted layer has a different name: {s.name} vs {t.name}", gate=True)
+            renamed.append([s.name, t.name])
+        if sw:
+            t.set_weights(sw); n_layers += 1
+    different = [w.path for a, b, w in zip(src.get_weights(), target.get_weights(), target.weights) if not np.array_equal(a, b)]
+    require(not different, f"V5 weights were not transferred exactly: {different[:5]}", gate=True)
+    head = [l.name for l in v5.layers if l is not src and l.weights]
+    n_tensors = len(src.get_weights())
+    del v5, src
+    require(sha256_file(CFG.V5_KERAS) == before, "the V5 model file changed during transfer", gate=True)
+    return dict(source=redact(CFG.V5_KERAS), source_sha256=before, input_contract=contract, layers_total=len(target.layers), layers_with_weights_transferred=n_layers,
+                tensors_transferred=n_tensors, layers_skipped=[], weightless_layers_renamed=renamed, v5_head_layers_not_transferred=head)
+
+
+def verify_v5_transfer(seed=None):
+    \"\"\"Non-destructive proof that E holds V5's backbone. Runs on CPU under mixed_float16, the policy stored in V5's backbone layers, so both sides do the same arithmetic.\"\"\"
+    seed = CFG.SEEDS[0] if seed is None else seed
+    old = keras.mixed_precision.global_policy().name
+    keras.mixed_precision.set_global_policy("mixed_float16")
+    try:
+        with tf.device("/CPU:0"):
+            head_names = ("global_embedding", "global_logits")
+            keras.backend.clear_session(); keras.mixed_precision.set_global_policy("mixed_float16"); set_all_seeds(seed)  # clear_session resets the policy
+            d_model, d_base = build_global("multilabel3", "imagenet")
+            d_head = [w.copy() for n in head_names for w in d_model.get_layer(n).get_weights()]
+            imagenet = d_base.get_weights()
+            keras.backend.clear_session(); keras.mixed_precision.set_global_policy("mixed_float16"); set_all_seeds(seed)
+            model, base = build_global("multilabel3", "v5_backbone")
+            rep = transfer_v5_backbone(base)
+            v5 = keras.models.load_model(CFG.V5_KERAS, compile=False); src = find_backbone(v5)
+            sw = src.get_weights()
+            rep["tensors_equal_to_v5"] = sum(np.array_equal(a, b) for a, b in zip(sw, base.get_weights()))
+            changed = [float(np.abs(a - b).mean() / max(np.abs(b).mean(), 1e-12)) for a, b in zip(sw, imagenet) if not np.array_equal(a, b)]
+            rep["v5_tensors_differing_from_imagenet"] = len(changed)
+            rep["v5_vs_imagenet_mean_relative_change_of_those"] = float(np.mean(changed)) if changed else 0.0
+            x = np.random.default_rng(seed).uniform(-1, 1, (4, IMG_PX, IMG_PX, 3)).astype(np.float32)
+            rep["backbone_output_max_abs_diff_v5_vs_e"] = float(np.abs(src(x, training=False).numpy() - base(x, training=False).numpy()).max())
+            rep["backbone_output_max_abs_diff_imagenet_vs_e"] = float(np.abs(d_base(x, training=False).numpy() - base(x, training=False).numpy()).max())
+            e_head = [w for n in head_names for w in model.get_layer(n).get_weights()]
+            rep["head_identical_to_D_at_same_seed"] = len(e_head) == len(d_head) and all(np.array_equal(a, b) for a, b in zip(e_head, d_head))
+            v5_kernels = [w.shape for l in v5.layers if isinstance(l, keras.layers.Dense) for w in l.get_weights()]
+            rep["head_shapes"] = [list(w.shape) for w in e_head]; rep["v5_dense_shapes"] = [list(s) for s in v5_kernels]
+            emb, logits = embedding_model(model)(x, training=False)
+            rep["output_shape"] = list(logits.shape); rep["embedding_shape"] = list(emb.shape)
+            rep["output_is_raw_logits"] = model.get_layer("global_logits").activation.__name__ == "linear"
+            rep["sigmoid_probabilities_in_0_1"] = bool(((tf.sigmoid(logits).numpy() > 0) & (tf.sigmoid(logits).numpy() < 1)).all())
+            y = np.array([[1, 0, 0, 1, 1, 0]], np.float32)
+            a = MaskedBCE()(y, logits[:1]); b = MaskedBCE()(y, tf.tensor_scatter_nd_update(logits[:1], [[0, 2]], [50.0]))
+            rep["unknown_label_is_masked"] = bool(abs(float(a) - float(b)) < 1e-6)
+            rep["trainable_backbone_layers_phase_A"] = set_trainable(model, base, "A", CFG.FINE_TUNE_AT)
+            rep["trainable_backbone_layers_phase_B"] = set_trainable(model, base, "B", CFG.FINE_TUNE_AT)
+            rep["batchnorm_frozen_phase_B"] = not any(l.trainable for l in base.layers if isinstance(l, keras.layers.BatchNormalization))
+            rep["layers_below_fine_tune_at_frozen_phase_B"] = not any(l.trainable for l in base.layers[:CFG.FINE_TUNE_AT])
+            del v5, src
+    finally:
+        keras.backend.clear_session(); keras.mixed_precision.set_global_policy(old)
+    require(rep["tensors_equal_to_v5"] == rep["tensors_transferred"], "not every tensor equals V5")
+    require(rep["backbone_output_max_abs_diff_v5_vs_e"] < 1e-5, f"backbone outputs differ from V5: {rep['backbone_output_max_abs_diff_v5_vs_e']}")
+    require(rep["output_shape"] == [4, CFG.N_COND] and rep["embedding_shape"] == [4, CFG.HEAD_UNITS], f"unexpected shapes: {rep['output_shape']} {rep['embedding_shape']}")
+    require(rep["output_is_raw_logits"] and rep["unknown_label_is_masked"] and rep["batchnorm_frozen_phase_B"] and rep["layers_below_fine_tune_at_frozen_phase_B"] and rep["trainable_backbone_layers_phase_A"] == 0,
+            "logit, masking or freezing check failed: " + json.dumps(rep, default=str))
+    write_json(os.path.join(CFG.DIRS["metrics"], "v5_transfer_verification.json"), rep)
+    return rep
+
+
+if "E_v5_backbone_multilabel3" in CFG.GLOBAL_EXPERIMENTS:
+    print(json.dumps(verify_v5_transfer(), indent=1, default=str))
+else:
+    print("Experiment E is not in CFG.GLOBAL_EXPERIMENTS: transfer verification not run.")
+"""
+EXPOSURE_MD = """## 22b. D vs E with V5 exposure controlled
+Most V6 images were in V5's own training split, so E's backbone may have seen them while D's has not. On those images E has an unfair advantage. This cell therefore compares D and E on three sets: all validation images, images V5 did not train on (by id, MD5 and leakage group), and the stricter subset from V5's own test split. When both were trained and one of them was selected, **the choice between D and E is made on the not-trained-by-V5 set**, across all three conditions. Nothing here touches the test split.
+"""
+EXPOSURE_CODE = """# 22b. Exposure-controlled comparison of D and E on validation (development data only)
+def v5_exposure_flags():
+    raw = pd.read_csv(CFG.V5_MANIFEST, usecols=["split", "md5"], dtype=str)
+    train_md5 = set(raw[raw.split == "train"].md5.dropna())
+    direct = (DF.v5_split == "train").values | DF.md5.astype(str).isin(train_md5).values
+    groups = set(DF.group_id[direct])
+    exposed = direct | DF.group_id.isin(groups).values
+    return pd.DataFrame(dict(split=DF.split.values, v5_split=DF.v5_split.values, exposed=exposed), index=DF.index)
+
+
+def hp_normal_errors(y, s, thr=0.5):
+    \"\"\"Primary development quantities at a fixed 0.5, on fully known rows: Hyperpigmentation missed as no target, and all-negative images flagged Hyperpigmentation.\"\"\"
+    j = CFG.CONDITIONS.index("Hyperpigmentation") if "Hyperpigmentation" in CFG.CONDITIONS else list(c.lower() for c in CFG.CONDITIONS).index("hyperpigmentation")
+    full = (y >= 0).all(1); y, s = y[full], s[full]
+    pos = y[:, j] == 1; neg = (y == 0).all(1); none = (s < thr).all(1)
+    return dict(hp_pos=int(pos.sum()), hp_missed_as_no_target=int((pos & none).sum()), all_neg=int(neg.sum()), all_neg_flagged_hp=int((neg & (s[:, j] >= thr)).sum()))
+
+
+def macro_ap(y, s):
+    vals = [average_precision_score(y[y[:, j] >= 0, j], s[y[:, j] >= 0, j]) for j in range(CFG.N_COND) if (y[y[:, j] >= 0, j] == 1).any() and (y[y[:, j] >= 0, j] == 0).any()]
+    return float(np.mean(vals)) if len(vals) == CFG.N_COND else float("nan")
+
+
+EXPOSURE = v5_exposure_flags()
+display(EXPOSURE.groupby("split").agg(images=("exposed", "size"), v5_exposed=("exposed", "sum")))
+_d, _e = "D_multilabel3", "E_v5_backbone_multilabel3"
+if _d in SEL["candidates"] and _e in SEL["candidates"]:
+    _x = EXPOSURE[EXPOSURE.split == "validation"]
+    _subsets = dict(all_validation=np.ones(len(_x), bool), not_trained_by_v5=~_x.exposed.values, v5_test_split_only=(~_x.exposed.values) & (_x.v5_split.values == "test"))
+    _sd = global_scores_for(_d, SEL["candidates"][_d]["best_seed"], val_df)["scores"]; _se = global_scores_for(_e, SEL["candidates"][_e]["best_seed"], val_df)["scores"]
+    _rows, _summary = [], {}
+    for _name, _m in _subsets.items():
+        for _exp, _s in ((_d, _sd), (_e, _se)):
+            _t = cond_metrics(yv_all[_m], _s[_m], [0.5] * CFG.N_COND); _t["subset"] = _name; _t["experiment"] = _exp; _rows.append(_t)
+            _summary.setdefault(_name, {})[_exp] = dict(macro_ap=macro_ap(yv_all[_m], _s[_m]), macro_f1=float(_t.f1.mean()), **hp_normal_errors(yv_all[_m], _s[_m]))
+        _rng = np.random.default_rng(CFG.SEEDS[0]); _idx = np.flatnonzero(_m); _diff = []
+        for _ in range(1000):
+            _b = _rng.choice(_idx, len(_idx))
+            _diff.append(macro_ap(yv_all[_b], _se[_b]) - macro_ap(yv_all[_b], _sd[_b]))
+        _summary[_name]["e_minus_d_macro_ap_ci95"] = [float(v) for v in np.nanpercentile(_diff, [2.5, 97.5])]
+    write_csv(pd.concat(_rows, ignore_index=True), os.path.join(CFG.DIRS["metrics"], "d_vs_e_validation_by_exposure.csv"))
+    display(pd.concat(_rows, ignore_index=True)[["subset", "experiment", "condition", "pos", "neg", "precision", "recall", "f1", "ap"]])
+    print(json.dumps(_summary, indent=1))
+    SEL["d_vs_e"] = _summary
+    _pool = {k: _summary["not_trained_by_v5"][k]["macro_ap"] for k in (_d, _e) if not SEL["candidates"][k]["regression"]} or {k: _summary["not_trained_by_v5"][k]["macro_ap"] for k in (_d, _e)}
+    if SEL.get("selected") in (_d, _e) and all(v == v for v in _pool.values()):
+        _win = max(_pool, key=lambda k: (_pool[k], k == _d))  # a tie keeps D: E has to earn its place
+        SEL["d_vs_e_selection_basis"] = "macro AP on validation images not trained on by V5, no per-condition regression preferred"
+        if _win != SEL["selected"]: print(f"Selection changed from {SEL['selected']} to {_win} after controlling for V5 exposure.")
+        SEL["selected"] = _win; SEL["selected_seed"] = SEL["candidates"][_win]["best_seed"]; SEL["selected_has_regression"] = bool(SEL["candidates"][_win]["regression"])
+    write_json(os.path.join(CFG.DIRS["metrics"], "global_selection.json"), SEL)
+    GLOBAL_SELECTED = (SEL.get("selected"), SEL.get("selected_seed"))
+    print("improved global model after exposure control:", GLOBAL_SELECTED)
+else:
+    print("D vs E comparison needs both experiments trained. Nothing was invented.")
+"""
+
+
+def new_cell(kind, text, cid):
+    c = {"cell_type": kind, "id": cid, "metadata": {}}
+    if kind == "code":
+        c.update(execution_count=None, outputs=[])
+    set_src(c, text)
+    return c
+
+
+i21 = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("## 21. Global classifier training")]
+if len(i21) != 1:
+    sys.exit("section 21 heading not found exactly once")
+nb["cells"][i21[0]:i21[0]] = [new_cell("markdown", TRANSFER_MD, "open-e-transfer-md"), new_cell("code", TRANSFER_CODE, "open-e-transfer-code")]
+sel = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "code" and 'GLOBAL_SELECTED = (SEL.get("selected"), SEL.get("selected_seed"))' in "".join(c["source"])]
+if len(sel) != 1:
+    sys.exit("selection cell not found exactly once")
+nb["cells"][sel[0] + 1:sel[0] + 1] = [new_cell("markdown", EXPOSURE_MD, "open-e-exposure-md"), new_cell("code", EXPOSURE_CODE, "open-e-exposure-code")]
+
+STATUS_MD = """## Overnight run: everything before the locked test has finished
+If you read this heading with a printed summary below it, the pre-test pipeline ran to the end (Global D and E, YOLO evidence, ROI, fusion, calibration, stage rules and the development reports). The next cell is the **locked test**, which is switched off on purpose (`OPEN_ALLOW_FINAL_TEST = False`), so Run All stops there with a GateError. That error is the expected end of an overnight run, not a failure."""
+STATUS_CODE = """# Overnight status: records what the run produced before the locked test. Reads only; trains nothing.
+_status = dict(finished_at=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, global_selected=list(GLOBAL_SELECTED) if GLOBAL_SELECTED else None,
+               roi_selected_seed=ROI_SELECTED_SEED if "ROI_SELECTED_SEED" in globals() else None)
+for _k, _expr in (("fusion_oof_ready", "bool(FUSION_STATE.get('oof'))"), ("calibration_ready", "bool(CALIB.get('full'))"), ("stage1_ready", "STAGE1 is not None"), ("ood_ready", "OOD is not None")):
+    try: _status[_k] = bool(eval(_expr))
+    except Exception as _e: _status[_k] = "not available: " + type(_e).__name__
+_status["gates"] = {k: v["ok"] for k, v in GATES.items()}
+write_json(os.path.join(CFG.DIRS["metrics"], "overnight_status.json"), _status)
+print(json.dumps(_status, indent=1, default=str))
+print("PRE-TEST PIPELINE COMPLETE. The next cell opens the locked test and is switched off: stopping there is expected.")
+"""
+_i39 = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("## 39. Classification evaluation")]
+if len(_i39) != 1:
+    sys.exit("section 39 heading not found exactly once")
+nb["cells"][_i39[0]:_i39[0]] = [new_cell("markdown", STATUS_MD, "open-status-md"), new_cell("code", STATUS_CODE, "open-status-code")]
+log.append("overnight status cell inserted before the locked test")
+log.append("transfer verification cells inserted before section 21; exposure-controlled D vs E cells inserted after section 22")
+
+# banner
+banner = {"cell_type": "markdown", "id": "open-banner", "metadata": {},
+          "source": ["# LUMYVUE V6 - Open training notebook (development)\n", "\n",
+                     "Derived from the Astra notebook by `tools/make_open_notebook.py`. Removed: the one-use `ASTRA_ACTION` tokens, the source-permission/provenance check and the blinded-labels-only rule (rows reviewed with AI proposals shown are accepted). "
+                     "Kept: leakage and split checks, the one-time test lock, Present/Absent/Unknown label rules, minimum-count gates, checkpoint identities. "
+                     "Outputs are tagged as a development run (see `ASTRA_EVALUATION_NOTE`); do not present them as thesis evidence until provenance and the dermatologist review are documented. "
+                     "Stages that need data you do not have yet (region boxes, fusion/test labels) will still stop with a shortfall message.\n", "\n",
+                     "**Experiment E** (`E_v5_backbone_multilabel3`) adds a V5-initialised backbone with a new three-condition head; the controlled comparison is D vs E. "
+                     "**Overnight mode:** `OPEN_TRAINING_ENABLED = True` in the first cell, so Run All trains straight through; it stops at the locked test (`OPEN_ALLOW_FINAL_TEST = False`), which is the expected end. "
+                     "Set the first switch to False to make every expensive stage stop and ask."]}
+nb["cells"].insert(0, banner)
+nb["metadata"]["lumyvue_variant"] = "open (derived from Astra)"
+json.dump(nb, open(OUT, "w", encoding="utf-8", newline="\n"), indent=1, ensure_ascii=False)
+print("wrote", OUT)
+print("\n".join("  - " + l for l in log))

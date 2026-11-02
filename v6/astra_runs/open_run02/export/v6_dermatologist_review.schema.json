@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LUMYVUE dermatologist review (separate from the AI assessment)",
+  "type": "object",
+  "required": [
+    "review_id",
+    "scan_id",
+    "ai_content_sha256",
+    "review_status",
+    "reviewer_id",
+    "reviewer_role",
+    "reviewed_at_utc",
+    "blinded_to_ai",
+    "ai_shown_before_review",
+    "image_adequate",
+    "findings",
+    "schema_version"
+  ],
+  "properties": {
+    "review_id": {
+      "type": "string"
+    },
+    "scan_id": {
+      "type": "string"
+    },
+    "ai_content_sha256": {
+      "type": "string",
+      "pattern": "[0-9a-f]{64}"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "DERMATOLOGIST_REVIEW_IN_PROGRESS",
+        "DERMATOLOGIST_REVIEW_COMPLETED",
+        "DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS"
+      ]
+    },
+    "reviewer_id": {
+      "type": "string"
+    },
+    "reviewer_role": {
+      "type": "string",
+      "const": "dermatologist"
+    },
+    "reviewed_at_utc": {
+      "type": "string"
+    },
+    "blinded_to_ai": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "ai_shown_before_review": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "image_adequate": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ]
+    },
+    "findings": {
+      "type": "object",
+      "required": [
+        "Acne",
+        "Hyperpigmentation",
+        "Eczema"
+      ],
+      "properties": {
+        "Acne": {
+          "type": "string",
+          "enum": [
+            "present",
+            "absent",
+            "unknown"
+          ]
+        },
+        "Hyperpigmentation": {
+          "type": "string",
+          "enum": [
+            "present",
+            "absent",
+            "unknown"
+          ]
+        },
+        "Eczema": {
+          "type": "string",
+          "enum": [
+            "present",
+            "absent",
+            "unknown"
+          ]
+        }
+      },
+      "description": "independent clinical findings; unknown is never absent"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "lumyvue-dermatologist-review/1.0"
+    }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "synthetic_only": true,
+  "scratch": "/tmp/astra_SYNTHETIC_TRAIN_sqajab6x",
+  "tests": [
+    {
+      "name": "actual_global_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "PASS",
+      "seconds": 70.17,
+      "details": {
+        "loss": 0.5246022343635559,
+        "output_shape": [
+          8,
+          3
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:GPU:0",
+        "checkpoint": "/tmp/astra_SYNTHETIC_TRAIN_sqajab6x/global.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true,
+        "fine_tune_attempts": 1
+      }
+    },
+    {
+      "name": "actual_ROI_MobileNetV2_forward_backward_optimizer_phaseA_phaseB_resume",
+      "status": "PASS",
+      "seconds": 30.11,
+      "details": {
+        "loss": 3.6176564693450928,
+        "output_shape": [
+          8,
+          4
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:GPU:0",
+        "checkpoint": "/tmp/astra_SYNTHETIC_TRAIN_sqajab6x/roi.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true,
+        "fine_tune_attempts": 1
+      }
+    },
+    {
+      "name": "actual_fusion_forward_backward_optimizer_masking_resume",
+      "status": "PASS",
+      "seconds": 4.4,
+      "details": {
+        "loss": 0.9385083317756653,
+        "output_shape": [
+          2,
+          3
+        ],
+        "device": "/job:localhost/replica:0/task:0/device:GPU:0",
+        "checkpoint": "/tmp/astra_SYNTHETIC_TRAIN_sqajab6x/fusion.keras",
+        "optimizer_iteration_restored": 1,
+        "continued_update": true,
+        "weights_restore": true,
+        "fine_tune_attempts": null,
+        "full_size_roi_input": [
+          12,
+          83
+        ]
+      }
+    }
+  ],
+  "started": 1793505636.374184,
+  "gpu_devices": [
+    "PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')"
+  ],
+  "policy": "mixed_float16",
+  "cnn_batch_size": 8,
+  "gpu_memory": {
+    "current": 123335168,
+    "peak": 1010684672
+  },
+  "original_models_unchanged": true,
+  "passed": 3,
+  "failed": 0,
+  "elapsed_seconds": 126.73,
+  "tensorflow": "2.21.0",
+  "keras": "3.15.1"
+}

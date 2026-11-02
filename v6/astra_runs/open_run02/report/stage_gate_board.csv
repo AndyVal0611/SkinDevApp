@@ -1,0 +1,13 @@
+gate,open,reason
+provenance_defined,True,
+annotations_train,True,
+annotations_validation,True,
+annotations_fusion,True,
+annotations_test,False,test: verified photos 0 < 250; Acne present 0 < 30; Acne absent 0 < 30; Hyperpigmentation present 0 < 30; Hyperpigmentation absent 0 < 30; E
+regions_train,True,
+regions_validation,True,
+regions_fusion,False,"fusion: fewer than 20 verified regions for ['acne', 'hyperpigmentation', 'eczema', 'background_false_positive']"
+regions_test,False,"test: fewer than 20 verified regions for ['acne', 'hyperpigmentation', 'eczema', 'background_false_positive']"
+yolo_all_three,True,
+yolo_any,True,
+roi_training_data,True,

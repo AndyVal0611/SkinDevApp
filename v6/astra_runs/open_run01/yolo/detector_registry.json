@@ -1,0 +1,80 @@
+{
+  "config_hash": "ce6ae3186e771bfe",
+  "detectors": [
+    {
+      "condition": "Acne",
+      "available": true,
+      "kind": "specialist",
+      "location": "WPF Model folder",
+      "members": 3,
+      "imgsz": 800,
+      "nms_iou": 0.6,
+      "fusion_iou": 0.5,
+      "deployed_threshold": 0.275,
+      "floor": 0.02,
+      "json_sha_matches": true,
+      "onnx_input": "[[1, 3, 800, 800]]",
+      "onnx_output": "[[1, 5, 13125]]",
+      "layout": "rows_first",
+      "classes": [
+        "acne"
+      ],
+      "sha256": [
+        "2f0f09ebc376",
+        "f00c6e6bb333",
+        "6dfb0969cf5c"
+      ],
+      "notes": ""
+    },
+    {
+      "condition": "Hyperpigmentation",
+      "available": true,
+      "kind": "specialist",
+      "location": "WPF Model folder",
+      "members": 3,
+      "imgsz": 800,
+      "nms_iou": 0.6,
+      "fusion_iou": 0.5,
+      "deployed_threshold": 0.225,
+      "floor": 0.02,
+      "json_sha_matches": false,
+      "onnx_input": "[[1, 3, 800, 800]]",
+      "onnx_output": "[[1, 5, 13125]]",
+      "layout": "rows_first",
+      "classes": [
+        "hyperpigmentation"
+      ],
+      "sha256": [
+        "f27affb73061",
+        "ed821543c9bc",
+        "2a6fa1afa61f"
+      ],
+      "notes": "JSON onnx_sha256 does NOT match the primary ONNX file (JSON written for another file?) - detector still loaded"
+    },
+    {
+      "condition": "Eczema",
+      "available": true,
+      "kind": "specialist",
+      "location": "WPF Model folder",
+      "members": 3,
+      "imgsz": 640,
+      "nms_iou": 0.6,
+      "fusion_iou": 0.5,
+      "deployed_threshold": 0.25,
+      "floor": 0.02,
+      "json_sha_matches": true,
+      "onnx_input": "[[1, 3, 640, 640]]",
+      "onnx_output": "[[1, 5, 8400]]",
+      "layout": "rows_first",
+      "classes": [
+        "eczema"
+      ],
+      "sha256": [
+        "a93b77460c2f",
+        "8fbf857b3169",
+        "b5a6b50b9c50"
+      ],
+      "notes": ""
+    }
+  ]
+}

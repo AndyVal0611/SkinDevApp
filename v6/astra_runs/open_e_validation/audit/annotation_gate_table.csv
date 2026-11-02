@@ -1,0 +1,5 @@
+split,images,verified_full,present_Acne,present_Hyperpigmentation,present_Eczema,absent_Acne,absent_Hyperpigmentation,absent_Eczema,gate_ok,missing
+train,5873,889,174,260,242,717,633,652,True,
+validation,979,591,172,232,54,422,364,538,True,
+fusion,1469,347,111,124,33,242,228,324,True,
+test,1468,0,0,0,0,0,0,0,False,verified photos 0 < 250; Acne present 0 < 30; Acne absent 0 < 30; Hyperpigmentation present 0 < 30; Hyperpigmentation absent 0 < 30; Eczema present 0 < 30; Eczema absent 0 < 30

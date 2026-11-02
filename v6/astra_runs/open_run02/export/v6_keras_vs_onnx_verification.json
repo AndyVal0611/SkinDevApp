@@ -1,0 +1,260 @@
+{
+  "global_features": {
+    "status": "compared",
+    "max_abs_diff_per_output": [
+      0.0425724983215332,
+      0.03326225280761719
+    ],
+    "within_tolerance": false,
+    "onnx_inputs": [
+      [
+        "image_nhwc_m1p1",
+        [
+          "unk__657",
+          224,
+          224,
+          3
+        ]
+      ]
+    ],
+    "onnx_outputs": [
+      [
+        "Identity:0",
+        [
+          "unk__658",
+          128
+        ]
+      ],
+      [
+        "Identity_1:0",
+        [
+          "unk__659",
+          3
+        ]
+      ]
+    ],
+    "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4"
+  },
+  "roi_features": {
+    "status": "compared",
+    "max_abs_diff_per_output": [
+      0.05155324935913086,
+      0.019429385662078857
+    ],
+    "within_tolerance": false,
+    "onnx_inputs": [
+      [
+        "roi_nhwc_m1p1",
+        [
+          "unk__1314",
+          224,
+          224,
+          3
+        ]
+      ]
+    ],
+    "onnx_outputs": [
+      [
+        "Identity:0",
+        [
+          "unk__1315",
+          64
+        ]
+      ],
+      [
+        "Identity_1:0",
+        [
+          "unk__1316",
+          4
+        ]
+      ]
+    ],
+    "sha256": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22"
+  },
+  "fusion_global_only_seed42": {
+    "status": "compared",
+    "max_abs_diff_per_output": [
+      0.000469207763671875
+    ],
+    "within_tolerance": false,
+    "onnx_inputs": [
+      [
+        "g_emb",
+        [
+          "unk__1442",
+          128
+        ]
+      ],
+      [
+        "g_logit",
+        [
+          "unk__1443",
+          3
+        ]
+      ],
+      [
+        "g_extra",
+        [
+          "unk__1444",
+          2
+        ]
+      ],
+      [
+        "det_ev",
+        [
+          "unk__1445",
+          21
+        ]
+      ],
+      [
+        "roi_feat",
+        [
+          "unk__1446",
+          12,
+          83
+        ]
+      ],
+      [
+        "roi_mask",
+        [
+          "unk__1447",
+          12
+        ]
+      ]
+    ],
+    "onnx_outputs": [
+      [
+        "Identity:0",
+        [
+          "unk__1448",
+          3
+        ]
+      ]
+    ],
+    "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a"
+  },
+  "fusion_global_yolo_seed42": {
+    "status": "compared",
+    "max_abs_diff_per_output": [
+      0.0005065202713012695
+    ],
+    "within_tolerance": false,
+    "onnx_inputs": [
+      [
+        "g_emb",
+        [
+          "unk__1574",
+          128
+        ]
+      ],
+      [
+        "g_logit",
+        [
+          "unk__1575",
+          3
+        ]
+      ],
+      [
+        "g_extra",
+        [
+          "unk__1576",
+          2
+        ]
+      ],
+      [
+        "det_ev",
+        [
+          "unk__1577",
+          21
+        ]
+      ],
+      [
+        "roi_feat",
+        [
+          "unk__1578",
+          12,
+          83
+        ]
+      ],
+      [
+        "roi_mask",
+        [
+          "unk__1579",
+          12
+        ]
+      ]
+    ],
+    "onnx_outputs": [
+      [
+        "Identity:0",
+        [
+          "unk__1580",
+          3
+        ]
+      ]
+    ],
+    "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97"
+  },
+  "fusion_full_seed42": {
+    "status": "compared",
+    "max_abs_diff_per_output": [
+      0.0005545616149902344
+    ],
+    "within_tolerance": false,
+    "onnx_inputs": [
+      [
+        "g_emb",
+        [
+          "unk__1706",
+          128
+        ]
+      ],
+      [
+        "g_logit",
+        [
+          "unk__1707",
+          3
+        ]
+      ],
+      [
+        "g_extra",
+        [
+          "unk__1708",
+          2
+        ]
+      ],
+      [
+        "det_ev",
+        [
+          "unk__1709",
+          21
+        ]
+      ],
+      [
+        "roi_feat",
+        [
+          "unk__1710",
+          12,
+          83
+        ]
+      ],
+      [
+        "roi_mask",
+        [
+          "unk__1711",
+          12
+        ]
+      ]
+    ],
+    "onnx_outputs": [
+      [
+        "Identity:0",
+        [
+          "unk__1712",
+          3
+        ]
+      ]
+    ],
+    "sha256": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7"
+  }
+}

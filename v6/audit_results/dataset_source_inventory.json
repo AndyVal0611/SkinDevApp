@@ -1,0 +1,739 @@
+{
+  "inventory": [
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Classes\\Acne",
+      "images": 5725
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Classes\\Eczema",
+      "images": 3566
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Classes\\Hyperpigmentation",
+      "images": 6422
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Classes\\Normal",
+      "images": 6180
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin_Raw\\Acne",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin_Raw\\Eczema",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin_Raw\\Hyperpigmentation",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Acne",
+      "images": 6697
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Eczema",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Hyperpigmentation",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Milia",
+      "images": 1597
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Nevi (moles)",
+      "images": 4628
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\FINAL DATASET\\Normal",
+      "images": 0
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Final Dataset V1\\Acne",
+      "images": 2845
+    }
+  ],
+  "notebook_source_evidence": [
+    {
+      "path": "C:\\Users\\Bautista\\source\\repos\\SkinDevApp\\v6\\LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb",
+      "cell": 131,
+      "urls": [
+        "https://json-schema.org/draft/2020-12/schema"
+      ],
+      "context": "    \"$schema\": \"https://json-schema.org/draft/2020-12/schema\", \"title\": \"LUMYVUE dermatologist review (separate from the AI assessment)\", \"type\": \"object\","
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb",
+      "cell": 131,
+      "urls": [
+        "https://json-schema.org/draft/2020-12/schema"
+      ],
+      "context": "    \"$schema\": \"https://json-schema.org/draft/2020-12/schema\", \"title\": \"LUMYVUE dermatologist review (separate from the AI assessment)\", \"type\": \"object\","
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training_FIXED.ipynb",
+      "cell": 131,
+      "urls": [
+        "https://json-schema.org/draft/2020-12/schema"
+      ],
+      "context": "    \"$schema\": \"https://json-schema.org/draft/2020-12/schema\", \"title\": \"LUMYVUE dermatologist review (separate from the AI assessment)\", \"type\": \"object\","
+    }
+  ],
+  "box_datasets": [
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\boxed_Acne\\labels",
+      "images": 658,
+      "label_files": 658,
+      "valid_boxes": 6103,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 6103
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Elaiza__acne\\labels",
+      "images": 4073,
+      "label_files": 927,
+      "valid_boxes": 6103,
+      "empty_labels": 269,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 3146,
+      "classes": {
+        "0": 6103
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Test_Acne\\boxed_Acne_TEST\\labels",
+      "images": 48,
+      "label_files": 48,
+      "valid_boxes": 338,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 338
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Test_Acne\\Elaiza__acne_TEST\\labels",
+      "images": 78,
+      "label_files": 78,
+      "valid_boxes": 338,
+      "empty_labels": 30,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 338
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Reliability_Rebox_Acne\\boxed_acne_rebox\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 304,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 304
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Reliability_Rebox_Acne\\Elaiza__acne_rebox\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 304,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 304
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\More_Faces\\boxed_Acne_more\\labels",
+      "images": 448,
+      "label_files": 448,
+      "valid_boxes": 4662,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 4662
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\More_Faces\\Elaiza__acne_more\\labels",
+      "images": 580,
+      "label_files": 580,
+      "valid_boxes": 4670,
+      "empty_labels": 131,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 4670
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Independent_Final_Set\\boxed_independent\\labels",
+      "images": 41,
+      "label_files": 41,
+      "valid_boxes": 437,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 437
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Independent_Final_Set\\Elaiza__acne_independent\\labels",
+      "images": 43,
+      "label_files": 43,
+      "valid_boxes": 437,
+      "empty_labels": 2,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 437
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_Acne_Missed_Spots\\boxed_Acne_SECOND_LOOK\\labels",
+      "images": 60,
+      "label_files": 60,
+      "valid_boxes": 1430,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1430
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_Acne_Missed_Spots\\Elaiza__acne_fix\\labels",
+      "images": 60,
+      "label_files": 60,
+      "valid_boxes": 1430,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1430
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_6_Test_Photos\\boxed_Acne_TEST_fix\\labels",
+      "images": 6,
+      "label_files": 6,
+      "valid_boxes": 12,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 12
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_6_Test_Photos\\Elaiza__acne_fix\\labels",
+      "images": 6,
+      "label_files": 6,
+      "valid_boxes": 12,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 12
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_46_Doubled_Boxes\\boxed_Acne_FIXED\\labels",
+      "images": 46,
+      "label_files": 46,
+      "valid_boxes": 673,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 673
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Fix_46_Doubled_Boxes\\Elaiza__acne_fix\\labels",
+      "images": 46,
+      "label_files": 46,
+      "valid_boxes": 673,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 673
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Draft_Acne\\boxed_Acne_drafts\\labels",
+      "images": 748,
+      "label_files": 748,
+      "valid_boxes": 8673,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 8673
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Draft_Acne\\Elaiza__acne_draft\\labels",
+      "images": 841,
+      "label_files": 841,
+      "valid_boxes": 8673,
+      "empty_labels": 93,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 8673
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_Review_Missing\\boxed_acne_review_missing\\labels",
+      "images": 111,
+      "label_files": 111,
+      "valid_boxes": 2078,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 2078
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_Review_Missing\\Elaiza__acne_review\\labels",
+      "images": 111,
+      "label_files": 111,
+      "valid_boxes": 2078,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 2078
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_New_Photos\\boxed_acne_new_photos\\labels",
+      "images": 240,
+      "label_files": 240,
+      "valid_boxes": 2907,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 2907
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_New_Photos\\Elaiza__acne_review\\labels",
+      "images": 250,
+      "label_files": 250,
+      "valid_boxes": 2907,
+      "empty_labels": 10,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 2907
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_Fresh_Test\\boxed_acne_fresh_test\\labels",
+      "images": 36,
+      "label_files": 36,
+      "valid_boxes": 203,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 203
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\Acne_Fresh_Test\\Elaiza__acne_review\\labels",
+      "images": 100,
+      "label_files": 100,
+      "valid_boxes": 203,
+      "empty_labels": 64,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 203
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\acne_dataset_v4\\test\\labels",
+      "images": 167,
+      "label_files": 167,
+      "valid_boxes": 1369,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1369
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\acne_dataset_v4\\train\\labels",
+      "images": 1145,
+      "label_files": 1145,
+      "valid_boxes": 11621,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 11621
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Acne_Boxing\\acne_dataset_v4\\val\\labels",
+      "images": 154,
+      "label_files": 154,
+      "valid_boxes": 1562,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1562
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Val\\boxed_v2_val\\labels",
+      "images": 27,
+      "label_files": 27,
+      "valid_boxes": 56,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 56
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Val\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 56,
+      "empty_labels": 3,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 56
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Train\\boxed_v2_train\\labels",
+      "images": 794,
+      "label_files": 794,
+      "valid_boxes": 1589,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1589
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Train\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 808,
+      "label_files": 808,
+      "valid_boxes": 1589,
+      "empty_labels": 14,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 1589
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Test\\boxed_v2_test\\labels",
+      "images": 98,
+      "label_files": 98,
+      "valid_boxes": 226,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 226
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\V2_Test\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 100,
+      "label_files": 100,
+      "valid_boxes": 226,
+      "empty_labels": 2,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 226
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Reliability_Rebox\\boxed_rebox\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 193,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 193
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Reliability_Rebox\\Elaiza__hyperpigmentation_rebox\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 193,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 193
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassC\\boxed_v2_C\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 58,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 58
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassC\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 58,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 58
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassB\\boxed_v2_B\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 76,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 76
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassB\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 76,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 76
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassA\\boxed_v2_A\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 86,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 86
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Rebox_V2_PassA\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 30,
+      "label_files": 30,
+      "valid_boxes": 86,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 86
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Negatives_100\\boxed_negatives_100\\labels",
+      "images": 4,
+      "label_files": 4,
+      "valid_boxes": 7,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 7
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Negatives_100\\Elaiza__hyperpigmentation_v2\\labels",
+      "images": 100,
+      "label_files": 100,
+      "valid_boxes": 7,
+      "empty_labels": 96,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 7
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Fix_Hyperpig_Consistency\\boxed_Hyperpig_CONSISTENCY\\labels",
+      "images": 42,
+      "label_files": 42,
+      "valid_boxes": 487,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 487
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Fix_Hyperpig_Consistency\\Elaiza__hyperpigmentation_fix\\labels",
+      "images": 42,
+      "label_files": 42,
+      "valid_boxes": 487,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 487
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Fix_Hyperpig_Boxes\\boxed_Hyperpig_FIXED\\labels",
+      "images": 26,
+      "label_files": 26,
+      "valid_boxes": 232,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 232
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Fix_Hyperpig_Boxes\\Elaiza__hyperpigmentation_fix\\labels",
+      "images": 26,
+      "label_files": 26,
+      "valid_boxes": 232,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 232
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Draft_Hyperpig\\boxed_Hyperpig_drafts\\labels",
+      "images": 501,
+      "label_files": 501,
+      "valid_boxes": 3045,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 3045
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\PrecisionSkin\\Hyperpigmentation_Boxing\\Draft_Hyperpig\\Elaiza__hyperpigmentation_draft\\labels",
+      "images": 600,
+      "label_files": 600,
+      "valid_boxes": 3247,
+      "empty_labels": 17,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 3247
+      }
+    },
+    {
+      "labels_path": "C:\\Users\\Bautista\\Downloads\\own_hyperpigmentation.yolov8\\labels",
+      "images": 504,
+      "label_files": 504,
+      "valid_boxes": 2117,
+      "empty_labels": 0,
+      "malformed_or_out_of_bounds_rows": 0,
+      "orphan_label_files": 0,
+      "images_without_label": 0,
+      "classes": {
+        "0": 2117
+      }
+    }
+  ],
+  "source_documents": []
+}

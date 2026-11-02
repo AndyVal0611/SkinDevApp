@@ -1,0 +1,715 @@
+{
+  "synthetic_detector_inputs_only": true,
+  "python": "3.13.15 (main, Aug  6 2026, 11:06:23) [GCC 15.2.0]",
+  "executable": "/home/bautista/PrecisionSkinV1/.venv/bin/python",
+  "frozen_rows": 9789,
+  "category_counts": {
+    "Acne": 3000,
+    "Hyperpigmentation": 3000,
+    "Normal": 3000,
+    "Eczema": 789
+  },
+  "partition_categories": {
+    "fusion": {
+      "Acne": 450,
+      "Eczema": 119,
+      "Hyperpigmentation": 450,
+      "Normal": 450
+    },
+    "test": {
+      "Acne": 450,
+      "Eczema": 118,
+      "Hyperpigmentation": 450,
+      "Normal": 450
+    },
+    "train": {
+      "Acne": 1800,
+      "Eczema": 473,
+      "Hyperpigmentation": 1800,
+      "Normal": 1800
+    },
+    "validation": {
+      "Acne": 300,
+      "Eczema": 79,
+      "Hyperpigmentation": 300,
+      "Normal": 300
+    }
+  },
+  "annotation_rows": 9789,
+  "annotation_status": {
+    "unverified": 9789
+  },
+  "region_rows": 0,
+  "imports": {
+    "numpy": {
+      "status": "PASS",
+      "version": "2.5.3"
+    },
+    "pandas": {
+      "status": "PASS",
+      "version": "3.0.5"
+    },
+    "scipy": {
+      "status": "PASS",
+      "version": "1.18.1"
+    },
+    "sklearn": {
+      "status": "PASS",
+      "version": "1.9.1"
+    },
+    "matplotlib": {
+      "status": "PASS",
+      "version": "3.11.2"
+    },
+    "PIL": {
+      "status": "PASS",
+      "version": "12.3.0"
+    },
+    "cv2": {
+      "status": "PASS",
+      "version": "5.0.0"
+    },
+    "tensorflow": {
+      "status": "PASS",
+      "version": "2.21.0"
+    },
+    "keras": {
+      "status": "PASS",
+      "version": "3.15.1"
+    },
+    "onnxruntime": {
+      "status": "PASS",
+      "version": "1.30.0"
+    },
+    "onnx": {
+      "status": "PASS",
+      "version": "1.22.0"
+    },
+    "tf2onnx": {
+      "status": "PASS",
+      "version": "1.17.0"
+    },
+    "IPython": {
+      "status": "PASS",
+      "version": "9.17.1"
+    },
+    "nbformat": {
+      "status": "FAIL",
+      "error": "No module named 'nbformat'"
+    }
+  },
+  "detectors": [
+    {
+      "name": "lesion_detector_acne.onnx",
+      "sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin acne specialist detector",
+        "condition": "acne",
+        "classes": [
+          "acne"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.275,
+        "nms_iou": 0.6,
+        "onnx_sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+        "onnx_file": "lesion_detector_acne.onnx",
+        "source_weights": "/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt",
+        "best_seed": 123,
+        "seeds": [
+          42,
+          7,
+          123
+        ],
+        "run_name": "boxed_only",
+        "use_negatives": false,
+        "base_model": "yolov8s.pt",
+        "epochs_max": 100,
+        "dataset": "/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing/acne_dataset_v4",
+        "dataset_fingerprint": "ae51483a7b72c11348be34ef732bf0d17208ede97f4e935c9a507bb3834843bb",
+        "primary_test": "test",
+        "test_mean": {
+          "mAP50": 0.4130636097629354,
+          "mAP50_95": 0.12251534210106513,
+          "precision": 0.4273683528528563,
+          "recall": 0.5427319211102996,
+          "F1": 0.47804383834513087
+        },
+        "test_std_mAP50": 0.005617897781191888,
+        "bootstrap_ci95_mAP50": [
+          0.3694341691942294,
+          0.462836159376498
+        ],
+        "leakfree": {
+          "n_removed": 2,
+          "test_mAP50": 0.4175671552561873
+        },
+        "v1_comparison": {
+          "test_mAP50": 0.22048661678019568,
+          "test_mAP50_95": 0.06618718655995873,
+          "precision": 0.35914702581369246,
+          "recall": 0.2337472607742878,
+          "F1": 0.2831858407079646
+        },
+        "cpu_latency_ms_this_machine": 131.27267150048283,
+        "versions": {
+          "torch": "2.14.1+cu130",
+          "ultralytics": "8.4.172"
+        },
+        "created": "2026-10-10T22:35:05",
+        "ensemble": [
+          "lesion_detector_acne.onnx (seed 123)",
+          "lesion_detector_acne_m2.onnx (seed 42)",
+          "lesion_detector_acne_m3.onnx (seed 7)"
+        ],
+        "note": "Average (weighted box fusion, IoU 0.5) of the three final seeds; threshold 0.275 chosen on validation; development test mAP50 0.439, F1 0.507 (single seed 123: 0.419 / 0.482)",
+        "test_mAP50_single_run": 0.439
+      }
+    },
+    {
+      "name": "lesion_detector_acne_m2.onnx",
+      "sha256": "f00c6e6bb3330b5574fb6e969e3d0cdc8037139fcf20767974d58121cacf4c92",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin acne specialist detector",
+        "condition": "acne",
+        "classes": [
+          "acne"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.275,
+        "nms_iou": 0.6,
+        "onnx_sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+        "onnx_file": "lesion_detector_acne.onnx",
+        "source_weights": "/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt",
+        "best_seed": 123,
+        "seeds": [
+          42,
+          7,
+          123
+        ],
+        "run_name": "boxed_only",
+        "use_negatives": false,
+        "base_model": "yolov8s.pt",
+        "epochs_max": 100,
+        "dataset": "/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing/acne_dataset_v4",
+        "dataset_fingerprint": "ae51483a7b72c11348be34ef732bf0d17208ede97f4e935c9a507bb3834843bb",
+        "primary_test": "test",
+        "test_mean": {
+          "mAP50": 0.4130636097629354,
+          "mAP50_95": 0.12251534210106513,
+          "precision": 0.4273683528528563,
+          "recall": 0.5427319211102996,
+          "F1": 0.47804383834513087
+        },
+        "test_std_mAP50": 0.005617897781191888,
+        "bootstrap_ci95_mAP50": [
+          0.3694341691942294,
+          0.462836159376498
+        ],
+        "leakfree": {
+          "n_removed": 2,
+          "test_mAP50": 0.4175671552561873
+        },
+        "v1_comparison": {
+          "test_mAP50": 0.22048661678019568,
+          "test_mAP50_95": 0.06618718655995873,
+          "precision": 0.35914702581369246,
+          "recall": 0.2337472607742878,
+          "F1": 0.2831858407079646
+        },
+        "cpu_latency_ms_this_machine": 131.27267150048283,
+        "versions": {
+          "torch": "2.14.1+cu130",
+          "ultralytics": "8.4.172"
+        },
+        "created": "2026-10-10T22:35:05",
+        "ensemble": [
+          "lesion_detector_acne.onnx (seed 123)",
+          "lesion_detector_acne_m2.onnx (seed 42)",
+          "lesion_detector_acne_m3.onnx (seed 7)"
+        ],
+        "note": "Average (weighted box fusion, IoU 0.5) of the three final seeds; threshold 0.275 chosen on validation; development test mAP50 0.439, F1 0.507 (single seed 123: 0.419 / 0.482)",
+        "test_mAP50_single_run": 0.439
+      }
+    },
+    {
+      "name": "lesion_detector_acne_m3.onnx",
+      "sha256": "6dfb0969cf5c0b987cfb31dfc6c002c90621dbc4a6b58619871b48edea9d88cb",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin acne specialist detector",
+        "condition": "acne",
+        "classes": [
+          "acne"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.275,
+        "nms_iou": 0.6,
+        "onnx_sha256": "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+        "onnx_file": "lesion_detector_acne.onnx",
+        "source_weights": "/home/bautista/PrecisionSkinV1/runs/lesion_acne_boxed_only/models/seed_123/weights/best.pt",
+        "best_seed": 123,
+        "seeds": [
+          42,
+          7,
+          123
+        ],
+        "run_name": "boxed_only",
+        "use_negatives": false,
+        "base_model": "yolov8s.pt",
+        "epochs_max": 100,
+        "dataset": "/mnt/c/Users/Bautista/Downloads/PrecisionSkin/Acne_Boxing/acne_dataset_v4",
+        "dataset_fingerprint": "ae51483a7b72c11348be34ef732bf0d17208ede97f4e935c9a507bb3834843bb",
+        "primary_test": "test",
+        "test_mean": {
+          "mAP50": 0.4130636097629354,
+          "mAP50_95": 0.12251534210106513,
+          "precision": 0.4273683528528563,
+          "recall": 0.5427319211102996,
+          "F1": 0.47804383834513087
+        },
+        "test_std_mAP50": 0.005617897781191888,
+        "bootstrap_ci95_mAP50": [
+          0.3694341691942294,
+          0.462836159376498
+        ],
+        "leakfree": {
+          "n_removed": 2,
+          "test_mAP50": 0.4175671552561873
+        },
+        "v1_comparison": {
+          "test_mAP50": 0.22048661678019568,
+          "test_mAP50_95": 0.06618718655995873,
+          "precision": 0.35914702581369246,
+          "recall": 0.2337472607742878,
+          "F1": 0.2831858407079646
+        },
+        "cpu_latency_ms_this_machine": 131.27267150048283,
+        "versions": {
+          "torch": "2.14.1+cu130",
+          "ultralytics": "8.4.172"
+        },
+        "created": "2026-10-10T22:35:05",
+        "ensemble": [
+          "lesion_detector_acne.onnx (seed 123)",
+          "lesion_detector_acne_m2.onnx (seed 42)",
+          "lesion_detector_acne_m3.onnx (seed 7)"
+        ],
+        "note": "Average (weighted box fusion, IoU 0.5) of the three final seeds; threshold 0.275 chosen on validation; development test mAP50 0.439, F1 0.507 (single seed 123: 0.419 / 0.482)",
+        "test_mAP50_single_run": 0.439
+      }
+    },
+    {
+      "name": "lesion_detector_eczema.onnx",
+      "sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            8400
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin eczema specialist detector",
+        "condition": "eczema",
+        "classes": [
+          "eczema"
+        ],
+        "imgsz": 640,
+        "default_conf": 0.25,
+        "nms_iou": 0.6,
+        "onnx_sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+        "onnx_file": "lesion_detector_eczema.onnx",
+        "source_weights": "WSL ~/runs (YOLOv8n, NA2 seeds 42/43/44 + NA3 seeds 42/43/44, exported to ONNX)",
+        "seeds": [
+          42,
+          43,
+          44
+        ],
+        "run_name": "NA2",
+        "base_model": "yolov8n.pt",
+        "epochs_max": 100,
+        "primary_test": "fresh (39 photos)",
+        "ensemble_test": {
+          "fresh_39": {
+            "mAP50": 0.52,
+            "AP30": 0.708
+          },
+          "r3_test_50": {
+            "mAP50": 0.12,
+            "AP30": 0.334
+          },
+          "dev2_39": {
+            "mAP50": 0.181,
+            "AP30": 0.313
+          }
+        },
+        "test_mAP50_ensemble": 0.52,
+        "versions": {
+          "ultralytics": "8.4.175"
+        },
+        "created": "2026-10-28",
+        "ensemble": [
+          "lesion_detector_eczema.onnx (NA2 seed 42)",
+          "lesion_detector_eczema_m2.onnx (NA2 seed 43)",
+          "lesion_detector_eczema_m3.onnx (NA2 seed 44)"
+        ],
+        "note": "Deployed model: 3-model ensemble (NA2 seeds 42/43/44), weighted box fusion (IoU 0.55). Fresh AP50 0.520, AP30 0.708. The 6-model NA23 (fresh 0.554) is kept as a backup. Labels are one annotator's boxes (same-annotator agreement F1 0.38 at IoU 0.5). Marks candidate patches, not a diagnosis. App threshold: ScanSettings.DetectorThresholdEczema = 0.25."
+      }
+    },
+    {
+      "name": "lesion_detector_eczema_m2.onnx",
+      "sha256": "8fbf857b316986f485a8fdb599866e8292ad7faffc32fc781c0b02596aea41fe",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            8400
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin eczema specialist detector",
+        "condition": "eczema",
+        "classes": [
+          "eczema"
+        ],
+        "imgsz": 640,
+        "default_conf": 0.25,
+        "nms_iou": 0.6,
+        "onnx_sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+        "onnx_file": "lesion_detector_eczema.onnx",
+        "source_weights": "WSL ~/runs (YOLOv8n, NA2 seeds 42/43/44 + NA3 seeds 42/43/44, exported to ONNX)",
+        "seeds": [
+          42,
+          43,
+          44
+        ],
+        "run_name": "NA2",
+        "base_model": "yolov8n.pt",
+        "epochs_max": 100,
+        "primary_test": "fresh (39 photos)",
+        "ensemble_test": {
+          "fresh_39": {
+            "mAP50": 0.52,
+            "AP30": 0.708
+          },
+          "r3_test_50": {
+            "mAP50": 0.12,
+            "AP30": 0.334
+          },
+          "dev2_39": {
+            "mAP50": 0.181,
+            "AP30": 0.313
+          }
+        },
+        "test_mAP50_ensemble": 0.52,
+        "versions": {
+          "ultralytics": "8.4.175"
+        },
+        "created": "2026-10-28",
+        "ensemble": [
+          "lesion_detector_eczema.onnx (NA2 seed 42)",
+          "lesion_detector_eczema_m2.onnx (NA2 seed 43)",
+          "lesion_detector_eczema_m3.onnx (NA2 seed 44)"
+        ],
+        "note": "Deployed model: 3-model ensemble (NA2 seeds 42/43/44), weighted box fusion (IoU 0.55). Fresh AP50 0.520, AP30 0.708. The 6-model NA23 (fresh 0.554) is kept as a backup. Labels are one annotator's boxes (same-annotator agreement F1 0.38 at IoU 0.5). Marks candidate patches, not a diagnosis. App threshold: ScanSettings.DetectorThresholdEczema = 0.25."
+      }
+    },
+    {
+      "name": "lesion_detector_eczema_m3.onnx",
+      "sha256": "b5a6b50b9c50c1f8d5c47379d9317bb62cdc0af4ba0328280daa805de581fdde",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            8400
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin eczema specialist detector",
+        "condition": "eczema",
+        "classes": [
+          "eczema"
+        ],
+        "imgsz": 640,
+        "default_conf": 0.25,
+        "nms_iou": 0.6,
+        "onnx_sha256": "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+        "onnx_file": "lesion_detector_eczema.onnx",
+        "source_weights": "WSL ~/runs (YOLOv8n, NA2 seeds 42/43/44 + NA3 seeds 42/43/44, exported to ONNX)",
+        "seeds": [
+          42,
+          43,
+          44
+        ],
+        "run_name": "NA2",
+        "base_model": "yolov8n.pt",
+        "epochs_max": 100,
+        "primary_test": "fresh (39 photos)",
+        "ensemble_test": {
+          "fresh_39": {
+            "mAP50": 0.52,
+            "AP30": 0.708
+          },
+          "r3_test_50": {
+            "mAP50": 0.12,
+            "AP30": 0.334
+          },
+          "dev2_39": {
+            "mAP50": 0.181,
+            "AP30": 0.313
+          }
+        },
+        "test_mAP50_ensemble": 0.52,
+        "versions": {
+          "ultralytics": "8.4.175"
+        },
+        "created": "2026-10-28",
+        "ensemble": [
+          "lesion_detector_eczema.onnx (NA2 seed 42)",
+          "lesion_detector_eczema_m2.onnx (NA2 seed 43)",
+          "lesion_detector_eczema_m3.onnx (NA2 seed 44)"
+        ],
+        "note": "Deployed model: 3-model ensemble (NA2 seeds 42/43/44), weighted box fusion (IoU 0.55). Fresh AP50 0.520, AP30 0.708. The 6-model NA23 (fresh 0.554) is kept as a backup. Labels are one annotator's boxes (same-annotator agreement F1 0.38 at IoU 0.5). Marks candidate patches, not a diagnosis. App threshold: ScanSettings.DetectorThresholdEczema = 0.25."
+      }
+    },
+    {
+      "name": "lesion_detector_hyperpigmentation.onnx",
+      "sha256": "f27affb73061ddff8a2f27463a117a79b3eba97655dca7c2099409971918f501",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin hyperpigmentation specialist detector",
+        "source_weights": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_v2human_all_pub/weights/best.pt",
+        "classes": [
+          "hyperpigmentation"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.225,
+        "nms_iou": 0.6,
+        "onnx_sha256": "df03a5d5e00f70d53e4e89b1c596545084e54e7749b8a7095f64ececa0b1cbf4",
+        "installed": "2026-10-11T20:53:52",
+        "test_mAP50_single_run": 0.508,
+        "note": "Annotation rule v2. Average of three seeds trained on 808 photos corrected by hand under rule v2 (x3) + 1,260 public photos; threshold 0.225 chosen on 60 validation photos; test (100 photos boxed under rule v2, scored once): mAP50 0.508, F1 0.520",
+        "ensemble": [
+          "lesion_detector_hyperpigmentation.onnx (H25 seed 42)",
+          "lesion_detector_hyperpigmentation_m2.onnx (H25 seed 7)",
+          "lesion_detector_hyperpigmentation_m3.onnx (H25 seed 123)"
+        ]
+      }
+    },
+    {
+      "name": "lesion_detector_hyperpigmentation_m2.onnx",
+      "sha256": "ed821543c9bc84ff2f24960c8e932017f821f490c68c6f11c9b486607a72d63e",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin hyperpigmentation specialist detector",
+        "source_weights": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_v2human_all_pub/weights/best.pt",
+        "classes": [
+          "hyperpigmentation"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.225,
+        "nms_iou": 0.6,
+        "onnx_sha256": "df03a5d5e00f70d53e4e89b1c596545084e54e7749b8a7095f64ececa0b1cbf4",
+        "installed": "2026-10-11T20:53:52",
+        "test_mAP50_single_run": 0.508,
+        "note": "Annotation rule v2. Average of three seeds trained on 808 photos corrected by hand under rule v2 (x3) + 1,260 public photos; threshold 0.225 chosen on 60 validation photos; test (100 photos boxed under rule v2, scored once): mAP50 0.508, F1 0.520",
+        "ensemble": [
+          "lesion_detector_hyperpigmentation.onnx (H25 seed 42)",
+          "lesion_detector_hyperpigmentation_m2.onnx (H25 seed 7)",
+          "lesion_detector_hyperpigmentation_m3.onnx (H25 seed 123)"
+        ]
+      }
+    },
+    {
+      "name": "lesion_detector_hyperpigmentation_m3.onnx",
+      "sha256": "2a6fa1afa61f4eeed11d15f87421c9429c9de07864f0608bcdb5921ce205a165",
+      "input_name": "images",
+      "input_shape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "outputs": [
+        {
+          "name": "output0",
+          "shape": [
+            1,
+            5,
+            13125
+          ]
+        }
+      ],
+      "synthetic_inference_finite": true,
+      "metadata": {
+        "model": "PrecisionSkin hyperpigmentation specialist detector",
+        "source_weights": "/home/bautista/PrecisionSkinV1/lesion_experiments/runs/H25_v2human_all_pub/weights/best.pt",
+        "classes": [
+          "hyperpigmentation"
+        ],
+        "imgsz": 800,
+        "default_conf": 0.225,
+        "nms_iou": 0.6,
+        "onnx_sha256": "df03a5d5e00f70d53e4e89b1c596545084e54e7749b8a7095f64ececa0b1cbf4",
+        "installed": "2026-10-11T20:53:52",
+        "test_mAP50_single_run": 0.508,
+        "note": "Annotation rule v2. Average of three seeds trained on 808 photos corrected by hand under rule v2 (x3) + 1,260 public photos; threshold 0.225 chosen on 60 validation photos; test (100 photos boxed under rule v2, scored once): mAP50 0.508, F1 0.520",
+        "ensemble": [
+          "lesion_detector_hyperpigmentation.onnx (H25 seed 42)",
+          "lesion_detector_hyperpigmentation_m2.onnx (H25 seed 7)",
+          "lesion_detector_hyperpigmentation_m3.onnx (H25 seed 123)"
+        ]
+      }
+    }
+  ],
+  "accepted_fully_decided": 0,
+  "source_records": 12,
+  "source_use_counts": {
+    "": 12
+  },
+  "nvidia_smi": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 1795 MiB",
+  "original_wsl_files_before": {
+    "/home/bautista/PrecisionSkinV1/v6/annotations/dataset_provenance.csv": "d857d89bcc1c3547780c9e516428f5f3e0a7ecd6ccdefc49f2279400dcf5a448",
+    "/home/bautista/PrecisionSkinV1/v6/annotations/region_annotations.csv": "c31d432f24a3faf24a945c85f7ced9e0fd975c19de44cfd24537100db52b4a64",
+    "/home/bautista/PrecisionSkinV1/v6/annotations/multilabel_annotations.csv": "7fe354fc164926f989f2df5b9281a1eafb0790f1bf55376b86e5a2f07fd6f51e",
+    "/home/bautista/PrecisionSkinV1/v6/annotations/dermatologist_reviews.csv": "c1268f486509c69dbb141b04c2bc4d2b855f9e2f6ed117a190e79cd51df6cf95",
+    "/home/bautista/PrecisionSkinV1/v6/annotations/hard_example_review_queue.csv": "74865bdc49410384866941e927dc0fc4f628e18f2fef48ea8847fde1dc88cde2",
+    "/home/bautista/PrecisionSkinV1/v6/splits/v6_split_fingerprint.json": "42b5a2b7f37049d3d76203c552e6a5a44555f31afd28e572298e743a2b8711c4",
+    "/home/bautista/PrecisionSkinV1/v6/splits/v6_split_manifest.csv": "f05380e784652895947a7b5234384ff5967e3629ec9200ac399aa37aa827e7b8",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/gradcam_service.py.bak": "106c76a38a37f361701f5dfbcc804c761e9f7ba9da6e731e5488e5bda74c9165",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/labels.json": "f987fcc55e3d43201186f969daf3bb3e617e49957f757b80939f47758faf51d9",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/deployment_summary.json": "4c2416918eded131842ea044b022e6cf3f45b8a5e67a328e1b80747925c40ff9",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/model_hash.txt": "378dddbe205f0a0d994eb4dc9c62a7fc35a159353ad938b0da9aff3fa953fdd8",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/model_metadata.json": "52db5d0f65ffadd4b217796adc8fb2374c372fa76cc52cdac52b66fc5018b716",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/model_version.json": "13c0fd9182bcefd9bd36d199a07ac414f02c577b4205a27a60ff2cc5e9171027",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/precisionskin_best.keras": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/gradcam_service.py": "106c76a38a37f361701f5dfbcc804c761e9f7ba9da6e731e5488e5bda74c9165",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/requirements_gradcam.txt": "5e438089f5a6c48124b057518a73a672f0621dcd13ef70887b9bf1e4d09f4615",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/stabilizer_params.json": "59e527405559013cfd8d79827424b7e37025159a603775b833ce3388b50a9bbe",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/precisionskin.onnx": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/gradcam_metadata.json": "beedfbcc9e688ee5108bc2c5eb71d2d054b52a065513ca2a58e6b394a917adaa",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/master_dataset.csv": "6ad6e4f2b8c56e34268bccde8698fa9e419aca9ddb516fa5c2ea1ef3f8ac48a3",
+    "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/__pycache__/gradcam_service.cpython-313.pyc": "70c43007f3bbbed80cbdf822fdbbf263be6bef916e147db5826d83d2bca03d7d"
+  },
+  "original_wsl_files_unchanged": true
+}

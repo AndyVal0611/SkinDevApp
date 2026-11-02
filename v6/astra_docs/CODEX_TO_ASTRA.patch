@@ -1,0 +1,1174 @@
+--- Codex/01_intro_and_baselines.cellsrc
++++ Astra/01_intro_and_baselines.cellsrc
+@@ -6,7 +6,7 @@
+ **Notebook file:** `LUMYVUE_V6_Hybrid_Three_YOLO_MobileNetV2_Training.ipynb` · **Training hardware:** Windows 11 + WSL2 Ubuntu, NVIDIA RTX 4060 Laptop GPU (8 GB VRAM).
+ 
+ > ### Read this first
+-> * This notebook is the **complete, runnable V6 pipeline**. **You** execute it; it has **not** been run by its author. It contains **no experimental result**: every number, table and figure is produced from files it saves under `…/v6/experiments/<RUN_ID>/` when you run it.
++> * This notebook is the **complete, runnable V6 pipeline**. **You** execute it; it has **not** been run by its author. It contains **no experimental result**: every number, table and figure is produced from files it saves under `…/v6/astra_runs/<RUN_ID>/` when you run it.
+ > * Stages that need verified labels, region annotations or model files that do not exist yet **stop with a `GateError`** that says exactly what is missing. They never invent labels, never treat *Unknown* as *Absent*, and never train on invalid data.
+ > * Original V5 and YOLO models, the datasets and the WPF application are **read-only** here: every write goes through `safe_write()` which refuses protected locations, and the notebook fingerprints the originals at the start and re-verifies them at the end.
+ > * **Every AI assessment requires dermatologist review**, whatever its state, confidence or stage. It is issued as `PENDING_DERMATOLOGIST_REVIEW`, sealed (SHA-256) and never edited; the dermatologist's findings are recorded in a **separate** record so agreement can be measured. Stage 2 is **AI verification, not clinical validation**.
+--- Codex/02_environment_security.cellsrc
++++ Astra/02_environment_security.cellsrc
+@@ -32,7 +32,7 @@
+ 
+ #@@ code
+ # 6.1 Experiment configuration. Override order (later wins): defaults < JSON file ($LUMYVUE_V6_CONFIG) < environment LUMYVUE_<NAME>.
+-import os, json, glob, datetime
++import os, json, glob, datetime, re
+ from types import SimpleNamespace
+ 
+ HOME = os.path.expanduser("~")
+@@ -54,7 +54,7 @@
+ 
+ DEFAULTS = dict(
+     # ---------------------------------------------------------------- run identity / security
+-    RUN_ID="v6_run01", OFFLINE_MODE=True,                 # OFFLINE_MODE blocks any attempt to download weights
++    RUN_ID="", OFFLINE_MODE=True,                 # OFFLINE_MODE blocks any attempt to download weights
+     PSEUDONYM_KEY_FILE=os.path.join(HOME, ".lumyvue_v6", "pseudonym.key"),   # kept OUTSIDE the experiment folders
+     REQUIRE_PROVENANCE_FOR_TRAINING=True,                # gate: every training source needs a permissible-use record
+     # ---------------------------------------------------------------- read-only inputs
+@@ -94,7 +94,7 @@
+     USE_SOURCE_LABEL_AS_WEAK_POSITIVE=True,           # train only: V5 class name = weak POSITIVE for that condition (never negative for the others, never used for evaluation)
+     UNCERTAIN_IN_TRAIN="mask",                          # 'mask' keeps the image with the label ignored; 'exclude' drops the image
+     # ---------------------------------------------------------------- input / augmentation (dermatology-safe)
+-    IMG_SIZE=224, BATCH_SIZE=32, SHUFFLE_BUFFER=2048,
++    IMG_SIZE=224, BATCH_SIZE=8, SHUFFLE_BUFFER=2048,
+     AUG=dict(flip=True, rotation_deg=10, translation=0.05, zoom=(-0.30, 0.10), brightness=0.08, contrast=0.08, scale_crop_p=0.5),
+     MIXED_OVERSAMPLE=2,
+     # ---------------------------------------------------------------- global model experiments
+@@ -111,10 +111,10 @@
+     DUP_IOU=0.5, NESTED_CONTAINMENT=0.8,
+     # ---------------------------------------------------------------- ROI
+     ROI_MARGIN=0.25, ROI_MIN_SIDE_FRAC=0.02, ROI_MAX_TIER1=6, ROI_MAX_TOTAL=12, ROI_OVERLAP_SUPPRESS_IOU=0.70, ROI_ALT_MARGIN=0.60,
+-    ROI_MATCH_IOU=0.50, ROI_BG_MAX_IOU=0.10, ROI_CLASSES=["Acne", "Hyperpigmentation", "Eczema", "Background"], ROI_EMB=64, ROI_BATCH=32,
++    ROI_MATCH_IOU=0.50, ROI_BG_MAX_IOU=0.10, ROI_CLASSES=["Acne", "Hyperpigmentation", "Eczema", "Background"], ROI_EMB=64, ROI_BATCH=8,
+     ROI_PHASE_A_EPOCHS=8, ROI_PHASE_B_EPOCHS=12, ROI_CACHE_ROIS=True,
+     # ---------------------------------------------------------------- fusion
+-    FUSION_HIDDEN=64, FUSION_DROPOUT=0.3, FUSION_EPOCHS=150, FUSION_LR=1e-3, FUSION_BATCH=64, FUSION_PATIENCE=20, FUSION_MODALITY_DROPOUT=0.25, FUSION_CV_FOLDS=5,
++    FUSION_HIDDEN=64, FUSION_DROPOUT=0.3, FUSION_EPOCHS=150, FUSION_LR=1e-3, FUSION_BATCH=2, FUSION_PATIENCE=20, FUSION_MODALITY_DROPOUT=0.25, FUSION_CV_FOLDS=5,
+     # ---------------------------------------------------------------- calibration / selective prediction / stages
+     THRESHOLD_GRID=[round(0.05 + 0.01 * i, 2) for i in range(91)], CALIBRATION_BINS=10,
+     TARGET_ACCEPTED_ERROR=0.10, MIN_ACCEPT_COVERAGE=0.30,
+@@ -128,7 +128,7 @@
+     # ---------------------------------------------------------------- evaluation
+     BOOTSTRAP_B=1000, BOOTSTRAP_SEED=11, ALLOW_TEST_REEVALUATION=False, ROBUSTNESS_N=150, N_EXAMPLE_IMAGES=12, GRADCAM_LAYER="out_relu",
+     # ---------------------------------------------------------------- hardware / reproducibility
+-    DETERMINISTIC=True, GPU_MEMORY_LIMIT_MB=0,         # 0 = memory growth only; e.g. 7000 caps TensorFlow at ~7 GB
++    DETERMINISTIC=True, GPU_MEMORY_LIMIT_MB=4096,         # 0 = memory growth only; e.g. 7000 caps TensorFlow at ~7 GB
+ )
+ 
+ 
+@@ -160,7 +160,16 @@
+ CFG.REVIEW_QUEUE_CSV = CFG.REVIEW_QUEUE_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "hard_example_review_queue.csv")
+ CFG.DERM_REVIEW_CSV = CFG.DERM_REVIEW_CSV or os.path.join(CFG.V6_WORKSPACE, "annotations", "dermatologist_reviews.csv")
+ CFG.SPLIT_DIR = os.path.join(CFG.V6_WORKSPACE, "splits")
+-CFG.EXP_DIR = os.path.join(CFG.V6_WORKSPACE, "experiments", CFG.RUN_ID)
++
++if not CFG.RUN_ID or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', CFG.RUN_ID):
++    raise ValueError('Set a unique LUMYVUE_RUN_ID before configuration; letters/digits/underscore/hyphen only.')
++_astra_runs = ASTRA_V6_DIR / 'astra_runs'
++if _astra_runs.is_symlink() or (_astra_runs / CFG.RUN_ID).is_symlink():
++    raise ValueError('Astra output roots must not be symlinks')
++CFG.EXP_DIR = str(_astra_runs / CFG.RUN_ID)
++CFG.REVIEW_QUEUE_CSV = os.path.join(CFG.EXP_DIR,'data','hard_example_review_queue.csv')
++if not os.path.isdir(CFG.SPLIT_DIR): raise FileNotFoundError('Existing frozen split directory required: '+CFG.SPLIT_DIR)
++
+ CFG.DIRS = {d: os.path.join(CFG.EXP_DIR, d) for d in
+             ["config", "audit", "data", "checkpoints", "logs", "metrics", "figures", "predictions", "yolo", "roi", "fusion", "stages", "v5_comparison", "export", "report", "tests"]}
+ CFG.AUG["zoom"] = tuple(CFG.AUG["zoom"])
+@@ -234,7 +243,7 @@
+         try:
+             tf.config.set_logical_device_configuration(GPUS[0], [tf.config.LogicalDeviceConfiguration(memory_limit=int(CFG.GPU_MEMORY_LIMIT_MB))])
+         except RuntimeError as e:
+-            print("  could not cap GPU memory:", e)
++            raise V6Error('GPU already initialized; restart kernel before applying the allocation cap') from e
+     keras.mixed_precision.set_global_policy("mixed_float16")
+     print("GPU:", [g.name for g in GPUS], "| mixed_float16 ON (all output layers are float32)")
+ else:
+@@ -274,8 +283,7 @@
+         os.chmod(_d, 0o700)
+     except OSError:
+         pass                                           # e.g. /mnt/c (NTFS) does not support POSIX modes: documented limitation
+-for _d in [os.path.dirname(CFG.ANNOTATION_CSV), CFG.SPLIT_DIR]:
+-    os.makedirs(_d, exist_ok=True)
++
+ 
+ 
+ def sha256_file(path, chunk=1 << 20):
+@@ -301,20 +309,19 @@
+ 
+ def is_protected(path):
+     p = _norm(path)
+-    exp = _norm(CFG.V6_WORKSPACE)
+-    if p == exp or p.startswith(exp + os.sep):
+-        return False
+-    return any(p == r or p.startswith(r + os.sep) for r in _protected_roots())
++    explicit = [CFG.ANNOTATION_CSV, CFG.REGION_CSV, CFG.PROVENANCE_CSV,
++                CFG.DERM_REVIEW_CSV, CFG.PSEUDONYM_KEY_FILE, CFG.V5_MANIFEST]
++    if any(p == _norm(x) for x in explicit if x): return True
++    if p == _norm(CFG.SPLIT_DIR) or p.startswith(_norm(CFG.SPLIT_DIR)+os.sep): return True
++    return any(p == r or p.startswith(r+os.sep) for r in _protected_roots())
+ 
+ 
+ def safe_path(path):
+-    """Return `path` if writing there is allowed, else raise. Only the V6 workspace is writable; protected originals never are."""
+-    p = _norm(path)
+-    ws = _norm(CFG.V6_WORKSPACE)
+-    require(p == ws or p.startswith(ws + os.sep), f"Refusing to write outside the V6 workspace: {path}")
+-    require(not is_protected(path), f"Refusing to write to a protected original location: {path}")
++    p, root = _norm(path), _norm(CFG.EXP_DIR)
++    require(p.startswith(root + os.sep), f'Astra writes only inside this run: {path}')
++    require(not is_protected(p), f'Protected input: {path}')
+     os.makedirs(os.path.dirname(p), exist_ok=True)
+-    return path
++    return p
+ 
+ 
+ def write_text(path, text):
+@@ -362,15 +369,7 @@
+ # ---- pseudonymous identifiers (keyed HMAC; the key lives outside every artifact folder) -----------------------------------
+ def _pseudonym_key():
+     kf = CFG.PSEUDONYM_KEY_FILE
+-    if not os.path.exists(kf):
+-        os.makedirs(os.path.dirname(kf), exist_ok=True)
+-        with open(kf, "wb") as f:
+-            f.write(secrets.token_bytes(32))
+-        try:
+-            os.chmod(kf, 0o600)
+-        except OSError:
+-            pass
+-        print("Created a new pseudonymisation key (back it up privately; without it ids cannot be re-linked):", redact(kf))
++    require(os.path.isfile(kf), 'Existing pseudonym key required; Astra will not create or replace it', gate=True)
+     with open(kf, "rb") as f:
+         return f.read()
+ 
+--- Codex/02c_training_recovery.cellsrc
++++ Astra/02c_training_recovery.cellsrc
+@@ -8,8 +8,9 @@
+ def content_digest(value):
+     h = hashlib.sha256()
+     def visit(x):
++        h.update((type(x).__name__+':').encode())
+         if isinstance(x, dict):
+-            for k in sorted(x): h.update(str(k).encode()); visit(x[k])
++            for k in sorted(x): h.update(json.dumps(str(k)).encode()); visit(x[k])
+         elif isinstance(x, (list, tuple)):
+             for v in x: visit(v)
+         elif isinstance(x, np.ndarray):
+@@ -18,23 +19,23 @@
+                 for v in x.flat: visit(str(v))
+             else: h.update(np.ascontiguousarray(x).tobytes())
+         elif isinstance(x, str) and os.path.isfile(x):
+-            h.update(x.encode()); h.update(sha256_file(x).encode())
++            h.update(json.dumps(x).encode()); h.update(sha256_file(x).encode())
+         else: h.update(json.dumps(x, sort_keys=True, default=str).encode())
+     visit(value)
+     return h.hexdigest()
+ 
+ 
+ def training_identity(stage, phase, seed, data):
+-    source_dir = os.path.join(os.path.dirname(os.path.dirname(CFG.YOLO_MODEL_DIR)), 'v6', 'notebook_src')
+-    sources = sorted(glob.glob(os.path.join(source_dir, '*.cellsrc')))
+-    require(sources, 'Notebook source files not found: set YOLO_MODEL_DIR to the real project Model folder before training', gate=True)
+-    records = {k: sha256_file(getattr(CFG, k)) if os.path.isfile(getattr(CFG, k, '')) else None
+-               for k in ['V5_MANIFEST', 'ANNOTATION_CSV', 'REGION_CSV', 'PROVENANCE_CSV', 'V5_KERAS']}
+-    if 'SPLIT_FP_PATH' in globals() and os.path.isfile(SPLIT_FP_PATH): records['frozen_split'] = sha256_file(SPLIT_FP_PATH)
+-    return dict(schema='lumyvue-training-contract/2', stage=stage, phase=phase, seed=int(seed),
++    sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR, '*.cellsrc')))
++    require(sources, 'Astra sources missing; retain astra_training_src beside the notebook', gate=True)
++    records = {k: sha256_file(getattr(CFG,k)) if os.path.isfile(getattr(CFG,k,'')) else None
++               for k in ['V5_MANIFEST','ANNOTATION_CSV','REGION_CSV','PROVENANCE_CSV','V5_KERAS']}
++    records['frozen_split'] = sha256_file(os.path.join(CFG.SPLIT_DIR,'v6_split_manifest.csv'))
++    records['detectors'] = {p:sha256_file(p) for p in sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR,'*.onnx')))}
++    return dict(schema='astra-training/1', stage=stage, phase=phase, seed=int(seed),
+                 configuration=content_digest(vars(CFG)), code=content_digest(sources), inputs=records,
+                 data=content_digest(data), conditions=CFG.CONDITIONS, roi_classes=CFG.ROI_CLASSES,
+-                tensorflow=tf.__version__, keras=keras.__version__, stochastic_resume='not_bitwise_exact')
++                tensorflow=tf.__version__, keras=keras.__version__, stochastic_resume='epoch_boundary_not_bitwise_exact')
+ 
+ 
+ def atomic_record(path, data):
+@@ -51,6 +52,12 @@
+     identity = dict(identity, model=json.loads(model.to_json()), optimizer=keras.optimizers.serialize(model.optimizer),
+                     epochs=int(epochs), monitor=monitor, mode=mode, patience=patience, use_plateau=use_plateau)
+     # Optimizer compile config contains initial LR, never the checkpoint's plateau-reduced LR.
++    def canonical(value):
++        if isinstance(value,dict): return {k:canonical(v) for k,v in value.items()}
++        if isinstance(value,list): return [canonical(v) for v in value]
++        if isinstance(value,str): return re.sub(r'(?<=[a-z])_\d+(?=$|/)', '', value)
++        return value
++    identity['model'] = canonical(identity['model'])
+     digest = content_digest(identity)
+     if os.path.exists(contract_path):
+         require(json.load(open(contract_path))['sha256'] == digest,
+@@ -66,8 +73,8 @@
+         require(os.path.isfile(os.path.join(attempt, name)) and sha256_file(os.path.join(attempt, name)) == expected,
+                 f'Checkpoint artifact integrity failure: {name}', gate=True)
+     if state.get('complete'):
+-        return keras.models.load_model(os.path.join(attempt, state['latest'])), dict(attempt=attempt, reused=True, **state)
+-    if state and restart_incomplete:
++        return keras.models.load_model(os.path.join(attempt, state['selected'])), dict(attempt=attempt, reused=True, **state)
++    if attempts and not state.get('complete') and restart_incomplete:
+         previous = attempt
+         attempt = os.path.join(directory, f'attempt_{len(attempts)+1:04d}')
+         state = {}; state_path = os.path.join(attempt, 'state.json')
+@@ -90,8 +97,7 @@
+             latest = f'epoch_{epoch+1:05d}.keras'
+             self.model.save(safe_path(os.path.join(attempt, latest)))
+             if better:
+-                best = f'best_epoch_{epoch+1:05d}.weights.h5'
+-                self.model.save_weights(safe_path(os.path.join(attempt, best)))
++                best = latest
+             else: best = current['best']
+             history.append(dict(epoch=epoch+1, **{k:float(v) for k,v in logs.items()}))
+             history_name = f'epoch_{epoch+1:05d}.history.csv'
+@@ -101,7 +107,11 @@
+                           early={k:getattr(early,k) for k in ('wait','best','stopped_epoch') if hasattr(early,k)},
+                           plateau={k:getattr(plateau,k) for k in ('wait','best','cooldown_counter') if hasattr(plateau,k)},
+                           hashes={n:sha256_file(os.path.join(attempt,n)) for n in (latest,best,history_name)})
+-            atomic_record(state_path, record); current.clear(); current.update(record)
++            atomic_record(state_path, record)
++            keep = set(record['hashes'])
++            for old in glob.glob(os.path.join(attempt,'epoch_*')):
++                if os.path.basename(old) not in keep: os.remove(safe_path(old))
++            current.clear(); current.update(record)
+     current = dict(state)
+     history = pd.read_csv(os.path.join(attempt,state['history'])).to_dict('records') if state else []
+     try:
+@@ -113,9 +123,9 @@
+         raise V6Error('GPU/RAM exhausted. Keep checkpoints. Do not silently change batch size under this RUN_ID; use a new run definition.') from ex
+     require(current, 'No epoch checkpoint was committed; inspect input pipeline/fit logs')
+     # Keep optimizer/latest generation for resume, but return/export validation-best weights.
+-    model.load_weights(os.path.join(attempt, current['best']))
++    model = keras.models.load_model(os.path.join(attempt, current['best']))
+     final = 'selected.keras'; model.save(safe_path(os.path.join(attempt, final)))
+-    current.update(complete=True, latest=final)
++    current.update(complete=True, selected=final)
+     current['hashes'].update({final:sha256_file(os.path.join(attempt,final))})
+     atomic_record(state_path, current)
+     return model, dict(attempt=attempt, reused=False, **current)
+@@ -128,3 +138,49 @@
+                 f'Completed selected model differs at {path}; use a new RUN_ID', gate=True)
+         return
+     model.save(safe_path(path))
++
++#@@ code
++def astra_require_action(action):
++    """A one-use token: Run All stops before any expensive research operation."""
++    global ASTRA_ACTION
++    if ASTRA_ACTION != action:
++        raise GateError(f'Researcher-controlled cell: set ASTRA_ACTION = {action!r} in a separate cell, then run this cell. Read the guide first.')
++    ASTRA_ACTION = None
++    log_event('researcher_action', action=action)
++
++def astra_phase_record(model, rec, directory, phase):
++    """Compatibility artifacts for existing plots/selection; recovery stays authoritative."""
++    model.save_weights(safe_path(os.path.join(directory, f'phase{phase}_best.weights.h5')))
++    shutil.copyfile(os.path.join(rec['attempt'],rec['history']), safe_path(os.path.join(directory,f'phase{phase}_history.csv')))
++    write_json(os.path.join(directory,f'phase{phase}_state.json'),rec)
++
++def astra_select_phase(directory, metric='val_sel'):
++    """B wins exact ties, matching the established ROI rule. Missing files fail."""
++    records = {p:json.load(open(os.path.join(directory,f'phase{p}_state.json'))) for p in 'AB'}
++    a,b = (float(records[p]['best_metric']) for p in 'AB')
++    require(np.isfinite([a,b]).all(),'Non-finite phase-selection metric',gate=True)
++    phase = 'B' if b >= a else 'A'
++    rec = records[phase]
++    selected = os.path.join(rec['attempt'],rec['selected'])
++    require(os.path.isfile(selected),'Missing selected checkpoint: '+selected,gate=True)
++    require(sha256_file(selected)==rec['hashes'][rec['selected']],'Selected checkpoint hash mismatch',gate=True)
++    model = keras.models.load_model(selected)
++    write_json(os.path.join(directory,'phase_selection.json'),dict(phase=phase,criterion=metric,phase_a=a,phase_b=b,
++        tie_rule='B',checkpoint=selected,sha256=sha256_file(selected),optimizer_note='selected epoch optimizer preserved'))
++    return model,phase
++
++#@@ code
++# Pin the entire run before any research data cache is reused.
++_astra_inputs = {k:sha256_file(getattr(CFG,k)) if os.path.isfile(getattr(CFG,k,'')) else None
++                 for k in ['V5_MANIFEST','ANNOTATION_CSV','REGION_CSV','PROVENANCE_CSV','V5_KERAS','V5_ONNX']}
++_astra_inputs['split'] = sha256_file(os.path.join(CFG.SPLIT_DIR,'v6_split_manifest.csv'))
++_astra_inputs['detectors'] = {p:sha256_file(p) for p in sorted(glob.glob(os.path.join(CFG.YOLO_MODEL_DIR,'*.onnx')))}
++_astra_sources = sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR,'*.cellsrc'))) + sorted(glob.glob(os.path.join(ASTRA_SOURCE_DIR,'*.cellpy')))
++_astra_contract = dict(config=vars(CFG),inputs=_astra_inputs,code=content_digest(_astra_sources),tensorflow=tf.__version__,keras=keras.__version__)
++_astra_contract_path = os.path.join(CFG.DIRS['config'],'astra_run_contract.json')
++_astra_digest = content_digest(_astra_contract)
++if os.path.exists(_astra_contract_path):
++    require(json.load(open(_astra_contract_path))['sha256']==_astra_digest,'Run inputs/configuration/source changed: use a NEW RUN_ID',gate=True)
++else:
++    atomic_record(_astra_contract_path,dict(sha256=_astra_digest,identity=_astra_contract))
++print('Astra run contract:',_astra_digest)
+--- Codex/03_dataset_audit.cellsrc
++++ Astra/03_dataset_audit.cellsrc
+@@ -244,17 +244,13 @@
+     require(sha256_file(SPLIT_PATH) == _fp["sha256"], "The frozen split file was modified after it was created. Restore it or start a new RUN_ID with a new V6_WORKSPACE.")
+     missing_ids = set(DF[DF.exact_dup_rank == 0].v5_image_id) - set(_s.v5_image_id)        # exact duplicates beyond the first copy were never in the split
+     require(not missing_ids, f"{len(missing_ids)} images are not in the frozen split (the dataset policy changed). Changing the policy after the split was frozen is not allowed; use a new V6_WORKSPACE.")
++    require(not _s.v5_image_id.duplicated().any(), 'Duplicate IDs in frozen split')
++    _check = DF.merge(_s[['v5_image_id','group_id']], on='v5_image_id', suffixes=('_current','_frozen'))
++    require((_check.group_id_current == _check.group_id_frozen).all(), 'Proxy group assignments differ from frozen manifest; stop for review')
+     DF = DF.merge(_s[["v5_image_id", "split"]], on="v5_image_id", how="inner")
+     print("Frozen split loaded:", _fp["created"])
+ else:
+-    d0 = DF[DF.exact_dup_rank == 0].copy()
+-    gsplit = assign_splits(d0, CFG.SPLIT_FRACTIONS, CFG.SPLIT_SEED)
+-    d0["split"] = d0.group_id.map(gsplit)
+-    write_csv(d0[["v5_image_id", "group_id", "split", "src_label"]], SPLIT_PATH)
+-    write_json(SPLIT_FP_PATH, dict(sha256=sha256_file(SPLIT_PATH), created=datetime.datetime.now().isoformat(timespec="seconds"), seed=CFG.SPLIT_SEED,
+-                                   fractions=CFG.SPLIT_FRACTIONS, n_images=len(d0), note="Frozen BEFORE annotation. Do not edit."))
+-    DF = DF.merge(d0[["v5_image_id", "split"]], on="v5_image_id", how="inner")
+-    log_event("split_frozen", n=len(d0))
++    raise GateError('Astra requires the existing frozen V6 split. No split is created or changed.')
+ 
+ # hard verification: no group in more than one split, no image in two splits
+ chk = DF.groupby("group_id").split.nunique()
+@@ -396,6 +392,9 @@
+     role_ok_eval = a.reviewer_role.eq("dermatologist") if CFG.EVAL_REQUIRES_DERMATOLOGIST else a.reviewer_role.isin(["dermatologist", "researcher"])
+     a["eval_ok"] = a.review_status.isin(["verified", "partial"]) & role_ok_eval
+     a["train_ok"] = a.review_status.isin(["verified", "partial"]) & a.reviewer_role.isin(CFG.TRAIN_ACCEPTED_ROLES)
++    documented = a.reviewer_id.str.strip().ne('') & pd.to_datetime(a.reviewed_at, errors='coerce', utc=True).notna()
++    a['train_ok'] &= documented
++    a['eval_ok'] &= documented & a.blinded_to_ai.str.strip().str.lower().isin(['yes','true','1'])
+     a["full_known"] = a.eval_ok & known.all(axis=1)
+     return a
+ 
+@@ -542,6 +541,7 @@
+ #@@ code
+ # 11.3 Optional annotation helper (needs ipywidgets). It only WRITES the rows you decide; it never pre-fills labels from any model.
+ def annotation_helper(split="validation", n=20, reviewer_id="", reviewer_role="dermatologist", blinded=True):
++    raise GateError('Astra treats reference annotation files as read-only. Use the separately approved annotation workflow, then a new Astra run for changed annotations.')
+     try:
+         import ipywidgets as W
+         from IPython.display import display as _d, clear_output
+--- Codex/04_parity_v5_baseline_errors.cellsrc
++++ Astra/04_parity_v5_baseline_errors.cellsrc
+@@ -138,14 +138,18 @@
+     return out
+ 
+ 
+-if os.path.exists(V5_PROBS_PATH) and set(pd.read_csv(V5_PROBS_PATH).image_id) >= set(DF.image_id):
+-    _v = pd.read_csv(V5_PROBS_PATH).set_index("image_id").loc[DF.image_id]
+-    V5P = _v[[f"v5_{c}" for c in CFG.V5_CLASS_ORDER]].to_numpy(np.float32)
+-else:
+-    t0 = time.time(); V5P = v5_probs_for(DF)
+-    pd.DataFrame({"image_id": DF.image_id, **{f"v5_{c}": V5P[:, i] for i, c in enumerate(CFG.V5_CLASS_ORDER)}, "v5_sha256": V5_SHA}).to_csv(safe_path(V5_PROBS_PATH), index=False)
+-    print(f"V5 inference on {len(DF)} images: {time.time() - t0:.0f}s")
+-require(np.isfinite(V5P).all() and np.allclose(V5P.sum(1), 1, atol=1e-3), "V5 probabilities are not a valid softmax: wrong model or preprocessing.")
++astra_require_action('baseline_development')
++require_source_permission(['train','validation','fusion'],'training')
++_devmask = DF.split.isin(['train','validation','fusion']).values
++_devdf = DF[_devmask]
++if os.path.exists(V5_PROBS_PATH) and set(pd.read_csv(V5_PROBS_PATH).image_id) >= set(_devdf.image_id):
++    _v = pd.read_csv(V5_PROBS_PATH).set_index('image_id').loc[_devdf.image_id]
++    _vp = _v[[f'v5_{c}' for c in CFG.V5_CLASS_ORDER]].to_numpy(np.float32)
++else:
++    _vp = v5_probs_for(_devdf)
++    write_csv(pd.DataFrame({'image_id':_devdf.image_id,**{f'v5_{c}':_vp[:,j] for j,c in enumerate(CFG.V5_CLASS_ORDER)}}),V5_PROBS_PATH)
++require(np.isfinite(_vp).all() and np.allclose(_vp.sum(1),1,atol=1e-3),'Invalid V5 softmax probabilities')
++V5P = np.full((len(DF),4),np.nan,np.float32);V5P[_devmask] = _vp
+ DF["v5_pred"] = [CFG.V5_CLASS_ORDER[i] for i in V5P.argmax(1)]
+ DF["v5_conf"] = V5P.max(1)
+ _s = np.sort(V5P, axis=1); DF["v5_margin"] = _s[:, -1] - _s[:, -2]
+@@ -153,7 +157,7 @@
+ log_event("v5_inference", n=len(DF), model_sha=V5_SHA[:16])
+ DEV = ["train", "validation", "fusion"]
+ print("V5 top-class agreement with the dataset's single class name, per V5 split (historical protocol, NOT verified misclassification):")
+-print(DF.groupby("v5_split").apply(lambda g: float((g.v5_pred == g.src_label).mean()), include_groups=False).round(4).to_dict())
++print(DF[DF.split.isin(DEV)].groupby("v5_split").apply(lambda g: float((g.v5_pred == g.src_label).mean()), include_groups=False).round(4).to_dict())
+ 
+ #@@ md
+ ## 17. V5 error and confusion analysis (development splits only)
+--- Codex/05_global_cnn.cellsrc
++++ Astra/05_global_cnn.cellsrc
+@@ -86,10 +86,9 @@
+         if v == v: vals.append(v)
+     return (float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5)), len(vals)) if len(vals) >= max(20, B // 10) else (np.nan, np.nan, len(vals))
+ 
+-
+ #@@ code
+ # 20.1 Data pipeline: decode -> (train only) dermatology-safe augmentation -> (p/127.5)-1. Batch-level augmentation keeps the CPU pipeline fast.
+-AUTOTUNE = tf.data.AUTOTUNE
++AUTOTUNE = 1
+ IMG_PX = CFG.IMG_SIZE                 # (never reuse a one-letter global: other cells assign S, H, W ...)
+ 
+ 
+@@ -141,7 +140,6 @@
+     """Multilabel target packing: [y(3) | mask(3)] -> (N,6)."""
+     return np.concatenate([np.where(mask, np.clip(y_known, 0, 1), 0), mask.astype(np.float32)], axis=1).astype(np.float32)
+ 
+-
+ #@@ code
+ # 20.2 Masked BCE loss, backbone, head, builders. The loss is registered so .keras checkpoints reload.
+ @keras.saving.register_keras_serializable(package="lumyvue")
+@@ -220,7 +218,6 @@
+             if isinstance(l, keras.layers.BatchNormalization): l.trainable = False          # keep ImageNet/V5 BN statistics
+     n = sum(1 for l in base.layers if l.trainable)
+     return n
+-
+ 
+ #@@ code
+ # 21.1 Experiment definitions and training-table construction (labels, masks, weights). Gated: needs verified annotations + provenance.
+@@ -290,12 +287,11 @@
+     return dict(train=(tr.proc_path.values, pack_ml(y.astype(np.float32), mask), w), val=(va.proc_path.values, pack_ml(yva_k.astype(np.float32), yva_k >= 0), np.ones(len(va), np.float32)),
+                 info=info, train_df=tr, pos_weight=pw)
+ 
+-
+ #@@ code
+ # 21.2 Validation-metric callback (VERIFIED validation images only) + checkpoint/resume machinery. `val_sel` = macro AP if computable else -val_loss.
+-def eval_global_scores(model, paths, mode, batch=64):
++def eval_global_scores(model, paths, mode, batch=None):
+     """Returns per-condition scores (N,3): sigmoid of logits (multilabel) or the 3 condition softmax probabilities (softmax4)."""
+-    ds = make_dataset(paths, np.zeros((len(paths), 6 if mode == "multilabel3" else 4), np.float32), training=False, batch=batch)
++    ds = make_dataset(paths, np.zeros((len(paths), 6 if mode == "multilabel3" else 4), np.float32), training=False, batch=batch or CFG.BATCH_SIZE)
+     out = model.predict(ds.map(lambda x, y, w: x), verbose=0)
+     out = np.asarray(out, np.float32)
+     return 1 / (1 + np.exp(-out)) if mode == "multilabel3" else out[:, :3]
+@@ -324,73 +320,60 @@
+ 
+ 
+ def run_phase(exp, seed, phase, model, base, tabs, epochs, lr, loss, metrics):
+-    """One training phase with checkpointing and resume. Re-running continues from the last completed epoch; a finished phase is skipped."""
+-    P = phase_paths(exp, seed, phase)
+-    done = len(pd.read_csv(P["hist"])) if os.path.exists(P["hist"]) else 0
+-    if (done >= epochs or os.path.exists(P["state"])) and os.path.exists(P["best"]):
+-        print(f"  [{exp} seed {seed} phase {phase}] already complete ({done}/{epochs} epochs)")
+-        model.load_weights(P["best"]); return model
+-    n_tr = set_trainable(model, base, phase, CFG.FINE_TUNE_AT)
+-    resumed = False
+-    if done > 0 and os.path.exists(P["latest"]):
+-        model = keras.models.load_model(P["latest"], custom_objects={"MaskedBCE": MaskedBCE})      # compiled model incl. optimizer state and the current (possibly reduced) learning rate
+-        base = find_backbone(model); n_tr = sum(1 for l in base.layers if l.trainable); resumed = True
+-        print(f"  RESUMING {exp} seed {seed} phase {phase} from epoch {done} (optimizer state restored)")
+-    if not resumed: model.compile(optimizer=keras.optimizers.Adam(lr), loss=loss, metrics=metrics)
+-    train_ds = make_dataset(*tabs["train"], training=True); val_ds = make_dataset(*tabs["val"], training=False)
+-    cbs = [ValMetrics("multilabel3" if EXPERIMENTS[exp]["mode"] == "multilabel3" else "softmax4", tabs["val"][0], tabs["val_y_eval"]),
+-           keras.callbacks.ModelCheckpoint(P["best"], monitor="val_sel", mode="max", save_best_only=True, save_weights_only=True),
+-           keras.callbacks.ModelCheckpoint(P["latest"], save_best_only=False),
+-           keras.callbacks.EarlyStopping(monitor="val_sel", mode="max", patience=CFG.EARLY_STOP_PATIENCE, restore_best_weights=False),
+-           keras.callbacks.ReduceLROnPlateau(monitor="val_sel", mode="max", factor=CFG.LR_FACTOR, patience=CFG.LR_PATIENCE, min_lr=CFG.MIN_LR, verbose=1),
+-           keras.callbacks.CSVLogger(P["hist"], append=True)]
+-    print(f"  [{exp} seed {seed} phase {phase}] trainable backbone layers: {n_tr}, lr={lr}, epochs {done}->{epochs}")
+-    model.fit(train_ds, validation_data=val_ds, epochs=epochs, initial_epoch=done, callbacks=cbs, verbose=2)
+-    if os.path.exists(P["best"]): model.load_weights(P["best"])
+-    write_json(P["state"], dict(exp=exp, seed=seed, phase=phase, epochs_target=epochs, completed=True, finished=datetime.datetime.now().isoformat(timespec="seconds")))
+-    log_event("phase_done", exp=exp, seed=seed, phase=phase)
++    set_trainable(model, base, phase, CFG.FINE_TUNE_AT)
++    model.compile(optimizer=keras.optimizers.Adam(lr), loss=loss, metrics=metrics, jit_compile=False)
++    directory = phase_paths(exp,seed,phase)['dir']
++    identity = training_identity(exp,phase,seed,dict(train=tabs['train'],val=tabs['val']))
++    model, rec = recovery_fit(model,make_dataset(*tabs['train'],training=True),make_dataset(*tabs['val'],training=False),
++        os.path.join(directory,'recovery_'+phase),identity,epochs,monitor='val_sel',mode='max',
++        metric_callbacks=[ValMetrics(EXPERIMENTS[exp]['mode'],tabs['val'][0],tabs['val_y_eval'])], verbose=2)
++    astra_phase_record(model,rec,directory,phase)
+     return model
+-
+ 
+ #@@ md
+ ## 21. Global classifier training — run cell by cell
+ 
+ The next cell trains **every experiment in `CFG.GLOBAL_EXPERIMENTS` for every seed in `CFG.SEEDS`**. It is safe to interrupt: re-running resumes from `phase*_latest.keras` and the epoch counter in `phase*_history.csv`; completed phases are skipped. Edit `CFG.GLOBAL_EXPERIMENTS` (or the environment variable) to train experiments one at a time. If a gate is closed, the cell stops *before* creating any dataset or model and prints the exact missing requirement.
+ 
+-Expected effort on an RTX 4060 8 GB at batch 32 (indicative only — measure on your machine): a few minutes per phase for ≈ 2 000–6 000 images.
+-
+-#@@ code
+-# 21.3 / 22.1  Train experiments B, C, D, D2 (Phase A: frozen backbone; Phase B: partial unfreeze, BatchNorm frozen).  >>> THIS CELL TRAINS MODELS <<<
++Astra starts at batch 8. Measure actual duration and memory on the eligible data; synthetic checks do not establish full-epoch runtime or memory safety. Separate action cells below initiate Phase A and Phase B.
++
++#@@ code
++# Global training controls and independent phase entry points
+ GLOBAL_RESULTS = {}
+-for exp in CFG.GLOBAL_EXPERIMENTS:
+-    try:
+-        tabs = training_tables(exp)
+-    except GateError as g:
+-        print(f"\n[{exp}] SKIPPED - {g}")
+-        GLOBAL_RESULTS[exp] = dict(status="blocked", why=str(g)); continue
+-    e = EXPERIMENTS[exp]
+-    yv = EVAL_Y[(DF.split == "validation").values]
+-    keep_val = DF[(DF.split == "validation")].proc_path.isin(tabs["val"][0]).values
+-    tabs["val_y_eval"] = yv[keep_val]
+-    write_json(os.path.join(CFG.DIRS["config"], f"{exp}_data_info.json"), tabs["info"])
+-    print(f"\n=== {exp}: {json.dumps({k: v for k, v in tabs['info'].items() if k != 'experiment'}, default=str)}")
+-    for seed in CFG.SEEDS:
+-        set_all_seeds(seed)
+-        model, base = build_global(e["mode"], e["init"])
+-        if e["mode"] == "multilabel3":
+-            loss = MaskedBCE(tabs["pos_weight"]); metrics = []
+-        else:
+-            loss = keras.losses.CategoricalCrossentropy(); metrics = ["accuracy"]
+-        # weights are supplied by the dataset (3rd element) for the softmax experiments and through pos_weight for multilabel
+-        lrA = e["phase_a_lr"] or CFG.PHASE_A_LR
+-        epochsA = CFG.PHASE_A_EPOCHS if e["init"] == "imagenet" else max(3, CFG.PHASE_A_EPOCHS // 3)
+-        model = run_phase(exp, seed, "A", model, base, tabs, epochsA, lrA, loss, metrics)
+-        model = run_phase(exp, seed, "B", model, find_backbone(model), tabs, CFG.PHASE_B_EPOCHS, CFG.PHASE_B_LR, loss, metrics)
+-        model.save(safe_path(os.path.join(CFG.DIRS["checkpoints"], exp, f"seed_{seed}", "final_best.keras")))
+-        keras.backend.clear_session()
+-    GLOBAL_RESULTS[exp] = dict(status="trained", info=tabs["info"])
+-write_json(os.path.join(CFG.DIRS["metrics"], "global_training_status.json"), GLOBAL_RESULTS)
+-
++def astra_global_phase(phase):
++    require_source_permission(['train','validation'],'training')
++    for exp in CFG.GLOBAL_EXPERIMENTS:
++        tabs=training_tables(exp); e=EXPERIMENTS[exp]
++        keep=DF[DF.split=='validation'].proc_path.isin(tabs['val'][0]).values
++        tabs['val_y_eval']=EVAL_Y[(DF.split=='validation').values][keep]
++        for seed in CFG.SEEDS:
++            keras.backend.clear_session(); set_all_seeds(seed)
++            directory=phase_paths(exp,seed,phase)['dir']
++            if phase=='A': model,base=build_global(e['mode'],e['init'])
++            else:
++                record=json.load(open(os.path.join(directory,'phaseA_state.json')))
++                model=keras.models.load_model(os.path.join(record['attempt'],record['selected']));base=find_backbone(model)
++            loss=MaskedBCE(tabs['pos_weight']) if e['mode']=='multilabel3' else keras.losses.CategoricalCrossentropy()
++            epochs=(CFG.PHASE_A_EPOCHS if e['init']=='imagenet' else max(3,CFG.PHASE_A_EPOCHS//3)) if phase=='A' else CFG.PHASE_B_EPOCHS
++            lr=(e['phase_a_lr'] or CFG.PHASE_A_LR) if phase=='A' else CFG.PHASE_B_LR
++            model=run_phase(exp,seed,phase,model,base,tabs,epochs,lr,loss,[] if e['mode']=='multilabel3' else ['accuracy'])
++            if phase=='B':
++                model,selected=astra_select_phase(directory)
++                save_selected_model(model,os.path.join(directory,'final_best.keras'))
++        GLOBAL_RESULTS[exp]=dict(status='trained' if phase=='B' else 'phase_A_complete',info=tabs['info'])
++    write_json(os.path.join(CFG.DIRS['metrics'],'global_training_status.json'),GLOBAL_RESULTS)
++#@@ md
++## Astra Global Phase A — EXPENSIVE, researcher initiated
++Frozen backbone. Set the one-use action token `global_A` in a separate cell first.
++#@@ code
++astra_require_action('global_A')
++astra_global_phase('A')
++#@@ md
++## Astra Global Phase B and phase selection — EXPENSIVE, researcher initiated
++Partial unfreeze with BatchNorm frozen, new optimizer. Restores the better A/B checkpoint; B wins ties.
++#@@ code
++astra_require_action('global_B')
++astra_global_phase('B')
+ #@@ md
+ ## 22. Selecting the global model on validation data, with a regression check
+ For each trained experiment and seed, scores on the verified **validation** images are computed and compared with the V5 baseline (experiment A) on the *same images*. The **best seed per experiment** is chosen by validation macro-AP; the **improved global model** is the experiment with the highest macro-AP **among those without a per-condition regression** (F1@0.5 drop larger than `REGRESSION_TOLERANCE_F1` versus A). If every candidate regresses somewhere, the best is still reported but flagged. The choice is saved to `metrics/global_selection.json`; the test set plays no part.
+@@ -448,7 +431,8 @@
+         c["delta_f1_vs_A"] = (m.f1 - base_f1).round(4).to_dict()
+         c["regression"] = [k for k, v in c["delta_f1_vs_A"].items() if v == v and v < -CFG.REGRESSION_TOLERANCE_F1]
+     ok = {e: c for e, c in SEL["candidates"].items() if not c["regression"] and c["val_macro_ap"] == c["val_macro_ap"]}
+-    pool = ok or {e: c for e, c in SEL["candidates"].items() if c["val_macro_ap"] == c["val_macro_ap"]}
++    ok = {e:c for e,c in ok.items() if EXPERIMENTS[e]['mode']=='multilabel3'}
++    pool = ok or {e: c for e, c in SEL["candidates"].items() if c["val_macro_ap"] == c["val_macro_ap"] and EXPERIMENTS[e]['mode']=='multilabel3'}
+     if pool:
+         SEL["selected"] = max(pool, key=lambda e: pool[e]["val_macro_ap"]); SEL["selected_seed"] = pool[SEL["selected"]]["best_seed"]; SEL["selected_has_regression"] = bool(pool[SEL["selected"]]["regression"])
+     write_json(os.path.join(CFG.DIRS["metrics"], "global_selection.json"), SEL)
+--- Codex/06_yolo_three_detectors.cellsrc
++++ Astra/06_yolo_three_detectors.cellsrc
+@@ -226,28 +226,40 @@
+ #@@ code
+ # 24.2 Run the detectors over the dataset images that matter (annotated images + region-annotated images), with append-only caching and resume.
+ #      Cost is roughly one second per image on CPU: run this cell once and let it finish; it resumes after interruption.
++astra_require_action('yolo_evidence')
+ YOLO_SCOPE = "annotated"       # 'annotated' (images with any known label / any verified region)  |  'all'
+ DET_PATH = os.path.join(CFG.DIRS["yolo"], f"detections_{YOLO_CONFIG_HASH}.jsonl")
+ 
+ 
+ def yolo_target_ids():
+-    if YOLO_SCOPE == "all": return list(DF.image_id)
+-    ids = set(DF[DF.eval_ok | DF.train_ok].image_id)
+-    if len(REG): ids |= set(REG.image_id)
+-    if not ids:                       # no annotations yet: a small stratified PREVIEW so the detectors and their diagnostics can be inspected
+-        prev = pd.concat([g.sample(min(len(g), 15), random_state=3) for _, g in DF.groupby("src_label")])
+-        print("No annotated images yet: running the detectors on a 60-image preview sample only (diagnostics; not used for any result).")
+-        ids = set(prev.image_id)
+-    return sorted(ids)
++    dev_ids=set(DF[DF.split.isin(['train','validation','fusion'])].image_id)
++    if YOLO_SCOPE == 'all': return sorted(dev_ids)
++    ids=set(DF[DF.eval_ok | DF.train_ok].image_id)
++    if len(REG):ids |= set(REG.image_id)
++    return sorted(ids & dev_ids)
++
+ 
+ 
+ def run_yolo_cache(ids, flush_every=25):
++    for split in DF[DF.image_id.isin(ids)].split.unique():
++        require_source_permission([split],'evaluation' if split=='test' else 'training')
+     done = set()
+     if os.path.exists(DET_PATH):
+         with open(DET_PATH, "r", encoding="utf-8") as f:
+             for line in f:
+                 try: done.add(json.loads(line)["image_id"])
+                 except Exception: pass                                      # a truncated last line from an interrupted run
++    if os.path.exists(DET_PATH):
++        with open(DET_PATH,'rb') as stream: lines=stream.readlines()
++        valid=[]
++        for line in lines:
++            try: json.loads(line); valid.append(line.rstrip(b'\r\n')+b'\n')
++            except (ValueError,UnicodeDecodeError): break
++        if len(valid)!=len(lines):
++            tmp=safe_path(DET_PATH+'.repair')
++            with open(tmp,'wb') as stream: stream.writelines(valid)
++            os.replace(tmp,safe_path(DET_PATH))
++            done={json.loads(line)['image_id'] for line in valid}
+     todo = [i for i in ids if i not in done]
+     print(f"YOLO: {len(done)} cached, {len(todo)} to run ({len(ids)} targets, scope={YOLO_SCOPE})")
+     byid = DF.set_index("image_id")
+@@ -484,3 +496,32 @@
+         a.imshow(cv2.cvtColor(draw_detections(bgr, DET[DET.image_id == iid].to_dict("records")), cv2.COLOR_BGR2RGB)); a.set_title(f"{pseudo_id(iid)[-6:]} | {r.src_label}", fontsize=8)
+     fig.suptitle("YOLO detections (solid = deployed threshold, thin = candidate pool only). Source-class names are NOT verified labels.")
+     savefig(fig, "yolo_detection_gallery")
++
++#@@ code
++
++
++def astra_refresh_detector_tables():
++    global DET, EVID, DETRAW
++    DETRAW = [json.loads(line) for line in open(DET_PATH,encoding='utf-8') if line.strip()]
++    # 24.3 Flatten to tables: DET (all pool boxes) and EVID (per image x condition: detector state + summary). States:
++    #      not_available (no detector / detector error)  |  no_qualifying (detector ran, no box >= deployed threshold)  |  detected (>=1 box >= deployed threshold)
++    rows, ev = [], []
++    for r in DETRAW:
++        if "error" in r:
++            for c in CFG.CONDITIONS: ev.append(dict(image_id=r["image_id"], condition=c, state="not_available", reason=r["error"], n_pool=0, n_deployed=0, max_conf=np.nan, best_rel_area=np.nan, best_cx=np.nan, best_cy=np.nan, source=r.get("source", "")))
++            continue
++        for c in CFG.CONDITIONS:
++            d = r["detectors"].get(c)
++            if d is None:
++                ev.append(dict(image_id=r["image_id"], condition=c, state="not_available", reason="detector_unavailable", n_pool=0, n_deployed=0, max_conf=np.nan, best_rel_area=np.nan, best_cx=np.nan, best_cy=np.nan, source=r["source"])); continue
++            bx = d["boxes"]; dep = [b for b in bx if b["deployed"]]
++            for b in bx: rows.append(dict(image_id=r["image_id"], source=r["source"], registry=r["registry"], **b))
++            best = max(dep, key=lambda b: b["conf"]) if dep else None
++            ev.append(dict(image_id=r["image_id"], condition=c, state="detected" if dep else "no_qualifying", reason="", n_pool=len(bx), n_deployed=len(dep), max_conf=best["conf"] if best else np.nan,
++                           best_rel_area=best["rel_area"] if best else np.nan, best_cx=best["cx"] if best else np.nan, best_cy=best["cy"] if best else np.nan, source=r["source"]))
++    DET = pd.DataFrame(rows); EVID = pd.DataFrame(ev)
++    if len(EVID):
++        print(EVID.groupby(["condition", "state"]).size().unstack(fill_value=0))
++        print("detection image source:", EVID.drop_duplicates("image_id").source.value_counts().to_dict(),
++              "\n  (processed_224_upsampled = detectors were run on a 224x224 image upsampled to their input size: out-of-domain for 800-px detectors; provide ORIGINAL_IMAGE_ROOT.)")
++        write_csv(EVID, os.path.join(CFG.DIRS["yolo"], "evidence_per_image_condition.csv")); write_csv(DET, os.path.join(CFG.DIRS["yolo"], "detections_flat.csv"))
+--- Codex/07_roi_branch.cellsrc
++++ Astra/07_roi_branch.cellsrc
+@@ -10,7 +10,7 @@
+ * *Leakage control.* Crops are derived **after** the frozen split and only from images of the split being built; no ROI of a test image exists in any training table.
+ * *Variable ROI counts.* Tier 1 = boxes above the deployed threshold (round-robin across detectors, duplicates suppressed); Tier 2 = lower-confidence candidates from the pool; Tier 3 = **alternative context crops** (wider margin) of Tier-1 boxes — different pixels, used by the verification cycle. Empty detection ⇒ zero ROIs (an explicit mask), never a fabricated crop.
+ * *Crop procedure.* Expand the box by `ROI_MARGIN` on each side, make it **square** by extending the shorter side (context-preserving, no stretching), shift it inside the image (never zero-pad), resize bilinearly to the ROI input size, then `(p/127.5)−1`. Validity checks reject degenerate, out-of-range and too-small boxes with an explicit reason.
+-* *Memory.* ROI input is 224×224 so the cached ImageNet weights are used; batch 32 with mixed precision fits 8 GB. Crops of training ROIs are cached as PNGs under `roi/crops/` (pseudonymous names, folder mode 0700; `purge_roi_cache()` deletes them).
++* *Memory.* ROI input is 224×224; Astra starts with batch 8 and a 4 GB TensorFlow cap. Only bounded synthetic batches have been tested; full-epoch memory safety is unverified. Training crops are cached under this run's `roi/crops/`.
+ 
+ #@@ code
+ # 25.1 Square, context-preserving crop and the ROI candidate builder.
+@@ -84,7 +84,6 @@
+     return onehot + [c["conf"], c["rel_area"], c["cx"], c["cy"], c["w_rel"], c["h_rel"], float(np.log(c["aspect"])), float(c["deployed"]), c["support_frac"],
+                      float(c["tier"] == 1), float(c["tier"] == 2), float(c["tier"] == 3)]
+ 
+-
+ #@@ code
+ # 25.2 ROI visualisation on a few annotated development images (Tier 1 solid, Tier 2 dashed-look thin, Tier 3 = wider context window).
+ DET_BY_IMG = {iid: g.to_dict("records") for iid, g in DET.groupby("image_id")} if len(DET) else {}
+@@ -247,56 +246,60 @@
+ 
+ 
+ def run_roi_phase(seed, phase, model, base, ds_tr, ds_va, y_va, epochs, lr):
+-    d = os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}"); os.makedirs(d, exist_ok=True)
+-    best, latest, hist, state = (os.path.join(d, f"phase{phase}_{n}") for n in ["best.weights.h5", "latest.keras", "history.csv", "state.json"])
+-    done = len(pd.read_csv(hist)) if os.path.exists(hist) else 0
+-    if (done >= epochs or os.path.exists(state)) and os.path.exists(best):
+-        print(f"  [ROI seed {seed} phase {phase}] complete"); model.load_weights(best); return model
+-    set_trainable(model, base, phase, CFG.FINE_TUNE_AT)
+-    resumed = False
+-    if done > 0 and os.path.exists(latest):
+-        model = keras.models.load_model(latest); base = find_backbone(model); resumed = True; print(f"  RESUMING ROI phase {phase} from epoch {done} (optimizer state restored)")
+-    if not resumed: model.compile(optimizer=keras.optimizers.Adam(lr), loss=keras.losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
+-    cbs = [ValROI(ds_va, y_va), keras.callbacks.ModelCheckpoint(best, monitor="val_sel", mode="max", save_best_only=True, save_weights_only=True), keras.callbacks.ModelCheckpoint(latest),
+-           keras.callbacks.EarlyStopping(monitor="val_sel", mode="max", patience=CFG.EARLY_STOP_PATIENCE), keras.callbacks.ReduceLROnPlateau(monitor="val_sel", mode="max", factor=CFG.LR_FACTOR, patience=CFG.LR_PATIENCE, min_lr=CFG.MIN_LR, verbose=1),
+-           keras.callbacks.CSVLogger(hist, append=True)]
+-    model.fit(ds_tr, validation_data=ds_va, epochs=epochs, initial_epoch=done, callbacks=cbs, verbose=2)
+-    if os.path.exists(best): model.load_weights(best)
+-    write_json(state, dict(done=True, finished=datetime.datetime.now().isoformat(timespec="seconds"))); log_event("roi_phase_done", seed=seed, phase=phase)
++    set_trainable(model,base,phase,CFG.FINE_TUNE_AT)
++    model.compile(optimizer=keras.optimizers.Adam(lr),loss=keras.losses.SparseCategoricalCrossentropy(),metrics=['accuracy'],jit_compile=False)
++    directory = os.path.join(CFG.DIRS['checkpoints'],'ROI',f'seed_{seed}')
++    identity = training_identity('ROI',phase,seed,{k:t.to_dict('list') for k,t in ROI_TABLES.items()})
++    model,rec = recovery_fit(model,ds_tr,ds_va,os.path.join(directory,'recovery_'+phase),identity,epochs,
++        monitor='val_sel',mode='max',metric_callbacks=[ValROI(ds_va,y_va)],verbose=2)
++    astra_phase_record(model,rec,directory,phase)
+     return model
+ 
+-
+ #@@ md
+ ## 27. ROI classifier training — run cell by cell
+-Phase A trains the head with a frozen backbone; Phase B partially unfreezes it (BatchNorm frozen). The notebook **records the validation macro-F1 after Phase A and after Phase B** and keeps whichever is better, which answers the freezing / partial / full question empirically: *full fine-tuning is not run* (it overfits small ROI sets and costs memory on an 8 GB GPU) — set `ROI_TRY_FULL_UNFREEZE=True` in this cell to add it as a third, separately-recorded phase. Seeds are `CFG.SEEDS`; the best seed is chosen on validation macro-F1 only. **>>> THIS CELL TRAINS MODELS <<<**
+-
+-#@@ code
+-ROI_TRY_FULL_UNFREEZE = False
++Phase A trains the head with a frozen backbone; Phase B partially unfreezes it (BatchNorm frozen). The notebook **records the validation macro-F1 after Phase A and after Phase B** and keeps whichever is better, which answers the freezing / partial / full question empirically: *full fine-tuning is not run* (it overfits small ROI sets and costs memory on an 8 GB GPU) — full unfreezing is not implemented in Astra. Seeds are `CFG.SEEDS`; the best seed is chosen on validation macro-F1 only. **>>> THIS CELL TRAINS MODELS <<<**
++
++#@@ code
+ ROI_RESULTS = {}
+-try:
+-    gate("roi_training_data"); gate("regions_train"); gate("regions_validation")
+-    tr, va = ROI_TABLES["train"], ROI_TABLES["validation"]
+-    require(tr.label.nunique() == 4 and len(tr) >= 100, f"ROI training needs all 4 classes and >=100 rows (found classes {sorted(tr.label.unique())}, {len(tr)} rows)", gate=True)
+-    cw = len(tr) / (4 * np.maximum(np.bincount(tr.label.values, minlength=4), 1)); w = cw[tr.label.values].astype(np.float32)
+-    ds_tr = make_roi_ds(tr.path.values, tr.label.values, w, True); ds_va = make_roi_ds(va.path.values, va.label.values, None, False); y_va = va.label.values
++ROI_SELECTED_SEED = None
++def astra_roi_phase(phase):
++    global ROI_SELECTED_SEED
++    require_source_permission(['train','validation'],'training')
++    for g in ['roi_training_data','regions_train','regions_validation']: gate(g)
++    tr,va=ROI_TABLES['train'],ROI_TABLES['validation']
++    require(tr.label.nunique()==4 and len(tr)>=100,'ROI needs all four classes and >=100 matched training rows',gate=True)
++    cw=len(tr)/(4*np.maximum(np.bincount(tr.label.values,minlength=4),1))
++    ds_tr=make_roi_ds(tr.path.values,tr.label.values,cw[tr.label.values].astype(np.float32),True)
++    ds_va=make_roi_ds(va.path.values,va.label.values,None,False)
+     for seed in CFG.SEEDS:
+-        set_all_seeds(seed)
+-        model, base = build_roi_model()
+-        model = run_roi_phase(seed, "A", model, base, ds_tr, ds_va, y_va, CFG.ROI_PHASE_A_EPOCHS, CFG.PHASE_A_LR)
+-        pA = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseA_history.csv")); fA = float(pA.val_macro_f1.max())
+-        model = run_roi_phase(seed, "B", model, find_backbone(model), ds_tr, ds_va, y_va, CFG.ROI_PHASE_B_EPOCHS, CFG.PHASE_B_LR)
+-        pB = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseB_history.csv")); fB = float(pB.val_macro_f1.max())
+-        selected_phase = restore_selected_roi_phase(model, os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}"), fA, fB)
+-        ROI_RESULTS[seed] = dict(frozen_backbone_val_macro_f1=fA, partial_finetune_val_macro_f1=fB, chosen="partial_finetune" if selected_phase == "B" else "frozen_backbone")
+-        model.save(safe_path(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "final_best.keras"))); keras.backend.clear_session()
+-    best_seed = max(ROI_RESULTS, key=lambda s: max(ROI_RESULTS[s]["frozen_backbone_val_macro_f1"], ROI_RESULTS[s]["partial_finetune_val_macro_f1"]))
+-    ROI_SELECTED_SEED = best_seed
+-    write_json(os.path.join(CFG.DIRS["metrics"], "roi_training_summary.json"), dict(per_seed=ROI_RESULTS, selected_seed=best_seed, init=ROI_INIT))
+-    display(pd.DataFrame(ROI_RESULTS).T)
+-except GateError as g:
+-    ROI_SELECTED_SEED = None
+-    print(f"[ROI training] BLOCKED - {g}")
+-
++        keras.backend.clear_session();set_all_seeds(seed)
++        directory=os.path.join(CFG.DIRS['checkpoints'],'ROI',f'seed_{seed}')
++        if phase=='A': model,base=build_roi_model()
++        else:
++            record=json.load(open(os.path.join(directory,'phaseA_state.json')))
++            model=keras.models.load_model(os.path.join(record['attempt'],record['selected']));base=find_backbone(model)
++        model=run_roi_phase(seed,phase,model,base,ds_tr,ds_va,va.label.values,
++            CFG.ROI_PHASE_A_EPOCHS if phase=='A' else CFG.ROI_PHASE_B_EPOCHS,CFG.PHASE_A_LR if phase=='A' else CFG.PHASE_B_LR)
++        if phase=='B':
++            model,selected=astra_select_phase(directory,'val_macro_f1')
++            save_selected_model(model,os.path.join(directory,'final_best.keras'))
++            vals=[json.load(open(os.path.join(directory,f'phase{p}_state.json')))['best_metric'] for p in 'AB']
++            ROI_RESULTS[seed]=dict(frozen_backbone_val_macro_f1=vals[0],partial_finetune_val_macro_f1=vals[1],chosen=selected)
++    if phase=='B':
++        ROI_SELECTED_SEED=max(ROI_RESULTS,key=lambda s:max(ROI_RESULTS[s]['frozen_backbone_val_macro_f1'],ROI_RESULTS[s]['partial_finetune_val_macro_f1']))
++        write_json(os.path.join(CFG.DIRS['metrics'],'roi_training_summary.json'),dict(per_seed=ROI_RESULTS,selected_seed=ROI_SELECTED_SEED,init=ROI_INIT))
++#@@ md
++## Astra ROI Phase A — EXPENSIVE, researcher initiated
++Requires reviewed proposal matches, all four ROI classes and at least 100 training rows.
++#@@ code
++astra_require_action('roi_A')
++astra_roi_phase('A')
++#@@ md
++## Astra ROI Phase B and phase selection — EXPENSIVE, researcher initiated
++Restores and saves the actual winning phase, with B winning ties.
++#@@ code
++astra_require_action('roi_B')
++astra_roi_phase('B')
+ #@@ md
+ ## 28. ROI feature aggregation for fusion
+ For every image of the `fusion` and `test` splits (and for `validation` when diagnosing) the notebook builds a **padded ROI set** of at most `ROI_MAX_TOTAL` regions: for each ROI the ROI-network *embedding* (64-d), its 4 *softmax scores*, and the YOLO geometry/evidence features. A boolean **mask** marks real ROIs, so images with no detections contribute an *all-false mask* (not a zero crop). The fusion network's **masked attention pooling** (Part VII) aggregates a variable number of ROIs into fixed-size per-condition vectors.
+@@ -321,6 +324,14 @@
+     require(not missing, f"YOLO has not been run for {len(missing)} of these images (e.g. {missing[:2]}): run Section 24 first. An image without detector output must never be treated as 'no detection'.", gate=True)
+     N = len(df); feat = np.zeros((N, R, ROI_FEAT_DIM), np.float32); mask = np.zeros((N, R), bool); tier = np.zeros((N, R), np.int8); meta = [[] for _ in range(N)]
+     crops, where = [], []
++    def flush():
++        if not crops: return
++        emb, pr = fm.predict(np.stack(crops), verbose=0)
++        for j,(n,k,c) in enumerate(where):
++            feat[n,k] = np.concatenate([emb[j],pr[j],yolo_roi_features(c)])
++            mask[n,k] = True; tier[n,k] = c['tier']
++            meta[n].append(dict(tier=c['tier'],alt=c['alt'],condition=c['condition'],conf=c['conf'],roi_probs=pr[j].round(4).tolist()))
++        crops.clear(); where.clear()
+     for n, r in enumerate(df.itertuples()):
+         src, _ = det_image_path(r); bgr = cv2.imread(src)
+         if bgr is None: continue
+@@ -330,17 +341,16 @@
+             rgb, why = crop_roi(bgr, (c["x0"], c["y0"], c["x1"], c["y1"]), CFG.ROI_ALT_MARGIN if c["alt"] else CFG.ROI_MARGIN)
+             if rgb is None: continue
+             crops.append(roi_norm(rgb)); where.append((n, k, c)); k += 1
+-    for i in range(0, len(crops), CFG.ROI_BATCH):
+-        emb, pr = fm.predict(np.stack(crops[i:i + CFG.ROI_BATCH]), verbose=0)
+-        for j, (n, k, c) in enumerate(where[i:i + CFG.ROI_BATCH]):
+-            feat[n, k] = np.concatenate([emb[j], pr[j], yolo_roi_features(c)]); mask[n, k] = True; tier[n, k] = c["tier"]; meta[n].append(dict(tier=c["tier"], alt=c["alt"], condition=c["condition"], conf=c["conf"], roi_probs=pr[j].round(4).tolist()))
++            if len(crops) >= CFG.ROI_BATCH: flush()
++    flush()
+     return dict(feat=feat, mask=mask, tier=tier, meta=meta)
+ 
+ 
+ def cached_roi_sets(split, tiers=(1, 2, 3)):
+     require_source_permission([split], "training" if split in ("train", "validation", "fusion") else "evaluation")
+     df = DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)] if split != "train" else DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)]
+-    key = hashlib.md5((",".join(df.image_id) + str(ROI_SELECTED_SEED) + YOLO_CONFIG_HASH).encode()).hexdigest()[:10]
++    key = content_digest(dict(ids=df.image_id.values,tiers=tiers,config=vars(CFG),detector=YOLO_CONFIG_HASH,
++        model=sha256_file(os.path.join(CFG.DIRS['checkpoints'],'ROI',f'seed_{ROI_SELECTED_SEED}','final_best.keras'))))[:24]
+     path = os.path.join(ROI_DIR, f"roi_sets_{split}_{key}.npz")
+     if os.path.exists(path):
+         z = np.load(path, allow_pickle=True); return df, dict(feat=z["feat"], mask=z["mask"], tier=z["tier"], meta=json.loads(str(z["meta"])))
+--- Codex/08_fusion.cellsrc
++++ Astra/08_fusion.cellsrc
+@@ -18,7 +18,7 @@
+ **Loss:** the same *masked* binary cross-entropy (Unknown labels contribute nothing). Labels for the fusion split come from the **reference standard** (dermatologist-verified).
+ 
+ ## Leakage control (the reason for the `fusion` split)
+-The CNNs were trained on `train` (selected on `validation`). The fusion network is trained and calibrated on `fusion` images that none of the CNNs has seen, using **grouped K-fold cross-fitting**: every `fusion` image receives an *out-of-fold* fusion logit from a model that never saw its group. Out-of-fold logits are the only data used to fit **calibration**, **thresholds**, the **Stage-1 reliability rule** and the **abstention bands** — all frozen before the `test` split is opened. The final fusion models (one per seed, trained on all `fusion` data, logits averaged) are applied to `test` once.
++The CNNs were trained on `train` (selected on `validation`). The fusion network is trained and calibrated on `fusion` images held out from the new V6 CNN fits (historical V5/YOLO exposure remains documented), using **grouped K-fold cross-fitting**: every `fusion` image receives an *out-of-fold* fusion logit from a model that never saw its group. Out-of-fold logits are the only data used to fit **calibration**, **thresholds**, the **Stage-1 reliability rule** and the **abstention bands** — all frozen before the `test` split is opened. The final fusion models (one per seed, trained on all `fusion` data, logits averaged) are applied to `test` once.
+ 
+ #@@ code
+ # 29.1 Feature assembly. A missing detector is encoded by available=0 (never by 'detected=0').
+@@ -93,7 +93,6 @@
+              det_ev=(ev * v["det"]).reshape(N, -1), roi_feat=feat * (v["roi"] or 0), roi_mask=(mask & bool(v["roi"])).astype(np.float32))
+     if FUSION_USE_QUALITY: X["quality"] = quality_matrix(df)
+     return X, g["scores"]
+-
+ 
+ #@@ code
+ # 29.2 Fusion network (float32 inside; mixed precision is switched off while it is built because the inputs are tiny and numerically sensitive).
+@@ -175,21 +174,20 @@
+ x_list = lambda X: [X[k] for k in FUSION_ORDER] + ([X["quality"]] if "quality" in X else [])
+ 
+ #@@ code
+-# 30.1 Grouped K-fold cross-fitting on the `fusion` split -> out-of-fold logits; final models trained on all fusion data (one per seed).
++# 30.1 Grouped K-fold cross-fitting on the `fusion` split -> out-of-fold logits; final models trained with a grouped inner validation holdout from fusion data (one per seed).
+ from sklearn.model_selection import GroupKFold
+ 
+ 
+-def train_one_fusion(Xtr, ytr, Xva, yva, seed, pos_weight=None, epochs=None):
+-    set_all_seeds(seed)
+-    old = keras.mixed_precision.global_policy().name; keras.mixed_precision.set_global_policy("float32")
+-    try:
+-        model = build_fusion(fusion_dims(Xtr))
+-        model.compile(optimizer=keras.optimizers.Adam(CFG.FUSION_LR), loss=MaskedBCE(pos_weight))
+-        pack = lambda y: pack_ml(np.clip(y, 0, 1).astype(np.float32), y >= 0)
+-        cb = [keras.callbacks.EarlyStopping(monitor="val_loss", patience=CFG.FUSION_PATIENCE, restore_best_weights=True)]
+-        model.fit(x_list(Xtr), pack(ytr), validation_data=(x_list(Xva), pack(yva)), epochs=epochs or CFG.FUSION_EPOCHS, batch_size=CFG.FUSION_BATCH, callbacks=cb, verbose=0)
+-    finally:
+-        keras.mixed_precision.set_global_policy(old)
++def train_one_fusion(Xtr,ytr,Xva,yva,seed,pos_weight=None,epochs=None,job=None,groups=None):
++    require(job is not None,'Fusion job identity is required',gate=True)
++    keras.backend.clear_session();set_all_seeds(seed)
++    model=build_fusion(fusion_dims(Xtr))
++    model.compile(optimizer=keras.optimizers.Adam(CFG.FUSION_LR),loss=MaskedBCE(pos_weight),jit_compile=False)
++    pack=lambda y:pack_ml(np.clip(y,0,1).astype(np.float32),y>=0)
++    identity=training_identity('fusion',job,seed,dict(Xtr=Xtr,ytr=ytr,Xva=Xva,yva=yva,groups=groups))
++    model,record=recovery_fit(model,x_list(Xtr),(x_list(Xva),pack(yva)),os.path.join(CFG.DIRS['fusion'],'recovery',job),
++        identity,epochs or CFG.FUSION_EPOCHS,monitor='val_loss',mode='min',restart_incomplete=True,
++        patience=CFG.FUSION_PATIENCE,use_plateau=False,y=pack(ytr),batch_size=CFG.FUSION_BATCH,verbose=2)
+     return model
+ 
+ 
+@@ -198,7 +196,7 @@
+ 
+ 
+ def split_groups(groups, frac, rng):
+-    ug = np.unique(groups); rng.shuffle(ug); k = max(1, int(len(ug) * frac)); va = set(ug[:k])
++    ug = np.unique(groups); require(len(ug)>=2, 'Need at least two distinct groups for inner validation', gate=True); rng.shuffle(ug); k = max(1, int(len(ug) * frac)); va = set(ug[:k])
+     m = np.array([g in va for g in groups]); return np.where(~m)[0], np.where(m)[0]
+ 
+ 
+@@ -221,8 +219,9 @@
+         rng = np.random.RandomState(seed)
+         for f, (tr, te) in enumerate(gkf.split(np.zeros(N), groups=groups)):
+             tr = tr[known[tr]]; a, b = split_groups(groups[tr], 0.15, rng); itr, iva = tr[a], tr[b]
+-            if len(itr) < 20 or len(iva) < 5: continue
+-            m = train_one_fusion(concat_views(Xs, itr), np.tile(y[itr], (V, 1)), concat_views(Xs, iva), np.tile(y[iva], (V, 1)), seed, fusion_pos_weights(y[itr]))
++            require(not (set(groups[itr]) & set(groups[iva])) and not (set(groups[tr]) & set(groups[te])), 'Fusion group leakage', gate=True)
++            require(len(itr)>=20 and len(iva)>=5,'Insufficient labelled rows in fusion inner fold',gate=True)
++            m = train_one_fusion(concat_views(Xs, itr), np.tile(y[itr], (V, 1)), concat_views(Xs, iva), np.tile(y[iva], (V, 1)), seed, fusion_pos_weights(y[itr]),job=f'{variant}/seed_{seed}/fold_{f}',groups=dict(all=groups,train=itr,val=iva,heldout=te))
+             for v in range(V): oof[v][te] += m.predict(x_list(subset(Xs[v], te)), verbose=0)
+             cnt[te] += 1
+             keras.backend.clear_session()
+@@ -231,8 +230,8 @@
+     finals = []
+     for seed in seeds:
+         rng = np.random.RandomState(seed); idx = np.where(known)[0]; a, b = split_groups(groups[idx], 0.15, rng)
+-        m = train_one_fusion(concat_views(Xs, idx[a]), np.tile(y[idx[a]], (V, 1)), concat_views(Xs, idx[b]), np.tile(y[idx[b]], (V, 1)), seed, fusion_pos_weights(y[idx[a]]))
+-        p = os.path.join(CFG.DIRS["fusion"], variant, f"final_seed{seed}.keras"); os.makedirs(os.path.dirname(p), exist_ok=True); m.save(safe_path(p)); finals.append(p)
++        m = train_one_fusion(concat_views(Xs, idx[a]), np.tile(y[idx[a]], (V, 1)), concat_views(Xs, idx[b]), np.tile(y[idx[b]], (V, 1)), seed, fusion_pos_weights(y[idx[a]]),job=f'{variant}/seed_{seed}/final',groups=dict(all=groups,train=idx[a],val=idx[b]))
++        p = os.path.join(CFG.DIRS["fusion"], variant, f"final_seed{seed}.keras"); os.makedirs(os.path.dirname(p), exist_ok=True); save_selected_model(m,p); finals.append(p)
+         keras.backend.clear_session()
+     return oof, finals
+ 
+@@ -247,12 +246,12 @@
+         outs.append(m.predict(x_list(X), verbose=0)); keras.backend.clear_session()
+     return np.mean(outs, axis=0).astype(np.float32)
+ 
+-
+ #@@ md
+ ## 30. Fusion training — run cell by cell
+-The next cell prepares the `fusion`-split feature tensors (this needs: trained global model, trained ROI model, YOLO output for those images, verified annotations) and then trains **every variant in `FUSION_RUN`** with cross-fitting. If any prerequisite is missing it stops with the exact reason. Fusion networks are tiny; each variant takes minutes. **>>> THIS CELL TRAINS MODELS <<<**
+-
+-#@@ code
++The next cell prepares fusion-split features and trains every variant in `FUSION_RUN` with grouped cross-fitting. It requires trained global/ROI models, detector evidence, eligible references and the one-use `fusion_train` action. Missing prerequisites stop explicitly. This is expensive; duration must be measured. Completed folds are reused; incomplete folds restart independently.
++
++#@@ code
++astra_require_action('fusion_train')
+ FUSION_RUN = ["full", "global_yolo", "global_only", "roi_only", "no_acne_evidence", "no_eczema_evidence", "no_hyper_evidence"]
+ FUSION_STATE = {}
+ try:
+@@ -318,6 +317,7 @@
+     return pd.DataFrame(rows)
+ 
+ 
++astra_require_action('calibration')
+ CALIB = {}
+ if FUSION_STATE.get("oof"):
+     require_source_permission(["fusion"], "training")
+--- Codex/09_stages_trust.cellsrc
++++ Astra/09_stages_trust.cellsrc
+@@ -364,6 +364,7 @@
+     return res
+ 
+ 
++astra_require_action('stage_rules')
+ STAGE1 = None
+ if CALIB.get("global_yolo") and CALIB.get("global_only") and FUSION_STATE.get("oof"):
+     yf = FUSION_STATE["y"]; fdf = FUSION_STATE["df"]
+@@ -441,6 +442,11 @@
+     if error: return dict(state="INFERENCE_ERROR", predicted=[], per_condition={}, reasons=[f"error: {error}"])
+     if quality and quality.get("blocking"): return dict(state="RECAPTURE_REQUIRED", predicted=[], per_condition={}, reasons=[f"blocking quality: {quality['blocking']}"])
+     if ood_flag: return dict(state="OUT_OF_SCOPE_REVIEW_REQUIRED", predicted=[], per_condition={}, reasons=["input unlike the training distribution (OOD)"])
++    if band is None or not np.isfinite(band):
++        return dict(state='UNCERTAIN_REVIEW_REQUIRED',predicted=[],
++                    per_condition={c:dict(calibrated_probability=float(probs[j]),threshold=float(thr[j]),band=None,
++                                          decision='uncertain',absence_supported=False,detector_available=bool(avail[j]))
++                                   for j,c in enumerate(CFG.CONDITIONS)},reasons=['No eligible calibrated reliability band; supported decisions disabled'])
+     per, predicted, uncertain, absent_ok = {}, [], [], []
+     for j, c in enumerate(CFG.CONDITIONS):
+         p, t = float(probs[j]), float(thr[j])
+@@ -477,6 +483,8 @@
+ def batch_stage_logic(df, X_by_var, roi_tier_counts, calib, stage1, band2, quality_list, ood_scores, logits_fn):
+     """df: rows; logits_fn(var, view_tier) -> logits [N,3] from the fusion models (or OOF logits for the fusion split).
+     quality_list: list of assess_quality dicts (or None). Returns DataFrame with one row per image: state, predicted, passes, stop_reason, stage_reached, calibrated probabilities."""
++    for var in ['global_only','global_yolo','full']:
++        require(all(c is not None for c in calib[var]['platt']), 'Incomplete calibration: '+var, gate=True)
+     N = len(df)
+     pg = apply_platt(logits_fn("global_only", 3), calib["global_only"]["platt"]); ps1 = apply_platt(logits_fn("global_yolo", 3), calib["global_yolo"]["platt"])
+     thr_g, thr_s1, thr_f = calib["global_only"]["thresholds"], calib["global_yolo"]["thresholds"], calib["full"]["thresholds"]
+@@ -508,6 +516,7 @@
+                              flags="|".join(flags), reasons=" ; ".join(d["reasons"]), review_status=REVIEW_STATUS_PENDING, requires_dermatologist_review=True))
+         except Exception as ex:                                  # never silently Normal
+             rows.append(dict(image_id=df.image_id.iloc[i], state="INFERENCE_ERROR", predicted="", stage=0, passes=0, stop_reason=f"{type(ex).__name__}", reasons=str(ex)[:120],
++                             **{f"p_{c}": float('nan') for c in CFG.CONDITIONS}, flags="",
+                              **{f"dec_{c}": "none" for c in CFG.CONDITIONS}, review_status=REVIEW_STATUS_PENDING, requires_dermatologist_review=True))
+     return pd.DataFrame(rows)
+ 
+@@ -518,9 +527,9 @@
+     pf = apply_platt(FUSION_STATE["oof"]["full"], CALIB["full"]["platt"])
+     sel2 = select_band(pf, CALIB["full"]["thresholds"], FUSION_STATE["y"], np.ones(len(pf), bool), CFG.TARGET_ACCEPTED_ERROR, CFG.MIN_ACCEPT_COVERAGE)
+     BAND2 = (sel2 or {}).get("band")
+-    write_json(os.path.join(CFG.DIRS["stages"], "stage2_rule.json"), dict(band=BAND2, selection=sel2, note="Stage-2 margin band selected on out-of-fold fusion data; if None, Stage 2 can only return supported conditions when margins are 0 (every near-threshold case stays uncertain)."))
++    write_json(os.path.join(CFG.DIRS["stages"], "stage2_rule.json"), dict(band=BAND2, selection=sel2, note="Stage-2 margin band selected on out-of-fold fusion data; None disables supported decisions and produces explicit abstention."))
+     print("Stage-2 band:", BAND2, sel2)
+-    if BAND2 is None: BAND2 = 0.5   # a band of 0.5 can never be satisfied: every case stays UNCERTAIN rather than guessing
++    if BAND2 is None: BAND2 = float('inf')   # an infinite band can never be satisfied: every case stays UNCERTAIN rather than guessing
+ 
+ #@@ md
+ ## 36–37. Live single-image reference implementation (`assess_image`) and abstention handling
+@@ -553,6 +562,8 @@
+     sid = scan_id or pseudo_id(path_or_bgr if isinstance(path_or_bgr, str) else str(time.time()), "scan")
+     fa = FinalAssessment(scan_id=sid, state="INFERENCE_ERROR", created_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), model_versions=bundle.versions if bundle else {})
+     try:
++        for var in ['global_only','global_yolo','full']:
++            require(all(c is not None for c in CALIB[var]['platt']), 'Incomplete calibration: '+var, gate=True)
+         ok, why = validate_input(bgr)
+         if not ok: fa.stop_reason = "invalid_input"; fa.uncertainty = dict(reasons=[why]); return fa
+         q = assess_quality(bgr); fa.quality = q; fa.recapture_advice = q["advice"]
+@@ -605,7 +616,7 @@
+         fa.uncertainty["reasons"] = d["reasons"]
+         fa.evidence_provenance = dict(global_model=GLOBAL_SELECTED, detectors={c: DETECTORS[c].version for c in CFG.CONDITIONS}, roi_model_seed=ROI_SELECTED_SEED, fusion_variants_used=["global_yolo"] + (["full"] if fa.stage_reached == 2 else []),
+                                       latency_s=round(time.monotonic() - t0, 3))
+-        fa.fusion_config = dict(stage1_band=STAGE1["band"], stage2_band=BAND2, thresholds=dict(zip(CFG.CONDITIONS, np.round(thr, 4).tolist())), max_passes=CFG.MAX_VERIFICATION_PASSES)
++        fa.fusion_config = dict(stage1_band=STAGE1["band"], stage2_band=(BAND2 if BAND2 is not None and np.isfinite(BAND2) else None), stage2_accepts_nothing=(BAND2 is None or not np.isfinite(BAND2)), thresholds=dict(zip(CFG.CONDITIONS, np.round(thr, 4).tolist())), max_passes=CFG.MAX_VERIFICATION_PASSES)
+     except Exception as ex:                                                  # any failure => explicit error state, details logged, never Normal
+         fa.state = "INFERENCE_ERROR"; fa.stop_reason = f"{type(ex).__name__}"; fa.uncertainty = dict(reasons=[str(ex)[:200]])
+         log_event("inference_error", scan=sid, error=type(ex).__name__)
+--- Codex/10_evaluation.cellsrc
++++ Astra/10_evaluation.cellsrc
+@@ -30,7 +30,7 @@
+     if os.path.exists(TEST_LOCK) and not CFG.ALLOW_TEST_REEVALUATION:
+         raise GateError(f"The test split was already evaluated ({json.load(open(TEST_LOCK))['when']}). Re-evaluating would let you tune against it. "
+                         "Set LUMYVUE_ALLOW_TEST_REEVALUATION=true ONLY to reproduce a reported number.")
+-    write_json(TEST_LOCK, dict(when=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, split_sha=json.load(open(SPLIT_FP_PATH))["sha256"], reeval_allowed=CFG.ALLOW_TEST_REEVALUATION))
++    write_json(TEST_LOCK, dict(evaluation_scope=ASTRA_EVALUATION_NOTE, when=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, split_sha=json.load(open(SPLIT_FP_PATH))["sha256"], reeval_allowed=CFG.ALLOW_TEST_REEVALUATION))
+     log_event("test_split_opened", reeval=CFG.ALLOW_TEST_REEVALUATION)
+ 
+ 
+@@ -42,7 +42,7 @@
+         yy, dd = y[ok, j], dec[ok, j] > 0.5
+         tp = int((dd & (yy == 1)).sum()); fp = int((dd & (yy == 0)).sum()); fn = int((~dd & (yy == 1)).sum()); tn = int((~dd & (yy == 0)).sum())
+         prec = tp / (tp + fp) if tp + fp else np.nan; rec = tp / (tp + fn) if tp + fn else np.nan; spec = tn / (tn + fp) if tn + fp else np.nan
+-        f1 = 2 * prec * rec / (prec + rec) if (prec == prec and rec == rec and prec + rec > 0) else np.nan
++        f1 = 2 * tp / (2 * tp + fp + fn) if (2 * tp + fp + fn) else np.nan
+         ks = kn & ~np.isnan(s[:, j]); ys, ss = y[ks, j], s[ks, j]
+         okc = ((ys == 1).sum() >= min_pos) and ((ys == 0).sum() >= min_pos)
+         rows.append(dict(condition=c, n_evaluable=int(ok.sum()), pos=int((yy == 1).sum()), neg=int((yy == 0).sum()), precision=prec, recall=rec, specificity=spec, f1=f1, tp=tp, fp=fp, fn=fn, tn=tn,
+@@ -80,10 +80,20 @@
+ This is the **single** evaluation of the test split. If a prerequisite is missing, the cell stops without opening the test split (no lock file is written).
+ 
+ #@@ code
++astra_require_action('final_test')
++require(bool(ASTRA_EVALUATION_NOTE.strip()), 'Record adviser-approved evaluation scope/limitations before opening test', gate=True)
+ TEST = {}
+ try:
+     for g in ["annotations_test", "annotations_fusion", "yolo_any"]: gate(g)
+     require(GLOBAL_SELECTED[0] and ROI_SELECTED_SEED is not None and CALIB.get("full") and FUSION_STATE.get("oof"), "trained global/ROI/fusion components and calibration are required before the test split may be opened", gate=True)
++    require(all(all(c is not None for c in CALIB[var]['platt']) for var in FUSION_RUN), 'Every evaluated fusion variant requires complete calibration', gate=True)
++    require_source_permission(['test'],'evaluation')
++    # Test baseline inference happens only inside this researcher-authorized cell.
++    _testmask = DF.split == 'test'
++    _vp = v5_probs_for(DF[_testmask])
++    for _j,_c in enumerate(CFG.V5_CLASS_ORDER): DF.loc[_testmask,f'v5_{_c}'] = _vp[:,_j]
++    run_yolo_cache(list(DF[_testmask & DF.eval_ok].image_id))
++    astra_refresh_detector_tables()
+     # build every test input BEFORE opening the lock, so a missing prerequisite never burns the single evaluation
+     tdf, tsets = cached_roi_sets("test"); tdf = tdf.reset_index(drop=True)
+     _b = DF.set_index("image_id").loc[tdf.image_id]; yt = _b[["y_acne", "y_hyperpigmentation", "y_eczema"]].to_numpy().copy(); yt[~_b.eval_ok.values] = -1
+@@ -117,7 +127,7 @@
+     GRES = batch_stage_logic(tdf, None, tier_counts, CALIB, STAGE1, BAND2, qlist, ood_t, logits_fn_test)
+     gd = np.array([[1.0 if c in str(p).split("|") else 0.0 for c in CFG.CONDITIONS] for p in GRES.predicted])
+     accepted = GRES.state.isin(["FINDINGS_SUPPORTED", "MULTIPLE_FINDINGS_SUPPORTED", "NO_FINDINGS_SUPPORTED"]).values
+-    pF = S["F_full_fusion"]["s"]
++    pF = GRES[[f"p_{c}" for c in CFG.CONDITIONS]].to_numpy(float)
+     S["G_two_stage_accepted_only"] = dict(s=np.where(accepted[:, None], pF, np.nan), dec=np.where(accepted[:, None], gd, np.nan))
+     TEST.update(S=S, GRES=GRES, accepted=accepted, qlist=qlist, tsets=tsets, thr_B=thr_B, thr_A2=thr_A2, avail=avail_t, detected=detected_t, ood=ood_t)
+     # ---- per-system tables + cluster bootstrap CIs. Predictions above used NO test labels; the lock is taken here, right before the first metric is computed ----
+@@ -134,6 +144,7 @@
+     write_csv(CI.reset_index(), os.path.join(CFG.DIRS["metrics"], "test_macro_f1_ci_by_system.csv"))
+     np.savez_compressed(safe_path(os.path.join(CFG.DIRS["predictions"], "test_system_scores.npz")), image_id=tdf.image_id.values.astype(str), y=yt, **{f"{k}__s": v["s"] for k, v in S.items()}, **{f"{k}__d": v["dec"] for k, v in S.items()})
+     write_csv(GRES, os.path.join(CFG.DIRS["predictions"], "test_final_assessments_batch.csv"))
++    astra_paired_stages(tdf,yt,qlist,ood_t,logits_fn_test,GRES,'test')
+     log_event("test_evaluated", n=len(tdf), systems=list(S))
+ except GateError as g:
+     print(f"[test evaluation] NOT RUN - {g}")
+--- Codex/11_export_tests_report.cellsrc
++++ Astra/11_export_tests_report.cellsrc
+@@ -3,7 +3,7 @@
+ 
+ Sections: **(50) ONNX export · (51) Keras-vs-ONNX verification · (52) deployment metadata · (53) structured audit logging · (54) unit and integration tests · (55) Chapter IV tables and visualisations · (56) final experiment and artifact summary.**
+ 
+-**Protection of production models.** Everything is written under `…/v6/experiments/<RUN_ID>/export/` with a `v6_` file-name prefix. `export_path()` refuses any path that is, or lies under, the V5 model folder, the YOLO/WPF `Model` folder, or any protected directory — and the end-of-run check re-computes SHA-256 hashes of every original model and raises if one changed. **Deployment of any exported file into the WPF application is a separate, manual, approved step that this notebook does not perform.**
++**Protection of production models.** Everything is written under `…/v6/astra_runs/<RUN_ID>/export/` with a `v6_` file-name prefix. `export_path()` refuses any path that is, or lies under, the V5 model folder, the YOLO/WPF `Model` folder, or any protected directory — and the end-of-run check re-computes SHA-256 hashes of every original model and raises if one changed. **Deployment of any exported file into the WPF application is a separate, manual, approved step that this notebook does not perform.**
+ 
+ #@@ code
+ # 50.1 Export helpers (guarded) + contract checks used by the export verification and by the unit tests.
+@@ -33,47 +33,53 @@
+         raise V6Error(f"model file is corrupted or not a valid ONNX model: {os.path.basename(path)} ({type(e).__name__})")
+ 
+ 
+-def to_onnx(model, name, opset=13):
+-    """tf2onnx conversion with a recorded outcome. Returns dict(status, path, error)."""
++def to_onnx(model,name,opset=13):
++    """Concrete tf.function avoids Keras 3 private save-signature dependencies."""
+     import tf2onnx
+-    path = export_path(name + ".onnx")
+-    for attempt in ("from_keras", "from_keras_with_signature"):
+-        try:
+-            if attempt == "from_keras": tf2onnx.convert.from_keras(model, opset=opset, output_path=path)
+-            else:
+-                sig = [tf.TensorSpec(i.shape, tf.float32, name=i.name.split(":")[0]) for i in model.inputs]; tf2onnx.convert.from_keras(model, input_signature=sig, opset=opset, output_path=path)
+-            return dict(status="exported", path=path, sha256=sha256_file(path), attempt=attempt)
+-        except Exception as e:
+-            err = f"{type(e).__name__}: {str(e)[:200]}"
+-    return dict(status="FAILED", path=None, error=err)
++    path=export_path(name+'.onnx')
++    sig=[tf.TensorSpec([None]+list(i.shape[1:]),tf.float32,name=i.name.split(':')[0]) for i in model.inputs]
++    @tf.function(input_signature=sig)
++    def serving(*args):
++        result=model(args[0] if len(args)==1 else list(args),training=False)
++        return tuple(result) if isinstance(result,(list,tuple)) else (result,)
++    try:
++        tf2onnx.convert.from_function(serving,input_signature=sig,opset=opset,output_path=path)
++        return dict(status='exported',path=path,sha256=sha256_file(path),attempt='from_function')
++    except Exception as e:
++        return dict(status='FAILED',path=None,error=f'{type(e).__name__}: {e}')
+ 
+ 
+ def dump_keras_weights_json(model, name):
+     """Fallback for tiny custom models: architecture summary + every weight as float32 lists (a C# port can implement the few layers natively)."""
+     path = export_path(name + "_weights.json")
+     write_json(path, dict(layers=[dict(name=l.name, cls=type(l).__name__, config={k: v for k, v in l.get_config().items() if isinstance(v, (int, float, str, bool, list, tuple, type(None)))},
+-                                       weights={w.name: np.asarray(w).astype(np.float32).tolist() for w in l.weights}) for l in model.layers], inputs=[i.name for i in model.inputs]))
++                                       weights={str(i)+":"+getattr(w,"path",w.name): np.asarray(w).astype(np.float32).tolist() for i,w in enumerate(l.weights)}) for l in model.layers], inputs=[i.name for i in model.inputs]))
+     return path
+ 
+-
+ #@@ md
+ ## 50. Export of the newly trained components
+-Exports (each skipped with a reason when its source model does not exist): **global features model** (128-d embedding + final output), **ROI features model** (64-d embedding + 4 softmax scores), and the **fusion models** `global_only`, `global_yolo`, `full` (first seed). tf2onnx may not convert the custom fusion layers; the notebook then writes the fusion weights as JSON and records that fact — it does not pretend the export worked. YOLO detectors and the V5 model are **not** re-exported.
+-
+-#@@ code
++Exports the selected global/ROI Keras models, their feature models, and every seed of runtime fusion variants `global_only`, `global_yolo`, `full`. Failed ONNX conversions are recorded explicitly. JSON weights are a reference for a future native port, not a tested C# implementation. YOLO detectors and V5 are not re-exported. Runtime deployment must average all per-seed fusion logits before calibration.
++
++#@@ code
++astra_require_action('export')
+ EXPORT_STATUS = {}
+ try:
+     require(GLOBAL_SELECTED[0], "no selected global model: nothing to export yet", gate=True)
+     gm = keras.models.load_model(os.path.join(CFG.DIRS["checkpoints"], GLOBAL_SELECTED[0], f"seed_{GLOBAL_SELECTED[1]}", "final_best.keras"), custom_objects={"MaskedBCE": MaskedBCE}, compile=False)
+-    fm = embedding_model(gm); EXPORT_STATUS["global_features"] = to_onnx(fm, "global_features_mobilenetv2")
++    save_selected_model(gm,export_path('global_selected.keras'))
++    fm = embedding_model(gm); save_selected_model(fm,export_path('global_features.keras')); EXPORT_STATUS["global_features"] = to_onnx(fm, "global_features_mobilenetv2")
+     EXPORT_STATUS["global_features"]["outputs"] = ["embedding_128", "logits (multilabel3: apply sigmoid; softmax4: probabilities)"]
+     if ROI_SELECTED_SEED is not None:
+-        rfm = load_roi_feature_model(); EXPORT_STATUS["roi_features"] = to_onnx(rfm, "roi_features_mobilenetv2"); EXPORT_STATUS["roi_features"]["outputs"] = [f"embedding_{CFG.ROI_EMB}", "softmax_" + "_".join(CFG.ROI_CLASSES)]
++        rfm = load_roi_feature_model(); save_selected_model(rfm,export_path('roi_features.keras'))
++        _roi_model = keras.models.load_model(os.path.join(CFG.DIRS['checkpoints'],'ROI',f'seed_{ROI_SELECTED_SEED}','final_best.keras'),compile=False)
++        save_selected_model(_roi_model,export_path('roi_selected.keras'))
++        EXPORT_STATUS["roi_features"] = to_onnx(rfm, "roi_features_mobilenetv2"); EXPORT_STATUS["roi_features"]["outputs"] = [f"embedding_{CFG.ROI_EMB}", "softmax_" + "_".join(CFG.ROI_CLASSES)]
+     for var in ("global_only", "global_yolo", "full"):
+-        p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{CFG.SEEDS[0]}.keras")
+-        if os.path.exists(p):
+-            fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
+-            st = to_onnx(fmod, f"fusion_{var}"); st["weights_json"] = dump_keras_weights_json(fmod, f"fusion_{var}"); EXPORT_STATUS[f"fusion_{var}"] = st
++        for export_seed in CFG.SEEDS:
++            p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{export_seed}.keras")
++            if os.path.exists(p):
++                fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
++                st = to_onnx(fmod, f"fusion_{var}_seed{export_seed}"); st["weights_json"] = dump_keras_weights_json(fmod, f"fusion_{var}_seed{export_seed}"); EXPORT_STATUS[f"fusion_{var}_seed{export_seed}"] = st
+     keras.backend.clear_session()
+     write_json(os.path.join(CFG.DIRS["export"], "v6_export_status.json"), EXPORT_STATUS); display(pd.DataFrame(EXPORT_STATUS).T[["status"] + [c for c in ["attempt", "error"] if c in pd.DataFrame(EXPORT_STATUS).T.columns]])
+ except GateError as g:
+@@ -104,10 +110,11 @@
+             rx = np.stack([roi_norm(cv2.cvtColor(cv2.resize(cv2.imread(p), (ROI_S, ROI_S)), cv2.COLOR_BGR2RGB)) for p in sample.proc_path]); compare("roi_features", load_roi_feature_model(), rx); keras.backend.clear_session()
+         if FUSION_STATE.get("X"):
+             for var in ("global_only", "global_yolo", "full"):
+-                p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{CFG.SEEDS[0]}.keras")
+-                if os.path.exists(p) and var in FUSION_STATE["X"]:
+-                    fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
+-                    feed = x_list(subset(FUSION_STATE["X"][var], np.arange(min(16, len(FUSION_STATE["df"]))))); compare(f"fusion_{var}", fmod, feed); keras.backend.clear_session()
++                for export_seed in CFG.SEEDS:
++                    p = os.path.join(CFG.DIRS["fusion"], var, f"final_seed{export_seed}.keras")
++                    if os.path.exists(p) and var in FUSION_STATE["X"]:
++                        fmod = keras.models.load_model(p, custom_objects={"MaskedBCE": MaskedBCE, "MaskedAttentionPool": MaskedAttentionPool, "ModalityDropout": ModalityDropout, "MaskFraction": MaskFraction}, compile=False)
++                        feed = x_list(subset(FUSION_STATE["X"][var], np.arange(min(16, len(FUSION_STATE["df"]))))); compare(f"fusion_{var}_seed{export_seed}", fmod, feed); keras.backend.clear_session()
+     except Exception as e:
+         PARITY_EXPORT["error"] = f"{type(e).__name__}: {str(e)[:200]}"; print("verification could not complete:", PARITY_EXPORT["error"])
+     write_json(os.path.join(CFG.DIRS["export"], "v6_keras_vs_onnx_verification.json"), PARITY_EXPORT); display(pd.DataFrame(PARITY_EXPORT).T)
+@@ -177,6 +184,7 @@
+ #@@ code
+ def build_deployment_metadata():
+     return dict(
++        feature_schema_version='astra-fusion/1', evaluation_scope=ASTRA_EVALUATION_NOTE,
+         schema=SCHEMA_VERSION, review_contract=REVIEW_CONTRACT, created=datetime.datetime.now().isoformat(timespec="seconds"), run_id=CFG.RUN_ID, status="EXPERIMENTAL - not validated for deployment; produced by an unexecuted-by-author notebook",
+         condition_order=CFG.CONDITIONS, normal_definition="Normal = all three conditions verified Absent (derived; never a model output)", v5_class_order=CFG.V5_CLASS_ORDER,
+         global_cnn=dict(experiment=GLOBAL_SELECTED, input="float32 NHWC [N,224,224,3]", preprocessing="BGR->RGB, bilinear (INTER_LINEAR) stretch to 224x224, (p/127.5)-1", outputs=["embedding_128", "logits/probabilities"],
+@@ -190,7 +198,7 @@
+                  max_tier1=CFG.ROI_MAX_TIER1, max_total=CFG.ROI_MAX_TOTAL, classes=CFG.ROI_CLASSES, preprocessing="RGB, bilinear, (p/127.5)-1", feature_dim=ROI_FEAT_DIM, yolo_feature_names=YOLO_FEATURE_NAMES),
+         fusion=dict(inputs=dict(g_emb=[128], g_logit=[3], g_extra=[2], det_ev=[CFG.N_COND * DET_EV_DIM], roi_feat=[CFG.ROI_MAX_TOTAL, ROI_FEAT_DIM], roi_mask=[CFG.ROI_MAX_TOTAL]), det_ev_layout=["available", "detected", "max_deployed_conf", "max_pool_conf", "sqrt_rel_area", "cx", "cy"],
+                     output="[3] logits in CFG.CONDITIONS order", ensemble="mean of per-seed logits", seeds=CFG.SEEDS, calibration=CALIB, variants_used_at_runtime=["global_only", "global_yolo", "full"]),
+-        stages=dict(stage1_rule=STAGE1, stage2_band=BAND2, verification=dict(max_passes=CFG.MAX_VERIFICATION_PASSES, max_seconds=CFG.MAX_VERIFICATION_SECONDS, min_new_rois=CFG.MIN_NEW_ROIS, convergence_eps=CFG.CONVERGENCE_EPS,
++        stages=dict(stage1_rule=STAGE1, stage2_band=(BAND2 if BAND2 is not None and np.isfinite(BAND2) else None), stage2_accepts_nothing=(BAND2 is None or not np.isfinite(BAND2)), verification=dict(max_passes=CFG.MAX_VERIFICATION_PASSES, max_seconds=CFG.MAX_VERIFICATION_SECONDS, min_new_rois=CFG.MIN_NEW_ROIS, convergence_eps=CFG.CONVERGENCE_EPS,
+                     actions=["pass1: tier-1 regions", "pass2: + tier-2 candidates", "pass3: + tier-3 alternative-context crops", "recapture request", "external AI verifier (if configured)"], nature="AI verification only - not clinical validation"),
+                     quality_thresholds=CFG.QUALITY, quality_status="provisional heuristics, unvalidated", ood=dict(method="Mahalanobis on global embedding", percentile=CFG.OOD_PERCENTILE, threshold=(None if OOD is None else OOD.threshold)), states=STATES),
+         versions=dict(v5_onnx_sha256=V5_SHA, yolo_config_hash=YOLO_CONFIG_HASH, python=sys.version.split()[0], tensorflow=tf.__version__, onnxruntime=ort.__version__), export_status=EXPORT_STATUS,
+@@ -616,3 +624,15 @@
+ require(ok_orig, f"ORIGINAL FILES CHANGED DURING THIS RUN: {bad_orig}")
+ require(ok_chain, "audit chain broken")
+ print("\nDone. Original models and datasets verified unchanged; audit chain intact.")
++
++#@@ md
++## Astra export run manifest
++Every file below belongs to this Astra run. JSON weights are a reference for a future native implementation, not a validated C# runtime. Every seed is required to reproduce the fusion ensemble.
++#@@ code
++_exports={os.path.basename(p):sha256_file(p) for p in glob.glob(os.path.join(CFG.DIRS['export'],'*')) if os.path.isfile(p) and not p.endswith('run_manifest.json')}
++write_json(export_path('run_manifest.json'),dict(run_id=CFG.RUN_ID,config_sha256=_astra_digest,artifacts=_exports,
++    keras_onnx_parity=PARITY_EXPORT,calibration=CALIB,conditions=CFG.CONDITIONS,roi_classes=CFG.ROI_CLASSES,
++    detector_feature_order=[f'{c}:{n}' for c in CFG.CONDITIONS for n in ['available','detected','max_deployed_conf','max_pool_conf','sqrt_rel_area','cx','cy']],
++    roi_feature_order=['embedding_'+str(i) for i in range(CFG.ROI_EMB)]+CFG.ROI_CLASSES+YOLO_FEATURE_NAMES,
++    mask=dict(shape=[None,CFG.ROI_MAX_TOTAL],valid=1,padding=0,empty_allowed=True),
++    fusion_seed_aggregation='mean logits, then Platt calibration',deployment='pending separate C# parity and workflow validation'))

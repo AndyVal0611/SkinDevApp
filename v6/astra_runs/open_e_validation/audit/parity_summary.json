@@ -1,0 +1,15 @@
+{
+  "level1_static": true,
+  "level2": {
+    "n": 60,
+    "max_abs_diff_pp": 0.000499990463256772,
+    "per_class_max_pp": {
+      "Acne": 0.0004954137951135862,
+      "Hyperpigmentation": 0.000499990463256772,
+      "Eczema": 0.0004996342658998287,
+      "Normal": 0.00048422503471368117
+    }
+  },
+  "level3_folders": 0,
+  "claim": "Equivalence is established only for the levels with data; camera, face detection and stabiliser are not covered."
+}

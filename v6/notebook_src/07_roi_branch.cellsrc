@@ -148,6 +148,7 @@ def label_proposal(c, W, H, regs, image_all_absent):
 
 
 def build_roi_table(split):
+    require_source_permission([split], "training" if split in ("train", "validation", "fusion") else "evaluation")
     gate(f"regions_{split}")
     if not len(DET): raise GateError("No YOLO detections available: run Section 24 first.")
     ids = DF[(DF.split == split)].image_id
@@ -236,6 +237,15 @@ class ValROI(keras.callbacks.Callback):
         print(f"   ROI val_macro_f1={logs['val_macro_f1']:.4f} recalls={np.round(rec, 3).tolist()}")
 
 
+def restore_selected_roi_phase(model, checkpoint_dir, fA, fB):
+    """Restore the phase actually selected by validation, including an A win."""
+    phase = "B" if fB >= fA else "A"
+    path = os.path.join(checkpoint_dir, f"phase{phase}_best.weights.h5")
+    require(os.path.isfile(path), f"Selected ROI phase {phase} checkpoint is missing: {path}", gate=True)
+    model.load_weights(path)
+    return phase
+
+
 def run_roi_phase(seed, phase, model, base, ds_tr, ds_va, y_va, epochs, lr):
     d = os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}"); os.makedirs(d, exist_ok=True)
     best, latest, hist, state = (os.path.join(d, f"phase{phase}_{n}") for n in ["best.weights.h5", "latest.keras", "history.csv", "state.json"])
@@ -276,7 +286,8 @@ try:
         pA = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseA_history.csv")); fA = float(pA.val_macro_f1.max())
         model = run_roi_phase(seed, "B", model, find_backbone(model), ds_tr, ds_va, y_va, CFG.ROI_PHASE_B_EPOCHS, CFG.PHASE_B_LR)
         pB = pd.read_csv(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "phaseB_history.csv")); fB = float(pB.val_macro_f1.max())
-        ROI_RESULTS[seed] = dict(frozen_backbone_val_macro_f1=fA, partial_finetune_val_macro_f1=fB, chosen="partial_finetune" if fB >= fA else "frozen_backbone")
+        selected_phase = restore_selected_roi_phase(model, os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}"), fA, fB)
+        ROI_RESULTS[seed] = dict(frozen_backbone_val_macro_f1=fA, partial_finetune_val_macro_f1=fB, chosen="partial_finetune" if selected_phase == "B" else "frozen_backbone")
         model.save(safe_path(os.path.join(CFG.DIRS["checkpoints"], "ROI", f"seed_{seed}", "final_best.keras"))); keras.backend.clear_session()
     best_seed = max(ROI_RESULTS, key=lambda s: max(ROI_RESULTS[s]["frozen_backbone_val_macro_f1"], ROI_RESULTS[s]["partial_finetune_val_macro_f1"]))
     ROI_SELECTED_SEED = best_seed
@@ -327,6 +338,7 @@ def roi_sets_for(df, tiers=(1, 2, 3), fm=None):
 
 
 def cached_roi_sets(split, tiers=(1, 2, 3)):
+    require_source_permission([split], "training" if split in ("train", "validation", "fusion") else "evaluation")
     df = DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)] if split != "train" else DF[(DF.split == split) & (DF.eval_ok | DF.train_ok)]
     key = hashlib.md5((",".join(df.image_id) + str(ROI_SELECTED_SEED) + YOLO_CONFIG_HASH).encode()).hexdigest()[:10]
     path = os.path.join(ROI_DIR, f"roi_sets_{split}_{key}.npz")

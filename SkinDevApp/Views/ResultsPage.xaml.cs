@@ -135,16 +135,17 @@ namespace SkinDevApp.Views
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
             foreach (string mode in new[] { "Original", "Grad-CAM++", "Localization", "Combined" })
             {
-                if (_v6 != null && (mode == "Grad-CAM++" || mode == "Combined")) continue;   // V6 view: the heat map explains the V5 classifier, so it is not shown beside a V6 result
+                if (_v6 != null && mode == "Combined") continue;   // V6 view: "Both" would overlay the V5 predicted class on the boxes, so it is not offered; the heat map itself is (labelled as V5 below)
                 var rb = new RadioButton
                 {
-                    Content = mode == "Grad-CAM++" ? "Heat map" : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
+                    Content = mode == "Grad-CAM++" ? (_v6 != null ? "Heat map (V5)" : "Heat map") : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
                     GroupName = "viewmode",
                     IsChecked = mode == "Original",
                     Margin = new Thickness(0, 0, 18, 0),
                     FontSize = 12.5,
                     ToolTip = mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
-                            : mode == "Grad-CAM++" ? "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map)."
+                            : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the condition the unified assessment ranks highest. It explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
+                                                                  : "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map).")
                             : mode == "Localization" ? "Candidate lesion locations from a separate research detector."
                             : "The exact frame that was analysed."
                 };
@@ -153,6 +154,9 @@ namespace SkinDevApp.Views
                 toggle.Children.Add(rb);
             }
             sp.Children.Add(toggle);
+            if (_v6 != null)
+                sp.Children.Add(Ui.Text("Heat map (V5): shows what the V5 classifier looked at for the condition ranked highest above. It is not the V6 explanation, it is diffuse, and the maps for different conditions look alike. \"Marked areas\" shows where the detectors found something.",
+                                        10.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
             string[] names = _d.Session.ScanMode == "Single" ? new[] { "Single" } : StudyText.Views;
@@ -207,12 +211,22 @@ namespace SkinDevApp.Views
 
         // ------------------------------------------------------ view toggle --
 
+        /// <summary>The condition with a "present" verdict and the highest AI support, else simply the highest AI support, for this photograph's saved V6 assessment.</summary>
+        private string V6LeadCondition(CaptureViewRow v)
+        {
+            SkinDevApp.V6.UnifiedAssessment a;
+            if (_v6 == null || v == null || !_v6.TryGetValue(v.ViewType ?? "Single", out a) || a.Conditions.Length == 0) return null;
+            var present = a.Conditions.Where(c => c.Status == SkinDevApp.V6.ConditionStatus.Present).ToList();
+            return (present.Count > 0 ? present : a.Conditions.ToList()).OrderByDescending(c => c.CalibratedProbability).First().Condition;
+        }
+
         private string PathFor(CaptureViewRow v, string mode)
         {
             switch (mode)
             {
                 case "Grad-CAM++":
                     string pred = v.Scores != null ? v.Scores.PredictedClass : null;
+                    if (_v6 != null) pred = V6LeadCondition(v) ?? pred;      // V6 view: the saved V5 map of the condition the unified assessment ranks highest (V5 may have predicted Normal)
                     AttributionMapRow map = v.Maps.FirstOrDefault(x => x.TargetClass == pred);
                     return map != null ? map.OverlayPath : null;
                 case "Localization":

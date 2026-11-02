@@ -412,6 +412,7 @@ def ap_from_matches(scores, tps, n_gt):
 
 
 def localisation_metrics(split_names, cond, only_deployed=False):
+    require_source_permission(split_names, "evaluation")
     sp = DETECTORS[cond]
     if not sp.available: return dict(condition=cond, status="detector_unavailable")
     if not len(REG) or not len(DET): return dict(condition=cond, status="no verified region annotations or no detections")

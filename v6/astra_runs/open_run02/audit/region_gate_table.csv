@@ -1,0 +1,5 @@
+split,acne,hyperpigmentation,eczema,background_false_positive
+train,5244,993,1058,134
+validation,850,148,117,93
+fusion,0,0,0,0
+test,0,0,0,0

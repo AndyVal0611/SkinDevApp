@@ -1,0 +1,27 @@
+{
+  "finished_at": "2026-11-02T16:38:51",
+  "run_id": "open_run02",
+  "global_selected": [
+    "E_v5_backbone_multilabel3",
+    42
+  ],
+  "roi_selected_seed": 42,
+  "fusion_oof_ready": true,
+  "calibration_ready": true,
+  "stage1_ready": true,
+  "ood_ready": true,
+  "gates": {
+    "provenance_defined": true,
+    "annotations_train": true,
+    "annotations_validation": true,
+    "annotations_fusion": true,
+    "annotations_test": false,
+    "regions_train": true,
+    "regions_validation": true,
+    "regions_fusion": false,
+    "regions_test": false,
+    "yolo_all_three": true,
+    "yolo_any": true,
+    "roi_training_data": true
+  }
+}

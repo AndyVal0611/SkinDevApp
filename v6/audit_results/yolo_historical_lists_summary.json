@@ -1,0 +1,27 @@
+{
+  "runs": [
+    {
+      "run": "H25_v2human_all_pub",
+      "readable_train_files": 3684,
+      "missing_train_files": 0,
+      "exact_unique_eval_images": 234,
+      "proxy_eval_images": 585
+    },
+    {
+      "run": "H25_s123",
+      "readable_train_files": 3684,
+      "missing_train_files": 0,
+      "exact_unique_eval_images": 234,
+      "proxy_eval_images": 585
+    },
+    {
+      "run": "H25_s7",
+      "readable_train_files": 3684,
+      "missing_train_files": 0,
+      "exact_unique_eval_images": 234,
+      "proxy_eval_images": 585
+    }
+  ],
+  "missing_originals": 0,
+  "limitations": "Historical train lists found for H25 only. Current listed file bytes do not authenticate past training snapshots or resolve installed ONNX hash mismatch. No eczema manifest proven. Patient identity unknown."
+}

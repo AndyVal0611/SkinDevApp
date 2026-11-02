@@ -1,0 +1,106 @@
+[
+  {
+    "source": "01_intro_and_baselines.cellsrc",
+    "original_sha256": "b9c361319ff8572265d81d9428e161b409e924bb559a61198924afb81358b2b2",
+    "astra_sha256": "2220e801f12326cd89c2dc62611f8053e8ac2c1fd6ec2130fceb16981ff91c3f",
+    "unchanged": false,
+    "added_lines": 1,
+    "removed_lines": 1
+  },
+  {
+    "source": "02_environment_security.cellsrc",
+    "original_sha256": "b8ec0825f4fbf469b4e4f81ae9443fa788659409737a5193938c350edca4c154",
+    "astra_sha256": "ab8a1b137fdfe8f246f2707a99637284079ed03bc4638bd2efd462173334fc0e",
+    "unchanged": false,
+    "added_lines": 28,
+    "removed_lines": 29
+  },
+  {
+    "source": "02b_architecture_diagram.cellsrc",
+    "original_sha256": "0814ad12a51155c8d975d8c186c899e375461342beb71c010546a619c4670c96",
+    "astra_sha256": "0814ad12a51155c8d975d8c186c899e375461342beb71c010546a619c4670c96",
+    "unchanged": true,
+    "added_lines": 0,
+    "removed_lines": 0
+  },
+  {
+    "source": "02c_training_recovery.cellsrc",
+    "original_sha256": "21583288f039a5a5dfae11bd70101d37a6afa006c7b2c1518dfd39bbc64b1e6c",
+    "astra_sha256": "367336bff751d9208c845febfcabaf7fccb35b23c7d9a8dd4c7f87f31659c95a",
+    "unchanged": false,
+    "added_lines": 73,
+    "removed_lines": 17
+  },
+  {
+    "source": "03_dataset_audit.cellsrc",
+    "original_sha256": "3d1f1aa484c80d95f0ae82268fd4537754a16dc697be0f98d3145d8c815de319",
+    "astra_sha256": "76973be4ae76e8fff6824f925e79cb9fd3166a1f4b4e724fee8bc798d3e23187",
+    "unchanged": false,
+    "added_lines": 8,
+    "removed_lines": 8
+  },
+  {
+    "source": "04_parity_v5_baseline_errors.cellsrc",
+    "original_sha256": "60a471b7408b810c061cecaada1c47409b3af2af0b6c664310931804058498ee",
+    "astra_sha256": "ba495b8fb452246884fbbde3533dab1f42efdf8780ae5a0729e64025b4251abf",
+    "unchanged": false,
+    "added_lines": 13,
+    "removed_lines": 9
+  },
+  {
+    "source": "05_global_cnn.cellsrc",
+    "original_sha256": "f565caf68bf55d43c92b42710a0f84a45407ad523a25b36dfa3b4d5f926e3289",
+    "astra_sha256": "147d8acd8c9d2ea432dab3fb419d498e04cc3c97d9a457f839b35f922296a954",
+    "unchanged": false,
+    "added_lines": 51,
+    "removed_lines": 67
+  },
+  {
+    "source": "06_yolo_three_detectors.cellsrc",
+    "original_sha256": "e67ccf12c45e98bd5dabb9b5d2bb4752e99479bebcbdf0e1956de25ff1e7a536",
+    "astra_sha256": "6f843d0700c718980ce0aa2dbacc1ec24607ccd66b76ceb8e3683c493da08bbf",
+    "unchanged": false,
+    "added_lines": 49,
+    "removed_lines": 8
+  },
+  {
+    "source": "07_roi_branch.cellsrc",
+    "original_sha256": "583978b24ec3addad7245255a62673b9e1bec887ce98453476e1ca56b06dd81a",
+    "astra_sha256": "0301d756c47906483f182a8d3db234ed12d25fa7e89457463194e19eeec7ee20",
+    "unchanged": false,
+    "added_lines": 61,
+    "removed_lines": 51
+  },
+  {
+    "source": "08_fusion.cellsrc",
+    "original_sha256": "5f79a97e50995d536021d4ff00c02c95ee5e64c76bbddadef0f68e92a099efda",
+    "astra_sha256": "80f3d9f0917cbb5795cea24548b9e88ec6190baf029f1d6239f4421a43629ce3",
+    "unchanged": false,
+    "added_lines": 23,
+    "removed_lines": 23
+  },
+  {
+    "source": "09_stages_trust.cellsrc",
+    "original_sha256": "f05f65d674f543445c0e5f4eb458ae624c66e1748eb9222d57b46293b230daaf",
+    "astra_sha256": "15d77e0caa3dde71a7d58839447d086cc2c3733c3bf32596ac61d8d26e7eee61",
+    "unchanged": false,
+    "added_lines": 14,
+    "removed_lines": 3
+  },
+  {
+    "source": "10_evaluation.cellsrc",
+    "original_sha256": "687a379b58d247602af3cc86d129c1329c4f8bb069e7359f68a14051db7c34b2",
+    "astra_sha256": "90d0769abbb2b7802915bd182406587a34da9655d3abc97341ec476d88051809",
+    "unchanged": false,
+    "added_lines": 14,
+    "removed_lines": 3
+  },
+  {
+    "source": "11_export_tests_report.cellsrc",
+    "original_sha256": "f5a61e2ea92091c33c98c282dd5a8a4eb15b8ced44acc516234447327a7908f0",
+    "astra_sha256": "ee53e0e0eeeee149a1dd75f5e0994d9b6f177edaa1b90212a0060224f0dcc8c0",
+    "unchanged": false,
+    "added_lines": 49,
+    "removed_lines": 29
+  }
+]

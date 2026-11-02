@@ -1,0 +1,10 @@
+{
+  "phase": "B",
+  "criterion": "val_sel",
+  "phase_a": 0.753139562376575,
+  "phase_b": 0.7963380217262873,
+  "tie_rule": "B",
+  "checkpoint": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/checkpoints/D_multilabel3/seed_42/recovery_B/attempt_0001/selected.keras",
+  "sha256": "d3eebb5543321847ac1a5ff9497ae6fb129c2c922a474ec61de9d4a75910ed7b",
+  "optimizer_note": "selected epoch optimizer preserved"
+}

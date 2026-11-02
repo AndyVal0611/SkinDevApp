@@ -1,0 +1,5 @@
+condition,catalog_images,frozen_images,verified_ai_training_permission,unresolved_frozen,confirmed_restricted,possible_dermnet_catalog,possible_dermnet_frozen,dermnet_filename_hints_frozen,dermnet_group_or_hash_only_frozen
+Acne,3000,3000,0,3000,0,0,0,0,0
+Eczema,1063,789,0,789,0,3,3,3,0
+Hyperpigmentation,3000,3000,0,3000,0,0,0,0,0
+Normal,3000,3000,0,3000,0,0,0,0,0

@@ -1,0 +1,513 @@
+{
+  "feature_schema_version": "astra-fusion/1",
+  "evaluation_scope": "DEVELOPMENT RUN (open notebook): source-permission, action-token and dermatologist-only gates are not enforced; not thesis evidence until provenance and dermatologist review are documented.",
+  "schema": "lumyvue-final-assessment/1.1",
+  "review_contract": {
+    "rule": "Every AI assessment, whatever its state, confidence, stage or findings, is issued as PENDING_DERMATOLOGIST_REVIEW and requires dermatologist review.",
+    "ai_assessment": {
+      "schema": "lumyvue-final-assessment/1.1",
+      "status_at_issue": "PENDING_DERMATOLOGIST_REVIEW",
+      "immutable_after_issue": true,
+      "seal": "ai_content_sha256 = SHA-256(canonical JSON of all other fields)",
+      "corrections": "issue a NEW assessment with a new scan_id; never edit"
+    },
+    "dermatologist_review": {
+      "schema": "lumyvue-dermatologist-review/1.0",
+      "separate_record": true,
+      "statuses": [
+        "DERMATOLOGIST_REVIEW_IN_PROGRESS",
+        "DERMATOLOGIST_REVIEW_COMPLETED",
+        "DERMATOLOGIST_REVIEW_UNABLE_TO_ASSESS"
+      ],
+      "links_to": "scan_id + ai_content_sha256 (a review for a different AI version is refused)",
+      "findings": "present | absent | unknown per condition; blank/unknown is never treated as absent",
+      "reviewer_role": "dermatologist",
+      "blinding_fields": [
+        "blinded_to_ai",
+        "ai_shown_before_review"
+      ]
+    },
+    "ai_verification": "Stage 2 and the adaptive verification cycle are AI verification; clinical_validation is always false and the AI statement says so",
+    "metrics": "agreement, disagreement, Cohen's kappa, PPV, sensitivity, specificity per condition from AI per-condition decisions vs dermatologist findings; AI-uncertain / AI-no-result / dermatologist-unknown are reported separately",
+    "states_meaning": "state describes how well the AI evidence supports a result; it is not a diagnosis and not clinical confirmation"
+  },
+  "created": "2026-11-02T16:43:32",
+  "run_id": "open_run02",
+  "status": "EXPERIMENTAL - not validated for deployment; produced by an unexecuted-by-author notebook",
+  "condition_order": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+  ],
+  "normal_definition": "Normal = all three conditions verified Absent (derived; never a model output)",
+  "v5_class_order": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "global_cnn": {
+    "experiment": [
+      "E_v5_backbone_multilabel3",
+      42
+    ],
+    "input": "float32 NHWC [N,224,224,3]",
+    "preprocessing": "BGR->RGB, bilinear (INTER_LINEAR) stretch to 224x224, (p/127.5)-1",
+    "outputs": [
+      "embedding_128",
+      "logits/probabilities"
+    ],
+    "note": "multilabel3: apply sigmoid; fusion consumes logit(clip(sigmoid(z), 1e-4, 1-1e-4)) i.e. z clipped to +-9.21"
+  },
+  "yolo": {
+    "execution_order": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema"
+    ],
+    "preprocessing": "letterbox to imgsz (pad 114, bilinear), RGB, /255, NCHW",
+    "output": "[1,4+nc,N] cx,cy,w,h (letterbox px) + class scores, no objectness",
+    "postprocessing": {
+      "per_member_nms_iou": {
+        "Acne": 0.6,
+        "Hyperpigmentation": 0.6,
+        "Eczema": 0.6
+      },
+      "member_floor": 0.02,
+      "ensemble_fusion_iou": {
+        "Acne": 0.5,
+        "Hyperpigmentation": 0.5,
+        "Eczema": 0.5
+      },
+      "fused_confidence": "min(1, sum(conf)/members)",
+      "deployed_thresholds": {
+        "Acne": 0.275,
+        "Hyperpigmentation": 0.225,
+        "Eczema": 0.25
+      },
+      "candidate_pool_min_conf": 0.05,
+      "max_boxes": 60,
+      "face_filter": "optional (centre inside face box +25%)"
+    },
+    "availability": {
+      "Acne": true,
+      "Hyperpigmentation": true,
+      "Eczema": true
+    },
+    "location": {
+      "Acne": "WPF Model folder",
+      "Hyperpigmentation": "WPF Model folder",
+      "Eczema": "WPF Model folder"
+    },
+    "versions": {
+      "Acne": "PrecisionSkin acne specialist detector (specialist, 3 member(s))",
+      "Hyperpigmentation": "PrecisionSkin hyperpigmentation specialist detector (specialist, 3 member(s))",
+      "Eczema": "PrecisionSkin eczema specialist detector (specialist, 3 member(s))"
+    },
+    "sha256": {
+      "Acne": [
+        "2f0f09ebc3766de869ac838eed45302f5bada4d1530529ffca759384f2c6486e",
+        "f00c6e6bb3330b5574fb6e969e3d0cdc8037139fcf20767974d58121cacf4c92",
+        "6dfb0969cf5c0b987cfb31dfc6c002c90621dbc4a6b58619871b48edea9d88cb"
+      ],
+      "Hyperpigmentation": [
+        "f27affb73061ddff8a2f27463a117a79b3eba97655dca7c2099409971918f501",
+        "ed821543c9bc84ff2f24960c8e932017f821f490c68c6f11c9b486607a72d63e",
+        "2a6fa1afa61f4eeed11d15f87421c9429c9de07864f0608bcdb5921ce205a165"
+      ],
+      "Eczema": [
+        "a93b77460c2fc90ffbb680a10e9f3e51aac07ab7bef41fdc861ad0f40b0fb2d3",
+        "8fbf857b316986f485a8fdb599866e8292ad7faffc32fc781c0b02596aea41fe",
+        "b5a6b50b9c50c1f8d5c47379d9317bb62cdc0af4ba0328280daa805de581fdde"
+      ]
+    },
+    "config_hash": "ce6ae3186e771bfe",
+    "note": "Detectors that are not installed are 'unavailable' (availability flag 0), never 'zero detections'."
+  },
+  "roi": {
+    "size": 224,
+    "margin": 0.25,
+    "alt_context_margin": 0.6,
+    "square_window": "extend shorter side, shift inside image, no padding",
+    "tiers": {
+      "1": "deployed boxes (round-robin over detectors, IoU>0.70 suppressed)",
+      "2": "lower-confidence pool boxes",
+      "3": "alternative wider-context crops of tier-1 boxes"
+    },
+    "max_tier1": 6,
+    "max_total": 12,
+    "classes": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema",
+      "Background"
+    ],
+    "preprocessing": "RGB, bilinear, (p/127.5)-1",
+    "feature_dim": 83,
+    "yolo_feature_names": [
+      "cond_acne",
+      "cond_hyper",
+      "cond_eczema",
+      "conf",
+      "rel_area",
+      "cx",
+      "cy",
+      "w_rel",
+      "h_rel",
+      "aspect_log",
+      "deployed",
+      "support_frac",
+      "tier1",
+      "tier2",
+      "tier3_alt"
+    ]
+  },
+  "fusion": {
+    "inputs": {
+      "g_emb": [
+        128
+      ],
+      "g_logit": [
+        3
+      ],
+      "g_extra": [
+        2
+      ],
+      "det_ev": [
+        21
+      ],
+      "roi_feat": [
+        12,
+        83
+      ],
+      "roi_mask": [
+        12
+      ]
+    },
+    "det_ev_layout": [
+      "available",
+      "detected",
+      "max_deployed_conf",
+      "max_pool_conf",
+      "sqrt_rel_area",
+      "cx",
+      "cy"
+    ],
+    "output": "[3] logits in CFG.CONDITIONS order",
+    "ensemble": "mean of per-seed logits",
+    "seeds": [
+      42
+    ],
+    "calibration": {
+      "full": {
+        "platt": [
+          {
+            "a": 0.5827944047112714,
+            "b": -0.8072235660569566
+          },
+          {
+            "a": 0.628212357860993,
+            "b": -0.2980508596037338
+          },
+          {
+            "a": 0.501094703231593,
+            "b": -1.6623883940716577
+          }
+        ],
+        "thresholds": [
+          0.43,
+          0.34,
+          0.33
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "global_yolo": {
+        "platt": [
+          {
+            "a": 0.7297918985761983,
+            "b": -0.6806363571042584
+          },
+          {
+            "a": 0.7619317641649174,
+            "b": -0.546835840466286
+          },
+          {
+            "a": 0.5355513342654367,
+            "b": -1.7331056613640594
+          }
+        ],
+        "thresholds": [
+          0.42,
+          0.37,
+          0.27
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "global_only": {
+        "platt": [
+          {
+            "a": 0.7935146005956473,
+            "b": -0.48752706922769473
+          },
+          {
+            "a": 0.8798338759914927,
+            "b": -0.4562666466105268
+          },
+          {
+            "a": 0.5938522075601034,
+            "b": -1.9048337721467055
+          }
+        ],
+        "thresholds": [
+          0.51,
+          0.39,
+          0.25
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "roi_only": {
+        "platt": [
+          {
+            "a": 0.8168179336930687,
+            "b": -0.631990091427639
+          },
+          {
+            "a": 0.7977973511480135,
+            "b": -0.45406062620865384
+          },
+          {
+            "a": 0.5917430660369379,
+            "b": -1.9097443788467345
+          }
+        ],
+        "thresholds": [
+          0.46,
+          0.5,
+          0.24
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "no_acne_evidence": {
+        "platt": [
+          {
+            "a": 0.7261238114254489,
+            "b": -0.7672606363910796
+          },
+          {
+            "a": 0.6483600160536619,
+            "b": -0.49988510632428684
+          },
+          {
+            "a": 0.5867209773302999,
+            "b": -1.7336472818809132
+          }
+        ],
+        "thresholds": [
+          0.4,
+          0.32,
+          0.18
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "no_eczema_evidence": {
+        "platt": [
+          {
+            "a": 0.5485327430822354,
+            "b": -0.2945123879987037
+          },
+          {
+            "a": 0.49960570498461265,
+            "b": -0.4088048815519022
+          },
+          {
+            "a": 0.37860955664727247,
+            "b": -1.879964218553207
+          }
+        ],
+        "thresholds": [
+          0.3,
+          0.4,
+          0.36
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      },
+      "no_hyper_evidence": {
+        "platt": [
+          {
+            "a": 0.6366788001249072,
+            "b": -0.758623408678779
+          },
+          {
+            "a": 0.5701822378483404,
+            "b": -0.2801021991813536
+          },
+          {
+            "a": 0.3894833817912891,
+            "b": -1.8939374497346417
+          }
+        ],
+        "thresholds": [
+          0.38,
+          0.39,
+          0.26
+        ],
+        "calibrated_conditions": [
+          "Acne",
+          "Hyperpigmentation",
+          "Eczema"
+        ]
+      }
+    },
+    "variants_used_at_runtime": [
+      "global_only",
+      "global_yolo",
+      "full"
+    ]
+  },
+  "stages": {
+    "stage1_rule": {
+      "band": 0.0,
+      "selection": {
+        "band": 0.0,
+        "coverage": 0.4083333333333333,
+        "error": 0.05442176870748299,
+        "n_accepted_known": 147
+      },
+      "thr_global": [
+        0.51,
+        0.39,
+        0.25
+      ],
+      "thr_stage1": [
+        0.42,
+        0.37,
+        0.27
+      ],
+      "target_error": 0.1,
+      "min_coverage": 0.3,
+      "accepts_nothing": false,
+      "note": "band selected on out-of-fold fusion-split data; PROVISIONAL, re-checked on the test split. If accepts_nothing=True every scan escalates to Stage 2."
+    },
+    "stage2_band": 0.14,
+    "stage2_accepts_nothing": false,
+    "verification": {
+      "max_passes": 3,
+      "max_seconds": 20.0,
+      "min_new_rois": 1,
+      "convergence_eps": 0.02,
+      "actions": [
+        "pass1: tier-1 regions",
+        "pass2: + tier-2 candidates",
+        "pass3: + tier-3 alternative-context crops",
+        "recapture request",
+        "external AI verifier (if configured)"
+      ],
+      "nature": "AI verification only - not clinical validation"
+    },
+    "quality_thresholds": {
+      "min_side_px": 224,
+      "blur_laplacian_min": 40.0,
+      "dark_mean_max": 45.0,
+      "bright_mean_min": 215.0,
+      "over_exposed_frac_max": 0.08,
+      "under_exposed_frac_max": 0.2,
+      "uneven_lr_ratio_max": 0.35,
+      "glare_frac_max": 0.02,
+      "gray_world_dev_max": 0.25,
+      "jpeg_blockiness_max": 1.8,
+      "overlay_edge_frac_max": 0.12,
+      "face_required": true
+    },
+    "quality_status": "provisional heuristics, unvalidated",
+    "ood": {
+      "method": "Mahalanobis on global embedding",
+      "percentile": 99.0,
+      "threshold": 14.743049920269426
+    },
+    "states": [
+      "FINDINGS_SUPPORTED",
+      "MULTIPLE_FINDINGS_SUPPORTED",
+      "NO_FINDINGS_SUPPORTED",
+      "UNCERTAIN_REVIEW_REQUIRED",
+      "RECAPTURE_REQUIRED",
+      "OUT_OF_SCOPE_REVIEW_REQUIRED",
+      "INFERENCE_ERROR"
+    ]
+  },
+  "versions": {
+    "v5_onnx_sha256": "eea31c7fe89c97b3682119f935a554a94319502e340f8635388223d0446ac746",
+    "yolo_config_hash": "ce6ae3186e771bfe",
+    "python": "3.13.15",
+    "tensorflow": "2.21.0",
+    "onnxruntime": "1.30.0"
+  },
+  "export_status": {
+    "global_features": {
+      "status": "exported",
+      "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_global_features_mobilenetv2.onnx",
+      "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4",
+      "attempt": "from_function",
+      "outputs": [
+        "embedding_128",
+        "logits (multilabel3: apply sigmoid; softmax4: probabilities)"
+      ]
+    },
+    "roi_features": {
+      "status": "exported",
+      "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_roi_features_mobilenetv2.onnx",
+      "sha256": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22",
+      "attempt": "from_function",
+      "outputs": [
+        "embedding_64",
+        "softmax_Acne_Hyperpigmentation_Eczema_Background"
+      ]
+    },
+    "fusion_global_only_seed42": {
+      "status": "exported",
+      "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_only_seed42.onnx",
+      "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a",
+      "attempt": "from_function",
+      "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_only_seed42_weights.json"
+    },
+    "fusion_global_yolo_seed42": {
+      "status": "exported",
+      "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_yolo_seed42.onnx",
+      "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97",
+      "attempt": "from_function",
+      "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_yolo_seed42_weights.json"
+    },
+    "fusion_full_seed42": {
+      "status": "exported",
+      "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_full_seed42.onnx",
+      "sha256": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7",
+      "attempt": "from_function",
+      "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_full_seed42_weights.json"
+    }
+  },
+  "parity_procedure": "Run `SkinDevApp.exe --diagnose <image> <dir>` for the C# tensor/probabilities, then Section 15.4; compare per-output differences with the tolerances recorded in v6_keras_vs_onnx_verification.json.",
+  "production_guard": "Nothing here replaces or overwrites the V5 model or any YOLO file."
+}

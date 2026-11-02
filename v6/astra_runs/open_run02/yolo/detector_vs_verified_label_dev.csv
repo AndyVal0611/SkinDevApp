@@ -1,0 +1,7 @@
+condition,verified_label,n_images,detector_not_available,detected,no_qualifying,detection_rate_where_available
+Acne,present,460,0,426,34,0.9260869565217391
+Acne,absent,1378,0,382,996,0.2772133526850508
+Hyperpigmentation,present,618,0,550,68,0.889967637540453
+Hyperpigmentation,absent,1223,0,627,596,0.5126737530662305
+Eczema,present,331,0,293,38,0.8851963746223565
+Eczema,absent,1512,0,586,926,0.38756613756613756

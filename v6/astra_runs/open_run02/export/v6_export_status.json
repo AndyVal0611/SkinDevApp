@@ -1,0 +1,43 @@
+{
+  "global_features": {
+    "status": "exported",
+    "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_global_features_mobilenetv2.onnx",
+    "sha256": "82662184cc526f267d977f8fa4dec9ec1362429aeec3bea7f6ac60b4c216a7d4",
+    "attempt": "from_function",
+    "outputs": [
+      "embedding_128",
+      "logits (multilabel3: apply sigmoid; softmax4: probabilities)"
+    ]
+  },
+  "roi_features": {
+    "status": "exported",
+    "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_roi_features_mobilenetv2.onnx",
+    "sha256": "45a65103d89c4c5911809930d8f7bceb45ee82c77dfd539355d766bdfb624d22",
+    "attempt": "from_function",
+    "outputs": [
+      "embedding_64",
+      "softmax_Acne_Hyperpigmentation_Eczema_Background"
+    ]
+  },
+  "fusion_global_only_seed42": {
+    "status": "exported",
+    "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_only_seed42.onnx",
+    "sha256": "fd9ef9a6803f30a9647084c5632d801d3a0b4c4a2476319d607939652c62c35a",
+    "attempt": "from_function",
+    "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_only_seed42_weights.json"
+  },
+  "fusion_global_yolo_seed42": {
+    "status": "exported",
+    "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_yolo_seed42.onnx",
+    "sha256": "f25a741cae5d87b5a2b17701ad861fac51b20118bbcaacc7832149fbfa756b97",
+    "attempt": "from_function",
+    "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_global_yolo_seed42_weights.json"
+  },
+  "fusion_full_seed42": {
+    "status": "exported",
+    "path": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_full_seed42.onnx",
+    "sha256": "1dbea01249c76fa2c6947ce9320f838d1a8a72270d723baabcf9687d89fe2ba7",
+    "attempt": "from_function",
+    "weights_json": "/mnt/c/Users/Bautista/source/repos/SkinDevApp/v6/astra_runs/open_run02/export/v6_fusion_full_seed42_weights.json"
+  }
+}

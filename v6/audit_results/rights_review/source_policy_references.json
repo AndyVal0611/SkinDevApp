@@ -1,0 +1,23 @@
+{
+  "reviewed_date": "2026-11-01",
+  "references": [
+    {
+      "provider": "DermNet",
+      "url": "https://dermnetnz.org/image-licence",
+      "section": "Prohibited Use of Images for AI Training, clause 25",
+      "finding": "Current standard website terms prohibit AI training, validation and testing of website images; separately licensed AI data are offered. No LUMYVUE-specific grant was found.",
+      "image_origin_caveat": "Filename hints do not establish an individual image's origin or historical licence. No automatic restricted-rights adjudication was made."
+    },
+    {
+      "provider": "Kaggle",
+      "url": "https://www.kaggle.com/aup",
+      "finding": "Hosting does not establish upstream image rights; no image-linked LUMYVUE training grant was established from this policy."
+    },
+    {
+      "provider": "Local Roboflow export records",
+      "evidence_file": "v6/audit_results/export_source_evidence.json",
+      "finding": "Archived CC BY 4.0 statements are retained as licence declarations, not discarded or treated as blanket proof of upstream ownership and consent."
+    }
+  ],
+  "live_permission_registry_modified": false
+}

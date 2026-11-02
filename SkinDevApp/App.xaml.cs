@@ -24,6 +24,11 @@ namespace SkinDevApp
 
             SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
 
+            // V6 unified assessment: ON when App.config says V6Unified=true (or the environment variable LUMYVUE_V6_UNIFIED=1 is set). Otherwise the app is the V5 app, unchanged.
+            SkinDevApp.V6.V6FeatureFlag.Provider = () =>
+                string.Equals(System.Configuration.ConfigurationManager.AppSettings["V6Unified"], "true", StringComparison.OrdinalIgnoreCase) ||
+                Environment.GetEnvironmentVariable(SkinDevApp.V6.V6FeatureFlag.EnvironmentVariable) == "1";
+
             // Crisp rendering on every window (including the ones created in code): snap to whole pixels, ClearType text,
             // high-quality image scaling. Combined with the DPI-aware manifest this removes the soft, blurry look.
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, args) =>

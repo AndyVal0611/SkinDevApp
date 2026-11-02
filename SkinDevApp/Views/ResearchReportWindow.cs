@@ -664,7 +664,6 @@ namespace SkinDevApp.Views
         private List<FrameworkElement> EvidenceBodies()
         {
             var pages = new List<FrameworkElement>();
-            if (_f.V6 != null) return pages;       // V6 flag on: the Grad-CAM++ pages explain the V5 classifier, so they are not part of the unified report
             List<EvidenceItem> items = _f.Evidence;
 
             if (items.Count == 0)
@@ -689,7 +688,10 @@ namespace SkinDevApp.Views
                 sp.Children.Add(T("Only the maps relevant to understanding the AI result are printed. " + StudyText.AttributionNote.Replace("Grad-CAM++ maps show model attribution (which image areas influenced each class score). They are not lesion segmentation.", ""),
                                   8.5, false, Muted, 4));
                 sp.Children.Add(T("Grad-CAM++ indicates image regions that influenced the model's class score. It is not lesion segmentation and should not be interpreted as a map of diseased tissue.",
-                                  8, false, Muted, 8));
+                                  8, false, Muted, _f.V6 != null ? 2 : 8));
+                if (_f.V6 != null)
+                    sp.Children.Add(T("These maps explain the V5 classifier, shown for the condition the unified V6 assessment ranks highest. They do not explain the V6 assessment, they are diffuse, and the maps for different conditions look alike. The marked areas page shows where the detectors found something.",
+                                      8, false, WarnInk, 8));
 
                 List<EvidenceItem> onPage = items.Skip(p * perPage).Take(perPage).ToList();
                 foreach (EvidenceItem it in onPage)
@@ -738,14 +740,14 @@ namespace SkinDevApp.Views
             left.Children.Add(ImageBox(original, "image not available", imgH));
             left.Children.Add(T("Original image", 8.5, true, TextInk, 0));
             left.Children[left.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
-            left.Children.Add(T("View: " + it.View.ViewType + "  ·  Predicted class: " + Lbl(it.View.Scores.PredictedClass), 8, false, Muted, 0));
+            left.Children.Add(T("View: " + it.View.ViewType + (_f.V6 != null ? "  ·  V5 classifier's top class: " : "  ·  Predicted class: ") + Lbl(it.View.Scores.PredictedClass), 8, false, Muted, 0));
             row.Children.Add(left);
 
             var right = new StackPanel();
             right.Children.Add(ImageBox(it.Map.OverlayPath, "Grad-CAM++ image not available", imgH, Ui.ClassColor(it.ClassName)));
             var cap = new StackPanel { Margin = new Thickness(0, 3, 0, 0) };
             cap.Children.Add(T("Grad-CAM++ attribution", 8.5, true, TextInk, 0));
-            cap.Children.Add(T("Target class: " + Lbl(it.ClassName) + "   ·   Model Class Score: " + Pc(it.Score) + "   ·   View: " + it.View.ViewType, 8, false, TextInk, 0));
+            cap.Children.Add(T("Target class: " + Lbl(it.ClassName) + "   ·   " + (_f.V6 != null ? "V5 class score: " : "Model Class Score: ") + Pc(it.Score) + "   ·   View: " + it.View.ViewType, 8, false, TextInk, 0));
             cap.Children.Add(T("Attribution: " + Attribution(it.Map) + "  (relative strength " + it.Map.RelativeStrength.ToString("0.00", CultureInfo.InvariantCulture) + ", compares the four classes in this frame; not a probability)", 7.5, false, Muted, 0));
             right.Children.Add(cap);
             Grid.SetColumn(right, 2);

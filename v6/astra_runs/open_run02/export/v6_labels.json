@@ -1,0 +1,29 @@
+{
+  "conditions": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema"
+  ],
+  "roi_classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Background"
+  ],
+  "v5_classes": [
+    "Acne",
+    "Hyperpigmentation",
+    "Eczema",
+    "Normal"
+  ],
+  "states": [
+    "FINDINGS_SUPPORTED",
+    "MULTIPLE_FINDINGS_SUPPORTED",
+    "NO_FINDINGS_SUPPORTED",
+    "UNCERTAIN_REVIEW_REQUIRED",
+    "RECAPTURE_REQUIRED",
+    "OUT_OF_SCOPE_REVIEW_REQUIRED",
+    "INFERENCE_ERROR"
+  ],
+  "normal": "derived: all conditions absent"
+}

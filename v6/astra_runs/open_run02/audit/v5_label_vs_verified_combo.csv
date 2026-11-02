@@ -1,0 +1,5 @@
+src_label,Acne,Acne+Eczema,Acne+Hyperpigmentation,Eczema,Hyperpigmentation,Hyperpigmentation+Eczema,none
+Acne,344,1,58,23,28,0,3
+Eczema,23,2,1,277,11,3,3
+Hyperpigmentation,8,0,5,9,460,1,18
+Normal,11,0,1,6,41,0,490

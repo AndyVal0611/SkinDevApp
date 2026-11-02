@@ -1,0 +1,5 @@
+src_label,test,train,validation
+Acne,465,2071,464
+Hyperpigmentation,454,2092,454
+Eczema,179,698,186
+Normal,458,2084,458

@@ -1,0 +1,37 @@
+{
+  "source": "<PROJECT>/runs/facial_only/models/final/precisionskin_best.keras",
+  "source_sha256": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+  "input_contract": {
+    "channel_order": "RGB",
+    "normalization": "(pixel / 127.5) - 1.0",
+    "input_size": [
+      224,
+      224,
+      3
+    ],
+    "classes": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema",
+      "Normal"
+    ]
+  },
+  "layers_total": 154,
+  "layers_with_weights_transferred": 104,
+  "tensors_transferred": 260,
+  "layers_skipped": [],
+  "weightless_layers_renamed": [
+    [
+      "input_layer_2",
+      "input_layer"
+    ]
+  ],
+  "v5_head_layers_not_transferred": [
+    "batch_normalization_3",
+    "dense_3",
+    "batch_normalization_4",
+    "dense_4",
+    "batch_normalization_5",
+    "dense_5"
+  ]
+}

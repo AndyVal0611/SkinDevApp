@@ -1,0 +1,46 @@
+{
+  "run_id": "open_run02",
+  "finished": "2026-11-02T16:54:05",
+  "originals_unchanged": true,
+  "changed_originals": [],
+  "audit_chain_intact": true,
+  "gates_open": 9,
+  "gates_blocked": 3,
+  "artifacts": 6139,
+  "unit_tests": {
+    "ran": 37,
+    "failures": [],
+    "errors": [],
+    "skipped": [
+      [
+        "test_end_to_end_reference_parity_with_batch_logic (__main__.TestV6.test_end_to_end_reference_parity_with_batch_logic)",
+        "needs all trained components and the evaluated test split"
+      ],
+      [
+        "test_unknown_is_not_negative (__main__.TestV6.test_unknown_is_not_negative)",
+        "weak positives disabled in this configuration"
+      ]
+    ],
+    "passed": 35
+  },
+  "test_split_evaluated": false,
+  "trained": {
+    "global_selected": [
+      "E_v5_backbone_multilabel3",
+      42
+    ],
+    "roi_seed": 42,
+    "fusion_variants": [
+      "full",
+      "global_yolo",
+      "global_only",
+      "roi_only",
+      "no_acne_evidence",
+      "no_eczema_evidence",
+      "no_hyper_evidence"
+    ]
+  },
+  "dermatologist_review_required_for_every_assessment": true,
+  "review_status_at_issue": "PENDING_DERMATOLOGIST_REVIEW",
+  "honesty": "Values appear only in files produced by this run. Where a stage was blocked, its outputs do not exist and no placeholder was created."
+}

@@ -1,0 +1,10 @@
+{
+  "_comment": "Conservative first-run proposal, not activated. Synthetic GPU smoke passed at CNN/ROI batch 8 with a 4096 MiB cap; actual data pipeline and full epoch behavior still require observation. All annotation, source and review gates remain unchanged.",
+  "RUN_ID": "v6_first_supervised",
+  "OFFLINE_MODE": true,
+  "BATCH_SIZE": 8,
+  "ROI_BATCH": 8,
+  "GPU_MEMORY_LIMIT_MB": 4096,
+  "EVAL_REQUIRES_DERMATOLOGIST": true,
+  "ALLOW_TEST_REEVALUATION": false
+}

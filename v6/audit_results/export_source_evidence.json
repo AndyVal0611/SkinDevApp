@@ -1,0 +1,118 @@
+{
+  "exports": [
+    {
+      "source_export": "ACNE Detection.v2i.yolov8",
+      "images": 6257,
+      "label_files": 6257,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    },
+    {
+      "source_export": "acne-detection.v2i.yolov8",
+      "images": 4859,
+      "label_files": 4859,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    },
+    {
+      "source_export": "Eczema.v1-facial-eczema.yolov8",
+      "images": 348,
+      "label_files": 348,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    },
+    {
+      "source_export": "eczema_corrected.yolov8",
+      "images": 326,
+      "label_files": 326,
+      "basename_candidates": 326,
+      "exact_pairs": 326
+    },
+    {
+      "source_export": "Hyperpigmentation.v1-hyperpigmentation.yolov8",
+      "images": 500,
+      "label_files": 500,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    },
+    {
+      "source_export": "hyperpigmentation.v2i.yolov8",
+      "images": 1169,
+      "label_files": 1169,
+      "basename_candidates": 955,
+      "exact_pairs": 955
+    },
+    {
+      "source_export": "hyperpigmentation_yolov10.v3-hyperpigmentation_yolov10_base.yolov8",
+      "images": 2250,
+      "label_files": 2250,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    },
+    {
+      "source_export": "Pigmentation.v1i.yolov8",
+      "images": 1634,
+      "label_files": 1634,
+      "basename_candidates": 0,
+      "exact_pairs": 0
+    }
+  ],
+  "readme_records": [
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\ACNE Detection.v2i.yolov8\\README.dataset.txt",
+      "text": "# ACNE Detection > 2024-09-12 3:28pm\nhttps://universe.roboflow.com/beautyai/acne-detection-mph4m\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\ACNE Detection.v2i.yolov8\\README.roboflow.txt",
+      "text": "\nACNE Detection - v2 2024-09-12 3:28pm\n==============================\n\nThis dataset was exported via roboflow.com on September 12, 2024 at 3:40 PM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 6280 images.\nAcne are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n* Auto-orientation of pixel data (with EXIF-orientation stripping)\n* Resize to 640x640 (Stretch)\n* Grayscale (CRT phosphor)\n* Auto-contrast via histogram equalization\n\nThe following augmentation was applied to create 3 versions of each source image:\n* 50% probability of horizontal flip\n* 50% probability of vertical flip\n* Equal probability of one of the following 90-degree rotations: none, clockwise, counter-clockwise, upside-down\n* Randomly crop between 0 and 20 percent of the image\n* Random rotation of between -10 and +10 degrees\n* Random shear of between -10\u00c2\u00b0 to +10\u00c2\u00b0 horizontally and -10\u00c2\u00b0 to +10\u00c2\u00b0 vertically\n* Random brigthness adjustment of between -25 and +25 percent\n* Random exposure adjustment of between -15 and +15 percent\n* Random Gaussian blur of between 0 and 2.5 pixels\n* Salt and pepper noise was applied to 3.43 percent of pixels\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\acne-detection.v2i.yolov8\\README.dataset.txt",
+      "text": "# acne-detection > 2024-03-16 1:34am\nhttps://universe.roboflow.com/sarah-kiyani-l30y8/acne-detection-gpqbh\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\acne-detection.v2i.yolov8\\README.roboflow.txt",
+      "text": "\nacne-detection - v2 2024-03-16 1:34am\n==============================\n\nThis dataset was exported via roboflow.com on March 15, 2024 at 8:35 PM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 4859 images.\nAcne-asHu are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n* Auto-orientation of pixel data (with EXIF-orientation stripping)\n* Resize to 640x640 (Stretch)\n\nNo image augmentation techniques were applied.\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Eczema.v1-facial-eczema.yolov8\\README.dataset.txt",
+      "text": "# Eczema > Facial Eczema\nhttps://universe.roboflow.com/2023-2-02500-lpunetwork-edu-ph/eczema-bgyew-jnsj1-lwh7o\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Eczema.v1-facial-eczema.yolov8\\README.roboflow.txt",
+      "text": "\nEczema - v1 Facial Eczema\n==============================\n\nThis dataset was exported via roboflow.com on October 3, 2026 at 7:37 AM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 348 images.\nStageok-1QKX-KbdU-UeTn-4CGK-KLFn-Uexh are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n\nNo image augmentation techniques were applied.\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Hyperpigmentation.v1-hyperpigmentation.yolov8\\README.dataset.txt",
+      "text": "# Hyperpigmentation > Hyperpigmentation\nhttps://universe.roboflow.com/2023-2-02500-lpunetwork-edu-ph/hyperpigmentation-dm0kf-pcmtc\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Hyperpigmentation.v1-hyperpigmentation.yolov8\\README.roboflow.txt",
+      "text": "\nHyperpigmentation - v1 Hyperpigmentation\n==============================\n\nThis dataset was exported via roboflow.com on October 3, 2026 at 7:23 AM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 500 images.\nHyperpigmentation are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n\nNo image augmentation techniques were applied.\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\hyperpigmentation.v2i.yolov8\\README.dataset.txt",
+      "text": "# hyperpigmentation > 2025-12-03 10:14pm\nhttps://universe.roboflow.com/goat-pf9lx/hyperpigmentation-ctmqm\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\hyperpigmentation.v2i.yolov8\\README.roboflow.txt",
+      "text": "\nhyperpigmentation - v2 2025-12-03 10:14pm\n==============================\n\nThis dataset was exported via roboflow.com on December 3, 2025 at 4:48 PM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 1169 images.\nHyperpigmentation are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n* Auto-orientation of pixel data (with EXIF-orientation stripping)\n* Resize to 512x512 (Stretch)\n\nNo image augmentation techniques were applied.\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\hyperpigmentation_yolov10.v3-hyperpigmentation_yolov10_base.yolov8\\README.dataset.txt",
+      "text": "# hyperpigmentation_yolov10 > hyperpigmentation_yolov10_base\nhttps://universe.roboflow.com/rizals-workspace-njmfs/hyperpigmentation_yolov10\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\hyperpigmentation_yolov10.v3-hyperpigmentation_yolov10_base.yolov8\\README.roboflow.txt",
+      "text": "\nhyperpigmentation_yolov10 - v3 hyperpigmentation_yolov10_base\n==============================\n\nThis dataset was exported via roboflow.com on May 9, 2026 at 8:57 AM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 2250 images.\nHyperpigmentation_yolov10 are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n* Auto-orientation of pixel data (with EXIF-orientation stripping)\n* Resize to 640x640 (Stretch)\n\nNo image augmentation techniques were applied.\n\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Pigmentation.v1i.yolov8\\README.dataset.txt",
+      "text": "# Pigmentation > 2026-04-29 1:41pm\nhttps://universe.roboflow.com/tinnaluris-workspace/pigmentation-ptdgs\n\nProvided by a Roboflow user\nLicense: CC BY 4.0\n\n"
+    },
+    {
+      "path": "C:\\Users\\Bautista\\Downloads\\Localization Training Datasets\\Pigmentation.v1i.yolov8\\README.roboflow.txt",
+      "text": "\nPigmentation - v1 2026-04-29 1:41pm\n==============================\n\nThis dataset was exported via roboflow.com on April 29, 2026 at 8:15 AM GMT\n\nRoboflow is an end-to-end computer vision platform that helps you\n* collaborate with your team on computer vision projects\n* collect & organize images\n* understand and search unstructured image data\n* annotate, and create datasets\n* export, train, and deploy computer vision models\n* use active learning to improve your dataset over time\n\nFor state of the art Computer Vision training notebooks you can use with this dataset,\nvisit https://github.com/roboflow/notebooks\n\nTo find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com\n\nThe dataset includes 1634 images.\nPigmentation are annotated in YOLOv8 format.\n\nThe following pre-processing was applied to each image:\n* Auto-orientation of pixel data (with EXIF-orientation stripping)\n* Resize to 768x768 (Stretch)\n\nThe following augmentation was applied to create 2 versions of each source image:\n* 50% probability of horizontal flip\n* Random brigthness adjustment of between -5 and +5 percent\n\n\n"
+    }
+  ]
+}

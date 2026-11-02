@@ -1,0 +1,15 @@
+{
+  "synthetic_only": true,
+  "original_model_path": "/home/bautista/PrecisionSkinV1/runs/facial_only/models/final/precisionskin_best.keras",
+  "status": "PASS",
+  "embedding_shape": [
+    1,
+    128
+  ],
+  "output_shape": [
+    1,
+    4
+  ],
+  "synthetic_head_update": true,
+  "original_unchanged": true
+}

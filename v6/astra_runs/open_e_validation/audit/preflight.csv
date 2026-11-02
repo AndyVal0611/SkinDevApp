@@ -1,0 +1,12 @@
+input,path,kind,level,unlocks,found
+V5 split manifest,<PROJECT>/metadata/metadata/split_manifest.csv,file,required,"dataset inventory, splits, everything downstream",True
+Processed 224x224 images,<PROJECT>/dataset_processed/processed,dir,required,global CNN / V5 baseline inference,True
+V5 ONNX model,<PROJECT>/runs/facial_only/models/final/precisionskin.onnx,file,required,V5 baseline inference and deployment-parity checks,True
+V5 Keras model,<PROJECT>/runs/facial_only/models/final/precisionskin_best.keras,file,recommended,"experiments B/C (fine-tune from V5), Grad-CAM++ on V5",True
+Original (full-size) images,/mnt/c/Users/<USER>/Downloads/PrecisionSkin/Classes,dir,recommended,YOLO on original resolution and ROI crops (else 224x224 processed images are used and flagged),True
+YOLO model folder,/mnt/c/Users/<USER>/source/repos/SkinDevApp/SkinDevApp/Model,dir,required,"three-detector branch, ROI extraction, fusion",True
+Camera capture folder,/mnt/c/Users/<USER>/AppData/Local/LUMYVUE/Captures,dir,optional,"camera-vs-training domain audit, deployment replay",True
+OOD reference folder,,dir,optional,OOD detection evaluation (AUROC),False
+Multilabel annotations,<PROJECT>/v6/annotations/multilabel_annotations.csv,file,gate,ALL supervised training and evaluation,True
+Region annotations,<PROJECT>/v6/annotations/region_annotations.csv,file,gate,"ROI classifier training, localisation metrics",True
+Dataset provenance,<PROJECT>/v6/annotations/dataset_provenance.csv,file,gate,training (permissible-use record),True

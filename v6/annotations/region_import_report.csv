@@ -1,0 +1,22 @@
+item,key,count
+skipped,conflicts with the researcher's image label (absent),30
+skipped,duplicate image-condition from a lower-priority folder,41
+skipped,label file without boxes,10
+skipped,"eczema image not in the 9,789 frozen V6 images",1076
+skipped,image not in V6 train/validation,154
+boxes_by_split_condition,train|acne,5244
+boxes_by_split_condition,train|eczema,1058
+boxes_by_split_condition,train|hyperpigmentation,993
+boxes_by_split_condition,validation|acne,850
+boxes_by_split_condition,validation|eczema,117
+boxes_by_split_condition,validation|hyperpigmentation,148
+boxes_by_source,acne_installed_metadata_dataset,6094
+boxes_by_source,Andrea__eczema_R3_train200,264
+boxes_by_source,hyperpigmentation_candidate_v2_train,727
+boxes_by_source,hyperpigmentation.v2i.yolov8,414
+boxes_by_source,Andrea__eczema_R3_b2,216
+boxes_by_source,Andrea__eczema_R3_b5,131
+boxes_by_source,Andrea__eczema_R3_b3,259
+boxes_by_source,Andrea__eczema_R3_b4,138
+boxes_by_source,Andrea__eczema_R3_b7,60
+boxes_by_source,Andrea__eczema_R3_b6,107

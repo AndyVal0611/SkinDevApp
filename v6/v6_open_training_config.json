@@ -1,0 +1,14 @@
+{
+  "_comment": "Config for LUMYVUE_V6_Training_Pipeline_Open.ipynb (development). Researcher-labelled validation is accepted (EVAL_REQUIRES_DERMATOLOGIST=false). Controlled comparison D vs E; B, C and D2 stay available by adding them to GLOBAL_EXPERIMENTS. Folder names are not used as weak labels (USE_SOURCE_LABEL_AS_WEAK_POSITIVE=false), so D and E train on human-reviewed rows only. One seed for a first, shorter run: restore [42, 7, 123] to assess variability.",
+  "RUN_ID": "open_run02",
+  "OFFLINE_MODE": true,
+  "BATCH_SIZE": 8,
+  "ROI_BATCH": 8,
+  "GPU_MEMORY_LIMIT_MB": 4096,
+  "EVAL_REQUIRES_DERMATOLOGIST": false,
+  "ALLOW_TEST_REEVALUATION": false,
+  "SEEDS": [42],
+  "GLOBAL_EXPERIMENTS": ["D_multilabel3", "E_v5_backbone_multilabel3"],
+  "USE_SOURCE_LABEL_AS_WEAK_POSITIVE": false,
+  "MIN_POSITIVES": {"train": 40, "validation": 20, "fusion": 30, "test": 30}
+}

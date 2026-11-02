@@ -1,0 +1,240 @@
+rank,image_id,split,tier,priority,current_labels,reason,det_acne,det_hyper,det_eczema,v5_normal,v5_hyper
+1,img_008423,validation,1,0.77,none,"labelled clean but Acne detector 0.68, V5 says not-Normal 0.90",0.68,0.0,0.0,0.1,0.89
+2,img_010204,validation,1,0.7,none,"labelled clean but Acne detector 0.50, V5 says not-Normal 1.00",0.5,0.23,0.0,0.0,0.38
+3,img_013783,validation,1,0.687,none,"labelled clean but Acne detector 0.48, V5 says not-Normal 1.00",0.48,0.0,0.0,0.0,0.0
+4,img_018763,validation,1,0.649,none,"labelled clean but Hyperpigmentation detector 0.42, V5 says not-Normal 0.99",0.0,0.42,0.0,0.01,0.0
+5,img_009929,train,1,0.648,none,"labelled clean but Acne detector 0.43, V5 says not-Normal 0.97",0.43,0.0,0.0,0.03,0.96
+6,img_006177,train,1,0.626,none,"labelled clean but Eczema detector 0.38, V5 says not-Normal 1.00",0.0,0.0,0.38,0.0,1.0
+7,img_001391,train,1,0.607,none,"labelled clean but Acne detector 0.35, V5 says not-Normal 1.00",0.35,0.0,0.29,0.0,0.07
+8,img_003275,fusion,1,0.599,none,"labelled clean but Acne detector 0.37, V5 says not-Normal 0.94",0.37,0.0,0.0,0.06,0.01
+9,img_008562,train,1,0.558,none,"labelled clean but Hyperpigmentation detector 0.26, V5 says not-Normal 1.00",0.0,0.26,0.0,0.0,1.0
+10,img_016342,train,1,0.557,none,"labelled clean but Eczema detector 0.26, V5 says not-Normal 1.00",0.0,0.23,0.26,0.0,0.15
+11,img_011178,validation,1,0.483,none,"labelled clean but Hyperpigmentation detector 0.29, V5 says not-Normal 0.78",0.0,0.29,0.0,0.22,0.7
+12,img_020101,validation,1,0.471,none,"labelled clean but Eczema detector 0.78, V5 says not-Normal 0.00",0.0,0.0,0.78,1.0,0.0
+13,img_008682,fusion,1,0.4,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+14,img_012052,train,1,0.4,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+15,img_008658,validation,1,0.4,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+16,img_013862,train,1,0.399,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,0.0
+17,img_011138,validation,1,0.399,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+18,img_009026,validation,1,0.399,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+19,img_005860,validation,1,0.399,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,1.0
+20,img_008009,train,1,0.398,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,0.96
+21,img_007862,train,1,0.398,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 1.00",0.0,0.0,0.0,0.0,0.99
+22,img_012517,validation,1,0.397,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.99",0.0,0.0,0.0,0.01,0.0
+23,img_006439,validation,1,0.394,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.99",0.0,0.0,0.0,0.01,0.99
+24,img_000742,validation,1,0.393,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.98",0.0,0.0,0.0,0.02,0.0
+25,img_006949,validation,1,0.354,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.89",0.0,0.0,0.0,0.11,0.88
+26,img_018630,train,1,0.341,none,"labelled clean but Hyperpigmentation detector 0.56, V5 says not-Normal 0.01",0.0,0.56,0.37,0.99,0.0
+27,img_016054,validation,1,0.341,none,"labelled clean but Eczema detector 0.57, V5 says not-Normal 0.00",0.28,0.0,0.57,1.0,0.0
+28,img_017411,train,1,0.329,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.82",0.0,0.0,0.0,0.18,0.82
+29,img_021549,train,1,0.328,none,"labelled clean but Acne detector 0.55, V5 says not-Normal 0.00",0.55,0.0,0.29,1.0,0.0
+30,img_019948,train,1,0.324,none,"labelled clean but Hyperpigmentation detector 0.53, V5 says not-Normal 0.02",0.0,0.53,0.0,0.98,0.0
+31,img_016297,train,1,0.311,none,"labelled clean but Acne detector 0.39, V5 says not-Normal 0.19",0.39,0.0,0.0,0.81,0.19
+32,img_020357,train,1,0.301,none,"labelled clean but Eczema detector 0.50, V5 says not-Normal 0.00",0.42,0.0,0.5,1.0,0.0
+33,img_019706,train,1,0.296,none,"labelled clean but Acne detector 0.48, V5 says not-Normal 0.01",0.48,0.0,0.0,0.99,0.0
+34,img_017273,train,1,0.295,none,"labelled clean but Acne detector 0.49, V5 says not-Normal 0.00",0.49,0.26,0.0,1.0,0.0
+35,img_011373,validation,1,0.294,none,"labelled clean but Acne detector 0.00, V5 says not-Normal 0.74",0.0,0.0,0.0,0.26,0.73
+36,img_019857,validation,1,0.283,none,"labelled clean but Eczema detector 0.47, V5 says not-Normal 0.01",0.0,0.0,0.47,0.99,0.01
+37,img_017745,fusion,1,0.281,none,"labelled clean but Eczema detector 0.45, V5 says not-Normal 0.02",0.0,0.44,0.45,0.98,0.01
+38,img_017360,validation,1,0.279,none,"labelled clean but Eczema detector 0.46, V5 says not-Normal 0.01",0.0,0.23,0.46,0.99,0.0
+39,img_018362,validation,1,0.265,none,"labelled clean but Hyperpigmentation detector 0.44, V5 says not-Normal 0.00",0.0,0.44,0.0,1.0,0.0
+40,img_017022,validation,1,0.265,none,"labelled clean but Hyperpigmentation detector 0.44, V5 says not-Normal 0.00",0.0,0.44,0.0,1.0,0.0
+41,img_016048,validation,1,0.265,none,"labelled clean but Hyperpigmentation detector 0.44, V5 says not-Normal 0.00",0.0,0.44,0.0,1.0,0.0
+42,img_021813,validation,1,0.263,none,"labelled clean but Hyperpigmentation detector 0.43, V5 says not-Normal 0.02",0.0,0.43,0.32,0.98,0.02
+43,img_018930,validation,1,0.262,none,"labelled clean but Acne detector 0.44, V5 says not-Normal 0.00",0.44,0.0,0.0,1.0,0.0
+44,img_020872,train,1,0.26,none,"labelled clean but Eczema detector 0.43, V5 says not-Normal 0.01",0.0,0.38,0.43,0.99,0.0
+45,img_015969,validation,1,0.26,none,"labelled clean but Acne detector 0.43, V5 says not-Normal 0.00",0.43,0.0,0.34,1.0,0.0
+46,img_019310,validation,1,0.258,none,"labelled clean but Acne detector 0.43, V5 says not-Normal 0.00",0.43,0.0,0.35,1.0,0.0
+47,img_021806,fusion,1,0.257,none,"labelled clean but Acne detector 0.42, V5 says not-Normal 0.02",0.42,0.0,0.0,0.98,0.01
+48,img_016140,train,1,0.255,none,"labelled clean but Hyperpigmentation detector 0.42, V5 says not-Normal 0.00",0.0,0.42,0.0,1.0,0.0
+49,img_020207,train,1,0.254,none,"labelled clean but Eczema detector 0.42, V5 says not-Normal 0.00",0.0,0.0,0.42,1.0,0.0
+50,img_017907,fusion,1,0.253,none,"labelled clean but Acne detector 0.42, V5 says not-Normal 0.00",0.42,0.32,0.0,1.0,0.0
+51,img_019066,validation,1,0.251,none,"labelled clean but Eczema detector 0.42, V5 says not-Normal 0.00",0.0,0.0,0.42,1.0,0.0
+52,img_016453,fusion,1,0.247,none,"labelled clean but Eczema detector 0.41, V5 says not-Normal 0.00",0.0,0.0,0.41,1.0,0.0
+53,img_018578,fusion,1,0.246,none,"labelled clean but Acne detector 0.41, V5 says not-Normal 0.00",0.41,0.0,0.0,1.0,0.0
+54,img_017366,train,1,0.246,none,"labelled clean but Acne detector 0.41, V5 says not-Normal 0.00",0.41,0.0,0.0,1.0,0.0
+55,img_016281,train,1,0.246,none,"labelled clean but Eczema detector 0.41, V5 says not-Normal 0.00",0.0,0.27,0.41,1.0,0.0
+56,img_021110,train,1,0.245,none,"labelled clean but Eczema detector 0.41, V5 says not-Normal 0.00",0.0,0.27,0.41,1.0,0.0
+57,img_019177,train,1,0.245,none,"labelled clean but Eczema detector 0.41, V5 says not-Normal 0.00",0.0,0.34,0.41,1.0,0.0
+58,img_018817,train,1,0.245,none,"labelled clean but Eczema detector 0.41, V5 says not-Normal 0.00",0.0,0.0,0.41,1.0,0.0
+59,img_018259,validation,1,0.244,none,"labelled clean but Acne detector 0.40, V5 says not-Normal 0.00",0.4,0.0,0.37,1.0,0.0
+60,img_020170,train,1,0.243,none,"labelled clean but Hyperpigmentation detector 0.40, V5 says not-Normal 0.00",0.3,0.4,0.0,1.0,0.0
+61,img_017382,train,1,0.243,none,"labelled clean but Acne detector 0.40, V5 says not-Normal 0.00",0.4,0.24,0.0,1.0,0.0
+62,img_016518,validation,1,0.242,none,"labelled clean but Hyperpigmentation detector 0.40, V5 says not-Normal 0.00",0.0,0.4,0.35,1.0,0.0
+63,img_019842,fusion,1,0.24,none,"labelled clean but Acne detector 0.40, V5 says not-Normal 0.00",0.4,0.0,0.0,1.0,0.0
+64,img_019214,fusion,1,0.239,none,"labelled clean but Acne detector 0.40, V5 says not-Normal 0.00",0.4,0.0,0.0,1.0,0.0
+65,img_017924,train,1,0.239,none,"labelled clean but Hyperpigmentation detector 0.40, V5 says not-Normal 0.00",0.0,0.4,0.0,1.0,0.0
+66,img_018884,validation,1,0.238,none,"labelled clean but Eczema detector 0.39, V5 says not-Normal 0.00",0.0,0.0,0.39,1.0,0.0
+67,img_020290,train,1,0.236,none,"labelled clean but Hyperpigmentation detector 0.37, V5 says not-Normal 0.03",0.0,0.37,0.26,0.97,0.0
+68,img_019049,fusion,1,0.235,none,"labelled clean but Acne detector 0.39, V5 says not-Normal 0.00",0.39,0.0,0.0,1.0,0.0
+69,img_020583,validation,1,0.235,none,"labelled clean but Acne detector 0.39, V5 says not-Normal 0.00",0.39,0.31,0.25,1.0,0.0
+70,img_018956,train,1,0.233,none,"labelled clean but Eczema detector 0.38, V5 says not-Normal 0.01",0.0,0.0,0.38,0.99,0.01
+71,img_021850,train,1,0.232,none,"labelled clean but Hyperpigmentation detector 0.39, V5 says not-Normal 0.00",0.0,0.39,0.0,1.0,0.0
+72,img_017975,fusion,1,0.226,none,"labelled clean but Hyperpigmentation detector 0.35, V5 says not-Normal 0.04",0.0,0.35,0.0,0.96,0.0
+73,img_020059,train,1,0.223,none,"labelled clean but Eczema detector 0.37, V5 says not-Normal 0.00",0.0,0.0,0.37,1.0,0.0
+74,img_019742,train,1,0.223,none,"labelled clean but Hyperpigmentation detector 0.37, V5 says not-Normal 0.01",0.0,0.37,0.0,0.99,0.01
+75,img_015810,train,1,0.221,none,"labelled clean but Hyperpigmentation detector 0.36, V5 says not-Normal 0.02",0.28,0.36,0.28,0.98,0.01
+76,img_016631,train,1,0.221,none,"labelled clean but Acne detector 0.37, V5 says not-Normal 0.00",0.37,0.0,0.0,1.0,0.0
+77,img_016312,validation,1,0.22,none,"labelled clean but Eczema detector 0.37, V5 says not-Normal 0.00",0.0,0.23,0.37,1.0,0.0
+78,img_018810,train,1,0.219,none,"labelled clean but Eczema detector 0.37, V5 says not-Normal 0.00",0.0,0.0,0.37,1.0,0.0
+79,img_020427,validation,1,0.218,none,"labelled clean but Acne detector 0.36, V5 says not-Normal 0.00",0.36,0.0,0.28,1.0,0.0
+80,img_016047,train,1,0.215,none,"labelled clean but Acne detector 0.35, V5 says not-Normal 0.01",0.35,0.0,0.0,0.99,0.0
+81,img_021321,validation,1,0.215,none,"labelled clean but Eczema detector 0.35, V5 says not-Normal 0.01",0.31,0.0,0.35,0.99,0.0
+82,img_018985,train,1,0.214,none,"labelled clean but Eczema detector 0.36, V5 says not-Normal 0.00",0.28,0.0,0.36,1.0,0.0
+83,img_016355,train,1,0.212,none,"labelled clean but Eczema detector 0.35, V5 says not-Normal 0.00",0.0,0.25,0.35,1.0,0.0
+84,img_018026,train,1,0.212,none,"labelled clean but Acne detector 0.35, V5 says not-Normal 0.00",0.35,0.0,0.0,1.0,0.0
+85,img_013462,fusion,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.0,0.0,0.0
+86,img_019374,fusion,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.0,1.0,0.0
+87,img_002403,train,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.6,0.0,0.62,0.0,0.0
+88,img_001530,train,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.68,0.0,0.29,0.0,0.0
+89,img_002418,train,2,1.0,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.4,0.0,0.0,0.0,0.0
+90,img_019163,validation,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.38,0.0,0.0,1.0,0.0
+91,img_014395,validation,2,1.0,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.33,0.0,0.0
+92,img_017315,validation,2,0.999,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.25,1.0,0.0
+93,img_018813,validation,2,0.999,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.25,1.0,0.0
+94,img_016513,validation,2,0.999,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.0,0.0,0.27,1.0,0.0
+95,img_001065,validation,2,0.998,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.69,0.0,0.44,0.0,0.0
+96,img_003675,validation,2,0.998,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.00 both say no,0.75,0.0,0.58,0.0,0.0
+97,img_004751,train,2,0.997,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.0,0.0,0.0,0.0,0.01
+98,img_000221,train,2,0.997,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.0,0.0,0.0,0.0,0.01
+99,img_017160,validation,2,0.997,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.0,0.0,0.0,0.98,0.01
+100,img_000301,validation,2,0.996,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.65,0.0,0.58,0.0,0.01
+101,img_016301,validation,2,0.996,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.32,0.0,0.0,0.99,0.01
+102,img_017267,fusion,2,0.995,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.0,0.0,0.0,0.98,0.01
+103,img_004258,validation,2,0.995,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.44,0.0,0.32,0.0,0.01
+104,img_012495,validation,2,0.995,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.01 both say no,0.66,0.0,0.39,0.0,0.01
+105,img_002197,train,2,0.992,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.0,0.0,0.0,0.0,0.02
+106,img_002063,train,2,0.992,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.0,0.0,0.0,0.0,0.02
+107,img_015277,train,2,0.992,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.0,0.0,0.0,0.0,0.02
+108,img_000741,train,2,0.99,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.72,0.0,0.0,0.0,0.02
+109,img_001033,train,2,0.99,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.66,0.0,0.55,0.0,0.02
+110,img_005350,train,2,0.988,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.4,0.0,0.0,0.0,0.02
+111,img_002788,train,2,0.988,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.02 both say no,0.67,0.0,0.35,0.0,0.02
+112,img_012998,train,2,0.987,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.03 both say no,0.0,0.0,0.0,0.01,0.03
+113,img_005276,fusion,2,0.978,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.04 both say no,0.0,0.0,0.0,0.0,0.04
+114,img_004570,train,2,0.964,Acne|Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.07 both say no,0.76,0.0,0.55,0.0,0.07
+115,img_013996,train,2,0.95,Hyperpigmentation,labelled hyperpigmentation but detector 0.00 and V5 0.10 both say no,0.0,0.0,0.0,0.08,0.1
+116,img_005234,validation,3,0.827,Acne,hyperpigmentation labelled absent but detector 0.83,0.48,0.83,0.59,0.0,0.0
+117,img_014997,train,3,0.811,Eczema,hyperpigmentation labelled absent but detector 0.81,0.63,0.81,0.71,0.0,0.0
+118,img_012282,train,3,0.795,Eczema,hyperpigmentation labelled absent but detector 0.80,0.31,0.8,0.75,0.0,0.01
+119,img_000708,fusion,3,0.774,Acne,hyperpigmentation labelled absent but detector 0.77,0.33,0.77,0.87,0.0,0.0
+120,img_012810,train,3,0.774,Eczema,hyperpigmentation labelled absent but detector 0.77,0.41,0.77,0.9,0.0,0.0
+121,img_013492,train,3,0.77,Eczema,hyperpigmentation labelled absent but detector 0.77,0.0,0.77,0.63,0.02,0.05
+122,img_003435,train,3,0.743,Acne,hyperpigmentation labelled absent but detector 0.74,0.72,0.74,0.5,0.0,0.0
+123,img_012341,train,3,0.74,Eczema,hyperpigmentation labelled absent but detector 0.74,0.0,0.74,0.55,0.0,0.0
+124,img_015057,train,3,0.732,Eczema,hyperpigmentation labelled absent but detector 0.73,0.4,0.73,0.42,0.01,0.1
+125,img_012944,train,3,0.722,Acne,hyperpigmentation labelled absent but detector 0.72,0.32,0.72,0.76,0.06,0.17
+126,img_013161,train,3,0.715,Eczema,hyperpigmentation labelled absent but detector 0.71,0.64,0.71,0.54,0.02,0.0
+127,img_012976,train,3,0.704,Eczema,hyperpigmentation labelled absent but detector 0.70,0.0,0.7,0.48,0.0,0.0
+128,img_005689,fusion,3,0.702,Acne,hyperpigmentation labelled absent but detector 0.70,0.47,0.7,0.31,0.0,0.0
+129,img_013443,train,3,0.702,Eczema,hyperpigmentation labelled absent but detector 0.70,0.63,0.7,0.82,0.0,0.01
+130,img_001356,fusion,3,0.7,Acne,hyperpigmentation labelled absent but detector 0.70,0.77,0.7,0.78,0.0,0.01
+131,img_014018,train,3,0.7,Eczema,hyperpigmentation labelled absent but detector 0.70,0.39,0.7,0.8,0.0,0.0
+132,img_003380,fusion,3,0.697,Acne,hyperpigmentation labelled absent but detector 0.70,0.0,0.7,0.7,0.0,0.0
+133,img_001716,train,3,0.692,Acne,hyperpigmentation labelled absent but detector 0.69,0.75,0.69,0.61,0.01,0.04
+134,img_015084,train,3,0.675,Eczema,hyperpigmentation labelled absent but detector 0.68,0.41,0.68,0.33,0.0,0.0
+135,img_012779,train,3,0.674,Eczema,hyperpigmentation labelled absent but detector 0.67,0.3,0.67,0.74,0.03,0.05
+136,img_013058,train,3,0.673,Eczema,hyperpigmentation labelled absent but detector 0.67,0.72,0.67,0.82,0.0,0.0
+137,img_013898,train,3,0.673,Eczema,hyperpigmentation labelled absent but detector 0.67,0.6,0.67,0.59,0.0,0.0
+138,img_001182,train,3,0.671,Acne,hyperpigmentation labelled absent but detector 0.67,0.79,0.67,0.72,0.0,0.01
+139,img_004196,train,3,0.66,Acne,hyperpigmentation labelled absent but detector 0.66,0.67,0.66,0.48,0.01,0.01
+140,img_014611,train,3,0.656,Eczema,hyperpigmentation labelled absent but detector 0.66,0.49,0.66,0.51,0.0,0.0
+141,img_003872,validation,3,0.656,Acne,hyperpigmentation labelled absent but detector 0.66,0.0,0.66,0.46,0.0,0.0
+142,img_004348,train,3,0.652,Acne,hyperpigmentation labelled absent but detector 0.65,0.74,0.65,0.37,0.0,0.0
+143,img_000076,fusion,3,0.65,Acne,hyperpigmentation labelled absent but detector 0.65,0.47,0.65,0.68,0.0,0.0
+144,img_014428,validation,3,0.649,Eczema,hyperpigmentation labelled absent but detector 0.65,0.71,0.65,0.57,0.0,0.0
+145,img_012304,train,3,0.648,Eczema,hyperpigmentation labelled absent but detector 0.65,0.34,0.65,0.75,0.0,0.0
+146,img_014106,validation,3,0.648,Eczema,hyperpigmentation labelled absent but detector 0.65,0.38,0.65,0.78,0.0,0.0
+147,img_012855,train,3,0.647,Eczema,hyperpigmentation labelled absent but detector 0.65,0.0,0.65,0.47,0.0,0.0
+148,img_012625,train,3,0.647,Eczema,hyperpigmentation labelled absent but detector 0.65,0.63,0.65,0.47,0.01,0.31
+149,img_014766,train,3,0.646,Eczema,hyperpigmentation labelled absent but detector 0.65,0.48,0.65,0.38,0.0,0.0
+150,img_012664,train,3,0.643,Eczema,hyperpigmentation labelled absent but detector 0.64,0.0,0.64,0.37,0.0,0.05
+151,img_013781,train,3,0.64,Eczema,hyperpigmentation labelled absent but detector 0.64,0.59,0.64,1.0,0.0,0.0
+152,img_013254,train,3,0.639,Eczema,hyperpigmentation labelled absent but detector 0.64,0.55,0.64,0.79,0.07,0.0
+153,img_013734,fusion,3,0.634,Eczema,hyperpigmentation labelled absent but detector 0.63,0.6,0.63,0.48,0.0,0.0
+154,img_005340,train,3,0.624,Acne,hyperpigmentation labelled absent but detector 0.62,0.68,0.62,0.62,0.0,0.11
+155,img_015570,validation,3,0.623,Eczema,hyperpigmentation labelled absent but detector 0.62,0.75,0.62,1.0,0.0,0.0
+156,img_001253,train,3,0.622,Acne,hyperpigmentation labelled absent but detector 0.62,0.33,0.62,0.0,0.0,0.0
+157,img_000599,train,3,0.62,Acne,hyperpigmentation labelled absent but detector 0.62,0.72,0.62,0.67,0.0,0.0
+158,img_014912,validation,3,0.62,Eczema,hyperpigmentation labelled absent but detector 0.62,0.63,0.62,0.71,0.03,0.08
+159,img_004077,validation,3,0.618,Acne,hyperpigmentation labelled absent but detector 0.62,0.75,0.62,0.65,0.0,0.0
+160,img_014225,fusion,3,0.615,Eczema,hyperpigmentation labelled absent but detector 0.61,0.74,0.61,0.67,0.0,0.0
+161,img_010504,train,3,0.615,Acne,hyperpigmentation labelled absent but detector 0.62,0.0,0.62,0.0,0.0,0.89
+162,img_012211,fusion,3,0.613,Eczema,hyperpigmentation labelled absent but detector 0.61,0.58,0.61,0.55,0.0,0.0
+163,img_003154,train,3,0.606,Acne,hyperpigmentation labelled absent but detector 0.61,0.73,0.61,0.41,0.0,0.0
+164,img_002361,validation,3,0.604,Acne,hyperpigmentation labelled absent but detector 0.60,0.58,0.6,0.53,0.0,0.0
+165,img_005060,fusion,3,0.602,Acne,hyperpigmentation labelled absent but detector 0.60,0.7,0.6,0.64,0.0,0.0
+166,img_002557,validation,3,0.6,Acne,hyperpigmentation labelled absent but detector 0.60,0.8,0.6,0.61,0.0,0.0
+167,img_002354,train,3,0.599,Acne,hyperpigmentation labelled absent but detector 0.60,0.74,0.6,0.67,0.0,0.0
+168,img_012427,validation,3,0.597,Eczema,hyperpigmentation labelled absent but detector 0.60,0.5,0.6,0.46,0.0,0.0
+169,img_012809,train,3,0.595,Eczema,hyperpigmentation labelled absent but detector 0.60,0.0,0.6,0.76,0.0,0.0
+170,img_014855,train,3,0.594,Eczema,hyperpigmentation labelled absent but detector 0.59,0.57,0.59,0.7,0.0,0.0
+171,img_011320,train,3,0.593,Eczema,hyperpigmentation labelled absent but detector 0.59,0.29,0.59,0.0,0.0,1.0
+172,img_000888,validation,3,0.593,Acne,hyperpigmentation labelled absent but detector 0.59,0.75,0.59,0.67,0.0,0.0
+173,img_015320,train,3,0.591,Eczema,hyperpigmentation labelled absent but detector 0.59,0.67,0.59,0.63,0.0,0.03
+174,img_014920,train,3,0.589,Eczema,hyperpigmentation labelled absent but detector 0.59,0.52,0.59,0.31,0.0,0.01
+175,img_012335,fusion,3,0.588,Eczema,hyperpigmentation labelled absent but detector 0.59,0.0,0.59,0.61,0.0,0.03
+176,img_013164,train,3,0.586,Eczema,hyperpigmentation labelled absent but detector 0.59,0.69,0.59,0.59,0.0,0.0
+177,img_015067,train,3,0.585,Eczema,hyperpigmentation labelled absent but detector 0.59,0.45,0.59,0.57,0.0,0.0
+178,img_012276,train,3,0.584,Eczema,hyperpigmentation labelled absent but detector 0.58,0.58,0.58,0.66,0.0,0.0
+179,img_013112,train,3,0.583,Eczema,hyperpigmentation labelled absent but detector 0.58,0.71,0.58,0.65,0.0,0.0
+180,img_014149,train,3,0.58,Acne,hyperpigmentation labelled absent but detector 0.58,0.56,0.58,0.41,0.0,0.19
+181,img_003033,train,3,0.58,Acne,hyperpigmentation labelled absent but detector 0.58,0.64,0.58,0.3,0.0,0.0
+182,img_013251,train,3,0.58,Eczema,hyperpigmentation labelled absent but detector 0.58,0.61,0.58,0.67,0.0,0.01
+183,img_000137,validation,3,0.579,Acne,hyperpigmentation labelled absent but detector 0.58,0.59,0.58,0.5,0.0,0.02
+184,img_010995,train,3,0.578,Acne,hyperpigmentation labelled absent but detector 0.58,0.0,0.58,0.0,0.0,0.99
+185,img_000075,train,3,0.576,Acne,hyperpigmentation labelled absent but detector 0.58,0.82,0.58,0.48,0.0,0.0
+186,img_002083,validation,3,0.576,Acne,hyperpigmentation labelled absent but detector 0.58,0.78,0.58,0.76,0.0,0.01
+187,img_002310,fusion,3,0.574,Acne,hyperpigmentation labelled absent but detector 0.57,0.7,0.57,0.42,0.0,0.0
+188,img_005478,validation,3,0.573,Acne,hyperpigmentation labelled absent but detector 0.57,0.7,0.57,0.5,0.0,0.01
+189,img_013278,train,3,0.572,Eczema,hyperpigmentation labelled absent but detector 0.57,0.0,0.57,0.77,0.0,0.0
+190,img_017709,validation,3,0.571,Acne,hyperpigmentation labelled absent but detector 0.57,0.33,0.57,0.0,0.99,0.0
+191,img_016993,validation,3,0.571,Acne,hyperpigmentation labelled absent but detector 0.57,0.33,0.57,0.0,0.99,0.0
+192,img_004657,train,3,0.565,Acne,hyperpigmentation labelled absent but detector 0.57,0.67,0.57,0.34,0.0,0.0
+193,img_002111,train,3,0.565,Acne,hyperpigmentation labelled absent but detector 0.57,0.57,0.57,0.55,0.0,0.01
+194,img_001749,fusion,3,0.559,Acne,hyperpigmentation labelled absent but detector 0.56,0.79,0.56,0.58,0.0,0.0
+195,img_015230,train,3,0.557,Eczema,hyperpigmentation labelled absent but detector 0.56,0.5,0.56,0.54,0.0,0.0
+196,img_000129,fusion,3,0.553,Acne,hyperpigmentation labelled absent but detector 0.55,0.81,0.55,0.46,0.0,0.0
+197,img_003487,validation,3,0.553,Acne,hyperpigmentation labelled absent but detector 0.55,0.8,0.55,0.54,0.0,0.0
+198,img_003168,validation,3,0.553,Acne,hyperpigmentation labelled absent but detector 0.55,0.7,0.55,0.79,0.0,0.0
+199,img_000721,train,3,0.549,Acne,hyperpigmentation labelled absent but detector 0.55,0.81,0.55,0.47,0.0,0.0
+200,img_005344,fusion,3,0.545,Acne,hyperpigmentation labelled absent but detector 0.54,0.66,0.54,0.56,0.01,0.0
+201,img_014073,train,3,0.545,Eczema,hyperpigmentation labelled absent but detector 0.54,0.37,0.54,0.34,0.0,0.01
+202,img_012948,train,3,0.543,Eczema,hyperpigmentation labelled absent but detector 0.54,0.28,0.54,0.41,0.0,0.0
+203,img_005241,fusion,3,0.541,Eczema,hyperpigmentation labelled absent but detector 0.54,0.43,0.54,0.65,0.0,0.0
+204,img_004329,validation,3,0.541,Acne,hyperpigmentation labelled absent but detector 0.54,0.66,0.54,0.46,0.0,0.0
+205,img_002703,train,3,0.539,Acne,hyperpigmentation labelled absent but detector 0.54,0.8,0.54,0.6,0.0,0.0
+206,img_000754,train,3,0.537,Acne,hyperpigmentation labelled absent but detector 0.54,0.77,0.54,0.36,0.0,0.09
+207,img_014798,train,3,0.537,Eczema,hyperpigmentation labelled absent but detector 0.54,0.67,0.54,0.64,0.0,0.0
+208,img_013274,train,3,0.532,Eczema,hyperpigmentation labelled absent but detector 0.53,0.66,0.53,0.37,0.0,0.03
+209,img_000933,train,3,0.529,Acne,hyperpigmentation labelled absent but detector 0.53,0.75,0.53,0.53,0.0,0.01
+210,img_004989,train,3,0.527,Acne,hyperpigmentation labelled absent but detector 0.53,0.68,0.53,0.68,0.0,0.0
+211,img_003544,validation,3,0.527,Acne,hyperpigmentation labelled absent but detector 0.53,0.7,0.53,0.47,0.0,0.0
+212,img_000700,validation,3,0.525,Acne,hyperpigmentation labelled absent but detector 0.53,0.76,0.53,0.65,0.06,0.03
+213,img_012636,train,3,0.524,Eczema,hyperpigmentation labelled absent but detector 0.52,0.4,0.52,0.39,0.03,0.0
+214,img_003281,fusion,3,0.523,Acne,hyperpigmentation labelled absent but detector 0.52,0.75,0.52,0.33,0.0,0.0
+215,img_002320,train,3,0.523,Acne,hyperpigmentation labelled absent but detector 0.52,0.81,0.52,0.59,0.0,0.0
+216,img_013256,train,3,0.523,Eczema,hyperpigmentation labelled absent but detector 0.52,0.44,0.52,0.7,0.0,0.0
+217,img_021741,train,3,0.52,Acne,hyperpigmentation labelled absent but detector 0.52,0.34,0.52,0.33,0.98,0.01
+218,img_003357,train,3,0.518,Acne,hyperpigmentation labelled absent but detector 0.52,0.72,0.52,0.47,0.0,0.0
+219,img_002783,fusion,3,0.517,Acne,hyperpigmentation labelled absent but detector 0.52,0.76,0.52,0.75,0.0,0.0
+220,img_003706,train,3,0.516,Acne,hyperpigmentation labelled absent but detector 0.52,0.38,0.52,0.44,0.0,0.0
+221,img_013745,train,3,0.516,Eczema,hyperpigmentation labelled absent but detector 0.52,0.62,0.52,0.6,0.0,0.01
+222,img_012238,train,3,0.516,Eczema,hyperpigmentation labelled absent but detector 0.52,0.67,0.52,0.57,0.0,0.0
+223,img_001575,validation,3,0.515,Acne,hyperpigmentation labelled absent but detector 0.51,0.41,0.51,0.5,0.01,0.1
+224,img_015284,train,3,0.514,Eczema,hyperpigmentation labelled absent but detector 0.51,0.55,0.51,0.64,0.01,0.0
+225,img_002807,fusion,3,0.513,Acne,hyperpigmentation labelled absent but detector 0.51,0.47,0.51,0.47,0.0,0.0
+226,img_002032,validation,3,0.513,Acne,hyperpigmentation labelled absent but detector 0.51,0.74,0.51,0.37,0.02,0.0
+227,img_002562,validation,3,0.511,Acne,hyperpigmentation labelled absent but detector 0.51,0.63,0.51,0.39,0.0,0.0
+228,img_005704,validation,3,0.511,Acne,hyperpigmentation labelled absent but detector 0.51,0.57,0.51,0.47,0.04,0.0
+229,img_003970,train,3,0.508,Eczema,hyperpigmentation labelled absent but detector 0.51,0.69,0.51,0.59,0.0,0.01
+230,img_012713,train,3,0.508,Eczema,hyperpigmentation labelled absent but detector 0.51,0.33,0.51,0.66,0.01,0.0
+231,img_003873,train,3,0.506,Acne,hyperpigmentation labelled absent but detector 0.51,0.71,0.51,0.5,0.02,0.03
+232,img_000280,train,3,0.505,Acne,hyperpigmentation labelled absent but detector 0.51,0.75,0.51,0.39,0.0,0.39
+233,img_014909,validation,3,0.505,Eczema,hyperpigmentation labelled absent but detector 0.51,0.64,0.51,0.44,0.0,0.0
+234,img_004974,fusion,3,0.504,Acne,hyperpigmentation labelled absent but detector 0.50,0.78,0.5,0.7,0.0,0.0
+235,img_014565,validation,3,0.503,Eczema,hyperpigmentation labelled absent but detector 0.50,0.64,0.5,0.53,0.0,0.0
+236,img_000011,validation,3,0.503,Acne,hyperpigmentation labelled absent but detector 0.50,0.66,0.5,0.29,0.0,0.01
+237,img_007520,train,3,0.502,Eczema,hyperpigmentation labelled absent but detector 0.50,0.0,0.5,0.0,0.01,0.95
+238,img_013475,train,3,0.502,Eczema,hyperpigmentation labelled absent but detector 0.50,0.42,0.5,0.57,0.0,0.0
+239,img_002010,validation,3,0.501,Acne,hyperpigmentation labelled absent but detector 0.50,0.7,0.5,0.62,0.0,0.0

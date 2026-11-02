@@ -1,0 +1,97 @@
+{
+  "source": "<PROJECT>/runs/facial_only/models/final/precisionskin_best.keras",
+  "source_sha256": "7710924820c4272bc0c2f9c06b42208953827f0e86bed5302621b841a7852f3e",
+  "input_contract": {
+    "channel_order": "RGB",
+    "normalization": "(pixel / 127.5) - 1.0",
+    "input_size": [
+      224,
+      224,
+      3
+    ],
+    "classes": [
+      "Acne",
+      "Hyperpigmentation",
+      "Eczema",
+      "Normal"
+    ]
+  },
+  "layers_total": 154,
+  "layers_with_weights_transferred": 104,
+  "tensors_transferred": 260,
+  "layers_skipped": [],
+  "weightless_layers_renamed": [
+    [
+      "input_layer_2",
+      "input_layer"
+    ]
+  ],
+  "v5_head_layers_not_transferred": [
+    "batch_normalization_3",
+    "dense_3",
+    "batch_normalization_4",
+    "dense_4",
+    "batch_normalization_5",
+    "dense_5"
+  ],
+  "tensors_equal_to_v5": 260,
+  "v5_tensors_differing_from_imagenet": 18,
+  "v5_vs_imagenet_mean_relative_change_of_those": 0.013118993982465731,
+  "backbone_output_max_abs_diff_v5_vs_e": 0.0,
+  "backbone_output_max_abs_diff_imagenet_vs_e": 6.0,
+  "head_identical_to_D_at_same_seed": true,
+  "head_shapes": [
+    [
+      1280,
+      128
+    ],
+    [
+      128
+    ],
+    [
+      128,
+      3
+    ],
+    [
+      3
+    ]
+  ],
+  "v5_dense_shapes": [
+    [
+      1280,
+      256
+    ],
+    [
+      256
+    ],
+    [
+      256,
+      128
+    ],
+    [
+      128
+    ],
+    [
+      128,
+      4
+    ],
+    [
+      4
+    ]
+  ],
+  "output_shape": [
+    4,
+    3
+  ],
+  "embedding_shape": [
+    4,
+    128
+  ],
+  "output_is_raw_logits": true,
+  "sigmoid_probabilities_in_0_1": true,
+  "unknown_label_is_masked": true,
+  "trainable_backbone_layers_phase_A": 0,
+  "trainable_backbone_layers_phase_B": 36,
+  "batchnorm_frozen_phase_B": true,
+  "layers_below_fine_tune_at_frozen_phase_B": true
+}
