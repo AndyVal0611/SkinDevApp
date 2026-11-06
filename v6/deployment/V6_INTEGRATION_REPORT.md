@@ -67,7 +67,7 @@ Set the environment variable `LUMYVUE_V6_UNIFIED=1`, launch the app and run a sc
 
 ## Full variant (Global + YOLO + ROI MobileNetV2)
 
-Added after the global_yolo integration. Selected by `V6Variant` in App.config (`full` or `global_yolo`; default `full`; if the full models cannot load the app falls back to `global_yolo`, and every saved assessment records which variant ran).
+Added after the global_yolo integration. Selected by `V6Variant` in App.config (`full` or `global_yolo`; default `global_yolo`, chosen because the full variant showed no clear accuracy gain and is slower; if the full models cannot load the app falls back to `global_yolo`, and every saved assessment records which variant ran).
 
 - Port of `build_roi_candidates`, `crop_roi`, `square_crop_box`, `yolo_roi_features` and `roi_sets_for` (`07_roi_branch.cellsrc`) in `SkinDevApp/V6/V6Roi.cs`; ensemble support counts exposed by `LesionDetector` (`LesionBox.Support`).
 - Calibration `full` (thresholds 0.43 / 0.34 / 0.33), band 0.0, same flags and states as global_yolo. The Global-only fusion is still used for the conflict flag.
