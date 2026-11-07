@@ -110,14 +110,10 @@ namespace SkinDevApp.Data
         {
             failed = 0;
             int imported = 0;
-            string root = CaptureArchive.RootDirectory;
-            if (!Directory.Exists(root)) return 0;
-
             HashSet<string> known = KnownSessionIds();
             var pid = new Regex(@"^PS-\d{4,}$");
 
-            foreach (string day in Directory.GetDirectories(root))
-                foreach (string folder in Directory.GetDirectories(day))
+            foreach (string folder in ScanStorage.ScanFoldersOnDisk().ToList())
                 {
                     try
                     {
@@ -229,6 +225,11 @@ namespace SkinDevApp.Data
                     "@op", head.OperatorID, "@fj", head.FusionJson, "@imp", StudyRepository.Now()))
                     cmd.ExecuteNonQuery();
 
+                // every new scan starts as Pending verification (an existing status is never overwritten by a re-import)
+                using (var cmd = StudyRepository.Cmd(c, "UPDATE ScanSessions SET ReviewStatus=@st, ReviewStatusAt=@at WHERE ScanSessionID=@id AND ReviewStatus IS NULL;", tx,
+                    "@st", ReviewStatus.Pending, "@at", StudyRepository.Now(), "@id", head.ScanSessionID))
+                    cmd.ExecuteNonQuery();
+
                 DeleteViews(c, tx, head.ScanSessionID);
                 foreach (Tuple<string, string, CaptureRecord> v in records)
                     InsertView(c, tx, head.ScanSessionID, v.Item1, v.Item2, v.Item3, modelId);
@@ -241,6 +242,10 @@ namespace SkinDevApp.Data
 
                 tx.Commit();
             }
+            // the final model's result of each photograph goes into the database with the scan (no-op for photographs without one)
+            if (finalize)
+                try { SkinDevApp.V6.AIResultStore.SyncSession(head.ScanSessionID); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[AIResultStore] " + ex.Message); }
         }
 
         private static string NewLabel(SQLiteConnection c, SQLiteTransaction tx, ScanSessionRow head)

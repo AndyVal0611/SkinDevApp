@@ -73,41 +73,45 @@ namespace SkinDevApp.Tests
         }
 
         [Fact]
-        public void Session_summary_reports_each_photograph_and_never_merges_them()
+        public void Session_summary_reports_each_photograph_and_gives_one_clinical_reading()
         {
             var map = Map(Kv("Front", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" })), Kv("Left", Make(V6States.UncertainReviewRequired, new string[0], new[] { "cnn_yolo_conflict_Eczema" })),
                           Kv("Right", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" })));
             V6SessionSummary s = V6SessionSummary.From(map, single: false);
             Assert.False(s.Single); Assert.Equal(new[] { "Front", "Left", "Right" }, s.Views.Select(v => v.View).ToArray());
-            Assert.Equal("Unified AI assessment for each photograph: 1 of 3 need a closer look", s.Headline);
+            Assert.Equal(ClinicalCategory.NeedsReview, s.Clinical.Category);                                    // one photograph needs a closer look: the scan needs review
+            Assert.Equal("Hyperpigmentation detected · needs review", s.Headline);
             Assert.True(s.ReviewRecommended); Assert.Equal(new[] { "Hyperpigmentation" }, s.PresentUnion); Assert.False(s.AllNoFindings);
-            Assert.Contains(s.Notes, n => n.Contains("not merged")); Assert.Contains(s.Notes, n => n.Contains("do not all show the same findings"));
-            Assert.Equal("V6: Hyperpigmentation", s.ShortLabel);
-            Assert.Equal("Left view", s.Views[1].Label); Assert.Single(s.Views[1].FlagLines);
+            Assert.Contains(s.Notes, n => n.Contains("do not all show the same findings"));
+            Assert.Equal("Needs review: Hyperpigmentation", s.ShortLabel);
+            Assert.Equal("Left side", s.Views[1].Label); Assert.Single(s.Views[1].FlagLines);
+            Assert.Contains("Eczema: the whole-face reading and the lesion detector disagree (Left side).", s.Clinical.ReviewReasons);
         }
 
         [Fact]
-        public void Single_photograph_summary_uses_the_state_headline_and_a_short_receipt_label()
+        public void Single_photograph_summary_uses_the_clinical_title_and_a_short_receipt_label()
         {
-            Assert.Equal("V6: no findings", V6SessionSummary.From(Map(Kv("Single", Make(V6States.NoFindingsSupported, new string[0]))), true).ShortLabel);
+            V6SessionSummary none = V6SessionSummary.From(Map(Kv("Single", Make(V6States.NoFindingsSupported, new string[0]))), true);
+            Assert.Equal("No condition detected", none.ShortLabel); Assert.True(none.AllNoFindings);
             V6SessionSummary two = V6SessionSummary.From(Map(Kv("Single", Make(V6States.MultipleFindingsSupported, new[] { "Acne", "Eczema" }))), true);
-            Assert.Equal("Several findings supported: Acne, Eczema", two.Headline); Assert.Equal("V6: Acne+Eczema", two.ShortLabel); Assert.False(two.ReviewRecommended);
-            Assert.Equal("V6: review required", V6SessionSummary.From(Map(Kv("Single", Make(V6States.UncertainReviewRequired, new string[0]))), true).ShortLabel);
-            Assert.Equal("V6: not completed", V6SessionSummary.From(Map(Kv("Single", UnifiedAssessment.Failed("x"))), true).ShortLabel);
+            Assert.Equal("Condition detected: Acne and Eczema", two.Headline); Assert.Equal("Condition detected: Acne, Eczema", two.ShortLabel); Assert.False(two.ReviewRecommended);
+            Assert.Equal("Needs review", V6SessionSummary.From(Map(Kv("Single", Make(V6States.UncertainReviewRequired, new string[0]))), true).ShortLabel);
+            Assert.Equal("Analysis not completed", V6SessionSummary.From(Map(Kv("Single", UnifiedAssessment.Failed("x"))), true).ShortLabel);
         }
 
         // ------------------------------------------------------------------ receipt
         [Fact]
-        public void Receipt_block_states_one_assessment_and_has_no_v5_classification_lines()
+        public void Receipt_block_states_the_clinical_result_and_has_no_v5_classification_lines()
         {
             V6SessionSummary s = V6SessionSummary.From(Map(Kv("Single", Make(V6States.FindingsSupported, new[] { "Hyperpigmentation" }, allDetectors: true))), true);
             foreach (bool final in new[] { false, true })
             {
                 var w = new ReceiptWriter(32); V6ReceiptText.Append(w, s, final);
                 string text = string.Join("\n", w.Lines.Select(l => l.Text));
-                Assert.Contains(final ? "AI ASSESSMENT (ORIGINAL)" : "AI ASSESSMENT", text); Assert.Contains("Finding supported: Hyperpigmentation", text);
-                Assert.Contains("Hyperpigmentation: Present", text); Assert.DoesNotContain("xperimental", text); Assert.Contains("do not confirm a diagnosis", text);
-                Assert.DoesNotContain("Most resembles", text); Assert.DoesNotContain("similarity scores", text); Assert.DoesNotContain("Lesion detectors (separate)", text);
+                Assert.Contains(final ? "AI SCREENING RESULT (ORIGINAL)" : "AI SCREENING RESULT", text); Assert.Contains("CONDITION DETECTED", text);
+                Assert.Contains("Condition detected: Hyperpigmentation", text); Assert.Contains("Detected, high certainty", text); Assert.Contains("Not detected, high certainty", text);
+                Assert.Contains("Verification: Pending verification", text); Assert.Contains("Not a diagnosis", text);
+                Assert.DoesNotContain("xperimental", text); Assert.DoesNotContain("Most resembles", text); Assert.DoesNotContain("similarity scores", text);
                 Assert.Equal(final, text.Contains("Shown exactly as the AI saved it"));
             }
         }
@@ -120,7 +124,7 @@ namespace SkinDevApp.Tests
         };
 
         [Fact]
-        public void Report_findings_use_the_v6_assessment_when_the_flag_is_on_and_do_not_when_it_is_off()
+        public void Report_findings_use_the_final_model_result_when_the_flag_is_on_and_do_not_when_it_is_off()
         {
             Func<bool> keep = V6FeatureFlag.Provider; string dir = Path.Combine(Path.GetTempPath(), "v6rep_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);
             try
@@ -128,10 +132,11 @@ namespace SkinDevApp.Tests
                 V6Archive.Write(dir, Make(V6States.UncertainReviewRequired, new[] { "Acne" }, new[] { "cnn_yolo_conflict_Eczema" }), null, null);
                 V6FeatureFlag.Provider = () => true;
                 ReportFindings f = ReportFindings.Build(Session("Single", dir));
-                Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside a V6 result
-                Assert.Contains(f.Lines, l => l.StartsWith("Unified AI assessment: Uncertain: review recommended"));
-                Assert.Contains(f.Lines, l => l.Contains("Acne: Present")); Assert.Contains(f.Lines, l => l.Contains("dermatologist review"));
-                Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("For Eczema, the whole-photograph model and the lesion detector point different ways"));
+                Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside the final model's result
+                Assert.Contains(f.Lines, l => l.StartsWith("AI screening result (needs review): Acne detected · needs review"));
+                Assert.Contains(f.Lines, l => l.StartsWith("Verification status: Pending verification"));
+                Assert.Contains(f.Lines, l => l.Contains("Acne: Detected")); Assert.Contains(f.Lines, l => l.Contains("confirmed by a dermatologist"));
+                Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("Eczema: the whole-face reading and the lesion detector disagree"));
                 Assert.Null(f.Interpretation);                                                                              // the V5 interpretation is not built
                 V6FeatureFlag.Provider = () => false;
                 ReportFindings off = ReportFindings.Build(Session("Single", dir));

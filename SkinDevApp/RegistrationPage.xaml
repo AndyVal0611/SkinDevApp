@@ -16,7 +16,7 @@
             <Setter Property="Foreground" Value="#B4483F"/>
         </Style>
         <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Margin" Value="0,5,0,0"/>
         </Style>
         <Style x:Key="ReadOnlyField" TargetType="TextBox" BasedOn="{StaticResource Field}">
@@ -46,12 +46,12 @@
         </Style>
         <Style x:Key="Tick" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
             <Setter Property="Margin" Value="0,1,16,1"/>
-            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontSize" Value="14"/>
         </Style>
         <Style x:Key="Choice" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
             <Setter Property="Margin" Value="0,0,8,8"/>
             <Setter Property="MinWidth" Value="76"/>
-            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
         <!-- one line of the physical examination: the label on the left, the choices on the right -->
@@ -106,7 +106,7 @@
                             <UniformGrid Columns="3" Style="{StaticResource Row}">
                                 <StackPanel Style="{StaticResource Cell}">
                                     <TextBlock Text="Patient ID" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox x:Name="PatientIdTxt" Style="{StaticResource ReadOnlyField}" Background="#EFD7CF" FontWeight="Bold"/>
+                                    <TextBox x:Name="PatientIdTxt" Style="{StaticResource ReadOnlyField}" Background="#EFD7CF" FontWeight="SemiBold"/>
                                     <TextBlock Style="{StaticResource Hint}" Text="Created automatically. It cannot be changed."/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">

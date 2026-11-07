@@ -25,10 +25,9 @@ namespace SkinDevApp
             SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
 
             SkinDevApp.V6.V6FeatureFlag.VariantProvider = () => System.Configuration.ConfigurationManager.AppSettings["V6Variant"] ?? Environment.GetEnvironmentVariable(SkinDevApp.V6.V6FeatureFlag.VariantEnvironmentVariable);
-            // V6 unified assessment: ON when App.config says V6Unified=true (or the environment variable LUMYVUE_V6_UNIFIED=1 is set). Otherwise the app is the V5 app, unchanged.
-            SkinDevApp.V6.V6FeatureFlag.Provider = () =>
-                string.Equals(System.Configuration.ConfigurationManager.AppSettings["V6Unified"], "true", StringComparison.OrdinalIgnoreCase) ||
-                Environment.GetEnvironmentVariable(SkinDevApp.V6.V6FeatureFlag.EnvironmentVariable) == "1";
+            // The final model (V6) is the only model whose results the application shows and stores.
+            SkinDevApp.V6.V6FeatureFlag.Provider = () => true;
+            SkinDevApp.V6.V6SessionSummary.FaceBoxProvider = SkinDevApp.V6.AIResultStore.FaceBoxOf;       // facial regions are named relative to the saved face box
 
             // Crisp rendering on every window (including the ones created in code): snap to whole pixels, ClearType text,
             // high-quality image scaling. Combined with the DPI-aware manifest this removes the soft, blurry look.
@@ -78,7 +77,8 @@ namespace SkinDevApp
             splash.Step("Initializing system", 0.26, dbProblem == null ? "Database ready" : "Database problem: " + dbProblem);
 
             // Safety net: re-index scans that are on disk (and belong to a registered participant) but missing from the database.
-            Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } });
+            Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } })
+                .ContinueWith(_ => SkinDevApp.V6.RecordsMaintenance.RunAsync());      // final-model results in the database, folders organised, older scans re-analysed
 
             // 2. camera: find the webcam the scan screen will use (it is opened later, on the scan screen)
             splash.Step("Connecting camera", 0.34, "Looking for cameras");

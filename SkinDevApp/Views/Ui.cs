@@ -99,8 +99,8 @@ namespace SkinDevApp.Views
             grid.Children.Add(divider);
 
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            titles.Children.Add(new TextBlock { Text = title, Foreground = Brush("#F7F5E9"), FontSize = 17, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
-            var subtitle = new TextBlock { Text = "AI skin health monitoring", Foreground = Brush("#DDDCC2"), FontSize = 11.5, Margin = new Thickness(0, 1, 0, 0) };
+            titles.Children.Add(new TextBlock { Text = title, Foreground = Brush("#F7F5E9"), FontSize = 18, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+            var subtitle = new TextBlock { Text = "AI skin health monitoring", Foreground = Brush("#DDDCC2"), FontSize = 12, Margin = new Thickness(0, 1, 0, 0) };
             titles.Children.Add(subtitle);
             Grid.SetColumn(titles, 2);
             grid.Children.Add(titles);
@@ -198,9 +198,9 @@ namespace SkinDevApp.Views
             row.Children.Add(new Border
             {
                 Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = Brush("#DDBAAE"),
-                Child = new TextBlock { Text = initials, FontSize = 12, FontWeight = FontWeights.Bold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                Child = new TextBlock { Text = initials, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
             });
-            var name = new TextBlock { Text = user, Foreground = Brush("#F7F5E9"), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 4, 0) };
+            var name = new TextBlock { Text = user, Foreground = Brush("#F7F5E9"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 4, 0) };
             row.Children.Add(name);
             return new Border
             {
@@ -334,7 +334,7 @@ namespace SkinDevApp.Views
             var badge = IconBadge(iconKey, 64, "#EFEADC", "#818263");
             badge.HorizontalAlignment = HorizontalAlignment.Center;
             sp.Children.Add(badge);
-            sp.Children.Add(new TextBlock { Text = title, FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 4) });
+            sp.Children.Add(new TextBlock { Text = title, FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 4) });
             sp.Children.Add(new TextBlock { Text = text, FontSize = 13, Foreground = Muted, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
             return sp;
         }
@@ -376,13 +376,28 @@ namespace SkinDevApp.Views
 
         // ------------------------------------------------------------ builders --
 
+        /// <summary>The application's type scale: 11 caption · 12 secondary · 13 body · 14 emphasis · 16 card title · 18 section · 22 / 28 headings.
+        /// Any other size is snapped to the nearest step so every screen uses the same sizes; large display numbers (34+) are kept.</summary>
+        public static double TypeSize(double size)
+        {
+            if (size >= 34) return size;
+            if (size < 11.25) return 11;
+            if (size < 12.25) return 12;
+            if (size < 13.25) return 13;
+            if (size < 14.5) return 14;
+            if (size < 16.5) return 16;
+            if (size < 19.5) return 18;
+            if (size < 24.5) return 22;
+            return 28;
+        }
+
         public static TextBlock Text(string text, double size = 13, bool bold = false, Brush color = null, Thickness? margin = null)
         {
             return new TextBlock
             {
                 Text = text ?? "",
-                FontSize = size,
-                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                FontSize = TypeSize(size),
+                FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
                 Foreground = color ?? Ink,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = margin ?? new Thickness(0, 0, 0, 4)
@@ -451,7 +466,7 @@ namespace SkinDevApp.Views
             {
                 Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = Brush(ink), VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 1, 0, 0),
-                Child = new TextBlock { Text = icon, Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                Child = new TextBlock { Text = icon, Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
             });
             var text = new StackPanel();
             text.Children.Add(Text(headline, 13.5, true, Brush(ink), new Thickness(0, 0, 0, 2)));
@@ -475,7 +490,7 @@ namespace SkinDevApp.Views
                 Padding = new Thickness(11, 3, 11, 4),
                 Margin = new Thickness(0, 0, 6, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Child = new TextBlock { Text = text, Foreground = fg, FontSize = 11.5, FontWeight = FontWeights.SemiBold }
+                Child = new TextBlock { Text = text, Foreground = fg, FontSize = 12, FontWeight = FontWeights.SemiBold }
             };
         }
 
@@ -656,8 +671,8 @@ namespace SkinDevApp.Views
             badge.Margin = new Thickness(0, 0, 10, 0);
             sp.Children.Add(badge);
             var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            words.Children.Add(new TextBlock { Text = name, FontWeight = FontWeights.SemiBold, FontSize = 12.5, Foreground = Ui.Brush("#2F3024") });
-            words.Children.Add(new TextBlock { Text = ok ? "Ready" : "Needs attention", FontSize = 11.5, Foreground = ok ? Ui.Brush("#4F7A4E") : Ui.Brush("#A93D33") });
+            words.Children.Add(new TextBlock { Text = name, FontWeight = FontWeights.SemiBold, FontSize = 13, Foreground = Ui.Brush("#2F3024") });
+            words.Children.Add(new TextBlock { Text = ok ? "Ready" : "Needs attention", FontSize = 12, Foreground = ok ? Ui.Brush("#4F7A4E") : Ui.Brush("#A93D33") });
             sp.Children.Add(words);
             return new Border
             {

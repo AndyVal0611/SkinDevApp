@@ -286,13 +286,13 @@ namespace SkinDevApp.Views
                 Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock
                 {
-                    Text = number, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(s.BadgeInk),
+                    Text = number, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(s.BadgeInk),
                     HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
                 }
             });
             var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             words.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("SectionTitle"), Margin = new Thickness(0) });
-            words.Children.Add(new TextBlock { Text = hint, Style = (Style)FindResource("Muted"), FontSize = 12.5, Margin = new Thickness(0, 2, 0, 0) });
+            words.Children.Add(new TextBlock { Text = hint, Style = (Style)FindResource("Muted"), FontSize = 13, Margin = new Thickness(0, 2, 0, 0) });
             Grid.SetColumn(words, 1);
             head.Children.Add(words);
             var line = new Border { Height = 1, Background = Ui.Brush("#EEE8DA"), Margin = new Thickness(0, 14, 0, 0) };

@@ -86,7 +86,8 @@ namespace SkinDevApp
             {
             sp.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Overall result", s.OverallPredictedClass == null ? "No usable result" : ClinicalText.Name(s.OverallPredictedClass) + " — " + ClinicalText.Strength(s.OverallScore ?? 0) + " match (" + s.ScoreText + ")"),
+                Ui.KV("AI result", string.IsNullOrEmpty(s.AITitle) ? "AI result pending" : s.AITitle),
+                Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
                 Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.CompletionText.Replace(" / ", " of ") + " analysed"),
                 Ui.KV("Photos agree?", s.ScanMode == "Single" ? "Not applicable" : (s.ViewDisagreement ? "No — please compare each photograph" : "Yes — all photographs point the same way"))
             }, 140, 12.5));
@@ -331,8 +332,8 @@ namespace SkinDevApp
             DermForm.Children.Add(Label("Dermatologist notes"));
             _dNotes = Field(area: true); DermForm.Children.Add(_dNotes);
 
-            DermForm.Children.Add(Label("Validation status *"));
-            _dStatus = Combo(new[] { "Completed", "Pending" }, 0);
+            DermForm.Children.Add(Label("Outcome of this review *"));
+            _dStatus = Combo(new[] { "Verified - review completed", "Requires further review", "Save as draft (not yet verified)" }, 0);
             DermForm.Children.Add(_dStatus);
 
             Button save = Ui.Btn("Save validation", (s, e) => SaveDerm(), "PrimaryButton");
@@ -343,11 +344,11 @@ namespace SkinDevApp
         private void SaveDerm()
         {
             List<string> labels = CheckedLabels(_dLabels);
-            string status = (string)_dStatus.SelectedItem ?? "Pending";
+            string status = _dStatus.SelectedIndex == 0 ? ReviewStatus.ValidationCompleted : _dStatus.SelectedIndex == 1 ? ReviewStatus.ValidationFurtherReview : ReviewStatus.ValidationDraft;
             var missing = new List<string>();
             if (string.IsNullOrWhiteSpace(_dId.Text)) missing.Add("validator ID");
-            if (status == "Completed" && labels.Count == 0) missing.Add("a reference assessment");
-            if (status == "Completed" && _dAgreeAi.SelectedItem == null) missing.Add("agreement with AI");
+            if (status != ReviewStatus.ValidationDraft && labels.Count == 0) missing.Add("a reference assessment");
+            if (status != ReviewStatus.ValidationDraft && _dAgreeAi.SelectedItem == null) missing.Add("agreement with AI");
             if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Validation"); return; }
 
             try
@@ -366,7 +367,7 @@ namespace SkinDevApp
                     ValidationStatus = status
                 }, labels);
 
-                LumyDialog.Show("Dermatologist validation saved (" + status + "). The AI prediction is unchanged.", "LUMYVUE Validation",
+                LumyDialog.Show("Dermatologist validation saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE Validation",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 Load();
             }
@@ -413,7 +414,7 @@ namespace SkinDevApp
                         Ui.KV("Date", v.ValidationDate), Ui.KV("Validator", v.DermatologistID + (v.ValidatorName != null ? " (" + v.ValidatorName + ")" : "")),
                         Ui.KV("Role", v.ProfessionalRole), Ui.KV("Credential ref.", v.CredentialReference),
                         Ui.KV("Assessment", v.DermatologistAssessment), Ui.KV("Agreement with the computer", v.AgreementWithAI),
-                        Ui.KV("Agreement w/ researcher", v.AgreementWithResearcher), Ui.KV("Status", v.ValidationStatus), Ui.KV("Notes", v.Notes)
+                        Ui.KV("Agreement w/ researcher", v.AgreementWithResearcher), Ui.KV("Outcome", ReviewStatus.FromValidation(v.ValidationStatus) ?? "Draft"), Ui.KV("Notes", v.Notes)
                     }, 160)
                 });
             }

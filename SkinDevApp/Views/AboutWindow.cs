@@ -28,10 +28,11 @@ namespace SkinDevApp.Views
             page.Children.Add(Banner());
             page.Children.Add(Section("What LUMYVUE does", Steps()));
             page.Children.Add(Section("How to read the results", Bullets(
-                new[] { "Category match", "how closely a photograph resembles each skin category. The four percentages add up to 100%. They show visual similarity, not the chance that the patient has the condition." },
-                new[] { "Heatmap (Grad-CAM++)", "shows which parts of the photograph the model paid most attention to for one category. It is not an outline of the affected skin." },
-                new[] { "Candidate lesion marks", "small boxes where a second model suggests possible lesions. Some lesions may be missed and some boxes may be wrong. They are not a lesion count." },
-                new[] { "Agreement between views", "whether the front, left and right photographs point to the same category." })));
+                new[] { "Outcome", "each scan is labelled Condition detected, Needs review, or No condition detected. Needs review means part of the result is uncertain and a dermatologist should look closely." },
+                new[] { "Per condition", "acne, hyperpigmentation and eczema are each reported as Detected, Possible, Inconclusive or Not detected, with a certainty (high, moderate or low)." },
+                new[] { "Facial regions", "where the lesion detectors marked areas: forehead, right or left cheek, nose, mouth / chin. They are possible locations, not a lesion count." },
+                new[] { "Heat map", "shows where the detectors found evidence for a condition. It is not an outline of the affected skin." },
+                new[] { "Verification status", "Pending verification until a dermatologist reviews the scan; then Verified, or Requires further review." })));
             page.Children.Add(Section("Important to know", Bullets(
                 new[] { "Research prototype", "LUMYVUE supports, and never replaces, the judgement of a qualified clinician." },
                 new[] { "Not a diagnosis", "it does not give a diagnosis or treatment advice." },
@@ -87,7 +88,7 @@ namespace SkinDevApp.Views
                 Text = title,
                 FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont"),
                 FontStyle = FontStyles.Italic,
-                FontSize = 20,
+                FontSize = 22,
                 Foreground = Ui.Ink,
                 Margin = new Thickness(0, 0, 0, 10)
             });
@@ -98,14 +99,14 @@ namespace SkinDevApp.Views
         private static UIElement Steps()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("LUMYVUE photographs the face from three angles and uses an artificial-intelligence model to compare each photograph " +
-                                    "with four skin categories: acne, hyperpigmentation, eczema and normal skin. It then shows the evidence behind the result so that a clinician can judge it.",
+            sp.Children.Add(Ui.Text("LUMYVUE photographs the face from three angles. For each photograph, one trained AI model combines a whole-face reading with three " +
+                                    "lesion detectors and reports acne, hyperpigmentation and eczema separately, with the facial regions involved, so that a dermatologist can judge it.",
                                     13, false, Ui.Ink, new Thickness(0, 0, 0, 12)));
 
             string[][] steps =
             {
                 new[] { "1", "Capture", "front, left and right photographs, taken one after another." },
-                new[] { "2", "Analyse", "the model reads each photograph and marks where it looked." },
+                new[] { "2", "Analyse", "the AI reads each photograph, marks possible lesion areas and states how certain it is." },
                 new[] { "3", "Review", "the clinician compares the photographs, the evidence and the AI result, then records their own assessment." }
             };
             foreach (string[] st in steps)
@@ -117,11 +118,11 @@ namespace SkinDevApp.Views
                 {
                     Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Brush("#EFD7CF"),
                     HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-                    Child = new TextBlock { Text = st[0], FontWeight = FontWeights.Bold, Foreground = Ui.Brush("#8A5A3C"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                    Child = new TextBlock { Text = st[0], FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#8A5A3C"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
                 };
                 row.Children.Add(dot);
                 var text = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = Ui.Ink, VerticalAlignment = VerticalAlignment.Center };
-                text.Inlines.Add(new System.Windows.Documents.Run(st[1]) { FontWeight = FontWeights.Bold });
+                text.Inlines.Add(new System.Windows.Documents.Run(st[1]) { FontWeight = FontWeights.SemiBold });
                 text.Inlines.Add(new System.Windows.Documents.Run(" — " + st[2]));
                 Grid.SetColumn(text, 1);
                 row.Children.Add(text);
@@ -140,7 +141,7 @@ namespace SkinDevApp.Views
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.Children.Add(new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), Background = Ui.Brush("#C99C8E"), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 7, 0, 0) });
                 var text = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = Ui.Ink };
-                text.Inlines.Add(new System.Windows.Documents.Run(it[0]) { FontWeight = FontWeights.Bold });
+                text.Inlines.Add(new System.Windows.Documents.Run(it[0]) { FontWeight = FontWeights.SemiBold });
                 text.Inlines.Add(new System.Windows.Documents.Run(" — " + it[1]));
                 Grid.SetColumn(text, 1);
                 row.Children.Add(text);
@@ -151,8 +152,8 @@ namespace SkinDevApp.Views
 
         private static UIElement ModelNote()
         {
-            var note = Ui.Text("Model: PrecisionSkinV1 — four categories (acne, hyperpigmentation, eczema, normal skin). " +
-                               "Technical details and version information are on the Model Information screen.", 11.5, false, Ui.Muted, new Thickness(2, 2, 2, 0));
+            var note = Ui.Text("Model: LUMYVUE final model (V6) — a MobileNetV2 whole-face reading fused with three YOLOv8 lesion detectors; three conditions, " +
+                               "with normal skin derived when none is found. Technical details and version information are on the Model information screen.", 12, false, Ui.Muted, new Thickness(2, 2, 2, 0));
             return note;
         }
     }

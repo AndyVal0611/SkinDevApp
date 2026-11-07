@@ -43,7 +43,7 @@ namespace SkinDevApp.V6
         }
 
         /// <summary>Writes v6_assessment.json (and v6_marked_areas.png when a frame is given) into the capture folder.</summary>
-        public static void Write(string folder, UnifiedAssessment a, Mat frame = null, Rect? faceBox = null)
+        public static void Write(string folder, UnifiedAssessment a, Mat frame = null, Rect? faceBox = null, string origin = null)
         {
             if (string.IsNullOrEmpty(folder)) throw new ArgumentException("capture folder is required");
             Directory.CreateDirectory(folder);
@@ -56,6 +56,7 @@ namespace SkinDevApp.V6
                     w.WriteString("schema", Schema);
                     w.WriteString("created_utc", DateTime.UtcNow.ToString("o"));
                     w.WriteString("ai_content_sha256", Seal(json));
+                    if (origin != null) w.WriteString("origin", origin);            // "Re-analysis": an older photograph assessed later by the final model
                     w.WritePropertyName("assessment"); w.WriteRawValue(json);
                     w.WriteEndObject();
                 }
@@ -67,6 +68,19 @@ namespace SkinDevApp.V6
                     File.WriteAllBytes(Path.Combine(folder, MarkedFileName), marked.ImEncode(".png"));
                 V6Heatmaps.WriteAll(folder, a, frame, faceBox);              // V6 heat maps (detector evidence), same form as V5's
             }
+        }
+
+        /// <summary>"Scan" or "Re-analysis" as written into the file, or null for files written before the origin was recorded.</summary>
+        public static string ReadOrigin(string folder)
+        {
+            try
+            {
+                string path = string.IsNullOrEmpty(folder) ? null : Path.Combine(folder, FileName);
+                if (path == null || !File.Exists(path)) return null;
+                using (JsonDocument doc = JsonDocument.Parse(File.ReadAllBytes(path)))
+                    return doc.RootElement.TryGetProperty("origin", out JsonElement o) ? o.GetString() : null;
+            }
+            catch { return null; }
         }
 
         /// <summary>Returns the saved assessment, or null with a reason (missing file, wrong schema, hash mismatch, unreadable).</summary>

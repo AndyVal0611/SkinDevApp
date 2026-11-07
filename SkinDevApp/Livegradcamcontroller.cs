@@ -328,7 +328,7 @@ namespace SkinDevApp.Explainability
             _disposed = true;
         }
 
-        /// <summary>User pressed "New Scan": cooldown, fresh stabiliser, back to Live.</summary>
+        /// <summary>User pressed "New scan": cooldown, fresh stabiliser, back to Live.</summary>
         public void NewScan()
         {
             lock (_stateLock)

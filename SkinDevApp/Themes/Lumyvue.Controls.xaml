@@ -139,14 +139,14 @@
         <Style x:Key="H1" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
             <Setter Property="FontStyle" Value="Italic"/>
-            <Setter Property="FontSize" Value="32"/>
+            <Setter Property="FontSize" Value="28"/>
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="Foreground" Value="#3A3B2C"/>
         </Style>
         <Style x:Key="H2" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
             <Setter Property="FontStyle" Value="Italic"/>
-            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#3A3B2C"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
@@ -437,7 +437,7 @@
         <Style TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
@@ -682,7 +682,7 @@
             <Setter Property="Width" Value="56"/>
             <Setter Property="Height" Value="56"/>
             <Setter Property="Margin" Value="0,2"/>
-            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontSize" Value="28"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -732,7 +732,7 @@
             <Setter Property="Foreground" Value="#F7F5E9"/>
             <Setter Property="BorderBrush" Value="#40FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Height" Value="44"/>
             <Setter Property="Padding" Value="16,0,18,0"/>
@@ -797,7 +797,7 @@
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#E3DDCB"/>
             <Setter Property="RowHeight" Value="44"/>
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="#3A3B2C"/>
             <Setter Property="ColumnHeaderStyle" Value="{StaticResource GridHeaderStyle}"/>
             <Setter Property="RowStyle" Value="{StaticResource GridRowStyle}"/>
@@ -986,7 +986,7 @@
             <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#2F3024"/>
             <Setter Property="Margin" Value="0,0,0,4"/>

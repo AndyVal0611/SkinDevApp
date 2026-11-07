@@ -59,7 +59,7 @@ namespace SkinDevApp.Views
             DockPanel.SetDock(search, Dock.Right);
             row.Children.Add(search);
             var box = new Grid();
-            _searchBox = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Height = 50, FontSize = 15, Padding = new Thickness(38, 0, 10, 0), ToolTip = "Search by Patient ID or name" };
+            _searchBox = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Height = 50, FontSize = 16, Padding = new Thickness(38, 0, 10, 0), ToolTip = "Search by Patient ID or name" };
             _searchBox.KeyDown += (s, e) =>
             {
                 if (e.Key == Key.Enter) Search();
@@ -121,7 +121,7 @@ namespace SkinDevApp.Views
             var avatar = new Border
             {
                 Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = Ui.Brush("#EFD7CF"), Margin = new Thickness(0, 0, 12, 0),
-                Child = new TextBlock { Text = initials, FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Ui.Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                Child = new TextBlock { Text = initials, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#2F3024"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
             };
             DockPanel.SetDock(avatar, Dock.Left);
             dock.Children.Add(avatar);
@@ -131,14 +131,14 @@ namespace SkinDevApp.Views
             {
                 CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 3, 10, 3), VerticalAlignment = VerticalAlignment.Center,
                 Background = Ui.Brush(withdrawn ? "#F8E6E2" : "#EAF1E4"),
-                Child = new TextBlock { Text = withdrawn ? "Withdrawn" : (p.Status ?? "Active"), FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = withdrawn ? Ui.Bad : Ui.Good }
+                Child = new TextBlock { Text = withdrawn ? "Withdrawn" : (p.Status ?? "Active"), FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = withdrawn ? Ui.Bad : Ui.Good }
             };
             DockPanel.SetDock(chip, Dock.Right);
             dock.Children.Add(chip);
 
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var top = new TextBlock { FontSize = 14, Foreground = Ui.Brush("#2F3024"), TextTrimming = TextTrimming.CharacterEllipsis };
-            top.Inlines.Add(new System.Windows.Documents.Run(p.ParticipantID) { FontWeight = FontWeights.Bold });
+            top.Inlines.Add(new System.Windows.Documents.Run(p.ParticipantID) { FontWeight = FontWeights.SemiBold });
             top.Inlines.Add(new System.Windows.Documents.Run("   " + (p.FullName ?? "")));
             text.Children.Add(top);
             string sub = (p.Age.HasValue ? p.Age + " years" : "Age not recorded") + (string.IsNullOrEmpty(p.Sex) ? "" : "  ·  " + p.Sex)

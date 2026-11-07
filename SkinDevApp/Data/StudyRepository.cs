@@ -514,8 +514,18 @@ namespace SkinDevApp.Data
             OperatorID = S(r, "OperatorID"),
             FusionJson = S(r, "FusionJson"),
             ModelLabel = SkinDevApp.Views.Fmt.ModelName((S(r, "ModelLabel") ?? "").Split(new[] { " / " }, StringSplitOptions.None)[0]),
-            ValidationStatus = S(r, "ValidationStatus")
+            ValidationStatus = S(r, "ValidationStatus"),
+            AIResult = Has(r, "AIResult") ? S(r, "AIResult") : null, AITitle = Has(r, "AITitle") ? S(r, "AITitle") : null,
+            AIConditions = Has(r, "AIConditions") ? S(r, "AIConditions") : null, AIModel = Has(r, "AIModel") ? S(r, "AIModel") : null,
+            ReviewStatus = Has(r, "ReviewStatus") ? ReviewStatus.Normalise(S(r, "ReviewStatus")) : ReviewStatus.Pending,
+            ReviewStatusAt = Has(r, "ReviewStatusAt") ? S(r, "ReviewStatusAt") : null
         };
+
+        private static bool Has(SQLiteDataReader r, string col)
+        {
+            for (int i = 0; i < r.FieldCount; i++) if (string.Equals(r.GetName(i), col, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
 
         public static List<ScanSessionRow> SessionsForParticipant(string participantId)
         {
@@ -542,8 +552,8 @@ namespace SkinDevApp.Data
             var list = new List<ScanSessionRow>();
             using (var c = StudyDatabase.Open())
             using (var cmd = Cmd(c, SessionSelect + @" WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
-                AND NOT EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID = s.ScanSessionID)
-                ORDER BY s.StartedAt DESC;"))
+                AND COALESCE(s.ReviewStatus, 'Pending verification') <> 'Verified'
+                ORDER BY CASE COALESCE(s.ReviewStatus, 'Pending verification') WHEN 'Requires further review' THEN 0 ELSE 1 END, s.StartedAt DESC;"))
             using (var r = cmd.ExecuteReader())
                 while (r.Read()) list.Add(ReadSession(r));
             return list;
@@ -693,6 +703,53 @@ namespace SkinDevApp.Data
                 Audit(c, tx, "Link legacy scan", "ScanSession", scanSessionId, "linked to " + participantId);
                 tx.Commit();
             }
+            try { ScanStorage.Place(scanSessionId); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Storage] " + ex.Message); }
+        }
+
+        // ------------------------------------------------- verification status --
+
+        /// <summary>Sets a scan's verification status (Pending verification / Verified / Requires further review) and moves its folder to match.</summary>
+        public static void SetReviewStatus(string scanSessionId, string status, string reason)
+        {
+            status = ReviewStatus.Normalise(status);
+            using (var c = StudyDatabase.Open())
+            using (var tx = c.BeginTransaction())
+            {
+                string before;
+                using (var cmd = Cmd(c, "SELECT ReviewStatus FROM ScanSessions WHERE ScanSessionID=@s;", tx, "@s", scanSessionId))
+                    before = Convert.ToString(cmd.ExecuteScalar());
+                using (var cmd = Cmd(c, "UPDATE ScanSessions SET ReviewStatus=@st, ReviewStatusAt=@at, ReviewStatusBy=@by WHERE ScanSessionID=@s;", tx,
+                    "@st", status, "@at", Now(), "@by", AppSession.ActorId, "@s", scanSessionId))
+                    cmd.ExecuteNonQuery();
+                Audit(c, tx, "Verification status", "ScanSession", scanSessionId, (string.IsNullOrEmpty(before) ? ReviewStatus.Pending : before) + " -> " + status +
+                                                                                   (string.IsNullOrWhiteSpace(reason) ? "" : " | " + reason));
+                tx.Commit();
+            }
+            try { ScanStorage.Place(scanSessionId); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Storage] " + ex.Message); }
+        }
+
+        public static string GetReviewStatus(string scanSessionId)
+        {
+            using (var c = StudyDatabase.Open())
+            using (var cmd = Cmd(c, "SELECT ReviewStatus FROM ScanSessions WHERE ScanSessionID=@s;", null, "@s", scanSessionId))
+                return ReviewStatus.Normalise(Convert.ToString(cmd.ExecuteScalar()));
+        }
+
+        /// <summary>Writes a copy of a human review into the scan's Verification folder (the database row stays the record of truth).</summary>
+        private static void ExportReview(string scanSessionId, string kind, long id, object record)
+        {
+            try
+            {
+                string folder;
+                using (var c = StudyDatabase.Open())
+                using (var cmd = Cmd(c, "SELECT SessionFolder FROM ScanSessions WHERE ScanSessionID=@s;", null, "@s", scanSessionId))
+                    folder = Convert.ToString(cmd.ExecuteScalar());
+                string dir = ScanStorage.ScanSubfolder(folder, "Verification");
+                if (dir == null) return;
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, kind + "_" + id.ToString("000", CultureInfo.InvariantCulture) + ".json"),
+                    JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[ExportReview] " + ex.Message); }
         }
 
         // ------------------------------------------------- human assessments --
@@ -714,6 +771,8 @@ namespace SkinDevApp.Data
                 InsertLabels(c, tx, "Researcher", id, labels);
                 Audit(c, tx, "Researcher evaluation", "ScanSession", e.ScanSessionID, e.ResearcherClassification + " / " + e.AgreementWithAI);
                 tx.Commit();
+                ExportReview(e.ScanSessionID, "researcher_review", id, new { e.ScanSessionID, e.ResearcherID, e.ResearcherClassification, e.AgreementWithAI, e.Notes,
+                                                                                  e.FrontComment, e.LeftComment, e.RightComment, e.EvaluationDate, Labels = labels == null ? null : labels.ToList() });
                 return id;
             }
         }
@@ -739,6 +798,11 @@ namespace SkinDevApp.Data
                 InsertLabels(c, tx, "Dermatologist", id, labels);
                 Audit(c, tx, "Dermatologist validation", "ScanSession", v.ScanSessionID, v.DermatologistAssessment + " / " + v.ValidationStatus);
                 tx.Commit();
+                ExportReview(v.ScanSessionID, "dermatologist_review", id, new { v.ScanSessionID, v.DermatologistID, v.ValidatorName, v.ProfessionalRole, v.CredentialReference,
+                                                                                  v.DermatologistAssessment, v.AgreementWithAI, v.AgreementWithResearcher, v.Notes, v.ValidationDate,
+                                                                                  v.ValidationStatus, v.FrontComment, v.LeftComment, v.RightComment, Labels = labels == null ? null : labels.ToList() });
+                string next = ReviewStatus.FromValidation(v.ValidationStatus);
+                if (next != null) SetReviewStatus(v.ScanSessionID, next, "dermatologist review #" + id);
                 return id;
             }
         }
@@ -868,8 +932,9 @@ namespace SkinDevApp.Data
         public static int TotalAttributionMaps() => Count(
             "SELECT COUNT(*) FROM AttributionMaps m JOIN CaptureViews v ON v.CaptureID = m.CaptureID JOIN ScanSessions s ON s.ScanSessionID = v.ScanSessionID WHERE " + ActiveSession + ";");
         public static int CompletedAnalyses() => Count("SELECT COUNT(*) FROM ScanSessions s WHERE s.ScanStatus='complete' AND " + ActiveSession + ";");
+        /// <summary>Scans not yet verified by a dermatologist (Pending verification or Requires further review).</summary>
         public static int PendingVerificationCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
-            AND NOT EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID=s.ScanSessionID);");
+            AND COALESCE(s.ReviewStatus, 'Pending verification') <> 'Verified';");
         public static int PendingDermatologistCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND NOT EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed');");
 
@@ -894,8 +959,31 @@ namespace SkinDevApp.Data
             return list;
         }
 
+        /// <summary>The final model's outcome per scan (Condition detected / Needs review / No condition detected / ...).</summary>
         public static List<CountRow> AiClassDistribution() => Group(
-            "SELECT s.OverallPredictedClass AS Label, COUNT(*) AS N FROM ScanSessions s WHERE s.OverallPredictedClass IS NOT NULL AND " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
+            "SELECT s.AIResult AS Label, COUNT(*) AS N FROM ScanSessions s WHERE s.AIResult IS NOT NULL AND " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
+
+        /// <summary>Scans in which the final model detected each condition (a scan can count for several).</summary>
+        public static List<CountRow> AiConditionDistribution() => Group(@"
+            SELECT 'Acne' AS Label, COUNT(*) AS N FROM ScanSessions s WHERE s.AIConditions LIKE '%Acne%' AND " + ActiveSession + @"
+            UNION ALL SELECT 'Hyperpigmentation', COUNT(*) FROM ScanSessions s WHERE s.AIConditions LIKE '%Hyperpigmentation%' AND " + ActiveSession + @"
+            UNION ALL SELECT 'Eczema', COUNT(*) FROM ScanSessions s WHERE s.AIConditions LIKE '%Eczema%' AND " + ActiveSession + @"
+            UNION ALL SELECT 'None detected', COUNT(*) FROM ScanSessions s WHERE s.AIResult IS NOT NULL AND COALESCE(s.AIConditions,'') = '' AND " + ActiveSession + ";");
+
+        public static List<CountRow> VerificationDistribution() => Group(
+            "SELECT COALESCE(s.ReviewStatus,'Pending verification') AS Label, COUNT(*) AS N FROM ScanSessions s WHERE " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
+
+        public static int CountByReviewStatus(string status) => Count(
+            "SELECT COUNT(*) FROM ScanSessions s WHERE COALESCE(s.ReviewStatus,'Pending verification') = @st AND " + ActiveSession + ";", "@st", status);
+
+        public static int TotalAIResults() => Count(
+            "SELECT COUNT(*) FROM AIAssessments a JOIN ScanSessions s ON s.ScanSessionID = a.ScanSessionID WHERE " + ActiveSession + ";");
+
+        private const string AiAgreementCase = @"CASE WHEN s.AIResult IS NULL THEN 'No AI result yet'
+                        WHEN instr({0}, ',') > 0 THEN 'Multiple reference labels'
+                        WHEN COALESCE(s.AIConditions,'') = '' AND s.AIResult <> 'No condition detected' THEN 'AI result needs review'
+                        WHEN (lower({0}) LIKE 'normal%' AND COALESCE(s.AIConditions,'') = '') OR {0} = s.AIConditions THEN 'Agree'
+                        ELSE 'Disagree' END";
 
         /// <summary>Latest researcher label per session (a later evaluation supersedes an earlier one for statistics).</summary>
         public static List<CountRow> ResearcherDistribution() => Group(@"
@@ -937,23 +1025,17 @@ namespace SkinDevApp.Data
 
         /// <summary>AI overall class vs the latest researcher label (single-label evaluations only).</summary>
         public static List<CountRow> AiVsResearcherAgreement() => Group(@"
-            SELECT CASE WHEN e.ResearcherClassification = s.OverallPredictedClass THEN 'Agree'
-                        WHEN instr(e.ResearcherClassification, ',') > 0 THEN 'Multiple reference labels'
-                        ELSE 'Disagree' END AS Label, COUNT(*) AS N
+            SELECT " + string.Format(AiAgreementCase, "e.ResearcherClassification") + @" AS Label, COUNT(*) AS N
             FROM ScanSessions s JOIN ResearcherEvaluations e ON e.ScanSessionID = s.ScanSessionID
             WHERE " + ActiveSession + @"
               AND e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = s.ScanSessionID)
-              AND s.OverallPredictedClass IS NOT NULL
             GROUP BY 1 ORDER BY 2 DESC;");
 
         public static List<CountRow> AiVsDermatologistAgreement() => Group(@"
-            SELECT CASE WHEN d.DermatologistAssessment = s.OverallPredictedClass THEN 'Agree'
-                        WHEN instr(d.DermatologistAssessment, ',') > 0 THEN 'Multiple reference labels'
-                        ELSE 'Disagree' END AS Label, COUNT(*) AS N
+            SELECT " + string.Format(AiAgreementCase, "d.DermatologistAssessment") + @" AS Label, COUNT(*) AS N
             FROM ScanSessions s JOIN DermatologistValidations d ON d.ScanSessionID = s.ScanSessionID
             WHERE " + ActiveSession + @" AND d.ValidationStatus='Completed'
               AND d.ValidationID = (SELECT MAX(ValidationID) FROM DermatologistValidations x WHERE x.ScanSessionID = s.ScanSessionID AND x.ValidationStatus='Completed')
-              AND s.OverallPredictedClass IS NOT NULL
             GROUP BY 1 ORDER BY 2 DESC;");
     }
 }

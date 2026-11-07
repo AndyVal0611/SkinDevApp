@@ -96,7 +96,7 @@ namespace SkinDevApp.Views
             return new TextBlock
             {
                 Text = text,
-                FontSize = size,
+                FontSize = SkinDevApp.Views.Ui.TypeSize(size),
                 FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
                 Foreground = Brush(color),
                 TextWrapping = TextWrapping.Wrap,
@@ -185,15 +185,15 @@ namespace SkinDevApp.Views
                 return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             }
 
-            sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#3A3B2C", new Thickness(0, 0, 0, 8)));
-
-            // V6 flag on and a saved V6 assessment: the unified assessment's evidence maps come first (same cards as the other maps); V5's class maps follow, labelled as V5.
+            // The final model's result and its evidence maps (the earlier classifier's maps are no longer shown).
             string v6problem;
             SkinDevApp.V6.UnifiedAssessment v6a = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? SkinDevApp.V6.V6Archive.Read(v.Folder, out v6problem) : null;
+            if (v6a == null) sp.Children.Add(GalleryUi.Text(v.SummaryLine, 14, true, "#3A3B2C", new Thickness(0, 0, 0, 8)));
             if (v6a != null)
             {
-                sp.Children.Add(GalleryUi.Text("Unified assessment (V6): " + SkinDevApp.V6.V6Text.StateHeadline(v6a), 13, true, "#3A3B2C", new Thickness(0, 2, 0, 2)));
-                sp.Children.Add(GalleryUi.Text("Where the lesion detectors found evidence for each condition (colour = the condition, strength = detector confidence). This is the evidence the unified assessment uses, not an explanation of the model.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
+                SkinDevApp.V6.ClinicalSummary gcs = SkinDevApp.V6.ClinicalSummary.From(v6a, SkinDevApp.V6.AIResultStore.FaceBoxOf(v.Folder));
+                sp.Children.Add(GalleryUi.Text(gcs.CategoryLabel + ": " + gcs.Title, 14, true, "#3A3B2C", new Thickness(0, 2, 0, 2)));
+                sp.Children.Add(GalleryUi.Text("Where the lesion detectors found evidence for each condition (colour = the condition, strength = detector confidence). This is the evidence the AI result uses, not an explanation of the model.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
                 var v6wrap = new WrapPanel();
                 string[] hex = { "#FF0000", "#0050FF", "#FFBE00" };
                 for (int i = 0; i < v6a.Conditions.Length; i++)
@@ -204,20 +204,19 @@ namespace SkinDevApp.Views
                     double conf = (v6a.Pool.Count > 0 ? v6a.Pool : v6a.Boxes).Where(b => b.Condition == cc.Condition).Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
                     v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard
                     {
-                        Title = cc.Condition + " - " + SkinDevApp.V6.V6Text.VerdictText(cc),
+                        Title = cc.Condition + " - " + (gcs.Findings.FirstOrDefault(f => f.Condition == cc.Condition)?.Status ?? SkinDevApp.V6.V6Text.VerdictText(cc)),
                         ColorHex = hex[i],
                         ImagePath = path,
-                        ScoreText = "Highest detector confidence " + SkinDevApp.V6.V6Text.Pct(conf) + " · AI support " + SkinDevApp.V6.V6Text.Pct(cc.CalibratedProbability),
+                        ScoreText = "Highest detector confidence " + SkinDevApp.V6.V6Text.Pct(conf) + " · certainty " + (gcs.Findings.FirstOrDefault(f => f.Condition == cc.Condition)?.Certainty ?? "—").ToLowerInvariant(),
                         Note = SkinDevApp.V6.V6Text.DetectorText(cc)
                     }));
                 }
                 string all = SkinDevApp.V6.V6Heatmaps.AllPath(v.Folder);
                 if (all != null) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "All three conditions", ColorHex = "#9CA3AF", ImagePath = all, ScoreText = "Strongest evidence on top", Note = "" }));
                 string marked = System.IO.Path.Combine(v.Folder, SkinDevApp.V6.V6Archive.MarkedFileName);
-                if (System.IO.File.Exists(marked)) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "Marked areas", ColorHex = "#9CA3AF", ImagePath = marked, ScoreText = SkinDevApp.V6.V6Text.BoxesLine(v6a), Note = "Boxes that supported the assessment" }));
+                if (System.IO.File.Exists(marked)) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "Marked areas", ColorHex = "#9CA3AF", ImagePath = marked, ScoreText = SkinDevApp.V6.V6SessionSummary.AreasLine(gcs), Note = "Boxes that supported the assessment" }));
                 sp.Children.Add(v6wrap);
-                sp.Children.Add(GalleryUi.Text("Classifier maps (V5)", 13, true, "#3A3B2C", new Thickness(0, 10, 0, 2)));
-                sp.Children.Add(GalleryUi.Text("V5's Grad-CAM++ maps, kept for comparison. They explain the V5 classifier, not the V6 assessment; they are diffuse and the maps for different conditions look alike.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
+                return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             }
 
             var wrap = new WrapPanel();
@@ -416,7 +415,7 @@ namespace SkinDevApp.Views
                         BorderThickness = new Thickness(0),
                         Background = Brushes.Transparent,
                         FontFamily = new FontFamily("Consolas"),
-                        FontSize = 11.5,
+                        FontSize = 12,
                         Margin = new Thickness(18, 6, 0, 0)
                     }
                 });

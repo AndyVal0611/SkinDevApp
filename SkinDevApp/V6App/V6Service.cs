@@ -28,6 +28,11 @@ namespace SkinDevApp.V6
 
         public static bool IsReady { get { lock (_lock) return _svc != null; } }
 
+        /// <summary>The variant that is running ("global_yolo" or "full"), or null before the models are loaded.</summary>
+        public static string Variant { get { lock (_lock) return _svc?.Variant; } }
+
+        public static V6Config Config { get { lock (_lock) return _svc?.Config; } }
+
         public static void EnsureLoaded()
         {
             lock (_lock)

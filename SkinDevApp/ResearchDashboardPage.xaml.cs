@@ -19,7 +19,7 @@ namespace SkinDevApp
         public ResearchDashboardPage()
         {
             InitializeComponent();
-            HeaderHost.Content = Ui.Header("Research Dashboard");
+            HeaderHost.Content = Ui.Header("Research dashboard");
             if (!AppSession.IsResearcher)
             {
                 StatGrid.Children.Add(Ui.Card(Ui.Text("The research dashboard is available to signed-in researchers / administrators only.", 14, false, Ui.Bad)));
@@ -42,24 +42,26 @@ namespace SkinDevApp
                 Stat("Total participants", StudyRepository.TotalParticipants());
                 Stat("Total scan sessions", StudyRepository.TotalSessions());
                 Stat("Captured images", StudyRepository.TotalCapturedImages(), "original views (each also has an analysed copy)");
-                Stat("Grad-CAM++ maps", StudyRepository.TotalAttributionMaps());
+                Stat("Photographs with an AI result", StudyRepository.TotalAIResults(), "final model; older photographs re-analysed");
                 Stat("Completed analyses", StudyRepository.CompletedAnalyses(), "sessions with every expected view");
-                Stat("Pending researcher verification", StudyRepository.PendingVerificationCount());
-                Stat("Pending dermatologist validation", StudyRepository.PendingDermatologistCount());
-                Stat("Model versions seen", StudyRepository.AllModelVersions().Count);
+                Stat("Pending verification", StudyRepository.CountByReviewStatus(ReviewStatus.Pending), "no completed dermatologist review yet");
+                Stat("Verified", StudyRepository.CountByReviewStatus(ReviewStatus.Verified), "reviewed by a dermatologist");
+                Stat("Requires further review", StudyRepository.CountByReviewStatus(ReviewStatus.FurtherReview));
                 Stat("Scans with consent for future model use", StudyRepository.SessionsWithFutureUseConsent(), "latest consent ticked the optional permission");
                 int withdrawn = StudyRepository.WithdrawnParticipants();
                 Stat("Withdrawn participants", withdrawn, "excluded from every figure on this page");
 
-                Chart("AI classification distribution", "Overall AI class per scan session", StudyRepository.AiClassDistribution());
+                Chart("AI result distribution", "Outcome of the final model per scan", StudyRepository.AiClassDistribution());
+                Chart("Conditions detected by the AI", "Scans in which each condition was detected (a scan can count twice)", StudyRepository.AiConditionDistribution(), sortByCount: false);
+                Chart("Verification status", "Scans by dermatologist verification status", StudyRepository.VerificationDistribution());
                 Chart("Researcher reference distribution", "Latest researcher assessment per session", StudyRepository.ResearcherDistribution());
                 Chart("Dermatologist reference distribution", "Latest completed validation per session", StudyRepository.DermatologistDistribution());
-                Chart("AI vs researcher agreement", "Overall AI class vs latest researcher label", StudyRepository.AiVsResearcherAgreement());
-                Chart("AI vs dermatologist agreement", "Overall AI class vs latest completed validation", StudyRepository.AiVsDermatologistAgreement());
+                Chart("AI vs researcher agreement", "Conditions detected by the AI vs the latest researcher label", StudyRepository.AiVsResearcherAgreement());
+                Chart("AI vs dermatologist agreement", "Conditions detected by the AI vs the latest completed dermatologist review", StudyRepository.AiVsDermatologistAgreement());
                 Chart("View completion rate", "Views captured per scan session", StudyRepository.ViewCompletion());
                 Chart("Age distribution", "Participants by age group", StudyRepository.AgeDistribution(), sortByCount: false);
                 Chart("Sex distribution", "Participants", StudyRepository.SexDistribution());
-                Chart("Model-version distribution", "Scan sessions per model (run / ONNX hash)", StudyRepository.ModelVersionDistribution());
+
             }
             catch (Exception ex)
             {
@@ -70,8 +72,8 @@ namespace SkinDevApp
         private void Stat(string label, int value, string note = null)
         {
             string icon = label.Contains("participant") ? "Icon.Users" : label.Contains("session") || label.Contains("Scans") ? "Icon.ScanFace"
-                        : label.Contains("images") ? "Icon.Image" : label.Contains("Grad-CAM") ? "Icon.Flame" : label.Contains("Completed") ? "Icon.CheckCircle"
-                        : label.Contains("Pending") ? "Icon.Clock" : label.Contains("Model") ? "Icon.Layers" : "Icon.Chart";
+                        : label.Contains("images") ? "Icon.Image" : label.Contains("AI result") ? "Icon.Layers" : label.Contains("Completed") ? "Icon.CheckCircle"
+                        : label.Contains("Pending") || label.Contains("Requires") ? "Icon.Clock" : label.Contains("Verified") ? "Icon.CheckCircle" : label.Contains("Model") ? "Icon.Layers" : "Icon.Chart";
             var dock = new DockPanel();
             Border badge = Ui.IconBadge(icon, 44, "#E7E8CF", "#5F6048");
             badge.Margin = new Thickness(0, 0, 14, 0);

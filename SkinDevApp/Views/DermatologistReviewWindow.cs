@@ -6,6 +6,7 @@
 // Everything shown is read from the saved scan session; nothing is re-run and no example values are hard-coded.
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -40,6 +41,8 @@ namespace SkinDevApp.Views
 
         // assessment form
         private readonly List<RadioButton> _refRadios = new List<RadioButton>();
+        private static readonly string[] StatusShown = { "Verified - review completed", "Requires further review", "Save as draft (not yet verified)" };
+        private static readonly string[] StatusStored = { ReviewStatus.ValidationCompleted, ReviewStatus.ValidationFurtherReview, ReviewStatus.ValidationDraft };
         private ComboBox _agree, _localization, _gradcam, _status;
         private TextBox _notes, _front, _left, _right, _id, _name, _cred;
 
@@ -239,7 +242,7 @@ namespace SkinDevApp.Views
             foreach (CaptureViewRow v in _d.Views)
             {
                 string name = v.ViewType;
-                Button b = Ui.Btn(name, (o, e) => { _viewName = name; RenderViewer(); }, name == _viewName ? "PrimaryButton" : "SecondaryButton");
+                Button b = Ui.Btn(SkinDevApp.V6.V6SessionSummary.LabelFor(name), (o, e) => { _viewName = name; RenderViewer(); }, name == _viewName ? "PrimaryButton" : "SecondaryButton");
                 b.Margin = new Thickness(0, 0, 8, 0);
                 bar.Children.Add(b);
             }
@@ -253,7 +256,9 @@ namespace SkinDevApp.Views
                 return;
             }
 
-            string[] modes = { "Original", "Affected Area / Localization", "Grad-CAM++" };
+            bool finalModel = File.Exists(Path.Combine(cur.RecordFolder ?? "", SkinDevApp.V6.V6Archive.FileName));
+            string[] modes = finalModel ? new[] { "Original", "Marked areas", "Heat map" } : new[] { "Original", "Affected Area / Localization", "Grad-CAM++" };
+            if (!modes.Contains(_mode)) _mode = "Original";
             var modeBar = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
             foreach (string m in modes)
             {
@@ -265,8 +270,23 @@ namespace SkinDevApp.Views
             sp.Children.Add(modeBar);
 
             string path = null, note, title;
+            SkinDevApp.V6.UnifiedAssessment fa = finalModel ? SkinDevApp.V6.V6Archive.Read(cur.RecordFolder, out string _) : null;
             switch (_mode)
             {
+                case "Marked areas":
+                    title = "Areas marked by the lesion detectors";
+                    path = SkinDevApp.V6.V6ResultsView.MarkedAreasPath(cur);
+                    note = fa == null ? "No AI result is stored for this view." :
+                           SkinDevApp.V6.V6SessionSummary.AreasLine(SkinDevApp.V6.ClinicalSummary.From(fa, SkinDevApp.V6.AIResultStore.FaceBoxOf(cur.RecordFolder))) +
+                           ". The boxes are possible locations, not confirmed lesions and not a lesion count.";
+                    break;
+                case "Heat map":
+                    string lead = fa == null ? null : SkinDevApp.V6.V6Heatmaps.LeadCondition(fa);
+                    title = "Heat map" + (lead == null ? "" : " · " + lead);
+                    path = lead == null ? null : SkinDevApp.V6.V6Heatmaps.OverlayPath(cur.RecordFolder, lead);
+                    note = path == null ? "No heat map is stored for this view." :
+                           "Where the lesion detectors found evidence for " + lead + " (colour = the condition, strength = detector confidence). It is not an outline of the affected skin.";
+                    break;
                 case "Affected Area / Localization":
                     title = "AI-identified region of interest";
                     if (cur.Localization != null && cur.Localization.Status == "OK")
@@ -293,7 +313,7 @@ namespace SkinDevApp.Views
                     break;
             }
 
-            sp.Children.Add(Ui.Text(cur.ViewType + "  ·  " + title, 12.5, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
+            sp.Children.Add(Ui.Text(SkinDevApp.V6.V6SessionSummary.LabelFor(cur.ViewType) + "  ·  " + title, 12.5, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
             var bmp = Ui.LoadImage(path, 1100);
             if (bmp != null)
             {
@@ -318,7 +338,7 @@ namespace SkinDevApp.Views
         private UIElement AssessmentCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Licensed Dermatologist Assessment", 17, true));
+            sp.Children.Add(Ui.Text("Licensed dermatologist assessment", 17, true));
             sp.Children.Add(Ui.Text("Your own independent assessment. Nothing here is filled in from the AI result, and saving it never changes the AI output.", 12, false, Ui.Muted));
 
             sp.Children.Add(Label("Dermatologist Reference Assessment *"));
@@ -368,8 +388,10 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(idRow);
 
-            sp.Children.Add(Label("Validation status *"));
-            _status = Combo(new[] { "Completed", "Pending" }); _status.SelectedIndex = 0; sp.Children.Add(_status);
+            sp.Children.Add(Label("Outcome of this review *"));
+            _status = Combo(StatusShown); _status.SelectedIndex = 0; sp.Children.Add(_status);
+            sp.Children.Add(Ui.Text("Verified moves the scan to the verified records. Requires further review keeps it open for another look. A draft does not change the scan's status.",
+                                    11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
 
             Button save = Ui.Btn("Save dermatologist assessment", (o, e) => Save(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
@@ -381,11 +403,11 @@ namespace SkinDevApp.Views
         private void Save()
         {
             int refIdx = _refRadios.FindIndex(r => r.IsChecked == true);
-            string status = (string)_status.SelectedItem ?? "Pending";
+            string status = _status.SelectedIndex < 0 ? ReviewStatus.ValidationDraft : StatusStored[_status.SelectedIndex];
             var missing = new List<string>();
             if (string.IsNullOrWhiteSpace(_id.Text)) missing.Add("validator ID");
-            if (status == "Completed" && refIdx < 0) missing.Add("a reference assessment");
-            if (status == "Completed" && _agree.SelectedIndex < 0) missing.Add("agreement with the AI classification");
+            if (status != ReviewStatus.ValidationDraft && refIdx < 0) missing.Add("a reference assessment");
+            if (status != ReviewStatus.ValidationDraft && _agree.SelectedIndex < 0) missing.Add("agreement with the AI result");
             if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Dermatologist Review"); return; }
 
             try
@@ -410,7 +432,7 @@ namespace SkinDevApp.Views
                     ValidationStatus = status
                 }, label == null ? null : new List<string> { label });
 
-                LumyDialog.Show("Dermatologist assessment saved (" + status + "). The AI output is unchanged.", "LUMYVUE Dermatologist Review",
+                LumyDialog.Show("Dermatologist assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE Dermatologist Review",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
             }
@@ -442,7 +464,7 @@ namespace SkinDevApp.Views
             foreach (DermatologistValidation v in _d.Validations)
                 sp.Children.Add(Ui.KeyValues(new[]
                 {
-                    Ui.KV("Date / status", v.ValidationDate + "  ·  " + v.ValidationStatus),
+                    Ui.KV("Date / outcome", v.ValidationDate + "  ·  " + (ReviewStatus.FromValidation(v.ValidationStatus) ?? "Draft")),
                     Ui.KV("Reference assessment", v.DermatologistAssessment ?? "—"),
                     Ui.KV("Agreement with AI", v.AgreementWithAI == "Uncertain" ? "Unable to determine" : v.AgreementWithAI ?? "—"),
                     Ui.KV("Localization relevance", v.LocalizationRelevance ?? "—"),

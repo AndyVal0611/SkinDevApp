@@ -13,6 +13,7 @@
     <Compile Include="..\SkinDevApp\Views\ReportFindings.cs" Link="Linked\ReportFindings.cs" />
     <Compile Include="..\SkinDevApp\Views\Fmt.cs" Link="Linked\Fmt.cs" />
     <Compile Include="..\SkinDevApp\Data\StudyModels.cs" Link="Linked\StudyModels.cs" />
+    <Compile Include="..\SkinDevApp\Data\ReviewStatus.cs" Link="Linked\ReviewStatus.cs" />
     <Compile Include="..\SkinDevApp\Printing\ReceiptContent.cs" Link="Linked\ReceiptContent.cs" />
     <Compile Include="..\SkinDevApp\Printing\ReceiptInterpretation.cs" Link="Linked\ReceiptInterpretation.cs" />
     <Compile Include="..\SkinDevApp\OnnxInference.cs" Link="Linked\OnnxInference.cs" />

@@ -220,14 +220,11 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            SkinDevApp.V6.V6SessionSummary v6l = null;      // V6 flag on and a saved V6 assessment: one unified assessment instead of the V5 class and match strength
-            if (SkinDevApp.V6.V6FeatureFlag.IsEnabled) { try { v6l = SkinDevApp.V6.V6SessionSummary.For(StudyRepository.GetSessionDetail(s.ScanSessionID)); } catch { v6l = null; } }
-            string overall = v6l != null ? v6l.Headline : string.IsNullOrEmpty(s.OverallPredictedClass) ? "No result"
-                : ClinicalText.Name(s.OverallPredictedClass) + (s.OverallScore.HasValue ? " — " + ClinicalText.Strength(s.OverallScore.Value) + " match" : "");
+            string overall = string.IsNullOrEmpty(s.AITitle) ? "AI result pending (analysed in the background)" : s.AITitle;
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("Overall result", overall), v6l != null ? Ui.KV("Review", v6l.ReviewRecommended ? "Recommended" : "No flags raised") : Ui.KV("Match strength", s.OverallScore.HasValue ? s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%" : "—") }, 120, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", s.ModelLabel) }, 100, 12.5)));
+                Ui.InfoRows(new[] { Ui.KV("AI result", overall), Ui.KV("Verification", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
+                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", string.IsNullOrEmpty(s.AIModel) ? "Final model (pending)" : s.AIModel) }, 100, 12.5)));
             return Ui.Card(sp);
         }
 
@@ -491,11 +488,9 @@ namespace SkinDevApp
                 _history.Columns.Add(new DataGridTextColumn { Header = header, Binding = new Binding(path), Width = w > 10 ? new DataGridLength(w + 26) : new DataGridLength(w, DataGridLengthUnitType.Star), MinWidth = w > 10 ? 60 : 150 });
             Col("Scan", "DisplayId", 112);
             Col("Date and time", "WhenText", 185);
-            Col("Overall result", "OverallPredictedClass", 105);
-            Col("Match", "ScoreText", 68);
-            Col("Photos", "CompletionText", 68);
-            Col("Status", "ScanStatus", 92);
-            Col("Review", "ReviewText", 2);
+            Col("AI result", "AITitle", 230);
+            Col("Photos", "CompletionText", 60);
+            Col("Verification", "ReviewStatus", 2);
             _history.ItemsSource = sessions;
             _history.SelectionChanged += (s, e) => ShowDetail(_history.SelectedItem as ScanSessionRow);
             sp.Children.Add(_history);
@@ -552,12 +547,13 @@ namespace SkinDevApp
                 Ui.KV("Patient", s.ParticipantID ?? "Not assigned to a patient"),
                 Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Date and time", Fmt.ScanWhen(s.StartedAt, s.CompletedAt)),
-                Ui.KV("Model", d.Model == null ? "Unknown" : d.Model.ShortLabel),
+                Ui.KV("Model", string.IsNullOrEmpty(s.AIModel) ? "Final model (pending)" : s.AIModel),
+                Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
                 Ui.KV("Overall result", overall),
                 Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analysed"),
                 Ui.KV("Scan status", s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus),
                 Ui.KV("Researcher notes", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
-                Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + dv.ValidationStatus.ToLowerInvariant())
+                Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
             }, 160, 12.5));
 
             if (v6 != null)
@@ -739,10 +735,9 @@ namespace SkinDevApp
             Col("Scan", "DisplayId", 112);
             Col("Patient", "ParticipantID", 85);
             Col("Date and time", "WhenText", 185);
-            Col("Overall result", "OverallPredictedClass", 105);
-            Col("Match", "ScoreText", 68);
-            Col("Photos", "CompletionText", 68);
-            Col("Review", "ReviewText", 2);
+            Col("AI result", "AITitle", 230);
+            Col("Photos", "CompletionText", 60);
+            Col("Verification", "ReviewStatus", 2);
             g.ItemsSource = rows;
             g.MouseDoubleClick += (s, e) => { var r = g.SelectedItem as ScanSessionRow; if (r != null) open(r); };
             return g;

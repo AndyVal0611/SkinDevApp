@@ -230,7 +230,7 @@ namespace SkinDevApp.Views
                 row.Children.Add(icon);
                 var sp = new StackPanel();
                 sp.Children.Add(new TextBlock { Text = k, FontSize = 11, Foreground = Ui.Muted });
-                var val = new TextBlock { Text = "—", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
+                var val = new TextBlock { Text = "—", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink, TextWrapping = TextWrapping.Wrap };
                 sp.Children.Add(val);
                 row.Children.Add(sp);
                 _status[k] = val;
@@ -393,7 +393,17 @@ namespace SkinDevApp.Views
                 info.Children.Add(titleRow);
 
                 var chips = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
-                if (ok)
+                SkinDevApp.V6.UnifiedAssessment va = ok && o.AbsoluteFolder != null ? SkinDevApp.V6.V6Archive.Read(o.AbsoluteFolder, out string _) : null;
+                if (ok && va != null)
+                {
+                    SkinDevApp.V6.ClinicalSummary vc = SkinDevApp.V6.ClinicalSummary.From(va, SkinDevApp.V6.AIResultStore.FaceBoxOf(o.AbsoluteFolder));
+                    string ink = SkinDevApp.V6.V6ResultsView.CategoryInk(vc.Category);
+                    var res = new StackPanel { Orientation = Orientation.Horizontal };
+                    res.Children.Add(new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = Ui.Brush(ink), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
+                    res.Children.Add(Ui.Text(vc.Title, 12, true, Ui.Brush(ink), new Thickness(0)));
+                    chips.Children.Add(new Border { Background = Ui.Brush("#F4F0E5"), CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 3, 10, 3), Margin = new Thickness(0, 0, 6, 4), Child = res });
+                }
+                else if (ok)
                 {
                     var res = new StackPanel { Orientation = Orientation.Horizontal };
                     res.Children.Add(new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = Ui.Brush(Ui.ClassColor(o.PredictedClass)), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
@@ -681,7 +691,7 @@ namespace SkinDevApp.Views
                 BeginMultiViewIfEnabled();
                 _live.Start();
 
-                LiveStatusTxt.Text = "Connecting to Grad-CAM++ service...";
+                LiveStatusTxt.Text = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? "Starting the live AI reading…" : "Connecting to Grad-CAM++ service...";
             }
             catch (Exception ex)
             {
@@ -1042,7 +1052,7 @@ namespace SkinDevApp.Views
         private void ApplyV6Bars()
         {
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
-            ScoresTitleTxt.Text = "Unified AI reading (V6)";
+            ScoresTitleTxt.Text = "Live AI reading";
             ScoresNoteTxt.Text = "AI support for each condition, refreshed every few seconds. Several can be present at once, and Normal is derived from the three, so it has no bar. Not a diagnosis.";
             NormalRow.Visibility = Visibility.Collapsed; NormalBar.Visibility = Visibility.Collapsed;
             bool ok = a != null && a.Conditions.Length >= 3 && a.State != SkinDevApp.V6.V6States.InferenceError;
@@ -1057,22 +1067,23 @@ namespace SkinDevApp.Views
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
             if (a == null)
             {
-                VerdictTxt.Text = SkinDevApp.V6.V6Service.LastError != null ? "V6 is not available: " + SkinDevApp.V6.V6Service.LastError : "V6 reading starting… keep your face in the oval.";
+                VerdictTxt.Text = SkinDevApp.V6.V6Service.LastError != null ? "The AI model is not available: " + SkinDevApp.V6.V6Service.LastError : "AI reading starting… keep your face in the oval.";
                 RegionTxt.Text = "";
                 return;
             }
-            string firstFlag = System.Linq.Enumerable.FirstOrDefault(SkinDevApp.V6.V6Text.FlagLines(a));
+            SkinDevApp.V6.ClinicalSummary cs = SkinDevApp.V6.ClinicalSummary.From(a);
+            string firstFlag = System.Linq.Enumerable.FirstOrDefault(cs.ReviewReasons);
             if (a.State == SkinDevApp.V6.V6States.RecaptureRequired) { VerdictTxt.Text = "Adjusting… " + (firstFlag ?? "check the lighting and position."); RegionTxt.Text = ""; return; }
-            if (a.State == SkinDevApp.V6.V6States.InferenceError) { VerdictTxt.Text = "The V6 reading could not be completed."; RegionTxt.Text = a.Error ?? ""; return; }
-            VerdictTxt.Text = "Live read (V6): " + SkinDevApp.V6.V6Text.StateHeadline(a);
-            RegionTxt.Text = a.Boxes.Count > 0 ? SkinDevApp.V6.V6Text.BoxesLine(a) : (firstFlag ?? "");
+            if (a.State == SkinDevApp.V6.V6States.InferenceError) { VerdictTxt.Text = "The AI reading could not be completed."; RegionTxt.Text = a.Error ?? ""; return; }
+            VerdictTxt.Text = "Live reading: " + cs.Title;
+            RegionTxt.Text = a.Boxes.Count > 0 ? SkinDevApp.V6.V6SessionSummary.AreasLine(cs) : (firstFlag ?? "");
         }
 
         private string V6LiveStatusText()
         {
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
-            if (a == null) return SkinDevApp.V6.V6Service.LastError != null ? "○ V6 unavailable" : "● V6 live reading: starting…";
-            return "● V6 live reading · " + a.InferenceMs.ToString("0") + " ms per reading";
+            if (a == null) return SkinDevApp.V6.V6Service.LastError != null ? "○ AI model unavailable" : "● Live AI reading: starting…";
+            return "● Live AI reading · " + a.InferenceMs.ToString("0") + " ms per reading";
         }
 
         private void UpdateGuide(FrameQuality q, ScanDecision d)
@@ -1162,7 +1173,7 @@ namespace SkinDevApp.Views
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    if (!_cameraLive) return;
+                    if (!_cameraLive || SkinDevApp.V6.V6FeatureFlag.IsEnabled) return;      // the final model's live reading reports its own status
                     LiveStatusTxt.Text = online
                         ? "● Grad-CAM++ connected"
                         : "○ Grad-CAM++ offline — " + error;
@@ -1200,12 +1211,32 @@ namespace SkinDevApp.Views
             if (!r.Ok || r.Request == null || r.Request.Onnx == null)
             {
                 SetBanner("Results — error", ScanState.Results);
-                VerdictTxt.Text = "Analysis failed: " + (r.Error ?? "unknown error") + ". Press New Scan to try again.";
+                VerdictTxt.Text = "Analysis failed: " + (r.Error ?? "unknown error") + ". Press New scan to try again.";
                 RegionTxt.Text = "";
                 return;
             }
 
             PredictionResult onnx = r.Request.Onnx;
+
+            if (r.V6 != null)
+            {
+                // the final model's reading of the EXACT captured frame
+                Volatile.Write(ref _latestV6, r.V6);
+                ApplyV6Bars();
+                SkinDevApp.V6.ClinicalSummary rc = SkinDevApp.V6.ClinicalSummary.From(r.V6, SkinDevApp.V6.AIResultStore.FaceBoxOf(r.Folder));
+                VerdictTxt.Text = rc.CategoryLabel + ": " + rc.Title;
+                RegionTxt.Text = SkinDevApp.V6.V6SessionSummary.AreasLine(rc) + (rc.ReviewReasons.Count > 0 ? "\n" + rc.ReviewReasons[0] : "");
+                LegendPanel.Visibility = Visibility.Collapsed;
+                RenderResultOverlay();
+                SetBanner(r.Request.Trigger == "auto" ? "Results — auto-captured" : "Results", ScanState.Results);
+                PrintBtn.IsEnabled = true;
+                OpenDetailsBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
+                GalleryBtn.IsEnabled = !string.IsNullOrEmpty(r.Folder);
+                if (ResearcherChk.IsChecked == true) ResearcherMetricsTxt.Text = BuildResultMetrics(r);
+                if (_live != null && _session != null && _live.RequiredView != ScanView.Any) AdvanceMultiView(r);
+                else SaveSingleAndEnableResults(r.Folder);
+                return;
+            }
 
             // Scores of the EXACT captured frame.
             SetBars(onnx.Probabilities);
@@ -1397,7 +1428,7 @@ namespace SkinDevApp.Views
 
             if (f == null || f.ViewsUsed == 0)
             {
-                VerdictTxt.Text = "Scan finished, but no view could be analysed. Press New Scan to try again.";
+                VerdictTxt.Text = "Scan finished, but no view could be analysed. Press New scan to try again.";
                 return;
             }
 
@@ -1701,9 +1732,10 @@ namespace SkinDevApp.Views
         {
             try
             {
-                var win = new ResearcherResultWindow(folder);
-                win.Owner = Application.Current.MainWindow;
-                win.ShowDialog();
+                // the final model's result and evidence maps of this capture (the earlier per-capture review window is retired;
+                // reviews are recorded on the saved scan: Results page -> Dermatologist review)
+                var win = new ComparisonGalleryWindow(folder) { Owner = Application.Current.MainWindow };
+                win.Show();
             }
             catch (Exception ex)
             {
@@ -1723,44 +1755,9 @@ namespace SkinDevApp.Views
                 return;
             }
 
-            try
-            {
-                RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
-                    (int)ImageCard.ActualWidth,
-                    (int)ImageCard.ActualHeight,
-                    96d, 96d, System.Windows.Media.PixelFormats.Pbgra32);
-                renderBitmap.Render(ImageCard);
-
-                PrintReportWindow printWin = new PrintReportWindow(
-                    renderBitmap,
-                    DatabaseHelper.CurrentClientName,
-                    primaryDiagnosis,
-                    confidencePercent,
-                    DatabaseHelper.CurrentClientAge,
-                    DatabaseHelper.CurrentClientContact,
-                    AcneBar.Value, HyperBar.Value, EczemaBar.Value, NormalBar.Value
-                );
-
-                // Page 2 of the report: every captured view with the original and the four class maps.
-                try
-                {
-                    string shotsFolder = (_session != null && _session.Outcomes.Count > 0) ? _session.Folder
-                                       : (_lastResult != null ? _lastResult.Folder : null);
-                    if (!string.IsNullOrEmpty(shotsFolder))
-                        printWin.SetShots(GalleryModel.Load(shotsFolder));
-                }
-                catch (Exception shotsEx)
-                {
-                    System.Diagnostics.Debug.WriteLine("[PRINT] shots page skipped: " + shotsEx.Message);
-                }
-
-                printWin.Owner = Application.Current.MainWindow;
-                printWin.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                LumyDialog.Show("Report Window Error: " + ex.Message, "LUMYVUE Print", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // Nothing saved yet (e.g. the scan was cancelled before any photograph was kept): there is no result to report.
+            LumyDialog.Show("There is no saved scan to report yet. Take the photographs first; the report is built from the saved scan.", "LUMYVUE Report",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void LogoutBtn_Click(object sender, RoutedEventArgs e)

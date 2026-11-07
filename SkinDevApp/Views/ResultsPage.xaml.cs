@@ -59,7 +59,7 @@ namespace SkinDevApp.Views
             TitleTxt.Text = "Results · " + s.DisplayId;
             SubtitleTxt.Text = (s.ParticipantID ?? "Scan without a patient" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")")) +
                                (_d.Participant != null ? "  ·  " + _d.Participant.FullName : "") +
-                               "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (_d.Model != null ? _d.Model.ShortLabel : "Unknown model") +
+                               "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (string.IsNullOrEmpty(s.AIModel) ? "Final model result pending" : s.AIModel) +
                                "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalised)");
 
             _v6 = SkinDevApp.V6.V6ResultsView.Load(_d, out _v6Problems);
@@ -145,7 +145,7 @@ namespace SkinDevApp.Views
                     GroupName = "viewmode",
                     IsChecked = mode == "Original",
                     Margin = new Thickness(0, 0, 18, 0),
-                    FontSize = 12.5,
+                    FontSize = 13,
                     ToolTip = mode == "V6Heat" ? "Where the lesion detectors found evidence for the chosen condition. Colour = the condition, strength = detector confidence. It is one input of the unified assessment, not an explanation of the model."
                             : mode == "V6Both" ? "The same evidence map with the marked boxes on top."
                             : mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
@@ -160,7 +160,7 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(toggle);
             if (_v6 != null)
-                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence for the condition ranked highest (the same evidence the unified assessment uses). It is an evidence map, not an explanation of the model.",
+                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence for the condition ranked highest (the same evidence the AI result uses). It is an evidence map, not an explanation of the model.",
                                         10.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
@@ -170,7 +170,11 @@ namespace SkinDevApp.Views
                 CaptureViewRow v = _d.View(name);
                 var col = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
                 col.Children.Add(Ui.Text(name == "Single" ? "Photograph" : name + " view", 13, true));
-                Border thumb = Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB",
+                SkinDevApp.V6.UnifiedAssessment frameA = null;
+                if (_v6 != null && v != null) _v6.TryGetValue(v.ViewType ?? name, out frameA);
+                string frameHex = frameA != null ? SkinDevApp.V6.V6ResultsView.CategoryInk(SkinDevApp.V6.ClinicalSummary.From(frameA).Category)
+                                : _v6 == null && v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB";
+                Border thumb = Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, frameHex,
                     v == null ? "Not captured" : null);
                 col.Children.Add(thumb);
                 if (v != null) _viewThumbs.Add(new KeyValuePair<CaptureViewRow, Border>(v, thumb));
@@ -178,8 +182,8 @@ namespace SkinDevApp.Views
                 if (_v6 != null)
                 {
                     SkinDevApp.V6.UnifiedAssessment v6a;
-                    if (_v6.TryGetValue(v?.ViewType ?? name, out v6a)) col.Children.Add(SkinDevApp.V6.V6ResultsView.ViewColumn(v6a));
-                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No V6 assessment was saved for this photograph.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
+                    if (_v6.TryGetValue(v?.ViewType ?? name, out v6a)) col.Children.Add(SkinDevApp.V6.V6ResultsView.ViewColumn(v6a, v?.RecordFolder));
+                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No AI result is stored for this photograph yet. It is analysed in the background; reopen this page in a moment.", 12, false, Ui.Warn, new Thickness(0, 6, 0, 0)));
                 }
                 else if (v?.Scores != null)
                 {
@@ -339,15 +343,17 @@ namespace SkinDevApp.Views
 
             // Human assessments (kept separate from the AI output)
             var human = new StackPanel();
-            human.Children.Add(Ui.Text("Clinical review", 15, true));
+            human.Children.Add(Ui.Text("Clinical review", 16, true));
+            human.Children.Add(SkinDevApp.V6.V6ResultsView.StatusChip(_d.Session.ReviewStatus));
+            human.Children.Add(new Border { Height = 8 });
             ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
-            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
+            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             human.Children.Add(Ui.InfoRows(new[]
             {
                 Ui.KV("Researcher", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
-                Ui.KV("Dermatologist", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + dv.ValidationStatus.ToLowerInvariant())
+                Ui.KV("Dermatologist", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft, not yet completed").ToLowerInvariant())
             }, 110, 12.5));
-            human.Children.Add(Ui.Text("Reviews are saved separately and never change the computer's result.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            human.Children.Add(Ui.Text("Reviews are saved separately and never change the AI result. The verification status follows the latest completed dermatologist review.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
 
             // Notice

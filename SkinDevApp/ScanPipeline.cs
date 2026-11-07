@@ -40,7 +40,10 @@ namespace SkinDevApp.Scanning
 
                 ClassHeatmapSet set = null;
                 string gradcamError = null;
+                bool finalModel = SkinDevApp.V6.V6FeatureFlag.IsEnabled;     // the final model (V6) makes its own evidence maps and detector run below
 
+                if (finalModel) gradcamError = "not used: the final model's evidence maps are saved instead";
+                else
                 using (GradCamAllResult r = await GradCamService
                     .ExplainAllClassesAsync(png, frameId, false, ServiceHeatmapMaxSide, ct, includeRawCam: true)
                     .ConfigureAwait(false))
@@ -62,7 +65,7 @@ namespace SkinDevApp.Scanning
                 LesionDetectionSet det = null;
                 string detError = null;
                 ScanSettings cfg = ScanSettings.Current;
-                if (cfg.DetectorEnabled)
+                if (cfg.DetectorEnabled && !finalModel)
                 {
                     try
                     {
@@ -78,7 +81,7 @@ namespace SkinDevApp.Scanning
                     }
                 }
 
-                // ---- V6 unified assessment (feature flag V6FeatureFlag, default OFF): same frozen frame, saved next to record.json, never changes the V5 outputs above ----
+                // ---- the final model (V6) assessment: same frozen frame, saved next to record.json ----
                 SkinDevApp.V6.UnifiedAssessment v6 = null;
                 if (SkinDevApp.V6.V6FeatureFlag.IsEnabled)
                 {
@@ -100,7 +103,7 @@ namespace SkinDevApp.Scanning
 
                 if (v6 != null)
                 {
-                    try { SkinDevApp.V6.V6Archive.Write(folder, v6, req.Working, req.Quality != null ? req.Quality.FaceBox : (Rect?)null); }
+                    try { SkinDevApp.V6.V6Archive.Write(folder, v6, req.Working, req.Quality != null ? req.Quality.FaceBox : (Rect?)null, SkinDevApp.V6.AIResultStore.OriginScan); }
                     catch (Exception wex) { v6.Reasons.Add("the V6 assessment could not be saved: " + wex.Message); }
                     result.V6 = v6;
                 }

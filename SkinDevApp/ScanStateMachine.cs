@@ -226,7 +226,7 @@ namespace SkinDevApp.Scanning
             lock (_lock) { if (_state == ScanState.FinalAnalysis || _state == ScanState.StableCapturing) _state = ScanState.Results; }
         }
 
-        /// <summary>User pressed "New Scan": cooldown, then back to Live.</summary>
+        /// <summary>User pressed "New scan": cooldown, then back to Live.</summary>
         public void NewScan(DateTime nowUtc)
         {
             lock (_lock)

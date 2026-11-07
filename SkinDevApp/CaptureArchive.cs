@@ -176,7 +176,7 @@ namespace SkinDevApp.Scanning
             // Multi-view: <session folder>\Front|Left|Right ; single capture: <date>\<time_id> as before.
             string folder = !string.IsNullOrEmpty(req.SessionFolder) && req.View != ScanView.Any
                 ? Path.Combine(req.SessionFolder, ScanViews.Name(req.View))
-                : Path.Combine(RootDirectory, day, stamp);
+                : Path.Combine(SkinDevApp.Data.ScanStorage.CaptureRoot(req.PatientId ?? SkinDevApp.Data.AppSession.CurrentParticipantId), day, stamp);
             Directory.CreateDirectory(folder);
 
             var files = new Dictionary<string, string>();
@@ -432,13 +432,9 @@ namespace SkinDevApp.Scanning
         public static List<string> ListAll()
         {
             var result = new List<string>();
-            string root = CaptureArchive.RootDirectory;
-            if (!Directory.Exists(root)) return result;
-
             try
             {
-                foreach (string day in Directory.GetDirectories(root))
-                    foreach (string cap in Directory.GetDirectories(day))
+                foreach (string cap in SkinDevApp.Data.ScanStorage.ScanFoldersOnDisk())
                     {
                         if (File.Exists(Path.Combine(cap, "record.json")))
                         {

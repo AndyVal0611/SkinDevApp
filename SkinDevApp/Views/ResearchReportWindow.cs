@@ -319,16 +319,37 @@ namespace SkinDevApp.Views
 
             if (_f.V6 != null)
             {
-                // V6 flag on: ONE unified assessment replaces the V5 classification, class bars and per-view score table
-                sp.Children.Add(Heading("Unified AI assessment"));
-                sp.Children.Add(T(_f.V6.Headline, 13, true, Navy, 4));
-                foreach (SkinDevApp.V6.V6ViewSummary v6v in _f.V6.Views)
+                // The final model's clinical reading: outcome, findings table (result, certainty, facial regions), review reasons, verification status
+                SkinDevApp.V6.ClinicalSummary cs = _f.V6.Clinical;
+                sp.Children.Add(Heading("AI screening result"));
+                sp.Children.Add(T(cs.CategoryLabel.ToUpperInvariant() + "  ·  Verification: " + _f.V6.ReviewStatus, 8.5, true,
+                                  cs.Category == SkinDevApp.V6.ClinicalCategory.NoConditionDetected ? TextInk : WarnInk, 1));
+                sp.Children.Add(T(cs.Title, 13, true, Navy, 2));
+                sp.Children.Add(T(cs.Explanation, 9, false, TextInk, 5));
+                var ft = new Grid();
+                foreach (double w in new[] { 120.0, 110.0, 80.0 }) ft.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
+                ft.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                string[] fh = { "Condition", "AI result", "Certainty", "Facial regions" };
+                ft.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (int ci = 0; ci < fh.Length; ci++) { var h = T(fh[ci], 8, true, Muted, 2); Grid.SetColumn(h, ci); ft.Children.Add(h); }
+                int fr = 1;
+                foreach (SkinDevApp.V6.ClinicalFinding cf in cs.Findings)
                 {
-                    sp.Children.Add(T(v6v.Label + ": " + v6v.Headline, 9.5, true, TextInk, 2));
-                    foreach (string cl in v6v.ConditionLines) sp.Children.Add(T("   " + cl, 8.5, false, TextInk, 1));
-                    sp.Children.Add(T("   " + v6v.BoxesLine, 8, false, Muted, 4));
+                    ft.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var cells = new[]
+                    {
+                        T(cf.Condition, 9, true, TextInk, 1),
+                        T(cf.Status + (cf.NeedsReview ? " (review)" : ""), 9, cf.IsDetected, cf.IsDetected ? Navy : cf.NeedsReview ? WarnInk : TextInk, 1),
+                        T(cf.Status == SkinDevApp.V6.ClinicalSummary.Detected || cf.Status == SkinDevApp.V6.ClinicalSummary.NotDetected ? cf.Certainty : "—", 9, false, TextInk, 1),
+                        T(cf.Regions.Count == 0 ? "—" : string.Join("; ", cf.Regions), 9, false, TextInk, 1)
+                    };
+                    for (int ci = 0; ci < cells.Length; ci++) { Grid.SetRow(cells[ci], fr); Grid.SetColumn(cells[ci], ci); ft.Children.Add(cells[ci]); }
+                    fr++;
                 }
+                sp.Children.Add(ft);
+                foreach (string rr in cs.ReviewReasons.Distinct()) sp.Children.Add(T("•  " + rr, 8.5, false, WarnInk, 1));
                 foreach (string n6 in _f.V6.Notes) sp.Children.Add(T(n6, 8.5, false, Muted, 2));
+                if (!string.IsNullOrEmpty(s.AIModel)) sp.Children.Add(T("Analysed by: " + s.AIModel, 7.5, false, Muted, 1));
                 sp.Children.Add(T(_f.V6.Disclaimer, 7.5, false, Muted, 4));
             }
             else
@@ -422,16 +443,17 @@ namespace SkinDevApp.Views
                 foreach (string flag in _f.Flags) w.Children.Add(T("•  " + flag, 8.5, false, WarnInk, 2));
                 sp.Children.Add(Panel(w, WarnBg, WarnLine, 8));
             }
-            else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised by the unified assessment. Every assessment still waits for dermatologist review.", 8.5, false, TextInk, 2));
+            else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised by the AI. Every result still waits for dermatologist review.", 8.5, false, TextInk, 2));
 
             ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
-            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus == "Completed") ?? _d.Validations.FirstOrDefault();
+            DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             SkinProfile skin = string.IsNullOrEmpty(s.ParticipantID) ? null : StudyRepository.GetSkinProfile(s.ParticipantID);
             sp.Children.Add(Heading("Human assessment"));
             sp.Children.Add(Table(new[]
             {
                 Ui.KV("Researcher assessment", ev == null ? "Pending" : ev.ResearcherClassification + " · " + ev.AgreementWithAI + " · " + ev.ResearcherID + " · " + ev.EvaluationDate),
-                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + dv.ValidationStatus + " · " + dv.DermatologistID + " · " + dv.ValidationDate)
+                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + dv.ValidationDate),
+                Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending)
             }, 150));
 
             // disclaimer + full hash
@@ -490,7 +512,7 @@ namespace SkinDevApp.Views
                 // V6 flag on: no V5 predicted class or Model Class Score under the photograph, only the capture quality and the unified headline
                 if (v != null && !string.IsNullOrEmpty(v.QualityStatus)) cell.Children.Add(T("Capture quality: " + v.QualityStatus, 8.5, false, v.QualityStatus == "Good" ? TextInk : WarnInk, 1));
                 SkinDevApp.V6.V6ViewSummary vs = _f.V6.Views.FirstOrDefault(x => x.View == (v?.ViewType ?? viewName));
-                cell.Children.Add(T(vs != null ? vs.Headline : "No V6 assessment was saved for this photograph", 8.5, false, vs != null && vs.ReviewRequired ? WarnInk : TextInk, 0));
+                cell.Children.Add(T(vs != null ? vs.Headline : "No AI result is stored for this photograph", 8.5, false, vs != null && vs.ReviewRequired ? WarnInk : TextInk, 0));
             }
             else if (v?.Scores != null)
             {

@@ -56,6 +56,12 @@ namespace SkinDevApp.Data
 
         public static string CapturesDir => SharedFolder != null ? Path.Combine(SharedFolder, "Captures") : LocalCaptures;
 
+        /// <summary>The data folder of this installation: the shared folder, or %LOCALAPPDATA%\LUMYVUE.</summary>
+        public static string DataRoot => SharedFolder ?? Path.GetDirectoryName(LocalCaptures);
+
+        /// <summary>Every scan's files: Patient Records\&lt;verification status&gt;\&lt;PatientID&gt;\&lt;date&gt;\&lt;scan folder&gt; (see ScanStorage).</summary>
+        public static string RecordsDir => Path.Combine(DataRoot, "Patient Records");
+
         private static string FindSharedFolder()
         {
             try
@@ -100,6 +106,8 @@ namespace SkinDevApp.Data
             try
             {
                 if (File.Exists(path) || Directory.Exists(path)) return path;
+                int r = path.IndexOf("\\Patient Records\\", StringComparison.OrdinalIgnoreCase);
+                if (r >= 0) return Path.Combine(RecordsDir, path.Substring(r + 17));
                 int i = path.IndexOf("\\Captures\\", StringComparison.OrdinalIgnoreCase);
                 if (i < 0) return path;
                 return Path.Combine(CapturesDir, path.Substring(i + 10));
@@ -110,7 +118,7 @@ namespace SkinDevApp.Data
 
     public static class StudyDatabase
     {
-        public const int SchemaVersion = 1;
+        public const int SchemaVersion = 2;
 
         public static string DbPath { get; } = DataLocation.DbFile;
 
@@ -133,6 +141,7 @@ namespace SkinDevApp.Data
             try
             {
                 if (!File.Exists(DbPath)) SQLiteConnection.CreateFile(DbPath);
+                else BackupBeforeUpgrade();
 
                 using (var c = Open())
                 using (var tx = c.BeginTransaction())
@@ -144,8 +153,18 @@ namespace SkinDevApp.Data
                     // Monk Skin Tone (rated by a person against the MST card; independent of every AI result)
                     foreach (string col in new[] { "MonkSkinTone", "MonkSource" })
                         EnsureColumn(c, tx, "SkinProfiles", col, "TEXT");
+                    // Version 2: the final model's results, the scan verification status and supporting indexes (additive; nothing is dropped).
+                    Exec(c, tx, SchemaV2);
+                    foreach (string col in new[] { "AIResult", "AITitle", "AIConditions", "AIModel", "AIUpdatedAt", "ReviewStatus", "ReviewStatusAt", "ReviewStatusBy" })
+                        EnsureColumn(c, tx, "ScanSessions", col, "TEXT");
+                    Exec(c, tx, "CREATE INDEX IF NOT EXISTS IX_ScanSessions_Review ON ScanSessions(ReviewStatus);");
+                    Exec(c, tx, @"UPDATE ScanSessions SET ReviewStatus = CASE
+                        (SELECT d.ValidationStatus FROM DermatologistValidations d WHERE d.ScanSessionID = ScanSessions.ScanSessionID AND d.ValidationStatus IN ('Completed','Further review') ORDER BY d.ValidationID DESC LIMIT 1)
+                          WHEN 'Completed' THEN 'Verified' WHEN 'Further review' THEN 'Requires further review' ELSE 'Pending verification' END
+                        WHERE ReviewStatus IS NULL;");
                     Exec(c, tx, "INSERT OR IGNORE INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('schema_version', '" +
                                 SchemaVersion + "', datetime('now','localtime'), 'system');");
+                    Exec(c, tx, "UPDATE SystemSettings SET Value='" + SchemaVersion + "', UpdatedAt=datetime('now','localtime'), UpdatedBy='system' WHERE Key='schema_version' AND CAST(Value AS INTEGER) < " + SchemaVersion + ";");
                     tx.Commit();
                 }
 
@@ -159,6 +178,28 @@ namespace SkinDevApp.Data
                 System.Diagnostics.Debug.WriteLine("[StudyDatabase] " + ex);
             }
         }
+
+        /// <summary>Before an older database is upgraded, a full copy is kept in Backups\ next to it (once per upgrade).</summary>
+        private static void BackupBeforeUpgrade()
+        {
+            int stored = 0;
+            try
+            {
+                using (var c = Open())
+                using (var cmd = new SQLiteCommand("SELECT Value FROM SystemSettings WHERE Key='schema_version';", c))
+                    int.TryParse(Convert.ToString(cmd.ExecuteScalar()), out stored);
+            }
+            catch { stored = 0; }                                     // no settings table yet: an old or empty database
+            if (stored >= SchemaVersion) return;
+            string dir = Path.Combine(Path.GetDirectoryName(DbPath), "Backups");
+            Directory.CreateDirectory(dir);
+            string copy = Path.Combine(dir, "lumyvue_db_before_v" + SchemaVersion + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".sqlite");
+            File.Copy(DbPath, copy, false);
+            LastBackup = copy;
+        }
+
+        /// <summary>The backup made by this start-up's upgrade, or null.</summary>
+        public static string LastBackup { get; private set; }
 
         private static void Exec(SQLiteConnection c, SQLiteTransaction tx, string sql)
         {
@@ -174,6 +215,56 @@ namespace SkinDevApp.Data
                     if (string.Equals(Convert.ToString(r["name"]), column, StringComparison.OrdinalIgnoreCase)) return;
             Exec(c, tx, "ALTER TABLE " + table + " ADD COLUMN " + column + " " + type + ";");
         }
+
+        // Final-model (V6) results: one assessment per photograph, one finding per condition, the marked areas. Written by AIResultStore.
+        private const string SchemaV2 = @"
+CREATE TABLE IF NOT EXISTS AIAssessments (
+    CaptureID       TEXT PRIMARY KEY REFERENCES CaptureViews(CaptureID),
+    ScanSessionID   TEXT NOT NULL REFERENCES ScanSessions(ScanSessionID),
+    ModelName       TEXT NOT NULL,
+    Variant         TEXT,
+    RunId           TEXT,
+    State           TEXT NOT NULL,
+    Category        TEXT NOT NULL,
+    Title           TEXT,
+    Explanation     TEXT,
+    ReviewReasons   TEXT,
+    Origin          TEXT NOT NULL,
+    AssessedAt      TEXT NOT NULL,
+    AssessmentFile  TEXT,
+    ContentSha256   TEXT,
+    ModelHashes     TEXT,
+    FaceBox         TEXT
+);
+CREATE INDEX IF NOT EXISTS IX_AIAssessments_Session ON AIAssessments(ScanSessionID);
+
+CREATE TABLE IF NOT EXISTS AIFindings (
+    FindingID       INTEGER PRIMARY KEY AUTOINCREMENT,
+    CaptureID       TEXT NOT NULL REFERENCES AIAssessments(CaptureID) ON DELETE CASCADE,
+    Condition       TEXT NOT NULL,
+    Status          TEXT NOT NULL,
+    Certainty       TEXT,
+    Probability     REAL,
+    Threshold       REAL,
+    DetectorMarked  INTEGER NOT NULL DEFAULT 0,
+    Regions         TEXT,
+    UNIQUE (CaptureID, Condition)
+);
+
+CREATE TABLE IF NOT EXISTS AIMarkedAreas (
+    AreaID          INTEGER PRIMARY KEY AUTOINCREMENT,
+    CaptureID       TEXT NOT NULL REFERENCES AIAssessments(CaptureID) ON DELETE CASCADE,
+    Condition       TEXT NOT NULL,
+    Confidence      REAL NOT NULL,
+    NX0 REAL, NY0 REAL, NX1 REAL, NY1 REAL,
+    FacialRegion    TEXT
+);
+CREATE INDEX IF NOT EXISTS IX_AIMarkedAreas_Capture ON AIMarkedAreas(CaptureID);
+
+CREATE INDEX IF NOT EXISTS IX_ScanSessions_Started ON ScanSessions(StartedAt);
+CREATE INDEX IF NOT EXISTS IX_Receipts_Participant ON Receipts(ParticipantID);
+CREATE INDEX IF NOT EXISTS IX_AuditLog_Entity ON AuditLog(Entity, EntityID);
+";
 
         private const string Schema = @"
 CREATE TABLE IF NOT EXISTS Participants (

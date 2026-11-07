@@ -50,7 +50,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Lesion detectors", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
-            sp.Children.Add(Ui.Text("Separate models that mark places that may contain lesions (the boxes on the photographs). They never change the skin-condition result.",
+            sp.Children.Add(Ui.Text("The three lesion detectors are part of the final model: their evidence feeds the fusion network, and their boxes name the facial regions on every result.",
                 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
 
             try { LesionEngine.EnsureLoaded(); } catch { }
@@ -190,7 +190,7 @@ namespace SkinDevApp.Views
                 Content = new TextBox
                 {
                     Text = text, IsReadOnly = true, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent,
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(18, 6, 0, 0)
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(18, 6, 0, 0)
                 }
             };
         }
@@ -205,29 +205,37 @@ namespace SkinDevApp.Views
             long currentId = 0;
             try { currentId = StudyRepository.EnsureCurrentModelVersion(); } catch { }
 
+            // the final model: the only model whose results are shown and stored
+            await System.Threading.Tasks.Task.Run(() => { try { SkinDevApp.V6.V6Service.EnsureLoaded(); } catch { } });
+            SkinDevApp.V6.V6Config v6c = SkinDevApp.V6.V6Service.Config;
+            string variant = SkinDevApp.V6.V6Service.Variant;
             var cls = new StackPanel();
-            cls.Children.Add(Ui.Text("Skin-condition model", 16, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
+            cls.Children.Add(Ui.Text("Final AI model", 16, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
             cls.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Name", Fmt.ModelName(mi.RunName)),
-                Ui.KV("Type", "MobileNetV2 image classifier"),
-                Ui.KV("Categories", Labels()),
-                Ui.KV("What it reports", "How closely a photograph resembles each of the four categories. The four figures add up to 100%."),
-                Ui.KV("Status", AiEngine.IsAvailable ? "Ready" : "Not ready — " + (AiEngine.LoadErrorMessage ?? "the model could not be loaded")),
-                Ui.KV("Version number", currentId > 0 ? currentId.ToString() : "—"),
-                Ui.KV("Created", Fmt.When(mi.CreatedUtc))
+                Ui.KV("Name", SkinDevApp.V6.AIResultStore.ModelLabel(variant)),
+                Ui.KV("How it works", "A MobileNetV2 whole-face reading and three YOLOv8 lesion detectors (acne, hyperpigmentation, eczema), combined by one trained fusion network, then calibrated."),
+                Ui.KV("Conditions", "Acne, Hyperpigmentation, Eczema (several can be present). Normal skin is derived when none is detected."),
+                Ui.KV("What it reports", "Condition detected / Needs review / No condition detected; per condition: result, certainty and the facial regions marked."),
+                Ui.KV("Status", SkinDevApp.V6.V6Service.IsReady ? "Ready" : "Not ready — " + (SkinDevApp.V6.V6Service.LastError ?? "the model could not be loaded")),
+                Ui.KV("Training run", v6c == null ? "—" : v6c.RunId)
             }, 150));
-            cls.Children.Add(Technical(string.Join(Environment.NewLine, new[]
+            var v6tech = new System.Collections.Generic.List<string>
             {
-                "Input size:      224 x 224 x 3",
-                "Colour order:    RGB (camera frames are converted from BGR)",
-                "Normalisation:   (pixel / 127.5) - 1",
-                "Runtime:         ONNX Runtime",
-                "Model file:      " + AiEngine.ModelPath + (File.Exists(AiEngine.ModelPath) ? "" : "  (NOT FOUND)"),
-                "Version source:  " + mi.Source,
-                "ONNX SHA-256:    " + mi.OnnxSha256,
-                "Keras SHA-256:   " + mi.KerasSha256
-            })));
+                "Variant:         " + (variant ?? "not loaded") + "   (App.config key V6Variant: global_yolo | full)",
+                "Preprocessing:   BGR->RGB, bilinear 224 x 224, (pixel / 127.5) - 1",
+                "Runtime:         ONNX Runtime (CPU)",
+                "Model folder:    " + SkinDevApp.V6.V6Service.DeploymentDir
+            };
+            if (v6c != null)
+            {
+                SkinDevApp.V6.FusionCalibration cal = variant == "full" && v6c.Full != null ? v6c.Full : v6c.GlobalYolo;
+                v6tech.Add("Thresholds:      Acne " + cal.Thresholds[0] + " · Hyperpigmentation " + cal.Thresholds[1] + " · Eczema " + cal.Thresholds[2] + " (calibrated probability), band " + v6c.Band);
+                foreach (SkinDevApp.V6.ModelFileSpec m in new[] { v6c.GlobalFeatures, v6c.FusionGlobalYolo, v6c.FusionGlobalOnly, v6c.FusionFull, v6c.RoiFeatures }.Where(x => x != null))
+                    v6tech.Add("File:            " + m.File + "  SHA-256 " + m.Sha256.Substring(0, 16) + "… (verified at load)");
+            }
+            v6tech.Add("Earlier classifier: " + Fmt.ModelName(mi.RunName) + " — used only to tell when the face is steady for an automatic photograph; its output is not shown or used for findings.");
+            cls.Children.Add(Technical(string.Join(Environment.NewLine, v6tech)));
             LeftColumn.Children.Add(Ui.Card(cls));
             LeftColumn.Children.Add(Ui.Card(LesionCard()));
 
@@ -237,7 +245,7 @@ namespace SkinDevApp.Views
             checking.Children.Add(Ui.Spinner(18));
             checking.Children.Add(Ui.Text("Checking the heat-map service…", 12.5, false, Ui.Muted, new Thickness(10, 0, 0, 0)));
             cam.Children.Add(checking);
-            RightColumn.Children.Add(Ui.Card(cam));
+            // the earlier heat-map (Grad-CAM++) service is not used by the final model, so its card is no longer shown
 
             var face = new StackPanel();
             face.Children.Add(Ui.Text("Face and angle models", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));

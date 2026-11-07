@@ -9,7 +9,7 @@
             <DockPanel Margin="8,0,8,8">
                 <Button DockPanel.Dock="Right" Content="Refresh" Style="{StaticResource SmallButton}" Margin="0" VerticalAlignment="Bottom" Click="RefreshBtn_Click"/>
                 <StackPanel>
-                    <TextBlock Text="Research Dashboard" Style="{StaticResource H1}"/>
+                    <TextBlock Text="Research dashboard" Style="{StaticResource H1}"/>
                     <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
                                Text="Every number below is counted from the stored database at the time of loading. Nothing is estimated or hard-coded."/>
                 </StackPanel>

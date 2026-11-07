@@ -83,7 +83,8 @@ namespace SkinDevApp.Views
             {
                 // V6 flag on: the report states the one unified assessment; the V5 classifier lines and the Grad-CAM++ attribution pages are not part of it
                 f.HasResult = true;
-                f.Lines.Add("Unified AI assessment: " + f.V6.Headline + ".");
+                f.Lines.Add("AI screening result (" + f.V6.Clinical.CategoryLabel.ToLowerInvariant() + "): " + f.V6.Headline + ".");
+                f.Lines.Add("Verification status: " + f.V6.ReviewStatus + ".");
                 foreach (SkinDevApp.V6.V6ViewSummary v in f.V6.Views)
                 {
                     if (!f.V6.Single) f.Lines.Add(v.Label + ": " + v.Headline);              // one photograph: the headline above already says it
@@ -94,7 +95,7 @@ namespace SkinDevApp.Views
                 }
                 foreach (string n in f.V6.Notes) f.Lines.Add(n);
                 foreach (string p in f.V6.Problems) f.Flags.Add(p);
-                f.Lines.Add(SkinDevApp.V6.V6Text.DisclaimerShort);
+                f.Lines.Add(SkinDevApp.V6.ClinicalSummary.Disclaimer);
 
                 // Heat maps: V6's detector-evidence map of the condition the unified assessment ranks highest, per photograph (same form as V5's maps).
                 foreach (SkinDevApp.V6.V6ViewSummary vs in f.V6.Views)

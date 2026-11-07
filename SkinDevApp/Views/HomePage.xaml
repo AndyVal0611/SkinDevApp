@@ -115,7 +115,7 @@
                     <Border Width="40" Height="40" CornerRadius="20" Background="#DDBAAE" Margin="0,0,12,0" DockPanel.Dock="Left">
                         <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.User}" Foreground="#2F3024" Width="19" Height="19" HorizontalAlignment="Center"/>
                     </Border>
-                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="13.5" Foreground="#2F3024" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CurrentParticipantTxt" FontSize="14" Foreground="#2F3024" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </DockPanel>
             </Border>
 
@@ -134,7 +134,7 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="New registration" FontSize="28" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                             <TextBlock Text="Register a patient. A Patient ID is created automatically, then consent is recorded."
-                                       FontSize="13.5" Foreground="#EDEBD3" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                       FontSize="14" Foreground="#EDEBD3" TextWrapping="Wrap" Margin="0,6,0,0"/>
                         </StackPanel>
                     </DockPanel>
                 </Button>
@@ -147,7 +147,7 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Skin analysis" FontSize="28" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                             <TextBlock Text="Choose a patient (or continue with the current one) and take the front, left and right photographs."
-                                       FontSize="13.5" Foreground="#FFF1EB" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                       FontSize="14" Foreground="#FFF1EB" TextWrapping="Wrap" Margin="0,6,0,0"/>
                         </StackPanel>
                     </DockPanel>
                 </Button>
@@ -159,7 +159,7 @@
 
             <DockPanel Margin="10,16,8,0">
                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Info}" Foreground="#8D8D76" Width="15" Height="15" Margin="0,0,8,0"/>
-                <TextBlock Style="{StaticResource Muted}" FontSize="11.5" VerticalAlignment="Center"
+                <TextBlock Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"
                            Text="LUMYVUE is a research prototype that assists with automated skin-image classification. It does not replace professional medical evaluation."/>
             </DockPanel>
         </StackPanel>

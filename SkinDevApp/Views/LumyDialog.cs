@@ -133,7 +133,7 @@ namespace SkinDevApp
             head.Children.Add(badge);
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             titles.Children.Add(new TextBlock { Text = "LUMYVUE", FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = B("#8D8D76") });
-            titles.Children.Add(new TextBlock { Text = title, FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = B("#2F3024"), TextTrimming = TextTrimming.CharacterEllipsis });
+            titles.Children.Add(new TextBlock { Text = title, FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = B("#2F3024"), TextTrimming = TextTrimming.CharacterEllipsis });
             head.Children.Add(titles);
             body.Children.Add(head);
 
@@ -224,7 +224,7 @@ namespace SkinDevApp
             var ic = Ui.Icon(iconKey, 20, Ui.Brush(accent));
             ic.Margin = new Thickness(0, 0, 12, 0);
             row.Children.Add(ic);
-            row.Children.Add(new TextBlock { Text = text, Foreground = Ui.Brush("#F7F5E9"), FontSize = 13.5, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 420, TextWrapping = TextWrapping.Wrap });
+            row.Children.Add(new TextBlock { Text = text, Foreground = Ui.Brush("#F7F5E9"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 420, TextWrapping = TextWrapping.Wrap });
             var toast = new Border
             {
                 Background = Ui.Brush("#F02F3024"), CornerRadius = new CornerRadius(16), Padding = new Thickness(18, 14, 22, 14),

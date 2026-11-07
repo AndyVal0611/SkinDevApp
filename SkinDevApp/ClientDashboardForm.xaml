@@ -27,7 +27,7 @@
         <Style x:Key="ScoreValue" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="#2F3024"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="FontFamily" Value="{StaticResource NumberFont}"/>
         </Style>
@@ -71,12 +71,12 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="26" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic"/>
+                    <TextBlock Text="LUMYVUE" Foreground="White" FontSize="28" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic"/>
                     <ContentControl Style="{StaticResource SkinRibbon}" Margin="2,3,0,0"/>
                 </StackPanel>
                 <Border Grid.Column="1" Width="1" Height="34" Background="#40FFFFFF" Margin="20,0" VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="Skin scan" Foreground="#F7F5E9" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock Text="Skin scan" Foreground="#F7F5E9" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock x:Name="ScanInfoTxt" Text="" Foreground="#DDDCC2" FontSize="12" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
@@ -145,7 +145,7 @@
                     <!-- Bottom centre: positioning instruction + hold-still progress -->
                     <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,18" IsHitTestVisible="False">
                         <Border x:Name="GuideBanner" Style="{StaticResource GlassChip}" Visibility="Collapsed" Padding="20,9" Margin="56,0,56,0" HorizontalAlignment="Center" CornerRadius="20">
-                            <TextBlock x:Name="GuideTxt" Text="" FontSize="19" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" TextAlignment="Center"/>
+                            <TextBlock x:Name="GuideTxt" Text="" FontSize="18" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" TextAlignment="Center"/>
                         </Border>
                         <ProgressBar x:Name="HoldBar" Minimum="0" Maximum="1" Value="0" Height="6" Width="240"
                                      Margin="0,10,0,0" Foreground="#C2C395" Background="#55FFFFFF"
@@ -155,7 +155,7 @@
                     <!-- Live service status (kept) -->
                     <TextBlock x:Name="LiveStatusTxt"
                                Text=""
-                               FontSize="11.5" FontWeight="SemiBold"
+                               FontSize="12" FontWeight="SemiBold"
                                Foreground="White" Background="#99000000"
                                Padding="10,5" VerticalAlignment="Bottom" HorizontalAlignment="Left"
                                Margin="22,0,0,22" IsHitTestVisible="False">
@@ -172,24 +172,24 @@
                     <Border x:Name="LegendPanel" Style="{StaticResource GlassChip}" Visibility="Collapsed"
                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,64,20,0" Padding="14,10" IsHitTestVisible="False">
                         <StackPanel>
-                            <TextBlock Text="HEAT MAP" FontSize="10" FontWeight="SemiBold" Foreground="#CCFFFFFF" Margin="0,0,0,6"/>
+                            <TextBlock Text="HEAT MAP" FontSize="11" FontWeight="SemiBold" Foreground="#CCFFFFFF" Margin="0,0,0,6"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <Ellipse Width="10" Height="10" Fill="#FF0000" Margin="0,0,8,0"/>
-                                <TextBlock Text="Acne" FontSize="11.5" Foreground="White"/>
+                                <TextBlock Text="Acne" FontSize="12" Foreground="White"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <Ellipse Width="10" Height="10" Fill="#0050FF" Margin="0,0,8,0"/>
-                                <TextBlock Text="Hyperpigmentation" FontSize="11.5" Foreground="White"/>
+                                <TextBlock Text="Hyperpigmentation" FontSize="12" Foreground="White"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <Ellipse Width="10" Height="10" Fill="#FFBE00" Margin="0,0,8,0"/>
-                                <TextBlock Text="Eczema" FontSize="11.5" Foreground="White"/>
+                                <TextBlock Text="Eczema" FontSize="12" Foreground="White"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                 <Ellipse Width="10" Height="10" Fill="#00C83C" Margin="0,0,8,0"/>
-                                <TextBlock Text="Normal" FontSize="11.5" Foreground="White"/>
+                                <TextBlock Text="Normal" FontSize="12" Foreground="White"/>
                             </StackPanel>
-                            <TextBlock Text="Colour = category&#x0a;Strength = how much it counted" FontSize="10" Foreground="#CCFFFFFF"/>
+                            <TextBlock Text="Colour = category&#x0a;Strength = how much it counted" FontSize="11" Foreground="#CCFFFFFF"/>
                         </StackPanel>
                     </Border>
 
@@ -257,7 +257,7 @@
                             <StackPanel>
                                 <DockPanel>
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Alert}" Foreground="#A93D33" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Top"/>
-                                    <TextBlock x:Name="SaveWarnTxt" FontSize="12.5" Foreground="#7F1D1D" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="SaveWarnTxt" FontSize="13" Foreground="#7F1D1D" TextWrapping="Wrap"/>
                                 </DockPanel>
                                 <Button x:Name="RetrySaveBtn" Content="Retry save" Style="{StaticResource SmallButton}"
                                         HorizontalAlignment="Left" Margin="30,10,0,0" Click="RetrySaveBtn_Click"/>
@@ -270,7 +270,7 @@
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,2">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Image}" Foreground="#B9897A" Width="20" Height="20" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Image review" FontSize="17" FontWeight="SemiBold" Foreground="#2F3024"/>
+                                    <TextBlock Text="Image review" FontSize="18" FontWeight="SemiBold" Foreground="#2F3024"/>
                                 </DockPanel>
                                 <TextBlock Text="Check each photograph. Retake any view without repeating registration. Results are finalised when you accept."
                                            FontSize="12" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,4,0,10"/>
@@ -288,24 +288,24 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button x:Name="StartCamBtn" Grid.Column="0" Style="{StaticResource PrimaryButton}" Height="64" FontSize="15" Padding="10,0" Click="StartCamBtn_Click">
+                            <Button x:Name="StartCamBtn" Grid.Column="0" Style="{StaticResource PrimaryButton}" Height="64" FontSize="16" Padding="10,0" Click="StartCamBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Video}" Width="22" Height="22" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Live Cam" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Live camera" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
-                            <Button x:Name="SnapBtn" Grid.Column="2" Style="{StaticResource AccentButton}" Height="64" FontSize="15" FontWeight="Bold" Padding="10,0" IsEnabled="False" Click="SnapBtn_Click">
+                            <Button x:Name="SnapBtn" Grid.Column="2" Style="{StaticResource AccentButton}" Height="64" FontSize="16" FontWeight="SemiBold" Padding="10,0" IsEnabled="False" Click="SnapBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Capture}" Width="22" Height="22" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Snap Now" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Snap now" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </Grid>
                         <Button x:Name="UploadBtn" Style="{StaticResource GhostButton}" Height="50" Margin="0,0,0,16" Click="UploadBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Upload}" Width="19" Height="19" Margin="0,0,10,0"/>
-                                <TextBlock Text="File Upload" VerticalAlignment="Center"/>
+                                <TextBlock Text="Upload a photo" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
@@ -319,15 +319,15 @@
                         <Border Style="{StaticResource Panel}" Margin="0,0,0,12" Padding="14,6">
                             <StackPanel>
                                 <CheckBox x:Name="AutoCaptureChk" Content="Take the photo automatically when the reading is steady" IsChecked="True"
-                                          FontSize="13.5" Foreground="#2F3024" Margin="0,2,0,2"
+                                          FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
                                 <CheckBox x:Name="MultiViewChk" Content="Three photographs: front, left side and right side" IsChecked="True"
-                                          FontSize="13.5" Foreground="#2F3024" Margin="0,2,0,2"
+                                          FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
 
                                 <CheckBox x:Name="CentreChk" Content="Show centre lines (height and left / right)" IsChecked="True"
-                                          FontSize="13.5" Foreground="#2F3024" Margin="0,2,0,2"
+                                          FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="CentreChk_Changed" Unchecked="CentreChk_Changed"/>
                             </StackPanel>
                         </Border>
@@ -352,7 +352,7 @@
                                 Margin="0,0,0,10" Click="NewScanBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Refresh}" Width="19" Height="19" Margin="0,0,10,0"/>
-                                <TextBlock Text="New Scan" VerticalAlignment="Center"/>
+                                <TextBlock Text="New scan" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
@@ -379,7 +379,7 @@
                                 <DockPanel Margin="0,0,0,10">
                                     <TextBlock Text="Prediction stability" FontSize="12" FontWeight="SemiBold" Foreground="#6F6F58" VerticalAlignment="Center"/>
                                     <Border HorizontalAlignment="Right" Background="#2F3024" CornerRadius="10" Padding="10,3">
-                                        <TextBlock x:Name="StabilityTxt" Text="ANALYZING" FontSize="11.5" FontWeight="Bold" Foreground="#F7F5E9"/>
+                                        <TextBlock x:Name="StabilityTxt" Text="ANALYZING" FontSize="12" FontWeight="SemiBold" Foreground="#F7F5E9"/>
                                     </Border>
                                 </DockPanel>
                                 <UniformGrid x:Name="StatusGrid" Columns="2"/>
@@ -388,7 +388,7 @@
 
                         <DockPanel Margin="0,0,0,2">
                             <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chart}" Foreground="#818263" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock x:Name="ScoresTitleTxt" Text="Model class scores" FontSize="15" FontWeight="SemiBold" Foreground="#2F3024"/>
+                            <TextBlock x:Name="ScoresTitleTxt" Text="Model class scores" FontSize="16" FontWeight="SemiBold" Foreground="#2F3024"/>
                         </DockPanel>
                         <TextBlock x:Name="ScoresNoteTxt" Text="The model's scores across four mutually exclusive classes. They are not independent disease probabilities."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,2,0,12"/>
@@ -470,7 +470,7 @@
                         <Border x:Name="ResearcherPanel" Visibility="Collapsed" Style="{StaticResource Panel}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="Heat-map controls" FontSize="12" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="CamOnChk" Content="Live Grad-CAM++ ON" IsChecked="True" FontSize="12.5" Margin="0,0,0,6"
+                                <CheckBox x:Name="CamOnChk" Content="Live heat map on" IsChecked="True" FontSize="13" Margin="0,0,0,6"
                                           Checked="CamOnChk_Changed" Unchecked="CamOnChk_Changed"/>
                                 <DockPanel Margin="0,0,0,10">
                                     <TextBlock Text="Overlay opacity" FontSize="12" Width="104" VerticalAlignment="Center" Foreground="#2F3024"/>
@@ -500,7 +500,7 @@
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Width="19" Height="19" Margin="8,0,0,0"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="PrintBtn" Style="{StaticResource AccentButton}" Height="54" FontWeight="Bold"
+                        <Button x:Name="PrintBtn" Style="{StaticResource AccentButton}" Height="54" FontWeight="SemiBold"
                                 IsEnabled="False" Click="PrintBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Report}" Width="19" Height="19" Margin="0,0,10,0"/>

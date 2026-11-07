@@ -257,6 +257,14 @@ namespace SkinDevApp.Data
 
     public sealed class ScanSessionRow
     {
+        // final model (V6) summary and the verification status (schema 2)
+        public string AIResult { get; set; }
+        public string AITitle { get; set; }
+        public string AIConditions { get; set; }
+        public string AIModel { get; set; }
+        public string ReviewStatus { get; set; }
+        public string ReviewStatusAt { get; set; }
+
         public string ScanSessionID { get; set; }
         public string SessionLabel { get; set; }
         public string ParticipantID { get; set; }

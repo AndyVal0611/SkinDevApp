@@ -181,13 +181,13 @@ namespace SkinDevApp.Views
                 if (done) disc.Child = new Grid { Children = { Ui.Icon("Icon.Check", 14, Brushes.White) } };
                 else disc.Child = new TextBlock
                 {
-                    Text = n.ToString(), FontSize = 13, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    Text = n.ToString(), FontSize = 13, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                     Foreground = Ui.Brush(now ? "#5F6048" : "#8D8D76")
                 };
 
                 var top = new StackPanel { Orientation = Orientation.Horizontal };
                 top.Children.Add(disc);
-                top.Children.Add(new TextBlock { Text = ScanViews.Name(v), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), VerticalAlignment = VerticalAlignment.Center });
+                top.Children.Add(new TextBlock { Text = ScanViews.Name(v), FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), VerticalAlignment = VerticalAlignment.Center });
                 var body = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
                 body.Children.Add(top);
                 var caption = new TextBlock

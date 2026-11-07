@@ -267,7 +267,7 @@ namespace SkinDevApp.Scanning
 
             DateTime local = StartedUtc.ToLocalTime();
             string name = "Session_" + local.ToString("HHmmss") + "_" + Slug(PatientId) + "_" + SessionId.Substring(0, 8);
-            Folder = Path.Combine(CaptureArchive.RootDirectory, local.ToString("yyyy-MM-dd"), name);
+            Folder = Path.Combine(SkinDevApp.Data.ScanStorage.CaptureRoot(PatientId), local.ToString("yyyy-MM-dd"), name);      // Patient Records\Pending verification\<PatientID>\<date>
             Directory.CreateDirectory(Folder);
             SaveIndex("in_progress");
         }

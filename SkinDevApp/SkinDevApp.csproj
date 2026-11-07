@@ -238,18 +238,12 @@
     <Compile Include="PrepearationPage.xaml.cs">
       <DependentUpon>PrepearationPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="PrintReportWindow.xaml.cs">
-      <DependentUpon>PrintReportWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="RegionAttribution.cs" />
     <Compile Include="RegistrationPage.xaml.cs">
       <DependentUpon>RegistrationPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="ResearchDashboardPage.xaml.cs">
       <DependentUpon>ResearchDashboardPage.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="ResearcherResultWindow.xaml.cs">
-      <DependentUpon>ResearcherResultWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ResearcherVerificationWindow.xaml.cs">
       <DependentUpon>ResearcherVerificationWindow.xaml</DependentUpon>
@@ -261,6 +255,13 @@
     <Compile Include="V6\V6Decision.cs" />
     <Compile Include="V6\V6Inference.cs" />
     <Compile Include="V6\V6Roi.cs" />
+    <Compile Include="Data\RecordsQueries.cs" />
+    <Compile Include="Views\RecordsDatabasePage.cs" />
+    <Compile Include="V6\ClinicalSummary.cs" />
+    <Compile Include="Data\ReviewStatus.cs" />
+    <Compile Include="Data\ScanStorage.cs" />
+    <Compile Include="V6App\AIResultStore.cs" />
+    <Compile Include="V6App\RecordsMaintenance.cs" />
     <Compile Include="V6\V6FeatureFlag.cs" />
     <Compile Include="V6\V6QualityMapper.cs" />
     <Compile Include="V6\V6Archive.cs" />
@@ -335,10 +336,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="PrintReportWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="RegistrationPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -346,10 +343,6 @@
     <Page Include="ResearchDashboardPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ResearcherResultWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
     <Page Include="ResearcherVerificationWindow.xaml">
       <SubType>Designer</SubType>

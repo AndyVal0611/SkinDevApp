@@ -1,12 +1,13 @@
 // ============================================================================
 // V6SessionSummary.cs  -  namespace SkinDevApp.V6
 //
-// One scan's saved V6 assessments reduced to text, for every screen and printout that used to show the V5 classifier and the separate detectors.
-// Built only from the sealed files saved at scan time (never re-run). The photographs of a three-view scan are NOT merged into one verdict:
-// each is reported on its own and the headline only counts how many need a closer look. Null when the V6 flag is off or the scan has no V6 files,
-// so older scans keep showing what produced them.
+// One scan's saved final-model results reduced to clinician-facing text, shared by every screen and printout (Results page, patient record,
+// dermatologist and researcher review, thermal receipt, A4 report). Built only from the sealed files next to each photograph (never re-run).
+// The wording comes from ClinicalSummary: Condition detected / Needs review / No condition detected, per-condition status, certainty and the
+// facial regions where the detectors marked areas. Null when the scan has no saved result.
 // ============================================================================
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SkinDevApp.Data;
@@ -15,8 +16,9 @@ namespace SkinDevApp.V6
 {
     public sealed class V6ViewSummary
     {
-        public string View, Label, Headline, BoxesLine;
+        public string View, Label, Headline, BoxesLine, Origin;
         public UnifiedAssessment Assessment;
+        public ClinicalSummary Clinical;
         public List<string> ConditionLines = new List<string>();
         public List<string> FlagLines = new List<string>();
         public bool ReviewRequired;
@@ -27,57 +29,78 @@ namespace SkinDevApp.V6
         public bool Single;
         public string Headline, ShortLabel;
         public bool ReviewRecommended;
+        public ClinicalSummary Clinical;
+        public string ReviewStatus = Data.ReviewStatus.Pending;
         public List<V6ViewSummary> Views = new List<V6ViewSummary>();
         public List<string> Notes = new List<string>();
         public List<string> Problems = new List<string>();
-        public string Disclaimer = V6Text.Disclaimer;
+        public string Disclaimer = ClinicalSummary.Disclaimer;
 
-        /// <summary>Conditions the saved V6 results call present in at least one photograph.</summary>
+        /// <summary>Conditions detected in at least one photograph.</summary>
         public List<string> PresentUnion = new List<string>();
-        /// <summary>Every photograph ended in NO_FINDINGS_SUPPORTED.</summary>
+        /// <summary>Every photograph: no condition detected.</summary>
         public bool AllNoFindings;
+        /// <summary>At least one photograph was assessed later from its saved image (taken before the final model was installed).</summary>
+        public bool Reanalysed;
+
+        /// <summary>Face box (normalised x, y, w, h) of a photograph folder, used to name facial regions. Set by the application; null in tests.</summary>
+        public static Func<string, double[]> FaceBoxProvider { get; set; }
 
         public static V6SessionSummary For(SessionDetail d)
         {
             List<string> problems;
             Dictionary<string, UnifiedAssessment> map = V6SessionLoader.Load(d, out problems);
-            return map == null ? null : From(map, d.Session != null && d.Session.ScanMode == "Single", problems);
+            if (map == null) return null;
+            var folders = new Dictionary<string, string>();
+            foreach (CaptureViewRow v in d.Views) if (!string.IsNullOrEmpty(v.ViewType) && !folders.ContainsKey(v.ViewType)) folders[v.ViewType] = v.RecordFolder;
+            V6SessionSummary s = From(map, d.Session != null && d.Session.ScanMode == "Single", problems, folders);
+            if (d.Session != null) s.ReviewStatus = Data.ReviewStatus.Normalise(d.Session.ReviewStatus);
+            return s;
         }
 
         private static readonly string[] Order = { "Single", "Front", "Left", "Right" };
 
-        public static V6SessionSummary From(Dictionary<string, UnifiedAssessment> map, bool single, IList<string> problems = null)
+        public static string LabelFor(string key) => key == "Single" ? "Photograph" : key == "Left" ? "Left side" : key == "Right" ? "Right side" : key == "Front" ? "Front" : key;
+
+        public static V6SessionSummary From(Dictionary<string, UnifiedAssessment> map, bool single, IList<string> problems = null, IDictionary<string, string> folders = null)
         {
             var s = new V6SessionSummary { Single = single || map.Count == 1 };
             if (problems != null) s.Problems.AddRange(problems);
             foreach (string key in Order.Where(map.ContainsKey).Concat(map.Keys.Where(k => !Order.Contains(k))))
             {
                 UnifiedAssessment a = map[key];
+                string folder = folders != null && folders.TryGetValue(key, out string f) ? f : null;
+                double[] face = null;
+                try { face = folder != null && FaceBoxProvider != null ? FaceBoxProvider(folder) : null; } catch { }
+                ClinicalSummary c = ClinicalSummary.From(a, face);
                 var v = new V6ViewSummary
                 {
-                    View = key, Label = key == "Single" ? "Photograph" : key + " view", Assessment = a, Headline = V6Text.StateHeadline(a), BoxesLine = V6Text.BoxesLine(a), ReviewRequired = a.ReviewRequired,
-                    ConditionLines = a.Conditions.Select(V6Text.ConditionLine).ToList(), FlagLines = V6Text.FlagLines(a).Distinct().ToList()
+                    View = key, Label = LabelFor(key), Assessment = a, Clinical = c, Headline = c.Title, ReviewRequired = c.Category != ClinicalCategory.ConditionDetected && c.Category != ClinicalCategory.NoConditionDetected,
+                    ConditionLines = c.Findings.Select(x => x.Condition + ": " + ClinicalSummary.FindingLine(x)).ToList(),
+                    FlagLines = c.ReviewReasons.Distinct().ToList(),
+                    BoxesLine = AreasLine(c), Origin = folder != null ? V6Archive.ReadOrigin(folder) : null
                 };
                 s.Views.Add(v);
             }
-            s.PresentUnion = s.Views.SelectMany(v => v.Assessment.PresentConditions).Distinct().OrderBy(c => V6Conditions.IndexOf(c)).ToList();
-            s.AllNoFindings = s.Views.Count > 0 && s.Views.All(v => v.Assessment.State == V6States.NoFindingsSupported);
-            int review = s.Views.Count(v => v.ReviewRequired);
-            s.ReviewRecommended = review > 0;
-            if (s.Single)
-            {
-                s.Headline = s.Views[0].Headline;
-                s.ShortLabel = V6Text.ShortLabel(s.Views[0].Assessment);
-            }
-            else
-            {
-                s.Headline = "Unified AI assessment for each photograph" + (review > 0 ? ": " + review + " of " + s.Views.Count + " need a closer look" : "");
-                s.ShortLabel = s.PresentUnion.Count > 0 ? "V6: " + string.Join("+", s.PresentUnion) : s.AllNoFindings ? "V6: no findings" : "V6: review required";
-                s.Notes.Add("The photographs are not merged into a single verdict; each one is reported on its own.");
-                if (s.Views.Select(v => string.Join("|", v.Assessment.PresentConditions.OrderBy(c => c))).Distinct().Count() > 1)
-                    s.Notes.Add("The photographs do not all show the same findings.");
-            }
+            s.Clinical = ClinicalSummary.ForScan(s.Views.Select(v => new KeyValuePair<string, ClinicalSummary>(v.Label, v.Clinical)).ToList());
+            s.PresentUnion = s.Clinical.DetectedFindings.Select(x => x.Condition).ToList();
+            s.AllNoFindings = s.Views.Count > 0 && s.Views.All(v => v.Clinical.Category == ClinicalCategory.NoConditionDetected);
+            s.ReviewRecommended = s.Clinical.Category == ClinicalCategory.NeedsReview || s.Clinical.Category == ClinicalCategory.Retake || s.Clinical.Category == ClinicalCategory.NotCompleted;
+            s.Headline = s.Clinical.Title;
+            s.ShortLabel = s.Clinical.CategoryLabel + (s.PresentUnion.Count > 0 ? ": " + string.Join(", ", s.PresentUnion) : "");
+            s.Reanalysed = s.Views.Any(v => v.Origin == "Re-analysis");
+            if (!s.Single && s.Views.Select(v => string.Join("|", v.Clinical.DetectedFindings.Select(x => x.Condition))).Distinct().Count() > 1)
+                s.Notes.Add("The photographs do not all show the same findings; each photograph is listed separately.");
+            if (s.Reanalysed)
+                s.Notes.Add("This scan was taken before the final model was installed; its saved photographs were analysed later by the final model.");
             return s;
+        }
+
+        /// <summary>"Areas marked: forehead, right cheek (Acne); nose (Hyperpigmentation)" or "No areas marked".</summary>
+        public static string AreasLine(ClinicalSummary c)
+        {
+            var parts = c.Findings.Where(f => f.Regions.Count > 0).Select(f => f.RegionsText + " (" + f.Condition + ")").ToList();
+            return parts.Count == 0 ? "No areas marked on the face" : "Areas marked: " + string.Join("; ", parts);
         }
     }
 }

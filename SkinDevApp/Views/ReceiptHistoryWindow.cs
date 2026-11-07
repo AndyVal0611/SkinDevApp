@@ -33,7 +33,7 @@ namespace SkinDevApp.Views
             var head = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
             DockPanel.SetDock(head, Dock.Top);
             head.Children.Add(Ui.Text("PATIENT RECEIPTS", 11, true, Ui.Brush("#8D8D76"), new Thickness(0, 0, 0, 2)));
-            head.Children.Add(new TextBlock { Text = "Receipt history · " + d.Session.DisplayId, Style = (Style)FindResource("SectionTitle"), FontSize = 21 });
+            head.Children.Add(new TextBlock { Text = "Receipt history · " + d.Session.DisplayId, Style = (Style)FindResource("SectionTitle"), FontSize = 22 });
             head.Children.Add(Ui.Text("Every version keeps the content it was printed with. Reprinting never runs the AI again and never changes the saved results.",
                 12, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             body.Children.Add(head);
