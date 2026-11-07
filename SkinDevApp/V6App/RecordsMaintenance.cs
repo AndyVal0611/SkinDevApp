@@ -38,6 +38,9 @@ namespace SkinDevApp.V6
                 foreach (string id in AllSessions())
                     try { AIResultStore.SyncSession(id); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Sync] " + id + ": " + ex.Message); }
 
+                Report("Applying the current reading rules");
+                try { AIResultStore.ReapplyRules(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Rules] " + ex.Message); }
+
                 Report("Organising scan folders");
                 int moved = 0;
                 try { moved = ScanStorage.PlaceAll(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[PlaceAll] " + ex.Message); }

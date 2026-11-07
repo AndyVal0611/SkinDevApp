@@ -22,7 +22,7 @@ namespace SkinDevApp.V6
             foreach (ClinicalFinding f in s.Clinical.Findings)
             {
                 b.Left(f.Condition + ":");
-                b.Text("  " + f.Status + (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? ", " + f.Certainty.ToLowerInvariant() + " certainty" : ", review needed"));
+                b.Text("  " + (f.ByDetector ? "Detected by lesion detector" : f.Status) + (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? ", " + f.Certainty.ToLowerInvariant() + " certainty" : ", review needed"));
                 if (f.Regions.Count > 0) b.Text("  Area: " + string.Join("; ", f.Regions));
             }
             var reasons = s.Clinical.ReviewReasons.Distinct().ToList();

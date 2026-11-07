@@ -107,7 +107,7 @@ namespace SkinDevApp.V6
                 top.Children.Add(pill);
                 top.Children.Add(Ui.Text(f.Condition, 13, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 2, 8, 0)));
                 item.Children.Add(top);
-                string detail = (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + " certainty" : "Review needed") +
+                string detail = (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + " certainty" + (f.ByDetector ? " · found by the lesion detector" : "") : "Review needed") +
                                 (f.Regions.Count > 0 ? " · " + string.Join("; ", f.Regions) : "");
                 item.Children.Add(Ui.Text(detail, 12, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
                 sp.Children.Add(item);
@@ -143,7 +143,7 @@ namespace SkinDevApp.V6
                 int idx = V6Conditions.IndexOf(f.Condition);
                 var name = Ui.Text(f.Condition, fontSize, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 7, 8, 7));
                 Border result = ResultPill(f); result.Margin = new Thickness(0, 5, 8, 5);
-                var cert = Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty : "—", fontSize, false, Ui.Ink, new Thickness(0, 7, 8, 7));
+                var cert = Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + (f.ByDetector ? " · lesion detector" : "") : "—", fontSize, false, Ui.Ink, new Thickness(0, 7, 8, 7));
                 var regions = Ui.Text(RegionText(f), fontSize, false, Ui.Ink, new Thickness(0, 7, 0, 7));
                 Grid.SetRow(name, row); Grid.SetRow(result, row); Grid.SetRow(cert, row); Grid.SetRow(regions, row);
                 Grid.SetColumn(result, 1); Grid.SetColumn(cert, 2); Grid.SetColumn(regions, 3);
@@ -190,6 +190,7 @@ namespace SkinDevApp.V6
         private static UIElement Footer(V6SessionSummary s, string modelLabel)
         {
             var sp = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+            foreach (string n in s.Clinical.Notes) sp.Children.Add(Ui.Text(n, 12, false, Ui.Ink, new Thickness(0, 0, 0, 2)));
             foreach (string n in s.Notes) sp.Children.Add(Ui.Text(n, 12, false, Ui.Muted, new Thickness(0, 0, 0, 2)));
             foreach (string p in s.Problems) sp.Children.Add(Ui.Text(p, 12, false, Ui.Bad, new Thickness(0, 0, 0, 2)));
             if (!string.IsNullOrEmpty(modelLabel)) sp.Children.Add(Ui.Text("Analysed by: " + modelLabel, 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
@@ -248,6 +249,7 @@ namespace SkinDevApp.V6
                 sp.Children.Add(line);
             }
             foreach (string r in c.ReviewReasons.Distinct().Take(3)) sp.Children.Add(Ui.Text("•  " + r, 11, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
+            foreach (string n in c.Notes) sp.Children.Add(Ui.Text(n, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return sp;
         }
 

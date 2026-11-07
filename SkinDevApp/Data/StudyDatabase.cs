@@ -157,6 +157,7 @@ namespace SkinDevApp.Data
                     Exec(c, tx, SchemaV2);
                     foreach (string col in new[] { "AIResult", "AITitle", "AIConditions", "AIModel", "AIUpdatedAt", "ReviewStatus", "ReviewStatusAt", "ReviewStatusBy" })
                         EnsureColumn(c, tx, "ScanSessions", col, "TEXT");
+                    EnsureColumn(c, tx, "AIFindings", "Source", "TEXT");          // model | lesion detector
                     Exec(c, tx, "CREATE INDEX IF NOT EXISTS IX_ScanSessions_Review ON ScanSessions(ReviewStatus);");
                     Exec(c, tx, @"UPDATE ScanSessions SET ReviewStatus = CASE
                         (SELECT d.ValidationStatus FROM DermatologistValidations d WHERE d.ScanSessionID = ScanSessions.ScanSessionID AND d.ValidationStatus IN ('Completed','Further review') ORDER BY d.ValidationID DESC LIMIT 1)

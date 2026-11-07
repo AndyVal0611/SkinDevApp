@@ -339,7 +339,7 @@ namespace SkinDevApp.Views
                     var cells = new[]
                     {
                         T(cf.Condition, 9, true, TextInk, 1),
-                        T(cf.Status + (cf.NeedsReview ? " (review)" : ""), 9, cf.IsDetected, cf.IsDetected ? Navy : cf.NeedsReview ? WarnInk : TextInk, 1),
+                        T(cf.Status + (cf.NeedsReview ? " (review)" : cf.ByDetector ? " (lesion detector)" : ""), 9, cf.IsDetected, cf.IsDetected ? Navy : cf.NeedsReview ? WarnInk : TextInk, 1),
                         T(cf.Status == SkinDevApp.V6.ClinicalSummary.Detected || cf.Status == SkinDevApp.V6.ClinicalSummary.NotDetected ? cf.Certainty : "—", 9, false, TextInk, 1),
                         T(cf.Regions.Count == 0 ? "—" : string.Join("; ", cf.Regions), 9, false, TextInk, 1)
                     };
@@ -348,6 +348,7 @@ namespace SkinDevApp.Views
                 }
                 sp.Children.Add(ft);
                 foreach (string rr in cs.ReviewReasons.Distinct()) sp.Children.Add(T("•  " + rr, 8.5, false, WarnInk, 1));
+                foreach (string cn in cs.Notes) sp.Children.Add(T(cn, 8.5, false, TextInk, 1));
                 foreach (string n6 in _f.V6.Notes) sp.Children.Add(T(n6, 8.5, false, Muted, 2));
                 if (!string.IsNullOrEmpty(s.AIModel)) sp.Children.Add(T("Analysed by: " + s.AIModel, 7.5, false, Muted, 1));
                 sp.Children.Add(T(_f.V6.Disclaimer, 7.5, false, Muted, 4));

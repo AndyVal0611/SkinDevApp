@@ -32,14 +32,31 @@ namespace SkinDevApp.V6
         public double Threshold;
         public bool NeedsReview;
         public List<string> Regions = new List<string>();
+        /// <summary>"model" (the fusion decided) or "lesion detector" (a detector-led condition whose detector marked an area the fusion did not confirm).</summary>
+        public string Source = ClinicalSummary.SourceModel;
 
         public bool IsDetected => Status == ClinicalSummary.Detected;
+        public bool ByDetector => Source == ClinicalSummary.SourceDetector;
         public string RegionsText => Regions.Count == 0 ? "" : string.Join(", ", Regions);
     }
 
     public sealed class ClinicalSummary
     {
         public const string Detected = "Detected", Possible = "Possible", NotDetected = "Not detected", Inconclusive = "Inconclusive";
+        public const string SourceModel = "model", SourceDetector = "lesion detector";
+
+        /// <summary>
+        /// Conditions where the lesion detector leads: an area its detector marks is reported as Detected even when the fusion did not confirm it.
+        /// Hyperpigmentation: the detector finds most hyperpigmentation photographs the whole-face reading misses (about 91% on the fair set),
+        /// at the cost of more false alarms on clear skin, so these findings carry at most moderate certainty and say where they came from.
+        /// </summary>
+        public static readonly string[] DetectorLed = { "Hyperpigmentation" };
+
+        /// <summary>Version of these reading rules; stored results are re-read when it changes (RecordsMaintenance).</summary>
+        public const int RulesVersion = 2;
+
+        /// <summary>Plain notes about how the result was reached (shown under the findings; not reasons for review).</summary>
+        public List<string> Notes = new List<string>();
 
         public ClinicalCategory Category;
         public string Title;                 // e.g. "Condition detected: Acne"
@@ -121,15 +138,26 @@ namespace SkinDevApp.V6
             foreach (ConditionAssessment c in a.Conditions)
             {
                 string status = c.Verdict == "present" ? Detected : c.Verdict == "possible" ? Possible : c.Verdict == "absent" ? NotDetected : Inconclusive;
+                string source = SourceModel, certainty = CertaintyFor(status, c.CalibratedProbability);
+                if (status != Detected && c.DetectorAvailable && c.DetectorFired && DetectorLed.Contains(c.Condition))
+                {
+                    // detector-led condition: the marked area counts as a finding; certainty from the detector's own confidence, never "high"
+                    double conf = a.Boxes.Where(b => b.Condition == c.Condition && b.Deployed).Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
+                    status = Detected; source = SourceDetector; certainty = conf >= 0.50 ? "Moderate" : "Low";
+                    s.Notes.Add(c.Condition + " was found by its lesion detector; the whole-face reading did not confirm it.");
+                }
                 var f = new ClinicalFinding
                 {
-                    Condition = c.Condition, Status = status, Probability = c.CalibratedProbability, Threshold = c.Threshold,
-                    Certainty = CertaintyFor(status, c.CalibratedProbability), NeedsReview = status == Possible || status == Inconclusive
+                    Condition = c.Condition, Status = status, Probability = c.CalibratedProbability, Threshold = c.Threshold, Source = source,
+                    Certainty = certainty, NeedsReview = status == Possible || status == Inconclusive
                 };
                 if (status == Detected || status == Possible) f.Regions = RegionsFor(a, c.Condition, faceBox);
                 s.Findings.Add(f);
             }
             s.ReviewReasons = ReviewReasonsFor(a, s.Findings);
+            // an uncertain model state with no specific reason left still needs review, unless the uncertainty was a detector-led finding resolved above
+            if (a.State == V6States.UncertainReviewRequired && s.ReviewReasons.Count == 0 && !s.Findings.Any(f => f.ByDetector))
+                s.ReviewReasons.Add("The AI marked this result as uncertain.");
 
             switch (a.State)
             {
@@ -144,8 +172,8 @@ namespace SkinDevApp.V6
             }
 
             List<string> detected = s.DetectedFindings.Select(f => f.Condition).ToList();
-            bool review = a.State != V6States.FindingsSupported && a.State != V6States.MultipleFindingsSupported && a.State != V6States.NoFindingsSupported
-                          || s.Findings.Any(f => f.NeedsReview);
+            // review when there is a concrete reason (uncertain or possible conditions, conflict, unusual photo, quality, missing detector)
+            bool review = s.ReviewReasons.Count > 0 || s.Findings.Any(f => f.NeedsReview) || a.State == V6States.OutOfScopeReviewRequired;
             if (!review && detected.Count > 0)
             {
                 s.Category = ClinicalCategory.ConditionDetected;
@@ -186,13 +214,14 @@ namespace SkinDevApp.V6
             List<string> inconclusive = findings.Where(x => x.Status == Inconclusive).Select(x => x.Condition).ToList();
             if (inconclusive.Count > 0) r.Add(Join(inconclusive) + ": the result was inconclusive.");
             List<string> conflict = a.Flags.Where(x => x.StartsWith("cnn_yolo_conflict_")).Select(x => x.Substring("cnn_yolo_conflict_".Length))
-                                     .Where(c => !findings.Any(f => f.Condition == c && f.Status == Possible)).ToList();
+                                     .Where(c => !findings.Any(f => f.Condition == c && (f.Status == Possible || f.ByDetector))).ToList();
             if (conflict.Count > 0) r.Add(Join(conflict) + ": the whole-face reading and the lesion detector disagree.");
             if (a.Flags.Contains("ood") || a.State == V6States.OutOfScopeReviewRequired) r.Add("The photograph looks unlike the photographs the system was trained on.");
             foreach (string q in a.Flags.Where(x => x.StartsWith("quality_") && !x.StartsWith("quality_warning")))
                 r.Add(V6QualityMapper.Advice(q.Substring("quality_".Length)) ?? "Photo quality: " + q.Substring("quality_".Length));
             if (a.Flags.Any(x => x.StartsWith("quality_warning:face_not_found"))) r.Add("No face was found, so photo quality could not be fully checked.");
             if (a.Reasons.Any(x => x.StartsWith("detector unavailable"))) r.Add("A lesion detector was not available, so absence cannot be confirmed.");
+            if (a.Reasons.Any(x => x.StartsWith("image quality was not assessed"))) r.Add("Photo quality could not be checked, so a clear result cannot be confirmed.");
             return r;
         }
 
@@ -209,10 +238,10 @@ namespace SkinDevApp.V6
             {
                 var per = views.Select(v => new { View = v.Key, F = v.Value.Findings.FirstOrDefault(f => f.Condition == cond) }).Where(x => x.F != null).ToList();
                 if (per.Count == 0) continue;
-                ClinicalFinding best = per.Select(x => x.F).OrderBy(f => Rank(f.Status)).ThenByDescending(f => f.Probability).First();
+                ClinicalFinding best = per.Select(x => x.F).OrderBy(RankFinding).ThenByDescending(f => f.Probability).First();
                 var f2 = new ClinicalFinding
                 {
-                    Condition = cond, Status = best.Status, Certainty = best.Certainty, Probability = best.Probability, Threshold = best.Threshold,
+                    Condition = cond, Status = best.Status, Certainty = best.Certainty, Probability = best.Probability, Threshold = best.Threshold, Source = best.Source,
                     NeedsReview = per.Any(x => x.F.NeedsReview)
                 };
                 foreach (var x in per.Where(x => x.F.Regions.Count > 0)) f2.Regions.Add(x.View + ": " + x.F.RegionsText);
@@ -226,6 +255,7 @@ namespace SkinDevApp.V6
                 s.ReviewReasons.Add(names.Count == views.Count && views.Count > 1 ? reason + " (all photographs)." : reason + " (" + string.Join(", ", names) + ").");
             }
 
+            foreach (var v in views) foreach (string n in v.Value.Notes) if (!s.Notes.Contains(n)) s.Notes.Add(n);
             List<string> detected = s.DetectedFindings.Select(f => f.Condition).ToList();
             bool anyProblem = views.Any(v => v.Value.Category == ClinicalCategory.NeedsReview || v.Value.Category == ClinicalCategory.Retake || v.Value.Category == ClinicalCategory.NotCompleted);
             if (views.All(v => v.Value.Category == ClinicalCategory.NotCompleted)) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "The AI analysis could not be completed for this scan."; }
@@ -244,6 +274,8 @@ namespace SkinDevApp.V6
             return s;
         }
 
+        private static int RankFinding(ClinicalFinding f) => f.Status == Detected ? (f.ByDetector ? 1 : 0) : 1 + Rank(f.Status);
+
         private static int Rank(string status) => status == Detected ? 0 : status == Possible ? 1 : status == Inconclusive ? 2 : 3;
 
         public static string Join(IList<string> names) =>
@@ -252,7 +284,7 @@ namespace SkinDevApp.V6
         /// <summary>"Detected · High certainty · forehead, right cheek" (no numbers).</summary>
         public static string FindingLine(ClinicalFinding f)
         {
-            string line = f.Status;
+            string line = f.ByDetector ? "Detected by the lesion detector" : f.Status;
             if (f.Status == Detected || f.Status == NotDetected) line += " · " + f.Certainty.ToLowerInvariant() + " certainty";
             else line += " · review needed";
             if (f.Regions.Count > 0) line += " · " + f.RegionsText;

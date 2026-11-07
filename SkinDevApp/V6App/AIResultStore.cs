@@ -65,10 +65,10 @@ namespace SkinDevApp.V6
                 foreach (ClinicalFinding f in s.Findings)
                 {
                     ConditionAssessment ca = a.Conditions.FirstOrDefault(x => x.Condition == f.Condition);
-                    using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO AIFindings(CaptureID, Condition, Status, Certainty, Probability, Threshold, DetectorMarked, Regions)
-                            VALUES (@c,@cond,@st,@ce,@p,@t,@d,@r);", tx,
+                    using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO AIFindings(CaptureID, Condition, Status, Certainty, Probability, Threshold, DetectorMarked, Regions, Source)
+                            VALUES (@c,@cond,@st,@ce,@p,@t,@d,@r,@src);", tx,
                         "@c", captureId, "@cond", f.Condition, "@st", f.Status, "@ce", f.Certainty, "@p", f.Probability, "@t", f.Threshold,
-                        "@d", ca != null && ca.DetectorFired ? 1 : 0, "@r", f.RegionsText))
+                        "@d", ca != null && ca.DetectorFired ? 1 : 0, "@r", f.RegionsText, "@src", f.Source))
                         cmd.ExecuteNonQuery();
                 }
                 if (a.FrameWidth > 0 && a.FrameHeight > 0)
@@ -156,8 +156,10 @@ namespace SkinDevApp.V6
                             var f = new ClinicalFinding
                             {
                                 Condition = StudyRepository.S(r, "Condition"), Status = StudyRepository.S(r, "Status"), Certainty = StudyRepository.S(r, "Certainty"),
-                                Probability = StudyRepository.D(r, "Probability") ?? 0, Threshold = StudyRepository.D(r, "Threshold") ?? 0
+                                Probability = StudyRepository.D(r, "Probability") ?? 0, Threshold = StudyRepository.D(r, "Threshold") ?? 0,
+                                Source = StudyRepository.S(r, "Source") ?? ClinicalSummary.SourceModel
                             };
+                            if (f.ByDetector) v.Summary.Notes.Add(f.Condition + " was found by its lesion detector; the whole-face reading did not confirm it.");
                             f.NeedsReview = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive;
                             string regions = StudyRepository.S(r, "Regions");
                             if (!string.IsNullOrEmpty(regions)) f.Regions = regions.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -187,6 +189,63 @@ namespace SkinDevApp.V6
                 "@r", s?.CategoryLabel, "@t", s?.Title, "@c", s == null ? null : string.Join(", ", s.DetectedFindings.Select(f => f.Condition)),
                 "@m", s == null ? null : ModelLabel(variant) + (views.Any(v => v.Origin == OriginReanalysis) ? " (re-analysed)" : ""), "@at", StudyRepository.Now(), "@id", scanSessionId))
                 cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// The clinical reading rules changed (ClinicalSummary.RulesVersion): re-read every stored photograph from its sealed file and rewrite
+        /// its derived rows (outcome, title, review reasons, findings). The model output itself (the sealed file) is never changed.
+        /// </summary>
+        public static int ReapplyRules()
+        {
+            string stored;
+            using (var c = StudyDatabase.Open())
+            using (var cmd = StudyRepository.Cmd(c, "SELECT Value FROM SystemSettings WHERE Key='clinical_rules_version';"))
+                stored = Convert.ToString(cmd.ExecuteScalar());
+            if (stored == ClinicalSummary.RulesVersion.ToString(CultureInfo.InvariantCulture)) return 0;
+
+            var rows = new List<Tuple<string, string, string>>();     // capture, session, folder
+            using (var c = StudyDatabase.Open())
+            using (var cmd = StudyRepository.Cmd(c, "SELECT a.CaptureID, a.ScanSessionID, v.RecordFolder FROM AIAssessments a JOIN CaptureViews v ON v.CaptureID=a.CaptureID;"))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) rows.Add(Tuple.Create(r.GetString(0), r.GetString(1), DataLocation.Rebase(StudyRepository.S(r, "RecordFolder"))));
+            int n = 0;
+            var sessions = new HashSet<string>();
+            foreach (var row in rows)
+            {
+                UnifiedAssessment a = V6Archive.Read(row.Item3, out string _);
+                if (a == null) continue;
+                ClinicalSummary s = ClinicalSummary.From(a, FaceBoxOf(row.Item3));
+                using (var c = StudyDatabase.Open())
+                using (var tx = c.BeginTransaction())
+                {
+                    using (var cmd = StudyRepository.Cmd(c, "UPDATE AIAssessments SET Category=@cat, Title=@t, Explanation=@e, ReviewReasons=@rr WHERE CaptureID=@c;", tx,
+                        "@cat", s.CategoryLabel, "@t", s.Title, "@e", s.Explanation, "@rr", JsonSerializer.Serialize(s.ReviewReasons), "@c", row.Item1))
+                        cmd.ExecuteNonQuery();
+                    using (var cmd = StudyRepository.Cmd(c, "DELETE FROM AIFindings WHERE CaptureID=@c;", tx, "@c", row.Item1)) cmd.ExecuteNonQuery();
+                    foreach (ClinicalFinding f in s.Findings)
+                    {
+                        ConditionAssessment ca = a.Conditions.FirstOrDefault(x => x.Condition == f.Condition);
+                        using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO AIFindings(CaptureID, Condition, Status, Certainty, Probability, Threshold, DetectorMarked, Regions, Source)
+                                VALUES (@c,@cond,@st,@ce,@p,@t,@d,@r,@src);", tx,
+                            "@c", row.Item1, "@cond", f.Condition, "@st", f.Status, "@ce", f.Certainty, "@p", f.Probability, "@t", f.Threshold,
+                            "@d", ca != null && ca.DetectorFired ? 1 : 0, "@r", f.RegionsText, "@src", f.Source))
+                            cmd.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+                sessions.Add(row.Item2); n++;
+            }
+            foreach (string sid in sessions) RefreshSession(sid);
+            using (var c = StudyDatabase.Open())
+            {
+                using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('clinical_rules_version', @v, @at, 'system')
+                        ON CONFLICT(Key) DO UPDATE SET Value=excluded.Value, UpdatedAt=excluded.UpdatedAt;", null,
+                    "@v", ClinicalSummary.RulesVersion.ToString(CultureInfo.InvariantCulture), "@at", StudyRepository.Now()))
+                    cmd.ExecuteNonQuery();
+                StudyRepository.Audit(c, null, "AI reading rules updated", "AIAssessments", null,
+                    "version " + ClinicalSummary.RulesVersion + ": " + n + " photograph(s) re-read from their sealed results (detector-led hyperpigmentation)");
+            }
+            return n;
         }
 
         /// <summary>Scans that have at least one photograph without a final-model result.</summary>

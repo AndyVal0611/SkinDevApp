@@ -53,12 +53,34 @@ namespace SkinDevApp.Tests
         [Fact]
         public void A_detector_mark_the_model_did_not_confirm_is_possible_and_needs_review()
         {
-            UnifiedAssessment a = Make(V6States.NoFindingsSupported, new[] { 0.1, 0.2, 0.05 }, fired: new[] { false, true, false });
+            UnifiedAssessment a = Make(V6States.NoFindingsSupported, new[] { 0.1, 0.1, 0.2 }, fired: new[] { false, false, true });
             ClinicalSummary s = ClinicalSummary.From(a);
-            Assert.Equal("Possible", s.Findings[1].Status); Assert.True(s.Findings[1].NeedsReview);
+            Assert.Equal("Possible", s.Findings[2].Status); Assert.True(s.Findings[2].NeedsReview);
             Assert.Equal(ClinicalCategory.NeedsReview, s.Category); Assert.Equal("Needs dermatologist review", s.Title);
-            Assert.Contains(s.ReviewReasons, r => r.StartsWith("Hyperpigmentation: a lesion detector marked an area"));
-            Assert.Equal("Possible · review needed", ClinicalSummary.FindingLine(s.Findings[1]));
+            Assert.Contains(s.ReviewReasons, r => r.StartsWith("Eczema: a lesion detector marked an area"));
+            Assert.Equal("Possible · review needed", ClinicalSummary.FindingLine(s.Findings[2]));
+        }
+
+        [Fact]
+        public void Hyperpigmentation_marked_by_its_detector_is_detected_with_the_source_named()
+        {
+            UnifiedAssessment a = Make(V6States.UncertainReviewRequired, new[] { 0.1, 0.2, 0.05 }, fired: new[] { false, true, false }, flags: new[] { "cnn_yolo_conflict_Hyperpigmentation" });
+            a.Boxes.Add(new V6Box { Condition = "Hyperpigmentation", X0 = 20, Y0 = 45, X1 = 30, Y1 = 55, Confidence = 0.31f, Deployed = true });
+            ClinicalSummary s = ClinicalSummary.From(a, Face);
+            ClinicalFinding h = s.Findings[1];
+            Assert.Equal("Detected", h.Status); Assert.True(h.ByDetector); Assert.False(h.NeedsReview);
+            Assert.Equal("Low", h.Certainty);                                                  // detector confidence 0.31: never more than moderate
+            Assert.Equal(ClinicalCategory.ConditionDetected, s.Category); Assert.Equal("Condition detected: Hyperpigmentation", s.Title);
+            Assert.Empty(s.ReviewReasons);                                                     // the conflict is the reason it was detector-led, not a separate doubt
+            Assert.Contains(s.Notes, n => n.StartsWith("Hyperpigmentation was found by its lesion detector"));
+            Assert.Equal("Detected by the lesion detector · low certainty · right cheek", ClinicalSummary.FindingLine(h));
+
+            // with acne also present and eczema only possible: two conditions detected, still needs review because of eczema
+            UnifiedAssessment b = Make(V6States.UncertainReviewRequired, new[] { 0.7, 0.2, 0.1 }, fired: new[] { true, true, true });
+            b.Boxes.Add(new V6Box { Condition = "Hyperpigmentation", X0 = 40, Y0 = 40, X1 = 60, Y1 = 60, Confidence = 0.6f, Deployed = true });
+            ClinicalSummary t = ClinicalSummary.From(b, Face);
+            Assert.Equal("Acne and Hyperpigmentation detected · needs review", t.Title); Assert.Equal("Moderate", t.Findings[1].Certainty);
+            Assert.Equal("Possible", t.Findings[2].Status);
         }
 
         [Fact]
