@@ -490,7 +490,7 @@ namespace SkinDevApp
             var sp = new StackPanel();
             var head = new DockPanel();
             bool hasFolder = !string.IsNullOrEmpty(d.Session.SessionFolder) && System.IO.Directory.Exists(d.Session.SessionFolder);
-            Button gallery = Ui.Btn("Compare photographs and heat maps", (o, e) =>
+            Button gallery = Ui.Btn("Compare photographs and marked areas", (o, e) =>
             {
                 try { new ComparisonGalleryWindow(d.Session.SessionFolder) { Owner = Application.Current.MainWindow }.Show(); }
                 catch (Exception ex) { LumyDialog.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE"); }
@@ -510,13 +510,13 @@ namespace SkinDevApp
             Func<CaptureViewRow, bool> hasMarks = v => v.Localization != null && v.Localization.Status == "OK" && !string.IsNullOrEmpty(v.Localization.OverlayPath);
             int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + (shownMap(v) != null ? 1 : 0)
                                           + (hasMarks(v) ? 1 : 0) + (hasMarks(v) && !string.IsNullOrEmpty(v.Localization.CombinedPath) ? 1 : 0));
-            head.Children.Add(Ui.Text("Photographs, heat maps and marked areas (" + images + " images)", 16, true));
+            head.Children.Add(Ui.Text("Photographs and marked areas (" + images + " images)", 16, true));
             sp.Children.Add(head);
 
             var tabs = new TabControl { Margin = new Thickness(0, 6, 0, 0), BorderThickness = new Thickness(0) };
             foreach (CaptureViewRow v in d.Views)
             {
-                var row = new UniformGrid { Columns = 4, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = 700 };
+                var row = new UniformGrid { Columns = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? 2 : 4, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? 360 : 700 };
                 row.Children.Add(EvidenceCell("Original", v.AnalysedImagePath ?? v.OriginalImagePath, "#9CA3AF", null, v.OriginalImagePath));
 
                 // V6 flag on and a saved V6 assessment: the same four cells, from the unified assessment's evidence maps (V5's maps stay in the gallery, labelled V5)
@@ -524,11 +524,8 @@ namespace SkinDevApp
                 SkinDevApp.V6.UnifiedAssessment v6e = SkinDevApp.V6.V6FeatureFlag.IsEnabled ? SkinDevApp.V6.V6Archive.Read(v.RecordFolder, out v6e_problem) : null;
                 if (v6e != null)
                 {
-                    string lead = SkinDevApp.V6.V6Heatmaps.LeadCondition(v6e); int li = Math.Max(0, SkinDevApp.V6.V6Conditions.IndexOf(lead));
-                    string heatPath = SkinDevApp.V6.V6Heatmaps.OverlayPath(v.RecordFolder, lead), markedPath = SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), bothPath = SkinDevApp.V6.V6Heatmaps.CombinedPath(v.RecordFolder, lead);
-                    row.Children.Add(EvidenceCell("Heat map - " + lead, heatPath, Imaging.ClassPalette.Hex[li], heatPath == null ? "Heat map not available" : "where the detectors found evidence", heatPath));
-                    row.Children.Add(EvidenceCell("Marked areas", markedPath, "#F59E0B", SkinDevApp.V6.V6Text.BoxesLine(v6e), markedPath));
-                    row.Children.Add(EvidenceCell("Heat map and marked areas", bothPath, "#9CA3AF", bothPath == null ? "Not available" : null, bothPath));
+                    string markedPath = SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v);
+                    row.Children.Add(EvidenceCell("Marked areas", markedPath, "#F59E0B", SkinDevApp.V6.V6SessionSummary.AreasLine(SkinDevApp.V6.ClinicalSummary.From(v6e, SkinDevApp.V6.AIResultStore.FaceBoxOf(v.RecordFolder))), markedPath));
                     tabs.Items.Add(new TabItem { Header = "  " + v.ViewType.ToUpperInvariant() + "  ", Content = row });
                     continue;
                 }

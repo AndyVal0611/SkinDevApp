@@ -689,6 +689,8 @@ namespace SkinDevApp.Views
             var pages = new List<FrameworkElement>();
             List<EvidenceItem> items = _f.Evidence;
 
+            if (items.Count == 0 && _f.V6 != null) return pages;          // the final model's report shows its marked-areas page instead of evidence-map pages
+
             if (items.Count == 0)
             {
                 var sp = new StackPanel();

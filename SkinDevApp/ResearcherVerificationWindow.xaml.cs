@@ -117,7 +117,7 @@ namespace SkinDevApp
 
             var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
             bool hasFolder = !string.IsNullOrEmpty(s.SessionFolder) && System.IO.Directory.Exists(s.SessionFolder);
-            Button gallery = Ui.Btn("Compare photographs and heat maps", (o, e) => OpenGallery(), "SmallButton");
+            Button gallery = Ui.Btn("Compare photographs and marked areas", (o, e) => OpenGallery(), "SmallButton");
             gallery.IsEnabled = hasFolder;
             buttons.Children.Add(gallery);
             Button folder = Ui.Btn("Open scan folder", (o, e) => OpenFile(s.SessionFolder), "SmallButton");

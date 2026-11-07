@@ -135,7 +135,7 @@ namespace SkinDevApp.Views
             // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
             // V6 view: "Heat map" and "Both" are V6's own detector-evidence maps (same form as V5's); V5's Grad-CAM++ stays available as "Classifier map (V5)".
             var toggle = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
-            string[] modes = _v6 != null ? new[] { "Original", "V6Heat", "Localization", "V6Both" } : new[] { "Original", "Grad-CAM++", "Localization", "Combined" };
+            string[] modes = _v6 != null ? new[] { "Original", "Localization" } : new[] { "Original", "Grad-CAM++", "Localization", "Combined" };
             foreach (string mode in modes)
             {
                 var rb = new RadioButton
@@ -160,8 +160,8 @@ namespace SkinDevApp.Views
             }
             sp.Children.Add(toggle);
             if (_v6 != null)
-                sp.Children.Add(Ui.Text("Heat map: where the lesion detectors found evidence for the condition ranked highest (the same evidence the AI result uses). It is an evidence map, not an explanation of the model.",
-                                        10.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
+                sp.Children.Add(Ui.Text("Marked areas: boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count and not a diagnosis.",
+                                        11, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
             string[] names = _d.Session.ScanMode == "Single" ? new[] { "Single" } : StudyText.Views;
@@ -261,7 +261,7 @@ namespace SkinDevApp.Views
                 var src = path != null ? Ui.LoadImage(path, 480) : null;
                 kv.Value.Child = src != null
                     ? (UIElement)new System.Windows.Controls.Image { Source = src, Stretch = System.Windows.Media.Stretch.Uniform }
-                    : Ui.Text(_viewMode == "Original" ? "image not available" : (_viewMode == "V6Heat" ? "Heat map" : _viewMode == "V6Both" ? "Both" : _viewMode) + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));
+                    : Ui.Text(_viewMode == "Original" ? "image not available" : (_viewMode == "Localization" ? "Marked areas" : _viewMode) + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));
             }
         }
 
@@ -288,7 +288,7 @@ namespace SkinDevApp.Views
 
             var icons = new Dictionary<string, string>
             {
-                { "Compare photographs and heat maps", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
+                { "Compare photographs and marked areas", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
                 { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
                 { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" },
                 { "Detailed A4 report", "Icon.Report" }
@@ -318,7 +318,7 @@ namespace SkinDevApp.Views
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
                 }, "SecondaryButton");
-                Add("Compare photographs and heat maps", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
+                Add("Compare photographs and marked areas", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
             Group("PATIENT RESULTS & REPORTS");
             // thermal receipts: preliminary (AI only) and final (after the dermatologist review); printing always starts from the preview

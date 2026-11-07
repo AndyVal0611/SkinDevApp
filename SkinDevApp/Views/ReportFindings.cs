@@ -97,19 +97,6 @@ namespace SkinDevApp.Views
                 foreach (string p in f.V6.Problems) f.Flags.Add(p);
                 f.Lines.Add(SkinDevApp.V6.ClinicalSummary.Disclaimer);
 
-                // Heat maps: V6's detector-evidence map of the condition the unified assessment ranks highest, per photograph (same form as V5's maps).
-                foreach (SkinDevApp.V6.V6ViewSummary vs in f.V6.Views)
-                {
-                    CaptureViewRow cv = d.View(vs.View) ?? d.Views.FirstOrDefault();
-                    string lead = SkinDevApp.V6.V6Heatmaps.LeadCondition(vs.Assessment);
-                    if (cv == null || lead == null) continue;
-                    string ov = SkinDevApp.V6.V6Heatmaps.OverlayPath(cv.RecordFolder, lead);
-                    if (ov == null) { if (!f.ViewsWithoutMaps.Contains(cv.ViewType)) f.ViewsWithoutMaps.Add(cv.ViewType); continue; }
-                    if (f.Evidence.Count >= MaxEvidence) { f.Omitted++; continue; }
-                    double conf = (vs.Assessment.Pool.Count > 0 ? vs.Assessment.Pool : vs.Assessment.Boxes).Where(x => x.Condition == lead).Select(x => (double)x.Confidence).DefaultIfEmpty(0).Max();
-                    f.Evidence.Add(new EvidenceItem { View = cv, Map = new AttributionMapRow { TargetClass = lead, OverlayPath = ov, RelativeStrength = conf }, ClassName = lead, Score = conf * 100.0,
-                                                      IsPrimary = f.Evidence.Count == 0, Reason = "Detector evidence for the condition the unified assessment ranks highest (" + lead + ")" });
-                }
                 return f;
             }
 

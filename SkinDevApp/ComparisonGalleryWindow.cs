@@ -133,7 +133,7 @@ namespace SkinDevApp.Views
 
             // header
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-            header.Children.Add(Ui.WindowBand("Compare photographs and heat maps", _model.Title));
+            header.Children.Add(Ui.WindowBand("Compare photographs and marked areas", _model.Title));
             header.Children.Add(new Border
             {
                 Background = GalleryUi.Brush("#F8EBE6"),
@@ -193,26 +193,8 @@ namespace SkinDevApp.Views
             {
                 SkinDevApp.V6.ClinicalSummary gcs = SkinDevApp.V6.ClinicalSummary.From(v6a, SkinDevApp.V6.AIResultStore.FaceBoxOf(v.Folder));
                 sp.Children.Add(GalleryUi.Text(gcs.CategoryLabel + ": " + gcs.Title, 14, true, "#3A3B2C", new Thickness(0, 2, 0, 2)));
-                sp.Children.Add(GalleryUi.Text("Where the lesion detectors found evidence for each condition (colour = the condition, strength = detector confidence). This is the evidence the AI result uses, not an explanation of the model.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
+                sp.Children.Add(GalleryUi.Text("Boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count and not a diagnosis.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
                 var v6wrap = new WrapPanel();
-                string[] hex = { "#FF0000", "#0050FF", "#FFBE00" };
-                for (int i = 0; i < v6a.Conditions.Length; i++)
-                {
-                    SkinDevApp.V6.ConditionAssessment cc = v6a.Conditions[i];
-                    string path = SkinDevApp.V6.V6Heatmaps.OverlayPath(v.Folder, cc.Condition);
-                    if (path == null) continue;
-                    double conf = (v6a.Pool.Count > 0 ? v6a.Pool : v6a.Boxes).Where(b => b.Condition == cc.Condition).Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
-                    v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard
-                    {
-                        Title = cc.Condition + " - " + (gcs.Findings.FirstOrDefault(f => f.Condition == cc.Condition)?.Status ?? SkinDevApp.V6.V6Text.VerdictText(cc)),
-                        ColorHex = hex[i],
-                        ImagePath = path,
-                        ScoreText = "Highest detector confidence " + SkinDevApp.V6.V6Text.Pct(conf) + " · certainty " + (gcs.Findings.FirstOrDefault(f => f.Condition == cc.Condition)?.Certainty ?? "—").ToLowerInvariant(),
-                        Note = SkinDevApp.V6.V6Text.DetectorText(cc)
-                    }));
-                }
-                string all = SkinDevApp.V6.V6Heatmaps.AllPath(v.Folder);
-                if (all != null) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "All three conditions", ColorHex = "#9CA3AF", ImagePath = all, ScoreText = "Strongest evidence on top", Note = "" }));
                 string marked = System.IO.Path.Combine(v.Folder, SkinDevApp.V6.V6Archive.MarkedFileName);
                 if (System.IO.File.Exists(marked)) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "Marked areas", ColorHex = "#9CA3AF", ImagePath = marked, ScoreText = SkinDevApp.V6.V6SessionSummary.AreasLine(gcs), Note = "Boxes that supported the assessment" }));
                 sp.Children.Add(v6wrap);

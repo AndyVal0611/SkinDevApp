@@ -30,8 +30,7 @@ namespace SkinDevApp.Views
             page.Children.Add(Section("How to read the results", Bullets(
                 new[] { "Outcome", "each scan is labelled Condition detected, Needs review, or No condition detected. Needs review means part of the result is uncertain and a dermatologist should look closely." },
                 new[] { "Per condition", "acne, hyperpigmentation and eczema are each reported as Detected, Possible, Inconclusive or Not detected, with a certainty (high, moderate or low)." },
-                new[] { "Facial regions", "where the lesion detectors marked areas: forehead, right or left cheek, nose, mouth / chin. They are possible locations, not a lesion count." },
-                new[] { "Heat map", "shows where the detectors found evidence for a condition. It is not an outline of the affected skin." },
+                new[] { "Marked areas", "boxes where the lesion detectors found a possible lesion. They are not an outline of the affected skin and not a lesion count." },
                 new[] { "Verification status", "Pending verification until a dermatologist reviews the scan; then Verified, or Requires further review." })));
             page.Children.Add(Section("Important to know", Bullets(
                 new[] { "Research prototype", "LUMYVUE supports, and never replaces, the judgement of a qualified clinician." },

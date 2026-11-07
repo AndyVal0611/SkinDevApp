@@ -257,7 +257,7 @@ namespace SkinDevApp.Views
             }
 
             bool finalModel = File.Exists(Path.Combine(cur.RecordFolder ?? "", SkinDevApp.V6.V6Archive.FileName));
-            string[] modes = finalModel ? new[] { "Original", "Marked areas", "Heat map" } : new[] { "Original", "Affected Area / Localization", "Grad-CAM++" };
+            string[] modes = finalModel ? new[] { "Original", "Marked areas" } : new[] { "Original", "Affected Area / Localization", "Grad-CAM++" };
             if (!modes.Contains(_mode)) _mode = "Original";
             var modeBar = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
             foreach (string m in modes)
