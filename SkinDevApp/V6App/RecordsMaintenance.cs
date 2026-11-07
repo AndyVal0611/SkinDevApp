@@ -46,7 +46,7 @@ namespace SkinDevApp.V6
                 try { moved = ScanStorage.PlaceAll(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[PlaceAll] " + ex.Message); }
 
                 int done = Reanalyse();
-                Report("Up to date" + (moved > 0 ? " · " + moved + " folder(s) organised" : "") + (done > 0 ? " · " + done + " older photograph(s) re-analysed" : ""));
+                Report("Up to date" + (moved > 0 ? " · " + moved + " folder(s) organised" : "") + (done > 0 ? " · " + done + " older photograph(s) re-analyzed" : ""));
             }
             catch (Exception ex) { Report("Stopped: " + ex.Message); }
             finally { Interlocked.Exchange(ref _running, 0); }
@@ -70,7 +70,7 @@ namespace SkinDevApp.V6
             foreach (string sid in sessions)
             {
                 n++;
-                Report("Re-analysing older scans with the final model (" + n + " of " + sessions.Count + ")");
+                Report("Re-analyzing older scans with the final model (" + n + " of " + sessions.Count + ")");
                 foreach (var v in AIResultStore.ViewsOf(sid).Where(x => !x.HasRow))
                 {
                     string img = File.Exists(v.Analysed ?? "") ? v.Analysed : File.Exists(v.Original ?? "") ? v.Original : null;

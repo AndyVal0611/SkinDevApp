@@ -106,7 +106,7 @@ namespace SkinDevApp.Views
             string[][] steps =
             {
                 new[] { "1", "Capture", "front, left and right photographs, taken one after another." },
-                new[] { "2", "Analyse", "the AI reads each photograph, marks possible lesion areas and states how certain it is." },
+                new[] { "2", "Analyze", "the AI reads each photograph, marks possible lesion areas and states how certain it is." },
                 new[] { "3", "Review", "the clinician compares the photographs, the evidence and the AI result, then records their own assessment." }
             };
             foreach (string[] st in steps)

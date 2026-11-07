@@ -88,7 +88,7 @@ namespace SkinDevApp
             {
                 Ui.KV("AI result", string.IsNullOrEmpty(s.AITitle) ? "AI result pending" : s.AITitle),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
-                Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.CompletionText.Replace(" / ", " of ") + " analysed"),
+                Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.CompletionText.Replace(" / ", " of ") + " analyzed"),
                 Ui.KV("Photos agree?", s.ScanMode == "Single" ? "Not applicable" : (s.ViewDisagreement ? "No — please compare each photograph" : "Yes — all photographs point the same way"))
             }, 140, 12.5));
 

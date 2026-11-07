@@ -88,7 +88,7 @@ namespace SkinDevApp.Views
         {
             // level: 0 = fine, 1 = look closer, 2 = disagree
             headline = ""; detail = ""; level = 0;
-            if (single || views.Count < 2) { headline = "Single photograph"; detail = "Only one photograph was analysed, so there is nothing to compare."; return; }
+            if (single || views.Count < 2) { headline = "Single photograph"; detail = "Only one photograph was analyzed, so there is nothing to compare."; return; }
 
             var tops = views.Select(v => v.TopClass).Distinct().ToList();
             if (tops.Count > 1)

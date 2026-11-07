@@ -157,7 +157,7 @@ namespace SkinDevApp.Scanning
                 Title = "Original",
                 ColorHex = "#374151",
                 ImagePath = analysedPath,
-                ScoreText = "Exact frame analysed (no heatmap)",
+                ScoreText = "Exact frame analyzed (no heatmap)",
                 Note = "Full-resolution capture: original.png"
             });
 

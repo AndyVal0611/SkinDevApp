@@ -41,8 +41,8 @@ namespace SkinDevApp
             {
                 Stat("Total participants", StudyRepository.TotalParticipants());
                 Stat("Total scan sessions", StudyRepository.TotalSessions());
-                Stat("Captured images", StudyRepository.TotalCapturedImages(), "original views (each also has an analysed copy)");
-                Stat("Photographs with an AI result", StudyRepository.TotalAIResults(), "final model; older photographs re-analysed");
+                Stat("Captured images", StudyRepository.TotalCapturedImages(), "original views (each also has an analyzed copy)");
+                Stat("Photographs with an AI result", StudyRepository.TotalAIResults(), "final model; older photographs re-analyzed");
                 Stat("Completed analyses", StudyRepository.CompletedAnalyses(), "sessions with every expected view");
                 Stat("Pending verification", StudyRepository.CountByReviewStatus(ReviewStatus.Pending), "no completed dermatologist review yet");
                 Stat("Verified", StudyRepository.CountByReviewStatus(ReviewStatus.Verified), "reviewed by a dermatologist");

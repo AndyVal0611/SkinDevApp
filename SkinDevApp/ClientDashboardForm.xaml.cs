@@ -157,7 +157,7 @@ namespace SkinDevApp.Views
             string problem = null;
             if (string.IsNullOrEmpty(_participantId))
                 problem = AppSession.IsResearcher
-                    ? "No patient is selected. A live scan is filed under a Patient ID, so please register or select a patient first. (An uploaded image can still be analysed; it is saved as a scan without a patient.)"
+                    ? "No patient is selected. A live scan is filed under a Patient ID, so please register or select a patient first. (An uploaded image can still be analyzed; it is saved as a scan without a patient.)"
                     : "No participant selected. Register or select a participant from the Dashboard first.";
             else if (IsWithdrawn(_participantId))
                 problem = _participantId + " has withdrawn from the study. Image capture is blocked.";
@@ -1376,7 +1376,7 @@ namespace SkinDevApp.Views
 
             NewScanBtn.IsEnabled = true;          // lets the operator restart the whole scan
             VerdictTxt.Text += next == doneView
-                ? "\n⚠ " + ScanViews.Title(doneView) + " could not be analysed. Please capture it again."
+                ? "\n⚠ " + ScanViews.Title(doneView) + " could not be analyzed. Please capture it again."
                 : "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
 
             // Show this view's result for a moment, then move on to the next angle.
@@ -1428,7 +1428,7 @@ namespace SkinDevApp.Views
 
             if (f == null || f.ViewsUsed == 0)
             {
-                VerdictTxt.Text = "Scan finished, but no view could be analysed. Press New scan to try again.";
+                VerdictTxt.Text = "Scan finished, but no view could be analyzed. Press New scan to try again.";
                 return;
             }
 

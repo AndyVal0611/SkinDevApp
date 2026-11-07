@@ -350,7 +350,7 @@ namespace SkinDevApp.Views
                 foreach (string rr in cs.ReviewReasons.Distinct()) sp.Children.Add(T("•  " + rr, 8.5, false, WarnInk, 1));
                 foreach (string cn in cs.Notes) sp.Children.Add(T(cn, 8.5, false, TextInk, 1));
                 foreach (string n6 in _f.V6.Notes) sp.Children.Add(T(n6, 8.5, false, Muted, 2));
-                if (!string.IsNullOrEmpty(s.AIModel)) sp.Children.Add(T("Analysed by: " + s.AIModel, 7.5, false, Muted, 1));
+                if (!string.IsNullOrEmpty(s.AIModel)) sp.Children.Add(T("Analyzed by: " + s.AIModel, 7.5, false, Muted, 1));
                 sp.Children.Add(T(_f.V6.Disclaimer, 7.5, false, Muted, 4));
             }
             else
@@ -417,7 +417,7 @@ namespace SkinDevApp.Views
                 Row(true, head);
                 foreach (CaptureViewRow v in _d.Views)
                 {
-                    if (v.Scores == null) { Row(false, v.ViewType, "not analysed", "", "", "", "", "", v.QualityStatus ?? ""); continue; }
+                    if (v.Scores == null) { Row(false, v.ViewType, "not analyzed", "", "", "", "", "", v.QualityStatus ?? ""); continue; }
                     double[] a = v.Scores.AsArray();
                     Row(false, v.ViewType, Lbl(v.Scores.PredictedClass), Pc(v.Scores.Confidence), Pc(a[0]), Pc(a[2]), Pc(a[1]), Pc(a[3]), v.QualityStatus ?? "");
                 }
@@ -522,7 +522,7 @@ namespace SkinDevApp.Views
                 cell.Children.Add(T("Predicted class: " + Lbl(v.Scores.PredictedClass), 8.5, false, TextInk, 1));
                 cell.Children.Add(T("Model Class Score: " + Pc(v.Scores.Confidence), 8.5, false, TextInk, 0));
             }
-            else cell.Children.Add(T(v == null ? "Not captured" : "Not analysed", 8.5, false, WarnInk, 0));
+            else cell.Children.Add(T(v == null ? "Not captured" : "Not analyzed", 8.5, false, WarnInk, 0));
             return cell;
         }
 
@@ -587,7 +587,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(T("Candidate Lesion Localization", 17, true, Navy, 0));
-            sp.Children.Add(T("Boxes proposed by a separate research detector on the same frames the classifier and Grad-CAM++ analysed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+            sp.Children.Add(T("Boxes proposed by a separate research detector on the same frames the classifier and Grad-CAM++ analyzed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
 
             var cells = new List<FrameworkElement>();
             if (_d.Session.ScanMode == "Single") cells.Add(LocalizationCell(_d.Views.FirstOrDefault(), "Single"));
@@ -632,7 +632,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(T("Marked Areas (Unified AI Assessment)", 17, true, Navy, 0));
-            sp.Children.Add(T("Possible lesion locations that supported the unified assessment, on the frame that was analysed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+            sp.Children.Add(T("Possible lesion locations that supported the unified assessment, on the frame that was analyzed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
 
             var cells = new List<FrameworkElement>();
             foreach (SkinDevApp.V6.V6ViewSummary vs in _f.V6.Views)

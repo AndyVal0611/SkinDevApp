@@ -171,7 +171,7 @@
                                     <TextBlock Style="{StaticResource Hint}" Text="MM/DD/YYYY, or pick the date from the calendar."/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock x:Name="AgeLabel" Text="Age (calculated)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock x:Name="AgeLabel" Text="Age" Style="{StaticResource FieldLabel}"/>
                                     <TextBox x:Name="AgeTxt" Style="{StaticResource ReadOnlyField}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
@@ -380,7 +380,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Style="{StaticResource Cell}">
                                     <TextBlock Text="Last menstrual period" Style="{StaticResource FieldLabel}" Margin="0,6,0,5"/>
-                                    <TextBox x:Name="LmpTxt" Style="{StaticResource IfField}"/>
+                                    <DatePicker x:Name="LmpPicker"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Style="{StaticResource Cell}" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,16,2">
                                     <CheckBox x:Name="PregnantChk" Content="Pregnant" Style="{StaticResource Tick}" Margin="0,0,28,0"/>

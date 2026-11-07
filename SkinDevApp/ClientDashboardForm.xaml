@@ -359,7 +359,7 @@
                         <Button x:Name="AnalyzeBtn" Style="{StaticResource SecondaryButton}" Height="54" IsEnabled="False" Margin="0,0,0,4" Click="AnalyzeBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Sparkle}" Width="19" Height="19" Margin="0,0,10,0"/>
-                                <TextBlock Text="Analyse uploaded image (researcher)" VerticalAlignment="Center"/>
+                                <TextBlock Text="Analyze uploaded image" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>

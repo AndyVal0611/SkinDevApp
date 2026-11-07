@@ -87,7 +87,7 @@ namespace SkinDevApp.Views
 
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
-                sp.Children.Add(Ui.Text("None of the photographs could be analysed. Please retake the scan.", 13, false, Ui.Bad));
+                sp.Children.Add(Ui.Text("None of the photographs could be analyzed. Please retake the scan.", 13, false, Ui.Bad));
                 return Ui.Card(sp);
             }
 
@@ -107,7 +107,7 @@ namespace SkinDevApp.Views
             if (s.ScanMode != "Single")
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 4) };
-                chips.Children.Add(Ui.Text("Photographs analysed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
+                chips.Children.Add(Ui.Text("Photographs analyzed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
                 foreach (string v in StudyText.Views)
                 {
                     bool ok = _d.View(v)?.Scores != null;
@@ -152,7 +152,7 @@ namespace SkinDevApp.Views
                             : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the chosen condition. Kept from V5 for comparison; it explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
                                                                   : "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map).")
                             : mode == "Localization" ? "Candidate lesion locations from a separate research detector."
-                            : "The exact frame that was analysed."
+                            : "The exact frame that was analyzed."
                 };
                 string m = mode;
                 rb.Checked += (s, e) => { _viewMode = m; RefreshThumbs(); };
@@ -183,7 +183,7 @@ namespace SkinDevApp.Views
                 {
                     SkinDevApp.V6.UnifiedAssessment v6a;
                     if (_v6.TryGetValue(v?.ViewType ?? name, out v6a)) col.Children.Add(SkinDevApp.V6.V6ResultsView.ViewColumn(v6a, v?.RecordFolder));
-                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No AI result is stored for this photograph yet. It is analysed in the background; reopen this page in a moment.", 12, false, Ui.Warn, new Thickness(0, 6, 0, 0)));
+                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No AI result is stored for this photograph yet. It is analyzed in the background; reopen this page in a moment.", 12, false, Ui.Warn, new Thickness(0, 6, 0, 0)));
                 }
                 else if (v?.Scores != null)
                 {
@@ -205,7 +205,7 @@ namespace SkinDevApp.Views
                 }
                 else
                 {
-                    col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "This photograph could not be analysed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
+                    col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "This photograph could not be analyzed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
                 }
                 grid.Children.Add(col);
             }

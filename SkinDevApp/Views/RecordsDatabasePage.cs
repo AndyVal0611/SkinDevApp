@@ -302,7 +302,7 @@ namespace SkinDevApp.Views
                 SkinDevApp.V6.V6SessionSummary v6 = null;
                 try { v6 = SkinDevApp.V6.V6SessionSummary.For(sd); } catch { }
                 if (v6 != null) d.Children.Add(SkinDevApp.V6.V6ResultsView.SummaryPanel(v6));
-                else d.Children.Add(Ui.Text("No AI result is stored for this scan yet. Older scans are analysed in the background.", 12.5, false, Ui.Warn));
+                else d.Children.Add(Ui.Text("No AI result is stored for this scan yet. Older scans are analyzed in the background.", 12.5, false, Ui.Warn));
 
                 d.Children.Add(Action("Open results", (s, e) => Nav.Go(new ResultsPage(id)), "PrimaryButton"));
                 d.Children.Add(Action("Dermatologist review", (s, e) => { new DermatologistReviewWindow(id) { Owner = Application.Current.MainWindow }.ShowDialog(); reload(); RenderSummary(); }));
@@ -355,7 +355,7 @@ namespace SkinDevApp.Views
             {
                 d.Children.Add(Ui.Text(Str(row, "Condition") + " · " + Str(row, "AI result"), 16, true, Ui.Ink, new Thickness(0, 0, 0, 8)));
                 Rows(d, row);
-                d.Children.Add(Ui.Text("A screening finding, not a diagnosis. Origin \"Re-analysis\" means the photograph was taken before the final model was installed and was analysed later.",
+                d.Children.Add(Ui.Text("A screening finding, not a diagnosis. Origin \"Re-analysis\" means the photograph was taken before the final model was installed and was analyzed later.",
                                        11, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
                 string id = Str(row, "_id");
                 d.Children.Add(Action("Open the scan's results", (s, e) => Nav.Go(new ResultsPage(id)), "PrimaryButton"));

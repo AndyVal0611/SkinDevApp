@@ -177,7 +177,7 @@ namespace SkinDevApp.V6
                 if (!s.Single) sp.Children.Add(Ui.Text(v.Label, 12, true, Ui.Ink, new Thickness(0, 4, 0, 2)));
                 foreach (ConditionAssessment c in v.Assessment.Conditions)
                     sp.Children.Add(Ui.Text(c.Condition + ": " + V6Text.SupportText(c).Replace("AI support", "probability") + " · " + V6Text.DetectorText(c), 11.5, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
-                sp.Children.Add(Ui.Text("Model state: " + v.Assessment.State + " · variant " + v.Assessment.Variant + (v.Origin == AIResultStore.OriginReanalysis ? " · re-analysed later from the saved photograph" : ""),
+                sp.Children.Add(Ui.Text("Model state: " + v.Assessment.State + " · variant " + v.Assessment.Variant + (v.Origin == AIResultStore.OriginReanalysis ? " · re-analyzed later from the saved photograph" : ""),
                                         11, false, Ui.Muted, new Thickness(6, 2, 0, 2)));
             }
             return new Expander
@@ -193,7 +193,7 @@ namespace SkinDevApp.V6
             foreach (string n in s.Clinical.Notes) sp.Children.Add(Ui.Text(n, 12, false, Ui.Ink, new Thickness(0, 0, 0, 2)));
             foreach (string n in s.Notes) sp.Children.Add(Ui.Text(n, 12, false, Ui.Muted, new Thickness(0, 0, 0, 2)));
             foreach (string p in s.Problems) sp.Children.Add(Ui.Text(p, 12, false, Ui.Bad, new Thickness(0, 0, 0, 2)));
-            if (!string.IsNullOrEmpty(modelLabel)) sp.Children.Add(Ui.Text("Analysed by: " + modelLabel, 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            if (!string.IsNullOrEmpty(modelLabel)) sp.Children.Add(Ui.Text("Analyzed by: " + modelLabel, 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             sp.Children.Add(Ui.Text(Disclaimer, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return sp;
         }
@@ -219,7 +219,7 @@ namespace SkinDevApp.V6
             if (!s.Single)
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 4, 0, 2) };
-                chips.Children.Add(Ui.Text("Photographs analysed:", 12, true, Ui.Ink, new Thickness(0, 3, 8, 0)));
+                chips.Children.Add(Ui.Text("Photographs analyzed:", 12, true, Ui.Ink, new Thickness(0, 3, 8, 0)));
                 foreach (string vw in StudyText.Views)
                 {
                     bool ok = map.ContainsKey(vw);

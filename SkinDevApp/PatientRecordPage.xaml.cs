@@ -206,7 +206,7 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            string overall = string.IsNullOrEmpty(s.AITitle) ? "AI result pending (analysed in the background)" : s.AITitle;
+            string overall = string.IsNullOrEmpty(s.AITitle) ? "AI result pending (analyzed in the background)" : s.AITitle;
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
                 Ui.InfoRows(new[] { Ui.KV("AI result", overall), Ui.KV("Verification", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
@@ -446,7 +446,7 @@ namespace SkinDevApp
                 Ui.KV("Model", string.IsNullOrEmpty(s.AIModel) ? "Final model (pending)" : s.AIModel),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
                 Ui.KV("Overall result", overall),
-                Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analysed"),
+                Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),
                 Ui.KV("Scan status", s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus),
                 Ui.KV("Researcher notes", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
                 Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
@@ -468,7 +468,7 @@ namespace SkinDevApp
             {
                 var col = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
                 col.Children.Add(Ui.Text(v.ViewType == "Single" ? "Photograph" : v.ViewType + " view", 13, true));
-                if (v.Scores == null) col.Children.Add(Ui.Text("This photograph could not be analysed.", 11.5, false, Ui.Bad));
+                if (v.Scores == null) col.Children.Add(Ui.Text("This photograph could not be analyzed.", 11.5, false, Ui.Bad));
                 else
                 {
                     var r = readings.First(x => x.View == v.ViewType);

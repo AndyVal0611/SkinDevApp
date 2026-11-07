@@ -233,7 +233,7 @@ namespace SkinDevApp.Views
             f.Lines.Add("   " + f.Interpretation.Caveat);
 
             foreach (CaptureViewRow v in d.Views)
-                f.Lines.Add(v.ViewType + ": " + (v.Scores == null ? "not analysed" : Label(v.Scores.PredictedClass) + " — " + P(v.Scores.Confidence)));
+                f.Lines.Add(v.ViewType + ": " + (v.Scores == null ? "not analyzed" : Label(v.Scores.PredictedClass) + " — " + P(v.Scores.Confidence)));
 
             if (!f.Single)
             {
@@ -248,7 +248,7 @@ namespace SkinDevApp.Views
                 f.Lines.Add("Highest competing class: " + Label(compClass) + " — " + P(compScore) + (f.Single ? "." : " in the " + compView.ViewType + " view."));
 
             f.Lines.Add("Capture quality: " + (badQuality.Count == 0
-                ? (f.Single ? "Good." : "Good across all " + views.Count + " analysed view(s).")
+                ? (f.Single ? "Good." : "Good across all " + views.Count + " analyzed view(s).")
                 : string.Join("; ", badQuality.Select(v => v.ViewType + " — " + v.QualityStatus)) + "."));
 
             if (f.Evidence.Count == 0)

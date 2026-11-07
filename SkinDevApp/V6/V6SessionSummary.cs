@@ -92,7 +92,7 @@ namespace SkinDevApp.V6
             if (!s.Single && s.Views.Select(v => string.Join("|", v.Clinical.DetectedFindings.Select(x => x.Condition))).Distinct().Count() > 1)
                 s.Notes.Add("The photographs do not all show the same findings; each photograph is listed separately.");
             if (s.Reanalysed)
-                s.Notes.Add("This scan was taken before the final model was installed; its saved photographs were analysed later by the final model.");
+                s.Notes.Add("This scan was taken before the final model was installed; its saved photographs were analyzed later by the final model.");
             return s;
         }
 

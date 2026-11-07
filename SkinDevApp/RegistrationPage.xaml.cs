@@ -189,7 +189,8 @@ namespace SkinDevApp.Views
 
             AllergyFoodTxt.Text = c.AllergyFood;
             AllergyDrugsTxt.Text = c.AllergyDrugs;
-            LmpTxt.Text = c.LastMenstrualPeriod;
+            DateTime lmp;
+            LmpPicker.SelectedDate = DateTime.TryParse(c.LastMenstrualPeriod, CultureInfo.InvariantCulture, DateTimeStyles.None, out lmp) ? (DateTime?)lmp : null;
             PregnantChk.IsChecked = c.Pregnant == "Yes";
             BreastfeedingChk.IsChecked = c.Breastfeeding == "Yes";
             SetChecks(SupplementPanel, c.Supplements);
@@ -380,7 +381,7 @@ namespace SkinDevApp.Views
             SetLabel(SchoolLabel, "School", student && _strict);
 
             bool female = SelectedChoice(SexPanel) == "Female";
-            LmpTxt.IsEnabled = PregnantChk.IsEnabled = BreastfeedingChk.IsEnabled = female;
+            LmpPicker.IsEnabled = PregnantChk.IsEnabled = BreastfeedingChk.IsEnabled = female;
             FemaleHead.Opacity = female ? 1 : 0.5;
             FemaleHint.Visibility = female ? Visibility.Collapsed : Visibility.Visible;
 
@@ -764,7 +765,7 @@ namespace SkinDevApp.Views
 
                 AllergyFood = T(AllergyFoodTxt),
                 AllergyDrugs = T(AllergyDrugsTxt),
-                LastMenstrualPeriod = female ? T(LmpTxt) : null,
+                LastMenstrualPeriod = female && LmpPicker.SelectedDate.HasValue ? LmpPicker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
                 Pregnant = female && PregnantChk.IsChecked == true ? "Yes" : null,
                 Breastfeeding = female && BreastfeedingChk.IsChecked == true ? "Yes" : null,
                 Supplements = Null(Checked(SupplementPanel)),

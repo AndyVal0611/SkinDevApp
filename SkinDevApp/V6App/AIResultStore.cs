@@ -187,7 +187,7 @@ namespace SkinDevApp.V6
             using (var c = StudyDatabase.Open())
             using (var cmd = StudyRepository.Cmd(c, "UPDATE ScanSessions SET AIResult=@r, AITitle=@t, AIConditions=@c, AIModel=@m, AIUpdatedAt=@at WHERE ScanSessionID=@id;", null,
                 "@r", s?.CategoryLabel, "@t", s?.Title, "@c", s == null ? null : string.Join(", ", s.DetectedFindings.Select(f => f.Condition)),
-                "@m", s == null ? null : ModelLabel(variant) + (views.Any(v => v.Origin == OriginReanalysis) ? " (re-analysed)" : ""), "@at", StudyRepository.Now(), "@id", scanSessionId))
+                "@m", s == null ? null : ModelLabel(variant) + (views.Any(v => v.Origin == OriginReanalysis) ? " (re-analyzed)" : ""), "@at", StudyRepository.Now(), "@id", scanSessionId))
                 cmd.ExecuteNonQuery();
         }
 
