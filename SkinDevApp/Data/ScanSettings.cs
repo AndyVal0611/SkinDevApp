@@ -174,7 +174,7 @@ namespace SkinDevApp.Data
                 sideMinAbsYaw: Clamp(SideMinAbsYaw, 0.05, 0.8));
 
             live.AutoCaptureEnabled = AutoCapture;
-            live.Enabled = LiveGradCam;
+            live.Enabled = true;          // the live heat-map setting is retired; the live AI reading always runs
             live.MinGradCamIntervalMs = Math.Max(0, GradCamIntervalMs);
             live.MaxHeatmapAgeSeconds = Math.Max(1.0, MaxHeatmapAgeSeconds);
         }

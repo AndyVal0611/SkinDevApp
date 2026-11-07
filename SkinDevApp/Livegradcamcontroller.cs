@@ -387,7 +387,7 @@ namespace SkinDevApp.Explainability
         public Mat RenderLiveOverlay(Mat frameBgr)
         {
             if (frameBgr == null || frameBgr.Empty()) return null;
-            if (V6FeatureFlag.IsEnabled) return _v6.RenderOverlay(frameBgr, MotionThreshold);       // V6 flag on: the live heat map is V6's evidence map, not V5's Grad-CAM++
+            if (V6FeatureFlag.IsEnabled) return null;       // the final model: the live picture is the plain camera image (no heat map); the reading appears in the verdict and bars
 
             using (Mat cur = MotionMeter.MakeThumb(frameBgr))
             {

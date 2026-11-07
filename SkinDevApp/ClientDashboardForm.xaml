@@ -469,10 +469,10 @@
 
                         <Border x:Name="ResearcherPanel" Visibility="Collapsed" Style="{StaticResource Panel}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="Heat-map controls" FontSize="12" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="CamOnChk" Content="Live heat map on" IsChecked="True" FontSize="13" Margin="0,0,0,6"
+                                <TextBlock Visibility="Collapsed" Text="Heat-map controls" FontSize="12" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="CamOnChk" Visibility="Collapsed" Content="Live heat map on" IsChecked="True" FontSize="13" Margin="0,0,0,6"
                                           Checked="CamOnChk_Changed" Unchecked="CamOnChk_Changed"/>
-                                <DockPanel Margin="0,0,0,10">
+                                <DockPanel Margin="0,0,0,10" Visibility="Collapsed">
                                     <TextBlock Text="Overlay opacity" FontSize="12" Width="104" VerticalAlignment="Center" Foreground="#2F3024"/>
                                     <TextBlock x:Name="OpacityTxt" DockPanel.Dock="Right" Width="40" FontSize="12" TextAlignment="Right" VerticalAlignment="Center" Foreground="#2F3024"/>
                                     <Slider x:Name="OpacitySlider" Minimum="0.1" Maximum="1.0" TickFrequency="0.05" IsSnapToTickEnabled="True"

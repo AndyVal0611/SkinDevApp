@@ -146,7 +146,7 @@ namespace SkinDevApp.Views
             AutoCaptureChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
 
             AutoCaptureChk.IsChecked = cfg.AutoCapture;
-            CamOnChk.IsChecked = cfg.LiveGradCam;
+            CamOnChk.IsChecked = true;          // the live heat-map option is retired; the live AI reading always runs
             OpacitySlider.Value = Math.Max(0.1, Math.Min(1.0, cfg.OverlayOpacity));
             OpacityTxt.Text = OpacitySlider.Value.ToString("0.00");
         }
@@ -1039,7 +1039,7 @@ namespace SkinDevApp.Views
             else
                 LiveStatusTxt.Text = "○ Grad-CAM++ offline — scores still live, no heatmap";
 
-            LegendPanel.Visibility = (v6 ? (_latestV6 != null && _latestV6.State != SkinDevApp.V6.V6States.InferenceError) : s.HeatmapAvailable) ? Visibility.Visible : Visibility.Collapsed;
+            LegendPanel.Visibility = !v6 && s.HeatmapAvailable ? Visibility.Visible : Visibility.Collapsed;
 
             if (ResearcherChk.IsChecked == true)
                 ResearcherMetricsTxt.Text = BuildLiveMetrics(s);
