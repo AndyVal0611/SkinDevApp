@@ -75,7 +75,7 @@ namespace SkinDevApp.Views
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(SmallBtn("Refresh", (s, e) => { RenderSummary(); foreach (Action a in _reloads) a(); }));
             buttons.Children.Add(SmallBtn("Open records folder", (s, e) => OpenFolder(DataLocation.RecordsDir)));
-            buttons.Children.Add(SmallBtn("Back up database", (s, e) => Backup()));
+            buttons.Children.Add(SmallBtn("Back up now", (s, e) => Backup()));
             buttons.Children.Add(SmallBtn("Check database", (s, e) => Check()));
             DockPanel.SetDock(buttons, Dock.Right);
             head.Children.Add(buttons);
@@ -102,7 +102,7 @@ namespace SkinDevApp.Views
             }
             catch (Exception ex) { _summary.Children.Add(Ui.Text("The database could not be read: " + ex.Message, 13, false, Ui.Bad)); }
             _summary.Children.Add(Ui.Text("Files: " + DataLocation.RecordsDir + "   ·   Database: " + StudyDatabase.DbPath, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
-            _summary.Children.Add(Ui.Text("Background upkeep: " + SkinDevApp.V6.RecordsMaintenance.Status, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            _summary.Children.Add(Ui.Text("Background upkeep: " + SkinDevApp.V6.RecordsMaintenance.Status + "   ·   The database is backed up automatically every day (last backup: " + (RecordsQueries.LastBackupText() ?? "none yet") + ").", 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
         }
 
         private static Button SmallBtn(string text, RoutedEventHandler click)

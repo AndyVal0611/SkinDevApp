@@ -123,19 +123,44 @@ namespace SkinDevApp.Data
             }
         }
 
-        /// <summary>A consistent copy of the whole database (SQLite online backup) in Backups\. Returns the file written.</summary>
-        public static string BackupNow()
+        /// <summary>Once a day, the first time the application starts: a copy of the database in Backups\; the newest 14 automatic copies are kept. Returns the file made, or null if today's exists.</summary>
+        public static string AutoBackup()
         {
             string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
             Directory.CreateDirectory(dir);
-            string file = Path.Combine(dir, "lumyvue_db_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".sqlite");
+            string today = "lumyvue_db_auto_" + DateTime.Now.ToString("yyyyMMdd");
+            if (Directory.GetFiles(dir, today + "*.sqlite").Length > 0) return null;
+            string file = BackupNow("auto");
+            var old = new DirectoryInfo(dir).GetFiles("lumyvue_db_auto_*.sqlite");
+            Array.Sort(old, (a, b) => b.Name.CompareTo(a.Name));
+            for (int i = 14; i < old.Length; i++) try { old[i].Delete(); } catch { }
+            return file;
+        }
+
+        /// <summary>The newest backup file name and time, or null.</summary>
+        public static string LastBackupText()
+        {
+            string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
+            if (!Directory.Exists(dir)) return null;
+            var files = new DirectoryInfo(dir).GetFiles("lumyvue_db_*.sqlite");
+            if (files.Length == 0) return null;
+            Array.Sort(files, (a, b) => b.LastWriteTime.CompareTo(a.LastWriteTime));
+            return files[0].LastWriteTime.ToString("yyyy-MM-dd HH:mm");
+        }
+
+        /// <summary>A consistent copy of the whole database (SQLite online backup) in Backups\. Returns the file written.</summary>
+        public static string BackupNow(string kind = "manual")
+        {
+            string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
+            Directory.CreateDirectory(dir);
+            string file = Path.Combine(dir, "lumyvue_db_" + (kind == "auto" ? "auto_" : "") + DateTime.Now.ToString(kind == "auto" ? "yyyyMMdd_HHmmss" : "yyyyMMdd_HHmmss") + ".sqlite");
             using (var src = StudyDatabase.Open())
             using (var dst = new SQLiteConnection("Data Source=" + file + ";Version=3;"))
             {
                 dst.Open();
                 src.BackupDatabase(dst, "main", "main", -1, null, 0);
             }
-            StudyRepository.Audit("Database backup", "Database", null, file);
+            StudyRepository.Audit(kind == "auto" ? "Automatic database backup" : "Database backup", "Database", null, file);
             return file;
         }
 

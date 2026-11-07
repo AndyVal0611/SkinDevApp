@@ -138,7 +138,12 @@ namespace SkinDevApp.Data
         }
 
         /// <summary>Check a username and password. Throttles repeated failures.</summary>
-        public static SignInResult SignIn(string username, string password)
+        public static SignInResult SignIn(string username, string password) => Check(username, password, "Sign in", "Sign in failed");
+
+        /// <summary>Re-checks the password of the user who is already signed in (for sensitive screens). Does not sign anyone in or out.</summary>
+        public static SignInResult Confirm(string username, string password) => Check(username, password, "Password confirmed", "Password confirmation failed");
+
+        private static SignInResult Check(string username, string password, string auditOk, string auditFail)
         {
             string u = (username ?? "").Trim();
             if (LockedSeconds(u) > 0) return SignInResult.LockedOut;
@@ -166,7 +171,7 @@ namespace SkinDevApp.Data
                 }
             }
 
-            StudyRepository.Audit(ok ? "Sign in" : "Sign in failed", "ResearcherAccount", u, ok ? "researcher / admin" : "wrong username or password");
+            StudyRepository.Audit(ok ? auditOk : auditFail, "ResearcherAccount", u, ok ? "researcher / admin" : "wrong username or password");
             return ok ? SignInResult.Ok : (LockedSeconds(u) > 0 ? SignInResult.LockedOut : SignInResult.Invalid);
         }
 

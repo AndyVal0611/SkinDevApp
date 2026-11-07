@@ -73,7 +73,7 @@ namespace SkinDevApp.Views
             bool r = AppSession.IsResearcher;
 
             AddTile("Icon.Users", "#E7E8CF", "Patient records", "Find a patient, see their scans and results", r, () => Nav.Go(new PatientRecordPage()));
-            AddTile("Icon.Archive", "#EFEADC", "Records & database", "Browse and manage patients, scans, AI findings and reviews", r, () => Nav.Go(new RecordsDatabasePage()));
+            AddTile("Icon.Archive", "#EFEADC", "Records & database", "Browse and manage patients, scans, AI findings and reviews", r, () => { if (ReauthDialog.Confirm("Records & database")) Nav.Go(new RecordsDatabasePage()); });
             AddTile("Icon.Chart", "#F8EBE6", "Research dashboard", "Totals and charts from the saved scans", r, () => Nav.Go(new ResearchDashboardPage()));
             AddTile("Icon.Clock", "#EFEADC", "Waiting for review", PendingText(), r, () => Nav.Go(new PatientRecordPage(pendingOnly: true)));
             AddTile("Icon.Layers", "#E7E8CF", "Model information", "Which AI model is in use", r, () => Nav.Go(new ModelInfoPage()));

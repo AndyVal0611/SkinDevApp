@@ -255,6 +255,7 @@
     <Compile Include="V6\V6Decision.cs" />
     <Compile Include="V6\V6Inference.cs" />
     <Compile Include="V6\V6Roi.cs" />
+    <Compile Include="Views\ReauthDialog.cs" />
     <Compile Include="Data\RecordsQueries.cs" />
     <Compile Include="Views\RecordsDatabasePage.cs" />
     <Compile Include="V6\ClinicalSummary.cs" />

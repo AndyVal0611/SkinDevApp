@@ -34,6 +34,7 @@ namespace SkinDevApp.V6
             try
             {
                 if (!StudyDatabase.IsReady) { Report("Database not available"); return; }
+                try { RecordsQueries.AutoBackup(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[AutoBackup] " + ex.Message); }
                 Report("Checking stored AI results");
                 foreach (string id in AllSessions())
                     try { AIResultStore.SyncSession(id); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Sync] " + id + ": " + ex.Message); }
