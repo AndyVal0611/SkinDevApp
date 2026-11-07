@@ -161,31 +161,17 @@ namespace SkinDevApp
 
             _p = p;
             List<ScanSessionRow> sessions = StudyRepository.SessionsForParticipant(p.ParticipantID);
-            SkinProfile sp = StudyRepository.GetSkinProfile(p.ParticipantID) ?? new SkinProfile();
             PatientChart chart = StudyRepository.GetPatientChart(p.ParticipantID);
-            MedicalIntake intake = StudyRepository.GetMedicalIntake(p.ParticipantID);
             Consent consent = StudyRepository.GetLatestConsent(p.ParticipantID);
-            bool earlierSkin = !string.IsNullOrWhiteSpace(sp.GeneralSkinType) || !string.IsNullOrWhiteSpace(sp.Concerns);
 
             RecordPanel.Children.Add(LatestCard(sessions.FirstOrDefault()));
 
-            if (chart != null)
-            {
-                // registered (or edited) with the current form: the patient's chart
-                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null, chart), ChartMedicalCard(chart, sp)));
-                RecordPanel.Children.Add(ChartDetailsCard(chart));
-                if (HasExam(chart)) RecordPanel.Children.Add(ExamCard(chart));
-                // answers saved with an earlier form stay visible, unchanged
-                if (intake != null) RecordPanel.Children.Add(Ui.Cols(700, MedicalCard(intake, sp, "Earlier form: reason for visit and medical history", false), ContactsCard(intake)));
-                if (earlierSkin) RecordPanel.Children.Add(SkinCard(sp, true));
-            }
-            else if (intake == null)
-                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null, null), SkinCard(sp, false)));     // registered with the first form
-            else
-            {
-                RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, intake, null), MedicalCard(intake, sp)));
-                RecordPanel.Children.Add(earlierSkin ? Ui.Cols(700, ContactsCard(intake), SkinCard(sp, true)) : (UIElement)ContactsCard(intake));
-            }
+            // The record follows the current registration form (the clinic's Patient's Chart). A patient registered with an earlier form
+            // gets the same sections, marked "not recorded yet" until the chart is completed with Edit; the earlier answers stay in the database.
+            PatientChart ch = chart ?? new PatientChart();
+            RecordPanel.Children.Add(Ui.Cols(700, InfoCard(p, consent, null, chart), ChartMedicalCard(ch, chart == null)));
+            RecordPanel.Children.Add(ChartDetailsCard(ch));
+            if (HasExam(ch)) RecordPanel.Children.Add(ExamCard(ch));
 
             RecordPanel.Children.Add(HistoryCard(sessions));
 
@@ -290,64 +276,6 @@ namespace SkinDevApp
             return Ui.Card(sp);
         }
 
-        /// <summary>Reason for visit and medical history from the registration form. Alerts come first, in red.</summary>
-        private Border MedicalCard(MedicalIntake m, SkinProfile s, string title = null, bool showMonk = true)
-        {
-            var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(title ?? "Reason for visit and medical history", 15, true));
-            if (!string.IsNullOrWhiteSpace(m.Alerts) && m.Alerts != "None")
-                sp.Children.Add(Ui.Callout("Alerts: " + m.Alerts, "Check these before any procedure.", 2));
-
-            string history = m.PastMedicalHistory;
-            if (history != null && !string.IsNullOrWhiteSpace(m.CancerDetail))
-                history = string.Join(", ", history.Split(',').Select(x => x.Trim()).Select(x => x == "Cancer" ? "Cancer (" + m.CancerDetail + ")" : x));
-            string Answer(string yesNo, string detail) => yesNo == "Yes" && !string.IsNullOrWhiteSpace(detail) ? "Yes — " + detail : yesNo;
-
-            var medical = new List<KeyValuePair<string, string>>
-            {
-                Ui.KV("Reason for visit", m.VisitReason),
-                Ui.KV("Location", m.ProblemLocation),
-                Ui.KV("Duration", m.ProblemDuration),
-                Ui.KV("Past medical history", history),
-                Ui.KV("Skin cancer or disorders", Answer(m.SkinHistory, m.SkinHistoryDetail)),
-                Ui.KV("Medications", m.Medications),
-                Ui.KV("Allergies", m.Allergies),
-                Ui.KV("Smoking", Answer(m.Smokes, m.SmokingAmount)),
-                Ui.KV("Alcohol", Answer(m.DrinksAlcohol, m.AlcoholAmount)),
-                Ui.KV("Review of systems", m.ReviewOfSystems ?? "Nothing ticked"),
-                Ui.KV("Alerts", m.Alerts)
-            };
-            if (showMonk) medical.Add(Ui.KV("Monk Skin Tone", MonkText(s)));
-            sp.Children.Add(Ui.InfoRows(medical, 170, 12.5));
-            sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
-            return Ui.Card(sp);
-        }
-
-        private Border ContactsCard(MedicalIntake m)
-        {
-            string Parts(params string[] parts)
-            {
-                string joined = string.Join("  ·  ", parts.Where(x => !string.IsNullOrWhiteSpace(x)));
-                return joined.Length == 0 ? null : joined;
-            }
-
-            var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Referral, emergency contact and pharmacy", 15, true));
-            sp.Children.Add(Ui.Cols(760,
-                Ui.InfoRows(new[]
-                {
-                    Ui.KV("Referred by", Parts(m.ReferredBy, m.ReferralDetail)),
-                    Ui.KV("Primary care physician", Parts(m.PrimaryCarePhysician, m.PrimaryCarePhone)),
-                    Ui.KV("Emergency contact", Parts(m.EmergencyName, m.EmergencyRelationship, m.EmergencyPhone))
-                }, 170, 12.5),
-                Ui.InfoRows(new[]
-                {
-                    Ui.KV("Preferred pharmacy", Parts(m.PharmacyName, m.PharmacyPhone)),
-                    Ui.KV("Pharmacy address", Parts(m.PharmacyAddress, m.PharmacyCity))
-                }, 150, 12.5)));
-            return Ui.Card(sp);
-        }
-
         // -------------------------------------------- the patient's chart (current form) --
 
         private static string Join(params string[] parts)
@@ -362,10 +290,12 @@ namespace SkinDevApp
             : string.Join("  ·  ", new[] { address, string.IsNullOrWhiteSpace(tel) ? null : "Tel. " + tel, string.IsNullOrWhiteSpace(cell) ? null : "Cell " + cell }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
         /// <summary>Present illness, personal / past and family medical history.</summary>
-        private Border ChartMedicalCard(PatientChart c, SkinProfile s)
+        private Border ChartMedicalCard(PatientChart c, bool notRecorded)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Present illness and medical history", 15, true));
+            sp.Children.Add(Ui.Text("Present illness and medical history", 16, true));
+            if (notRecorded)
+                sp.Children.Add(Ui.Callout("Patient's chart not completed yet", "This patient was registered with an earlier form. Use Edit to fill in the patient's chart.", 1));
             if (c.Pregnant == "Yes" || c.Breastfeeding == "Yes")
                 sp.Children.Add(Ui.Callout(c.Pregnant == "Yes" && c.Breastfeeding == "Yes" ? "Pregnant and breastfeeding" : c.Pregnant == "Yes" ? "Pregnant" : "Breastfeeding",
                     "Tell the care team before any treatment.", 1));
@@ -385,8 +315,7 @@ namespace SkinDevApp
                 Ui.KV("Medical conditions", Join(c.Conditions, c.ConditionsOther)),
                 Ui.KV("Surgery", string.IsNullOrWhiteSpace(c.SurgeryYear) ? c.Surgery : string.IsNullOrWhiteSpace(c.Surgery) ? "Year " + c.SurgeryYear : c.Surgery + " (" + c.SurgeryYear + ")"),
                 Ui.KV("Last menstrual period", c.LastMenstrualPeriod),
-                Ui.KV("Family history", Join(c.FamilyHistory, c.FamilyHistoryOther)),
-                Ui.KV("Monk Skin Tone", MonkText(s))
+                Ui.KV("Family history", Join(c.FamilyHistory, c.FamilyHistoryOther))
             }, 170, 12.5));
             sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
@@ -443,39 +372,6 @@ namespace SkinDevApp
             return Ui.Card(sp);
         }
 
-        private static string MonkText(SkinProfile s) =>
-            string.IsNullOrWhiteSpace(s.MonkSkinTone) || s.MonkSkinTone == "Not collected" ? "Not recorded yet" : "MST " + s.MonkSkinTone + " (" + (s.MonkSource ?? "source not recorded") + ")";
-
-        /// <summary>The skin-profile answers of the earlier registration form (kept exactly as saved).</summary>
-        private Border SkinCard(SkinProfile s, bool earlierForm)
-        {
-            var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(earlierForm ? "Skin profile (earlier registration form)" : "Skin profile", 15, true));
-            string concerns = s.Concerns + (string.IsNullOrWhiteSpace(s.ConcernOther) ? "" : " (" + s.ConcernOther + ")");
-            string regions = s.Regions + (string.IsNullOrWhiteSpace(s.RegionOther) ? "" : " (" + s.RegionOther + ")");
-            var care = new[] { Tuple.Create("Cleanser", s.Cleanser), Tuple.Create("Moisturizer", s.Moisturizer), Tuple.Create("Sunscreen", s.Sunscreen),
-                               Tuple.Create("Acne treatment", s.AcneTreatment), Tuple.Create("Eczema treatment", s.EczemaTreatment), Tuple.Create("Pigmentation treatment", s.PigmentationTreatment),
-                               Tuple.Create("Other", s.OtherProducts) }
-                .Where(t => !string.IsNullOrWhiteSpace(t.Item2)).Select(t => t.Item1 + ": " + t.Item2);
-
-            sp.Children.Add(Ui.InfoRows(new[]
-            {
-                Ui.KV("Skin type", s.GeneralSkinType),
-                Ui.KV("Monk Skin Tone", MonkText(s)),
-                Ui.KV("Sensitivity", s.Sensitivity),
-                Ui.KV("Skin concerns", concerns),
-                Ui.KV("Areas affected", regions),
-                Ui.KV("Present for", s.ConcernDuration),
-                Ui.KV("Current skincare", string.Join("; ", care)),
-                Ui.KV("Recent procedures", s.RecentProcedures),
-                Ui.KV("Other notes", s.OtherResponses)
-            }, 140, 12.5));
-            sp.Children.Add(Ui.Text(earlierForm
-                ? "Saved with the earlier registration form and kept exactly as it was. The current form does not change these answers."
-                : "This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.",
-                10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
-            return Ui.Card(sp);
-        }
 
         private Border HistoryCard(List<ScanSessionRow> sessions)
         {
