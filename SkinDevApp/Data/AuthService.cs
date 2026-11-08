@@ -213,6 +213,108 @@ namespace SkinDevApp.Data
 
         private static void DummyWork() => Hash("x", new byte[16], Iterations);
 
+        // ------------------------------------------------------------- recovery --
+
+        private const string CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";          // no 0/O or 1/I to misread
+
+        private static string NormaliseCode(string code) => (code ?? "").Replace("-", "").Replace(" ", "").Trim().ToUpperInvariant();
+
+        /// <summary>
+        /// Makes a new recovery code for the account, stores only its salted hash and returns the code (shown once, "ABCD-EFGH-JKLM-NPQR").
+        /// It replaces any earlier code. Whoever holds the code can set a new password without knowing the old one, so it must be kept safe.
+        /// </summary>
+        public static string NewRecoveryCode(string username)
+        {
+            string u = (username ?? "").Trim();
+            var bytes = new byte[16];
+            using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(bytes);
+            var chars = new char[16];
+            for (int i = 0; i < 16; i++) chars[i] = CodeAlphabet[bytes[i] % CodeAlphabet.Length];
+            string raw = new string(chars);
+
+            byte[] salt = new byte[16];
+            using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(salt);
+            byte[] hash = Hash(raw, salt, Iterations);
+            using (var c = StudyDatabase.Open())
+            using (var tx = c.BeginTransaction())
+            {
+                int n;
+                using (var cmd = StudyRepository.Cmd(c, "UPDATE ResearcherAccounts SET RecoverySalt=@s, RecoveryHash=@h WHERE Username=@u;", tx, "@s", salt, "@h", hash, "@u", u))
+                    n = cmd.ExecuteNonQuery();
+                if (n != 1) throw new InvalidOperationException("That account was not found.");
+                StudyRepository.Audit(c, tx, "Recovery code created", "ResearcherAccount", u, "a new recovery code was issued");
+                tx.Commit();
+            }
+            return raw.Substring(0, 4) + "-" + raw.Substring(4, 4) + "-" + raw.Substring(8, 4) + "-" + raw.Substring(12, 4);
+        }
+
+        private static bool VerifyRecovery(string username, string code)
+        {
+            byte[] salt = null, hash = null;
+            using (var c = StudyDatabase.Open())
+            using (var cmd = StudyRepository.Cmd(c, "SELECT RecoverySalt, RecoveryHash FROM ResearcherAccounts WHERE Username=@u;", null, "@u", username))
+            using (var r = cmd.ExecuteReader())
+                if (r.Read() && !r.IsDBNull(0) && !r.IsDBNull(1)) { salt = (byte[])r[0]; hash = (byte[])r[1]; }
+            if (salt == null) { DummyWork(); return false; }
+            return SameBytes(Hash(NormaliseCode(code), salt, Iterations), hash);
+        }
+
+        private static void SetPassword(string u, string newPassword, string auditText)
+        {
+            byte[] salt = new byte[16];
+            using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(salt);
+            byte[] hash = Hash(newPassword, salt, Iterations);
+            using (var c = StudyDatabase.Open())
+            using (var tx = c.BeginTransaction())
+            {
+                using (var cmd = StudyRepository.Cmd(c, @"UPDATE ResearcherAccounts SET Salt=@s, Hash=@h, Iterations=@i, PasswordChangedAt=@at WHERE Username=@u;", tx,
+                    "@s", salt, "@h", hash, "@i", Iterations, "@at", StudyRepository.Now(), "@u", u))
+                    cmd.ExecuteNonQuery();
+                StudyRepository.Audit(c, tx, "Password reset", "ResearcherAccount", u, auditText);
+                tx.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Sets a new password using the account's recovery code (wrong attempts count towards the same lock-out as sign-in).
+        /// The code is single-use: a fresh one is issued and returned.
+        /// </summary>
+        public static string ResetWithRecoveryCode(string username, string code, string newPassword)
+        {
+            string u = (username ?? "").Trim();
+            if (LockedSeconds(u) > 0) throw new InvalidOperationException("Too many incorrect attempts. Please wait " + LockedSeconds(u) + " seconds and try again.");
+            string err = CheckNewPassword(u, newPassword);
+            if (err != null) throw new InvalidOperationException(err);
+
+            bool ok = VerifyRecovery(u, code);
+            lock (Gate)
+            {
+                if (ok) { Failures.Remove(u); LockedUntil.Remove(u); }
+                else
+                {
+                    int n; Failures.TryGetValue(u, out n); n++; Failures[u] = n;
+                    if (n >= MaxFailures) { LockedUntil[u] = DateTime.UtcNow + LockFor; Failures[u] = 0; }
+                }
+            }
+            if (!ok)
+            {
+                StudyRepository.Audit("Password reset failed", "ResearcherAccount", u, "wrong username or recovery code");
+                throw new InvalidOperationException("The username or the recovery code is not correct.");
+            }
+            SetPassword(u, newPassword, "with the recovery code");
+            return NewRecoveryCode(u);
+        }
+
+        /// <summary>An administrator sets a temporary password for another account.</summary>
+        public static void ResetPasswordByAdmin(string username, string newPassword, string admin)
+        {
+            string u = (username ?? "").Trim();
+            string err = CheckNewPassword(u, newPassword);
+            if (err != null) throw new InvalidOperationException(err);
+            if (!Usernames().Contains(u)) throw new InvalidOperationException("That account was not found.");
+            SetPassword(u, newPassword, "set by administrator " + admin);
+        }
+
         public static void ChangePassword(string username, string currentPassword, string newPassword)
         {
             string u = (username ?? "").Trim();

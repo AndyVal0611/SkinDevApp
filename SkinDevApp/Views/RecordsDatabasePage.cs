@@ -170,12 +170,13 @@ namespace SkinDevApp.Views
                 try
                 {
                     DataTable t = load();
+                    PrettifyDates(t);
                     if (parts.Grid.Columns.Count == 0)
                         foreach (DataColumn c in t.Columns)
                             if (!c.ColumnName.StartsWith("_"))
                                 parts.Grid.Columns.Add(new DataGridTextColumn
                                 {
-                                    Header = c.ColumnName, Binding = new Binding("[" + c.ColumnName + "]"),
+                                    Header = c.ColumnName, Binding = new Binding("[" + c.ColumnName + "]") { StringFormat = c.DataType == typeof(DateTime) ? "MMM d, yyyy · h:mm tt" : null },
                                     Width = c.ColumnName == "Notes" || c.ColumnName == "Details" || c.ColumnName == "AI summary" || c.ColumnName == "Facial regions"
                                             ? new DataGridLength(1, DataGridLengthUnitType.Star) : DataGridLength.Auto,
                                     MaxWidth = 420
@@ -196,6 +197,25 @@ namespace SkinDevApp.Views
             };
             _reloads.Add(reload);
             return new TabItem { Header = header, Tag = tag, Content = new Border { Padding = new Thickness(0, 12, 0, 0), Child = g } };
+        }
+
+        /// <summary>Columns holding a stored date become real dates, so the grid sorts by date and shows "Nov 9, 2026 · 9:14 PM".</summary>
+        private static void PrettifyDates(DataTable t)
+        {
+            foreach (string name in new[] { "Registered", "Date", "When" })
+            {
+                if (!t.Columns.Contains(name) || t.Columns[name].DataType != typeof(string)) continue;
+                int ord = t.Columns[name].Ordinal;
+                var typed = t.Columns.Add(name + "__d", typeof(DateTime));
+                foreach (DataRow r in t.Rows)
+                {
+                    DateTime d;
+                    r[typed] = Fmt.TryParse(Convert.ToString(r[name]), out d) ? (object)d : DBNull.Value;
+                }
+                t.Columns.Remove(name);
+                typed.ColumnName = name;
+                typed.SetOrdinal(ord);
+            }
         }
 
         private static TextBox Search(string hint, Action changed)

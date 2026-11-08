@@ -20,7 +20,7 @@
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="900" HorizontalAlignment="Stretch">
-                <Border Style="{StaticResource NoticeBox}" Margin="8">
+                <Border Background="#F7F5EC" BorderBrush="{StaticResource CardEdge}" BorderThickness="1" CornerRadius="14" Padding="16,12" Margin="8">
                     <TextBlock x:Name="PreviousConsentTxt" Style="{StaticResource Body}" FontSize="12"
                                Text="Items marked * are required. Nothing is ticked for you. Your answer and the time are saved in the patient record."/>
                 </Border>

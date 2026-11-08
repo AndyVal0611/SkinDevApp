@@ -43,9 +43,9 @@ namespace SkinDevApp
 
             Consent prev = StudyRepository.GetLatestConsent(p.ParticipantID);
             if (prev != null)
-                PreviousConsentTxt.Text = "Previous consent record: " + prev.Decision + " on " + prev.RecordedAt +
-                    (prev.AllowsScanning ? "." : " (does not allow scanning).") +
-                    " Please confirm again for this visit. Required items are marked *; nothing is pre-selected.";
+                PreviousConsentTxt.Text = "Consent was previously recorded on " + SkinDevApp.Views.Fmt.When(prev.RecordedAt) + " (" + prev.Decision + ")" +
+                    (prev.AllowsScanning ? "." : "; it does not allow scanning.") +
+                    " Please confirm it again for this visit. Items marked * are required, and nothing is pre-selected.";
         }
 
         private bool IsWithdrawnNow()

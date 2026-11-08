@@ -466,6 +466,9 @@ namespace SkinDevApp
                 host.Children.Add(addBtn);
                 rows.Add(Row("Accounts", "Everyone listed here can sign in. Create an account for a dermatologist or another administrator who will use the prototype.", host));
             }
+            Button codeBtn = Ui.Btn("New recovery code", (s2, e2) => PasswordDialogs.NewCodeForMe(Application.Current.MainWindow), "SecondaryButton", 220);
+            codeBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            rows.Add(Row("Recovery code", "A code that lets you set a new password if you forget it, without asking an administrator. Keep it written down somewhere safe. Making a new code cancels the old one.", codeBtn));
             rows.Add(Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change));
             rows.Add(new Border { Child = _acctMsg });
             return RowCard(rows.ToArray());
@@ -478,21 +481,29 @@ namespace SkinDevApp
             try
             {
                 var g = new Grid();
-                double[] w = { 150, 230, 140 };
+                double[] w = { 150, 230, 140, 130 };
                 foreach (double x in w) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(x) });
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string[] head = { "Username", "Name", "Type", "Created" };
+                string[] head = { "Username", "Name", "Type", "Created", "" };
                 g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 for (int k = 0; k < head.Length; k++) { var t = Ui.Text(head[k], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, k); g.Children.Add(t); }
                 int row = 1;
                 foreach (string[] a in AuthService.Accounts())
                 {
                     g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    string[] cells = { a[0], string.IsNullOrWhiteSpace(a[1]) ? "—" : a[1], a[2], a[3].Length >= 10 ? a[3].Substring(0, 10) : a[3] };
+                    string[] cells = { a[0], string.IsNullOrWhiteSpace(a[1]) ? "—" : a[1], a[2], Fmt.Date(a[3]) };
                     for (int k = 0; k < cells.Length; k++)
                     {
                         var t = Ui.Text(cells[k], 12.5, k == 0, Ui.Ink, new Thickness(0, 5, 8, 5));
                         Grid.SetRow(t, row); Grid.SetColumn(t, k); g.Children.Add(t);
+                    }
+                    if (!string.Equals(a[0], AppSession.UserId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string who = a[0];
+                        Button reset = Ui.Btn("Reset password", (o, e) => { if (PasswordDialogs.AdminReset(Application.Current.MainWindow, who)) AcctMessage("The password for \"" + who + "\" was reset.", true); }, "SmallButton");
+                        reset.Height = 38; reset.Margin = new Thickness(0, 2, 0, 2);
+                        Grid.SetRow(reset, row); Grid.SetColumn(reset, 4);
+                        g.Children.Add(reset);
                     }
                     row++;
                 }

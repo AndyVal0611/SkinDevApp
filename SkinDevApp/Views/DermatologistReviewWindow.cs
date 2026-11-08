@@ -506,7 +506,7 @@ namespace SkinDevApp.Views
             {
                 var rows = new List<KeyValuePair<string, string>>
                 {
-                    Ui.KV("Date / outcome", v.ValidationDate + "  ·  " + (ReviewStatus.FromValidation(v.ValidationStatus) ?? "Draft")),
+                    Ui.KV("Date and outcome", Fmt.When(v.ValidationDate) + "  ·  " + (ReviewStatus.FromValidation(v.ValidationStatus) ?? "Draft")),
                     Ui.KV("Confirmed", v.DermatologistAssessment ?? "—"),
                     Ui.KV("Agreement with AI", v.AgreementWithAI == "Uncertain" ? "Not decided" : v.AgreementWithAI ?? "—")
                 };

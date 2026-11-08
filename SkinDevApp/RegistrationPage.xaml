@@ -74,7 +74,7 @@
         <StackPanel Grid.Row="1" Margin="8,0,8,10">
             <TextBlock x:Name="PageTitle" Text="Patient registration" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0">
-                This form follows the clinic's patient's chart. Fields marked <Run Text="*" Style="{StaticResource Req}"/> are required. The participant signs the separate paper consent form; no signature is collected on screen.
+                This form follows the clinic's patient's chart. Fields marked <Run Text="*" Style="{StaticResource Req}"/> are required. The patient signs the separate paper consent form; no signature is collected on screen.
                 Photographs are filed under the Patient ID, never under the name.
             </TextBlock>
         </StackPanel>
@@ -115,7 +115,7 @@
                                     <TextBlock Style="{StaticResource Hint}" Text="Filled in automatically."/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource Cell}">
-                                    <TextBlock Style="{StaticResource FieldLabel}">Recorded by (staff ID) <Run x:Name="OperatorReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
+                                    <TextBlock Style="{StaticResource FieldLabel}">Recorded by (username) <Run x:Name="OperatorReq" Text="*" Style="{StaticResource Req}"/></TextBlock>
                                     <TextBox x:Name="OperatorTxt" Style="{StaticResource Field}"/>
                                 </StackPanel>
                             </UniformGrid>

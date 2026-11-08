@@ -52,11 +52,12 @@ namespace SkinDevApp.Views
             }
 
             FirstRunPanel.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
+            if (ForgotBtn != null) { ForgotBtn.Visibility = _firstRun ? Visibility.Collapsed : Visibility.Visible; ForgotNote.Visibility = ForgotBtn.Visibility; }
             if (_firstRun)
             {
                 LoginHintTxt.Text = "No account exists yet. Create the first account now (password of at least " +
                                     AuthService.MinPasswordLength + " characters) and keep it safe: it protects patient records and settings. " +
-                                    "More accounts can be added later in Settings.";
+                                    "You will then be shown a recovery code and asked for your personal and professional details. More accounts can be added later in Settings.";
                 EnterPortalBtn.Content = "Create account and sign in";
             }
             else
@@ -64,6 +65,11 @@ namespace SkinDevApp.Views
                 if (string.IsNullOrEmpty(LoginHintTxt.Text) || LoginHintTxt.Text.StartsWith("No account exists")) LoginHintTxt.Text = "";
                 EnterPortalBtn.Content = "Sign in";
             }
+        }
+
+        private void ForgotBtn_Click(object sender, RoutedEventArgs e)
+        {
+            PasswordDialogs.ForgotPassword(Application.Current.MainWindow, UsernameTxt.Text.Trim());
         }
 
         private void EnterPortalBtn_Click(object sender, RoutedEventArgs e)
@@ -116,6 +122,10 @@ namespace SkinDevApp.Views
             if (AuthService.SignIn(user, pw) == SignInResult.Ok)
             {
                 AppSession.SignIn(UserRole.Researcher, user);
+                Window owner = Application.Current.MainWindow;
+                // the first account is the administrator: it gets a recovery code, then gives its personal and professional details before the dashboard
+                try { PasswordDialogs.ShowRecoveryCode(owner, user, AuthService.NewRecoveryCode(user)); } catch { }
+                if (!ProfileDialog.RequireForCurrentUser(owner)) { Nav.SignOut(); return; }
                 Nav.Home();
             }
         }

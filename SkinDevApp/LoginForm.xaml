@@ -99,6 +99,9 @@
                 <!-- Dynamic Action Button -->
                 <Button x:Name="EnterPortalBtn" Content="Sign in" Style="{StaticResource PrimaryButton}" Height="50"
                         FontSize="14" Margin="0,26,0,0" Click="EnterPortalBtn_Click"/>
+                <Button x:Name="ForgotBtn" Content="Forgot your password?" Style="{StaticResource GhostButton}" Height="44" FontSize="13"
+                        Margin="0,12,0,0" HorizontalAlignment="Center" Click="ForgotBtn_Click"/>
+                <TextBlock x:Name="ForgotNote" Text="Ask an administrator if you do not have a recovery code." FontSize="11.5" Foreground="#6F6F58" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,6,0,0"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

@@ -41,8 +41,8 @@ namespace SkinDevApp.Views
         private const double OriginalH = 255, OriginalHWithBanner = 232, EvidenceH2 = 226, EvidenceH1 = 255;
 
         // restrained palette
-        private const string Navy = "#1F2A44", TextInk = "#1F2937", Muted = "#6B7280", RuleGray = "#D1D5DB",
-                             PanelBg = "#F3F4F6", ImgBg = "#E5E7EB", WarnInk = "#92400E", WarnBg = "#FAF7F0", WarnLine = "#F5C99A";
+        private const string Navy = "#4F503B", TextInk = "#2F3024", Muted = "#6F6F58", RuleGray = "#DCD4C1",
+                             PanelBg = "#F7F5EC", ImgBg = "#EFEADC", WarnInk = "#92400E", WarnBg = "#FAF7F0", WarnLine = "#F5C99A";
 
         private static readonly string[] ResearchTeamMembers =
         {
@@ -272,7 +272,7 @@ namespace SkinDevApp.Views
             var sp = new StackPanel();
 
             sp.Children.Add(T("Analysis Report", 21, true, Navy, 0));
-            sp.Children.Add(T("Skin screening  ·  generated " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), 9, false, Muted, 8));
+            sp.Children.Add(T("Skin screening  ·  generated " + DateTime.Now.ToString("MMM d, yyyy · h:mm tt", System.Globalization.CultureInfo.InvariantCulture), 9, false, Muted, 8));
             if (_d.Participant != null && _d.Participant.Status == "Withdrawn")
             {
                 sp.Children.Add(Panel(T("This patient has withdrawn from the study. Do not include this scan in any analysis.", 9, true, WarnInk, 0), WarnBg, WarnLine, 7));
@@ -293,7 +293,7 @@ namespace SkinDevApp.Views
             {
                 Ui.KV("Patient ID", FirstUnlinked(s)),
                 Ui.KV("Scan", s.DisplayId),
-                Ui.KV("Scan date / time", s.StartedAt),
+                Ui.KV("Scan date and time", Fmt.When(s.StartedAt)),
                 Ui.KV("Scan completeness", completeness),
                 Ui.KV("Scan status", s.ScanStatus)
             }, 104));
@@ -442,7 +442,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(Heading("Human assessment"));
             sp.Children.Add(Table(new[]
             {
-                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + dv.ValidationDate),
+                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + Fmt.When(dv.ValidationDate)),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending)
             }, 150));
 
@@ -969,7 +969,7 @@ namespace SkinDevApp.Views
             {
                 Ui.KV("Patient ID", FirstUnlinked(s)),
                 Ui.KV("Scan", s.DisplayId),
-                Ui.KV("Date / time of scan", s.StartedAt),
+                Ui.KV("Date and time of scan", Fmt.When(s.StartedAt)),
                 Ui.KV("AI result (for reference)", _f.V6 != null ? _f.V6.Headline : (s.OverallPredictedClass == null ? "no usable result" : Lbl(s.OverallPredictedClass)) + (s.OverallScore.HasValue ? "  (" + s.ScoreText + ")" : ""))
             }, 130, 9));
             sp.Children.Add(Rule(4, 6));

@@ -65,7 +65,7 @@ namespace SkinDevApp
             {
                 var sp = new StackPanel { Margin = new Thickness(2, 4, 2, 4) };
                 sp.Children.Add(Ui.Text(p.ParticipantID + "  ·  " + p.FullName, 12.5, true, Ui.Ink, new Thickness(0)));
-                sp.Children.Add(Ui.Text("Registered " + (p.RegisteredAt ?? "").Split(' ')[0] + "  ·  " + p.Status, 11, false, Ui.Muted, new Thickness(0)));
+                sp.Children.Add(Ui.Text("Registered " + Fmt.Date(p.RegisteredAt) + "  ·  " + p.Status, 11, false, Ui.Muted, new Thickness(0)));
                 ParticipantList.Items.Add(new ListBoxItem { Content = sp, Tag = p.ParticipantID });
             }
             ListCountTxt.Text = (list.Count == 1 ? "1 patient" : list.Count + " patients");

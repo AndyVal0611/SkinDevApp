@@ -205,7 +205,7 @@ namespace SkinDevApp.Views
             Consent k = StudyRepository.GetLatestConsent(p.ParticipantID);
             string head = "Selected:  " + p.ParticipantID + "  ·  " + p.FullName +
                           (p.Age.HasValue ? "  ·  age " + p.Age : "") + (string.IsNullOrEmpty(p.Sex) ? "" : "  ·  " + p.Sex) +
-                          "\nRegistered " + (p.RegisteredAt ?? "").Split(' ')[0] + "  ·  " + p.Status + "\n";
+                          "\nRegistered " + Fmt.Date(p.RegisteredAt) + "  ·  " + p.Status + "\n";
 
             if (p.Status == "Withdrawn")
             {
@@ -216,8 +216,8 @@ namespace SkinDevApp.Views
 
             _summary.Foreground = Ui.Ink;
             _summary.Text = head + "Consent: " + (k == null ? "not recorded — the consent screen will open next"
-                                                  : k.AllowsScanning ? "given " + k.RecordedAt
-                                                  : k.Decision + " " + k.RecordedAt + " — consent will be asked again");
+                                                  : k.AllowsScanning ? "given " + Fmt.When(k.RecordedAt)
+                                                  : k.Decision + " " + Fmt.When(k.RecordedAt) + " — consent will be asked again");
             _selected = p;
             _continue.IsEnabled = true;
         }
