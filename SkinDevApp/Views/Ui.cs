@@ -633,18 +633,14 @@ namespace SkinDevApp.Views
                 }
                 catch (Exception ex) { h.CameraText = "Check failed: " + ex.Message; }
 
-                try { if (!AiEngine.IsAvailable) AiEngine.EnsureLoaded(); } catch { }
-                h.ModelOk = AiEngine.IsAvailable;
-                h.ModelText = h.ModelOk ? "Ready" : "Not ready: " + (AiEngine.LoadErrorMessage ?? "the model is not loaded");
+                try { if (!AiEngine.IsAvailable) AiEngine.EnsureLoaded(); } catch { }      // still needed to tell when the face is steady for the automatic photo
+                try { SkinDevApp.V6.V6Service.EnsureLoaded(); } catch { }
+                h.ModelOk = SkinDevApp.V6.V6Service.IsReady && AiEngine.IsAvailable;
+                h.ModelText = h.ModelOk ? "Ready" : "Not ready: " + (SkinDevApp.V6.V6Service.IsReady ? (AiEngine.LoadErrorMessage ?? "the steadiness model is not loaded") : (SkinDevApp.V6.V6Service.LastError ?? "the AI model is not loaded"));
 
                 h.PoseModelOk = File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "face_detection_yunet_2023mar.onnx"));
             }).ConfigureAwait(true);
 
-            h.GradCam = await GradCamService.GetHealthAsync().ConfigureAwait(true);
-            h.GradCamOk = h.GradCam != null && h.GradCam.Ok;
-            h.GradCamText = h.GradCamOk
-                ? "Running"
-                : "Not running. Scans still work, but no heat maps are created";
 
             h.DatabaseOk = StudyDatabase.IsReady;
             h.DatabaseText = h.DatabaseOk ? "Ready" : "Problem: " + (StudyDatabase.LastError ?? "not set up yet");
@@ -657,7 +653,6 @@ namespace SkinDevApp.Views
             var w = new WrapPanel();
             w.Children.Add(Chip("Camera", h.CameraOk, h.CameraText));
             w.Children.Add(Chip("Skin model", h.ModelOk, h.ModelText));
-            w.Children.Add(Chip("Heat-map service", h.GradCamOk, h.GradCamText));
             w.Children.Add(Chip("Database", h.DatabaseOk, h.DatabaseText));
             return w;
         }

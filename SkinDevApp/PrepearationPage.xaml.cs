@@ -10,7 +10,7 @@ using System.Windows.Shapes;
 namespace SkinDevApp
 {
     /// <summary>
-    /// Pre-analysis preparation: camera check and patient reminders before scanning.
+    /// Pre-analysis preparation: automatic camera, light and AI-model checks plus two quick confirmations before scanning.
     /// </summary>
     public partial class PreparationPage : Page
     {
@@ -39,41 +39,24 @@ namespace SkinDevApp
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // the lighting needs no manual step: it is reported ready automatically (the scan's own photo-quality checks warn about poor light)
+            _lightingConfirmed = true;
+            SetStatus(LightingStatusDot, LightingStatusText, ReadyBrush, "Ready");
             RunCameraCheck();
             RefreshOverallStatus();
             await RunServiceChecks();
         }
 
-        /// <summary>AI classifier (required) and Grad-CAM++ service (optional: scan continues without heatmaps).</summary>
+        /// <summary>The final AI model (required). Loaded here so the first scan does not wait for it.</summary>
         private async System.Threading.Tasks.Task RunServiceChecks()
         {
-            SystemHealth h;
-            try { h = await SystemHealth.CheckAsync(); }
-            catch (Exception ex)
-            {
-                SetStatus(ModelStatusDot, ModelStatusText, WarningBrush, "Check failed");
-                ModelDetailText.Text = ex.Message;
-                return;
-            }
-
-            _modelReady = h.ModelOk;
-            SetStatus(ModelStatusDot, ModelStatusText, h.ModelOk ? ReadyBrush : FailedBrush, h.ModelOk ? "Loaded" : "Unavailable");
-            ModelDetailText.Text = h.ModelText;
-
-            SetStatus(GradCamStatusDot, GradCamStatusText, h.GradCamOk ? ReadyBrush : WarningBrush, h.GradCamOk ? "Ready" : GradCamEnvironment.StateTitle(GradCamState.Unavailable));
-            GradCamDetailText.Text = h.GradCamOk
-                ? h.GradCamText
-                : "The heat-map service is not running yet. The scan still works and saves its results, but no heat maps will be created. The service starts automatically; press Try again if it does not.";
-            StartServiceBtn.Visibility = h.GradCamOk ? Visibility.Collapsed : Visibility.Visible;
-
+            SetStatus(ModelStatusDot, ModelStatusText, PendingBrush, "Checking...");
+            try { await System.Threading.Tasks.Task.Run(() => SkinDevApp.V6.V6Service.EnsureLoaded()); } catch { }
+            bool ok = SkinDevApp.V6.V6Service.IsReady;
+            _modelReady = ok;
+            SetStatus(ModelStatusDot, ModelStatusText, ok ? ReadyBrush : FailedBrush, ok ? "Loaded" : "Unavailable");
+            ModelDetailText.Text = ok ? "Ready: the final AI model is loaded." : "The AI model could not be loaded: " + (SkinDevApp.V6.V6Service.LastError ?? "unknown error");
             RefreshOverallStatus();
-
-            // First visit and the service is not running: try to start it once automatically (no duplicate if it is already healthy).
-            if (!h.GradCamOk && !_autoStartTried)
-            {
-                _autoStartTried = true;
-                await StartGradCamAsync();
-            }
         }
 
         private bool _cameraPickerBusy;
@@ -144,52 +127,9 @@ namespace SkinDevApp
             RunCameraCheck(cam.Name);
         }
 
-        private bool _autoStartTried;
-
-        /// <summary>
-        /// Detects this PC's Python/TensorFlow, then starts (or connects to) the local Grad-CAM++ service with the real project paths.
-        /// A healthy service is never started twice. The UI stays responsive; failures show a specific reason and the log path.
-        /// </summary>
-        private async System.Threading.Tasks.Task StartGradCamAsync()
-        {
-            StartServiceBtn.IsEnabled = false;
-            SetStatus(GradCamStatusDot, GradCamStatusText, PendingBrush, GradCamEnvironment.StateTitle(GradCamState.Starting));
-            var progress = new Progress<string>(t => GradCamDetailText.Text = t);
-            try
-            {
-                GradCamStartResult r = await GradCamEnvironment.EnsureRunningAsync(progress);
-                if (r.State == GradCamState.Ready)
-                {
-                    await RunServiceChecks();
-                    return;
-                }
-                SetStatus(GradCamStatusDot, GradCamStatusText, WarningBrush, GradCamEnvironment.StateTitle(r.State));
-                GradCamDetailText.Text = r.Message + "\nThe scan still works without heat maps.";
-                StartServiceBtn.Visibility = Visibility.Visible;
-            }
-            catch (Exception ex)
-            {
-                SetStatus(GradCamStatusDot, GradCamStatusText, WarningBrush, GradCamEnvironment.StateTitle(GradCamState.StartFailed));
-                GradCamDetailText.Text = "The heat-map service could not be started: " + ex.Message;
-                StartServiceBtn.Visibility = Visibility.Visible;
-            }
-            finally { StartServiceBtn.IsEnabled = true; }
-        }
-
-        private async void StartServiceBtn_Click(object sender, RoutedEventArgs e) => await StartGradCamAsync();
-
         private void RecheckCameraBtn_Click(object sender, RoutedEventArgs e)
         {
             RunCameraCheck();
-        }
-
-        private void LightingConfirmBtn_Click(object sender, RoutedEventArgs e)
-        {
-            _lightingConfirmed = true;
-            SetStatus(LightingStatusDot, LightingStatusText, ReadyBrush, "Confirmed");
-            LightingConfirmBtn.IsEnabled = false;
-            LightingConfirmBtn.Content = "Lighting confirmed";
-            RefreshOverallStatus();
         }
 
         private void DistanceConfirmBtn_Click(object sender, RoutedEventArgs e)

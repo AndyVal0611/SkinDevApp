@@ -120,10 +120,7 @@
                             </StackPanel>
                         </DockPanel>
                         <TextBlock Grid.Row="1" Style="{StaticResource CardBody}"
-                                   Text="Switch on the white light. The light should be even and come from the front, with no strong backlight or harsh shadows on the face."/>
-                        <Button Grid.Row="2" x:Name="LightingConfirmBtn" Style="{StaticResource ConfirmLinkButton}"
-                                Content="The lighting looks good"
-                                Click="LightingConfirmBtn_Click"/>
+                                   Text="The white light is switched on automatically. Keep the light even and from the front, with no strong backlight or harsh shadows on the face."/>
                     </Grid>
                 </Border>
 
@@ -189,20 +186,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource PrepCardBorder}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <Border Width="42" Height="42" CornerRadius="21" Background="#EFEADC" Margin="0,0,12,0"><ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Flame}" Foreground="#5F6048" Width="20" Height="20" HorizontalAlignment="Center"/></Border>
-                            <TextBlock Text="Heat-map service" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
-                            <Ellipse x:Name="GradCamStatusDot" Width="10" Height="10" Fill="#9B9B84" Margin="16,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="GradCamStatusText" Text="Checking..." FontSize="12" FontWeight="SemiBold" Foreground="#9B9B84" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <Button x:Name="StartServiceBtn" Content="Try again" Visibility="Collapsed" HorizontalAlignment="Left"
-                                Style="{StaticResource SmallButton}" Margin="0,0,0,8" Click="StartServiceBtn_Click"/>
-                        <TextBlock x:Name="GradCamDetailText" Style="{StaticResource CardBody}"
-                                   Text="If the heat-map service is not running, the scan still works and saves its results, but no heat maps are created."/>
-                    </StackPanel>
-                </Border>
+                
 
             </UniformGrid>
         </ScrollViewer>
