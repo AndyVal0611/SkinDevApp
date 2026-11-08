@@ -796,6 +796,10 @@ namespace SkinDevApp.Data
                     id = Convert.ToInt64(cmd.ExecuteScalar());
 
                 InsertLabels(c, tx, "Dermatologist", id, labels);
+                foreach (ConditionReview cr in v.ConditionReviews ?? new List<ConditionReview>())
+                    using (var cmd = Cmd(c, "INSERT INTO DermatologistConditionReviews(ValidationID, ScanSessionID, Condition, Status, Observation) VALUES (@v,@s,@c,@st,@o);", tx,
+                        "@v", id, "@s", v.ScanSessionID, "@c", cr.Condition, "@st", cr.Status, "@o", cr.Observation))
+                        cmd.ExecuteNonQuery();
                 Audit(c, tx, "Dermatologist validation", "ScanSession", v.ScanSessionID, v.DermatologistAssessment + " / " + v.ValidationStatus);
                 tx.Commit();
                 ExportReview(v.ScanSessionID, "dermatologist_review", id, new { v.ScanSessionID, v.DermatologistID, v.ValidatorName, v.ProfessionalRole, v.CredentialReference,
@@ -805,6 +809,22 @@ namespace SkinDevApp.Data
                 if (next != null) SetReviewStatus(v.ScanSessionID, next, "dermatologist review #" + id);
                 return id;
             }
+        }
+
+        /// <summary>Per-condition verdicts of the most recent saved assessment that has any (condition -> review). Empty when the scan was not verified per condition.</summary>
+        public static Dictionary<string, ConditionReview> LatestConditionReviews(string scanSessionId)
+        {
+            var d = new Dictionary<string, ConditionReview>();
+            try
+            {
+                using (var c = StudyDatabase.Open())
+                using (var cmd = Cmd(c, @"SELECT Condition, Status, Observation FROM DermatologistConditionReviews
+                        WHERE ValidationID = (SELECT MAX(ValidationID) FROM DermatologistConditionReviews WHERE ScanSessionID=@s);", null, "@s", scanSessionId))
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read()) d[S(r, "Condition")] = new ConditionReview { Condition = S(r, "Condition"), Status = S(r, "Status"), Observation = S(r, "Observation") };
+            }
+            catch { }
+            return d;
         }
 
         private static void InsertLabels(SQLiteConnection c, SQLiteTransaction tx, string owner, long id, IEnumerable<string> labels)

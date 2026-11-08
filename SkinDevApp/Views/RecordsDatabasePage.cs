@@ -366,7 +366,7 @@ namespace SkinDevApp.Views
         {
             Action reload = null;
             TextBox q = Search("Scan, patient, reviewer or assessment", () => reload());
-            ComboBox k = Filter(new[] { "All", "Dermatologist", "Researcher" }, () => reload(), 170);
+            ComboBox k = Filter(new[] { "All", "Dermatologist" }, () => reload(), 170);
             var bar = FilterBar(Labelled("Search", q), Labelled("Reviewer type", k));
             return Tab("Verification records", "verifications", bar, () => RecordsQueries.Verifications(q.Text, (string)k.SelectedItem), (row, d) =>
             {

@@ -209,7 +209,6 @@ namespace SkinDevApp.Views
                 bodies.Add(LocalizationBody());          // candidate lesion boxes (separate detector), same frames
             bodies.AddRange(EvidenceBodies());
             bodies.Add(FormBody(true));      // licensed dermatologist first
-            bodies.Add(FormBody(false));     // then the research team
 
             var pages = new List<FrameworkElement>();
             for (int i = 0; i < bodies.Count; i++) pages.Add(Wrap(bodies[i], i + 1, bodies.Count));
@@ -452,7 +451,6 @@ namespace SkinDevApp.Views
             sp.Children.Add(Heading("Human assessment"));
             sp.Children.Add(Table(new[]
             {
-                Ui.KV("Researcher assessment", ev == null ? "Pending" : ev.ResearcherClassification + " · " + ev.AgreementWithAI + " · " + ev.ResearcherID + " · " + ev.EvaluationDate),
                 Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + dv.ValidationDate),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending)
             }, 150));
@@ -780,7 +778,7 @@ namespace SkinDevApp.Views
             {
                 cap.Children.Add(T("Detector evidence map", 8.5, true, TextInk, 0));
                 cap.Children.Add(T("Target condition: " + Lbl(it.ClassName) + "   ·   Highest detector confidence: " + Pc(it.Score) + "   ·   View: " + it.View.ViewType, 8, false, TextInk, 0));
-                cap.Children.Add(T("Colour = the condition, strength = detector confidence (full strength from 0.70). Boxes centred outside the face region are not drawn.", 8, false, Muted, 0));
+                cap.Children.Add(T("Colour = the condition, strength = detector confidence (full strength from 0.70). Boxes centered outside the face region are not drawn.", 8, false, Muted, 0));
             }
             else
             {
@@ -852,7 +850,7 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
-            sp.Children.Add(T(dermatologist ? "Licensed Dermatologist Validation" : "Researcher Reference Assessment", 17, true, Navy, 0));
+            sp.Children.Add(T(dermatologist ? "Dermatologist Review" : "Researcher Reference Assessment", 17, true, Navy, 0));
             sp.Children.Add(T("Printed form — to be completed by hand and signed", 8.5, false, Muted, 6));
 
             sp.Children.Add(Table(new[]
@@ -872,8 +870,8 @@ namespace SkinDevApp.Views
             {
                 sp.Children.Add(FieldRow(Tuple.Create("Validator ID *", (string)null),
                                          Tuple.Create("Validator Name (where permitted by protocol)", (string)null)));
-                sp.Children.Add(FieldRow(Tuple.Create("Professional Role", "Licensed Dermatologist"),
-                                         Tuple.Create("License / Credential No. (if required by protocol)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Professional Role", "Dermatologist"),
+                                         Tuple.Create("Registration no. (optional)", (string)null)));
             }
 
             sp.Children.Add(FormLabel((dermatologist ? "Dermatologist reference assessment" : "Reference assessment") + " *"));
@@ -907,7 +905,7 @@ namespace SkinDevApp.Views
             if (dermatologist)
             {
                 sp.Children.Add(FieldRow(
-                    Tuple.Create("Signature of licensed dermatologist", (string)null),
+                    Tuple.Create("Signature of dermatologist", (string)null),
                     Tuple.Create("Printed name", (string)null),
                     Tuple.Create("Date", (string)null)));
                 sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 22, 0, 8));
@@ -927,7 +925,7 @@ namespace SkinDevApp.Views
             }
 
             sp.Children.Add(T("After completion, the research team enters these answers in the system (Researcher Verification window, tab \"" +
-                              (dermatologist ? "Licensed Dermatologist Validation" : "Researcher Assessment") +
+                              (dermatologist ? "Dermatologist Review" : "Researcher Assessment") +
                               "\"). Keep the signed sheet with the study records. Human assessments are saved separately and never overwrite the AI prediction.",
                               7.5, false, Muted, 0));
             return sp;

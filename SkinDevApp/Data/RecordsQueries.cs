@@ -82,11 +82,7 @@ namespace SkinDevApp.Data
                            CASE d.ValidationStatus WHEN 'Completed' THEN 'Verified' WHEN 'Further review' THEN 'Requires further review' ELSE 'Draft' END AS ""Outcome"",
                            substr(d.ValidationDate,1,16) AS ""Date"", COALESCE(d.Notes,'') AS ""Notes""
                     FROM DermatologistValidations d JOIN ScanSessions s ON s.ScanSessionID=d.ScanSessionID
-                    UNION ALL
-                    SELECT e.ScanSessionID, 'Researcher', COALESCE(s.SessionLabel, s.ScanSessionID), COALESCE(s.ParticipantID,'Unassigned'),
-                           e.ResearcherID, e.ResearcherClassification, COALESCE(e.AgreementWithAI,'—'), 'Researcher notes',
-                           substr(e.EvaluationDate,1,16), COALESCE(e.Notes,'')
-                    FROM ResearcherEvaluations e JOIN ScanSessions s ON s.ScanSessionID=e.ScanSessionID)
+)
                 WHERE (@q = '%%' OR ""Scan"" LIKE @q OR ""Patient"" LIKE @q OR ""Reviewer"" LIKE @q OR ""Assessment"" LIKE @q)
                   AND (@k = 'All' OR ""Reviewer type"" = @k)
                 ORDER BY ""Date"" DESC;", "@q", Like(search), "@k", kind ?? "All");

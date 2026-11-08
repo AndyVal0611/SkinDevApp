@@ -422,7 +422,7 @@ namespace SkinDevApp.Data
         public string ScanSessionID { get; set; }
         public string DermatologistID { get; set; }
         public string ValidatorName { get; set; }
-        public string ProfessionalRole { get; set; } = "Licensed Dermatologist";
+        public string ProfessionalRole { get; set; } = "Dermatologist";
         public string CredentialReference { get; set; }
         public string DermatologistAssessment { get; set; }
         public string AgreementWithAI { get; set; }
@@ -435,6 +435,18 @@ namespace SkinDevApp.Data
         public string RightComment { get; set; }
         public string ValidationDate { get; set; }
         public string ValidationStatus { get; set; }          // Pending | Completed
+        /// <summary>Per-condition verification entered with this assessment (saved in its own table).</summary>
+        public System.Collections.Generic.List<ConditionReview> ConditionReviews { get; set; } = new System.Collections.Generic.List<ConditionReview>();
+    }
+
+    /// <summary>The dermatologist's verdict on one AI-reported condition. Never filled in automatically.</summary>
+    public sealed class ConditionReview
+    {
+        public const string Pending = "Pending Review", Confirmed = "Confirmed", NotConfirmed = "Not Confirmed", FurtherAssessment = "Requires Further Assessment";
+        public static readonly string[] All = { Pending, Confirmed, NotConfirmed, FurtherAssessment };
+        public string Condition { get; set; }
+        public string Status { get; set; } = Pending;
+        public string Observation { get; set; }
     }
 
     public sealed class AuditEntry

@@ -420,10 +420,6 @@ namespace SkinDevApp
             {
                 new DermatologistReviewWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
             }, "SmallButton"));
-            buttons.Children.Add(Ui.Btn("Researcher notes", (o, e) =>
-            {
-                new ResearcherVerificationWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
-            }, "SmallButton"));
             buttons.Children.Add(Ui.Btn("Report", (o, e) => ResearchReportWindow.Open(s.ScanSessionID), "SmallButton"));
             head.Children.Add(buttons);
             head.Children.Add(Ui.Text("Selected scan · " + s.DisplayId, 16, true));
@@ -448,7 +444,6 @@ namespace SkinDevApp
                 Ui.KV("Overall result", overall),
                 Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),
                 Ui.KV("Scan status", s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus),
-                Ui.KV("Researcher notes", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
                 Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
             }, 160, 12.5));
 
@@ -579,7 +574,7 @@ namespace SkinDevApp
             sp.Children.Add(Ui.Text("Double-click a scan to open it for review.", 11.5, false, Ui.Muted));
             sp.Children.Add(SessionGrid(rows, r =>
             {
-                new ResearcherVerificationWindow(r.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
+                new DermatologistReviewWindow(r.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
                 ShowPending();
             }));
             RecordPanel.Children.Add(Ui.Card(sp));

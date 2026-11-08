@@ -274,7 +274,7 @@ namespace SkinDevApp.Scanning
                 if (!centred)
                 {
                     v.Ok = false;
-                    v.Message = "Centre your face in the oval";
+                    v.Message = "Center your face in the oval";
                     return v;
                 }
             }

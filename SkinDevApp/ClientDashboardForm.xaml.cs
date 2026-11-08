@@ -143,7 +143,7 @@ namespace SkinDevApp.Views
             UploadBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
             AnalyzeBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
             MultiViewChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;   // operators always run the 3-view scan
-            AutoCaptureChk.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
+            AutoCaptureChk.Visibility = Visibility.Visible;   // everyone can switch automatic capture off (then use Take photo now)
 
             AutoCaptureChk.IsChecked = cfg.AutoCapture;
             CamOnChk.IsChecked = true;          // the live heat-map option is retired; the live AI reading always runs
@@ -207,6 +207,88 @@ namespace SkinDevApp.Views
                 sb.Append("   ·   All photographs taken");
             }
             ScanInfoTxt.Text = sb.ToString();
+            UpdatePhotoSlots();
+        }
+
+        // ---- Front / Left / Right photograph slots ------------------------------------
+
+        public const string SlotNotYet = "Not yet captured", SlotCaptured = "Successfully captured", SlotRecapture = "Requires recapture", SlotUnavailable = "Image unavailable";
+
+        /// <summary>Capture status of one photograph, from what was really saved: the outcome, the image file and the measured quality. note = why a recapture is advised.</summary>
+        private static string SlotStatus(ViewOutcome o, CaptureRecord rec, string imagePath, out string note)
+        {
+            note = null;
+            if (o == null) return SlotNotYet;
+            if (!o.Ok) { note = string.IsNullOrWhiteSpace(o.Error) ? "the photograph could not be analysed" : o.Error; return SlotRecapture; }
+            if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath)) return SlotUnavailable;
+            if (rec != null && rec.Quality != null)
+            {
+                var why = new List<string>();
+                if (rec.Quality.Sharpness < ScanSettings.Current.MinSharpness) why.Add("blurred");
+                if (rec.Quality.Brightness < ScanSettings.Current.MinBrightness) why.Add("too dark");
+                else if (rec.Quality.Brightness > ScanSettings.Current.MaxBrightness) why.Add("too bright");
+                if (!rec.Quality.FaceFound) why.Add("face not found");
+                if (why.Count > 0) { note = string.Join(", ", why); return SlotRecapture; }
+            }
+            return SlotCaptured;
+        }
+
+        private static string SlotInk(string status) =>
+            status == SlotCaptured ? "#3F6B2F" : status == SlotNotYet ? "#6F6F58" : "#8A5A00";
+
+        private void UpdatePhotoSlots()
+        {
+            MultiViewSession session = _session;
+            PhotoSlots.Children.Clear();
+            if (session == null) { PhotoSlots.Visibility = Visibility.Collapsed; return; }
+            PhotoSlots.Visibility = Visibility.Visible;
+            PhotoSlots.Children.Add(new TextBlock { Text = "PHOTOGRAPHS", Style = (Style)FindResource("Eyebrow"), Margin = new Thickness(0, 0, 0, 6) });
+            foreach (ScanView v in ScanViews.Sequence)
+            {
+                ViewOutcome o = session.Outcomes.FirstOrDefault(x => x.View == ScanViews.Name(v));
+                CaptureRecord rec = null; string img = null;
+                try
+                {
+                    if (o != null && !string.IsNullOrEmpty(o.AbsoluteFolder)) { rec = ReviewStore.LoadRecord(o.AbsoluteFolder); img = Path.Combine(o.AbsoluteFolder, "analysed.png"); }
+                }
+                catch { }
+                string note;
+                string status = SlotStatus(o, rec, img, out note);
+                bool current = !session.IsComplete && v == session.Current && o == null;
+
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var thumb = Ui.Thumb(status == SlotUnavailable ? null : img, 56, current ? "#818263" : "#E3DDCB", status == SlotNotYet ? (current ? "now" : "—") : "n/a");
+                thumb.VerticalAlignment = VerticalAlignment.Top;
+                row.Children.Add(thumb);
+
+                var info = new StackPanel { Margin = new Thickness(10, 0, 0, 0) };
+                info.Children.Add(Ui.Text(ScanViews.Title(v), 13, true, Ui.Ink, new Thickness(0)));
+                info.Children.Add(Ui.Text(current ? "Capturing now" : status, 12, true, Ui.Brush(SlotInk(status)), new Thickness(0, 1, 0, 0)));
+                if (note != null) info.Children.Add(Ui.Text(note, 11, false, Ui.Muted, new Thickness(0, 1, 0, 0)));
+                if (o != null)
+                {
+                    var btns = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+                    ScanView captured = v; string path = img; string title = ScanViews.Title(v);
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                    {
+                        var inspect = new Button { Style = (Style)FindResource("GhostButton"), Height = 36, Padding = new Thickness(12, 0, 12, 0), Margin = new Thickness(0, 0, 8, 0), Content = "Inspect" };
+                        inspect.Click += (s, e) => ImagePopup.Show(path, title);
+                        btns.Children.Add(inspect);
+                    }
+                    if (_live != null)
+                    {
+                        var retake = new Button { Style = (Style)FindResource("GhostButton"), Height = 36, Padding = new Thickness(12, 0, 12, 0), Content = "Retake" };
+                        retake.Click += (s, e) => RetakeView(captured);
+                        btns.Children.Add(retake);
+                    }
+                    info.Children.Add(btns);
+                }
+                Grid.SetColumn(info, 1);
+                row.Children.Add(info);
+                PhotoSlots.Children.Add(row);
+            }
         }
 
         private static readonly string[] StatusKeys =
@@ -264,7 +346,7 @@ namespace SkinDevApp.Views
             }
 
             if (q == null || !q.FaceFound) SetStatusLine("Face position", false, "Position your face");
-            else SetStatusLine("Face position", q.Ready || g.Face, q.Ready ? "Centred" : q.GuidanceText);
+            else SetStatusLine("Face position", q.Ready || g.Face, q.Ready ? "Centered" : q.GuidanceText);
 
             if (_live != null && _live.RequiredView != ScanView.Any)
             {
@@ -462,6 +544,7 @@ namespace SkinDevApp.Views
                 ReviewList.Children.Add(card);
             }
 
+            UpdatePhotoSlots();
             AcceptBtn.IsEnabled = session.IsComplete;
             AcceptBtn.Content = session.IsComplete ? "Accept views and view results  ›" : "Capture the missing view(s) first";
             ReviewPanel.Visibility = Visibility.Visible;
@@ -621,7 +704,7 @@ namespace SkinDevApp.Views
             UploadedImageViewer.Source = null;
             PlaceholderPanel.Visibility = Visibility.Visible;
 
-            VerdictTxt.Text = "Status: Ready. Click Live Cam to start a new scan.";
+            VerdictTxt.Text = "Ready. Press Start camera to begin a new scan.";
             RegionTxt.Text = "";
             ResearcherMetricsTxt.Text = "";
         }
@@ -1053,13 +1136,18 @@ namespace SkinDevApp.Views
         {
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
             ScoresTitleTxt.Text = "Live AI reading";
-            ScoresNoteTxt.Text = "AI support for each condition, refreshed every few seconds. Several can be present at once, and Normal is derived from the three, so it has no bar. Not a diagnosis.";
+            ScoresNoteTxt.Text = "Updates every few seconds while you scan. The full result appears after the photographs are taken. Not a diagnosis.";
             NormalRow.Visibility = Visibility.Collapsed; NormalBar.Visibility = Visibility.Collapsed;
-            bool ok = a != null && a.Conditions.Length >= 3 && a.State != SkinDevApp.V6.V6States.InferenceError;
-            double p0 = ok ? a.Conditions[0].CalibratedProbability * 100.0 : 0, p1 = ok ? a.Conditions[1].CalibratedProbability * 100.0 : 0, p2 = ok ? a.Conditions[2].CalibratedProbability * 100.0 : 0;
-            AcneBar.Value = p0; AcneScoreTxt.Text = ok ? p0.ToString("F1") + "%" : "—";
-            HyperBar.Value = p1; HyperScoreTxt.Text = ok ? p1.ToString("F1") + "%" : "—";
-            EczemaBar.Value = p2; EczemaScoreTxt.Text = ok ? p2.ToString("F1") + "%" : "—";
+            bool ok = a != null && a.Conditions.Length >= 3 && a.State != SkinDevApp.V6.V6States.InferenceError && a.State != SkinDevApp.V6.V6States.RecaptureRequired;
+            SkinDevApp.V6.ClinicalSummary cs = ok ? SkinDevApp.V6.ClinicalSummary.From(a) : null;
+            TextBlock[] labels = { AcneScoreTxt, HyperScoreTxt, EczemaScoreTxt };
+            for (int i = 0; i < 3; i++)
+            {
+                string word = !ok || cs.Findings.Count <= i ? "—" : cs.Findings[i].Status == SkinDevApp.V6.ClinicalSummary.Detected ? "Detected"
+                            : cs.Findings[i].Status == SkinDevApp.V6.ClinicalSummary.NotDetected ? "Not detected" : "Review";
+                labels[i].Text = word;
+                labels[i].FontWeight = word == "Detected" ? FontWeights.SemiBold : FontWeights.Normal;
+            }
         }
 
         private void ApplyV6Verdict()
@@ -1337,7 +1425,7 @@ namespace SkinDevApp.Views
             UpdateScanInfo();
 
             if (!_live.PoseCheckAvailable)
-                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Snap Now when the view is right.)";
+                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Take photo now when the view is right.)";
         }
 
         private void UpdateViewStep()
@@ -1517,6 +1605,8 @@ namespace SkinDevApp.Views
 
         private void SetBars(float[] probs)
         {
+            if (SkinDevApp.V6.V6FeatureFlag.IsEnabled) { ApplyV6Bars(); return; }          // the final model: plain status words, never the earlier classifier's percentages
+
             double a = probs != null && probs.Length > 0 ? probs[0] * 100.0 : 0;
             double h = probs != null && probs.Length > 1 ? probs[1] * 100.0 : 0;
             double e = probs != null && probs.Length > 2 ? probs[2] * 100.0 : 0;

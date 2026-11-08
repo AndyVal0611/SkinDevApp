@@ -322,12 +322,11 @@ namespace SkinDevApp.Views
             if (r)
             {
                 Group("REVIEW");
-                Add("Add researcher notes", (s, e) => OpenVerification(), "PrimaryButton");
                 Add("Dermatologist review", (s, e) =>
                 {
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
-                }, "SecondaryButton");
+                }, "PrimaryButton");
                 Add("Compare photographs and marked areas", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
             Group("PATIENT RESULTS & REPORTS");

@@ -236,8 +236,8 @@
             <Border x:Name="ControlsCard" Style="{StaticResource Card}" Padding="22,20,22,20" Margin="8">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="CAPTURE" Style="{StaticResource Eyebrow}"/>
-                        <TextBlock Text="Three-angle scan" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+                        <TextBlock Text="SCAN" Style="{StaticResource Eyebrow}"/>
+                        <TextBlock Text="Take the photographs" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
 
                         <!-- Participant / consent gate message -->
                         <Border x:Name="GateBox" Style="{StaticResource NoticeBox}" Margin="0,0,0,12" Visibility="Collapsed">
@@ -291,14 +291,14 @@
                             <Button x:Name="StartCamBtn" Grid.Column="0" Style="{StaticResource PrimaryButton}" Height="64" FontSize="16" Padding="10,0" Click="StartCamBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Video}" Width="22" Height="22" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Live camera" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Start camera" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <Button x:Name="SnapBtn" Grid.Column="2" Style="{StaticResource AccentButton}" Height="64" FontSize="16" FontWeight="SemiBold" Padding="10,0" IsEnabled="False" Click="SnapBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Capture}" Width="22" Height="22" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Snap now" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Take photo now" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </Grid>
@@ -310,7 +310,7 @@
                         </Button>
 
                         <!-- front / left / right stages -->
-                        <TextBlock Text="STAGES" Style="{StaticResource Eyebrow}"/>
+                        <TextBlock Text="PHOTOGRAPHS" Style="{StaticResource Eyebrow}"/>
                         <UniformGrid x:Name="StepperGrid" Columns="3" Margin="0,0,0,8" Visibility="Collapsed"/>
                         <TextBlock x:Name="ViewStepTxt" Text="" FontSize="14" FontWeight="SemiBold" Foreground="#5F6048"
                                    TextWrapping="Wrap" Margin="2,0,0,14"/>
@@ -318,7 +318,7 @@
                         <!-- capture options -->
                         <Border Style="{StaticResource Panel}" Margin="0,0,0,12" Padding="14,6">
                             <StackPanel>
-                                <CheckBox x:Name="AutoCaptureChk" Content="Take the photo automatically when the reading is steady" IsChecked="True"
+                                <CheckBox x:Name="AutoCaptureChk" Content="Take each photo automatically when steady (turn off to use Take photo now)" IsChecked="True"
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
@@ -326,7 +326,7 @@
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
 
-                                <CheckBox x:Name="CentreChk" Content="Show centre lines (height and left / right)" IsChecked="True"
+                                <CheckBox x:Name="CentreChk" Content="Show center lines on the camera view" IsChecked="True"
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="CentreChk_Changed" Unchecked="CentreChk_Changed"/>
                             </StackPanel>
@@ -370,8 +370,11 @@
             <Border x:Name="AnalysisCard" Style="{StaticResource Card}" Padding="22,20,22,20" Margin="8">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="AI ANALYSIS" Style="{StaticResource Eyebrow}"/>
-                        <TextBlock Text="Live reading" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+                        <TextBlock Text="AI READING" Style="{StaticResource Eyebrow}"/>
+                        <TextBlock Text="Scan status" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+
+                        <!-- Front / Left / Right photograph slots: preview, orientation, capture status, retake and inspect (filled in code) -->
+                        <StackPanel x:Name="PhotoSlots" Margin="0,0,0,16" Visibility="Collapsed"/>
 
                         <!-- Live capture status (face, pose, sharpness, exposure, motion, stability, camera) -->
                         <Border x:Name="StatusPanel" Style="{StaticResource Panel}" Margin="0,0,0,16" Visibility="Collapsed">
@@ -388,40 +391,40 @@
 
                         <DockPanel Margin="0,0,0,2">
                             <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chart}" Foreground="#818263" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock x:Name="ScoresTitleTxt" Text="Model class scores" FontSize="16" FontWeight="SemiBold" Foreground="#2F3024"/>
+                            <TextBlock x:Name="ScoresTitleTxt" Text="Live AI reading" FontSize="16" FontWeight="SemiBold" Foreground="#2F3024"/>
                         </DockPanel>
-                        <TextBlock x:Name="ScoresNoteTxt" Text="The model's scores across four mutually exclusive classes. They are not independent disease probabilities."
+                        <TextBlock x:Name="ScoresNoteTxt" Text="Updates every few seconds while you scan. The full result appears after the photographs are taken."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,2,0,12"/>
 
                         <!-- Progress Bars for 4 target classes (colours = heatmap colours) -->
                         <StackPanel>
-                            <DockPanel>
+                            <DockPanel Margin="0,0,0,12">
                                 <Ellipse Style="{StaticResource ScoreDot}" Fill="#FF0000"/>
-                                <TextBlock x:Name="AcneScoreTxt" Text="0.0%" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
+                                <TextBlock x:Name="AcneScoreTxt" Text="—" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
                                 <TextBlock Text="Acne" Style="{StaticResource ScoreName}"/>
                             </DockPanel>
-                            <ProgressBar x:Name="AcneBar" Style="{StaticResource ScoreBar}" Foreground="#FF0000"/>
+                            <ProgressBar x:Name="AcneBar" Visibility="Collapsed" Style="{StaticResource ScoreBar}" Foreground="#FF0000"/>
 
-                            <DockPanel>
+                            <DockPanel Margin="0,0,0,12">
                                 <Ellipse Style="{StaticResource ScoreDot}" Fill="#0050FF"/>
-                                <TextBlock x:Name="HyperScoreTxt" Text="0.0%" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
+                                <TextBlock x:Name="HyperScoreTxt" Text="—" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
                                 <TextBlock Text="Hyperpigmentation" Style="{StaticResource ScoreName}"/>
                             </DockPanel>
-                            <ProgressBar x:Name="HyperBar" Style="{StaticResource ScoreBar}" Foreground="#0050FF"/>
+                            <ProgressBar x:Name="HyperBar" Visibility="Collapsed" Style="{StaticResource ScoreBar}" Foreground="#0050FF"/>
 
-                            <DockPanel>
+                            <DockPanel Margin="0,0,0,12">
                                 <Ellipse Style="{StaticResource ScoreDot}" Fill="#FFBE00"/>
-                                <TextBlock x:Name="EczemaScoreTxt" Text="0.0%" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
+                                <TextBlock x:Name="EczemaScoreTxt" Text="—" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
                                 <TextBlock Text="Eczema" Style="{StaticResource ScoreName}"/>
                             </DockPanel>
-                            <ProgressBar x:Name="EczemaBar" Style="{StaticResource ScoreBar}" Foreground="#FFBE00"/>
+                            <ProgressBar x:Name="EczemaBar" Visibility="Collapsed" Style="{StaticResource ScoreBar}" Foreground="#FFBE00"/>
 
-                            <DockPanel x:Name="NormalRow">
+                            <DockPanel x:Name="NormalRow" Visibility="Collapsed">
                                 <Ellipse Style="{StaticResource ScoreDot}" Fill="#00C83C"/>
                                 <TextBlock x:Name="NormalScoreTxt" Text="0.0%" DockPanel.Dock="Right" Style="{StaticResource ScoreValue}"/>
                                 <TextBlock Text="Normal" Style="{StaticResource ScoreName}"/>
                             </DockPanel>
-                            <ProgressBar x:Name="NormalBar" Style="{StaticResource ScoreBar}" Foreground="#00C83C" Margin="0,6,0,16"/>
+                            <ProgressBar x:Name="NormalBar" Visibility="Collapsed" Style="{StaticResource ScoreBar}" Foreground="#00C83C" Margin="0,6,0,16"/>
                         </StackPanel>
 
                         <!-- Primary Result Callout -->
@@ -438,10 +441,10 @@
                         </Border>
 
                         <TextBlock x:Name="DisclaimerTxt"
-                                   Text="Screening aid only. Not a medical diagnosis. Heatmaps show regions that influenced the model, not lesion outlines. Results are pending review."
+                                   Text="Screening aid only. Not a medical diagnosis. Every result is pending dermatologist review."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="2,0,0,14"/>
 
-                        <Expander x:Name="MoreOptions" FontSize="14" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,14">
+                        <Expander x:Name="MoreOptions" Visibility="Collapsed" FontSize="14" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,14">
                             <Expander.Header>
                                 <StackPanel Orientation="Horizontal">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Sliders}" Foreground="#6F6F58" Width="18" Height="18" Margin="0,0,10,0"/>
@@ -500,7 +503,7 @@
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Width="19" Height="19" Margin="8,0,0,0"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="PrintBtn" Style="{StaticResource AccentButton}" Height="54" FontWeight="SemiBold"
+                        <Button x:Name="PrintBtn" Visibility="Collapsed" Style="{StaticResource AccentButton}" Height="54" FontWeight="SemiBold"
                                 IsEnabled="False" Click="PrintBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Report}" Width="19" Height="19" Margin="0,0,10,0"/>

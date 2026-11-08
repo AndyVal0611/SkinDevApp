@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // V6ResultsView.cs  -  namespace SkinDevApp.V6   (WPF presentation of the final model's result)
 //
 // The clinician-facing result card used on the Results page, and the compact summary used in the patient record, dermatologist review and
@@ -86,7 +86,7 @@ namespace SkinDevApp.V6
         {
             Background = Ui.Brush(f.Status == ClinicalSummary.Detected ? "#FBEDEA" : f.Status == ClinicalSummary.NotDetected ? "#EEF3E8" : "#FFF6E6"),
             CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock { Text = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive ? f.Status + " · review" : f.ByDetector ? "Detected · detector" : f.Status,
+            Child = new TextBlock { Text = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive ? f.Status + " · review" : f.Status,
                                     FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(FindingInk(f)) }
         };
 
@@ -232,9 +232,124 @@ namespace SkinDevApp.V6
                 sp.Children.Add(chips);
             }
             sp.Children.Add(Footer(s, d.Session.AIModel));
+            sp.Children.Add(QualityAndLimits(d, s));
             sp.Children.Add(DermatologistPanel(d));
-            sp.Children.Add(TechnicalDetails(s));
+            sp.Children.Add(ProbabilityBars(s));
             return Ui.Card(sp);
+        }
+
+        /// <summary>Optional (closed by default): one bar per condition showing the model's probability, with the decision limit marked.</summary>
+        public static UIElement ProbabilityBars(V6SessionSummary s)
+        {
+            var sp = new StackPanel { Margin = new Thickness(4, 8, 0, 0) };
+            sp.Children.Add(Ui.Text("Each bar is how strongly the AI's final reading points to that condition. The thin line marks the level at which a condition is called detected. A longer bar is not a more severe condition.",
+                                    11.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
+            foreach (V6ViewSummary v in s.Views)
+            {
+                if (!s.Single) sp.Children.Add(Ui.Text(v.Label, 12, true, Ui.Ink, new Thickness(0, 6, 0, 3)));
+                foreach (ConditionAssessment c in v.Assessment.Conditions)
+                {
+                    int idx = V6Conditions.IndexOf(c.Condition);
+                    var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                    var name = Ui.Text(c.Condition, 12.5, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 0, 8, 0));
+                    name.VerticalAlignment = VerticalAlignment.Center;
+                    double p = Math.Max(0, Math.Min(1, c.CalibratedProbability)), t = Math.Max(0, Math.Min(1, c.Threshold));
+                    var track = new Grid { Height = 14, VerticalAlignment = VerticalAlignment.Center };
+                    track.Children.Add(new Border { Background = Ui.Brush("#EFEADC"), CornerRadius = new CornerRadius(7) });
+                    var fill = new Grid();
+                    fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(p, 0.0001), GridUnitType.Star) });
+                    fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1 - p, 0.0001), GridUnitType.Star) });
+                    fill.Children.Add(new Border { Background = Ui.Brush(idx >= 0 ? ClassPalette.Hex[idx] : "#818263"), CornerRadius = new CornerRadius(7) });
+                    track.Children.Add(fill);
+                    var mark = new Grid();
+                    mark.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(t, 0.0001), GridUnitType.Star) });
+                    mark.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1 - t, 0.0001), GridUnitType.Star) });
+                    mark.Children.Add(new Border { Background = Ui.Ink, Width = 2, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, -2, 0, -2) });
+                    track.Children.Add(mark);
+                    Grid.SetColumn(track, 1);
+                    var pct = Ui.Text(c.CalibratedProbability.ToString("0%") + "  (line at " + c.Threshold.ToString("0%") + ")", 12, false, Ui.Ink, new Thickness(10, 0, 0, 0));
+                    pct.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(pct, 2);
+                    row.Children.Add(name); row.Children.Add(track); row.Children.Add(pct);
+                    sp.Children.Add(row);
+                }
+            }
+            return new Expander
+            {
+                Header = new TextBlock { Text = "Show the AI's reading as bars (optional)", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
+                IsExpanded = false, Margin = new Thickness(0, 10, 0, 0), Content = sp
+            };
+        }
+
+        /// <summary>Global model, lesion detector and fusion side by side for each condition. Only numbers the system really holds are shown.</summary>
+        public static UIElement AnalysisBreakdown(V6SessionSummary s)
+        {
+            var sp = new StackPanel { Margin = new Thickness(4, 6, 0, 0) };
+            sp.Children.Add(Ui.Text("Global = whole-face model (MobileNetV2). Localized = lesion detector (YOLOv8) boxes. Fusion = the final decision that combines both. The global figure is the calibrated global-only reading, not a raw model output.",
+                                    11, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
+            foreach (V6ViewSummary v in s.Views)
+            {
+                if (!s.Single) sp.Children.Add(Ui.Text(v.Label, 12, true, Ui.Ink, new Thickness(0, 6, 0, 2)));
+                var g = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+                double[] w = { 130, 120, 220, 220 };
+                foreach (double x in w) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(x) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                string[] head = { "Condition", "Global (whole face)", "Localized (lesion detector)", "Fusion (final)", "Result" };
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (int c = 0; c < head.Length; c++) { var t = Ui.Text(head[c], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, c); g.Children.Add(t); }
+                int row = 1;
+                foreach (ConditionAssessment c in v.Assessment.Conditions)
+                {
+                    ClinicalFinding f = v.Clinical == null ? null : v.Clinical.Findings.FirstOrDefault(x => x.Condition == c.Condition);
+                    g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    string global = c.GlobalOnlyProbability > 0 || c.CalibratedProbability > 0 ? c.GlobalOnlyProbability.ToString("0%") + " probability" : "not available";
+                    string local = !c.DetectorAvailable ? "No detector for this condition"
+                                 : f != null && f.BoxCount > 0 ? f.BoxCount + (f.BoxCount == 1 ? " area marked" : " areas marked") + ", best confidence " + f.BestBoxConfidence.ToString("0%")
+                                 : "No area marked";
+                    string fusion = c.CalibratedProbability.ToString("0%") + " (limit " + c.Threshold.ToString("0%") + ")";
+                    string res = f != null ? f.Status + (f.ByDetector ? " · by lesion detector" : "") : "—";
+                    string[] cells = { c.Condition, global, local, fusion, res };
+                    for (int k = 0; k < cells.Length; k++)
+                    {
+                        var t = Ui.Text(cells[k], 12, k == 0 || k == 4, Ui.Ink, new Thickness(0, 4, 8, 4));
+                        Grid.SetRow(t, row); Grid.SetColumn(t, k); g.Children.Add(t);
+                    }
+                    row++;
+                }
+                sp.Children.Add(g);
+                sp.Children.Add(Ui.Text("Explainability maps (Grad-CAM) are not produced by this model; the boxes are the only visual evidence.", 11, false, Ui.Muted, new Thickness(0, 0, 0, 2)));
+            }
+            return new Expander
+            {
+                Header = new TextBlock { Text = "How the AI reached this reading (global, localized and fusion)", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
+                IsExpanded = true, Margin = new Thickness(0, 10, 0, 0), Content = sp
+            };
+        }
+
+        private static string FlagText(string f)
+        {
+            if (f.StartsWith("cnn_yolo_conflict_")) return "the whole-face model and the lesion detector disagree on " + f.Substring(18) + ".";
+            if (f.StartsWith("near_threshold_")) return f.Substring(15) + " is close to its decision limit.";
+            if (f == "ood") return "the photograph looks unlike the training photographs.";
+            return f.Replace('_', ' ');
+        }
+
+        /// <summary>Image quality as measured when each photograph was captured, plus the limits of this screening. Nothing is shown for a measure that was not taken.</summary>
+        public static UIElement QualityAndLimits(SessionDetail d, V6SessionSummary s)
+        {
+            var sp = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+            sp.Children.Add(Ui.Text("Image quality and limitations", 13, true, Ui.Ink, new Thickness(0, 0, 0, 3)));
+            foreach (CaptureViewRow v in d.Views.OrderBy(x => Array.IndexOf(StudyText.Views, x.ViewType)))
+            {
+                string q = string.IsNullOrWhiteSpace(v.QualityStatus) ? "Not evaluated" : ClinicalText.PlainQuality(v.QualityStatus);
+                sp.Children.Add(Ui.Text("•  " + (string.IsNullOrEmpty(v.ViewType) ? "Photograph" : V6SessionSummary.LabelFor(v.ViewType)) + ": " + q, 12, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
+            }
+            foreach (string r in s.Views.SelectMany(x => x.Assessment.Flags).Distinct().Take(6))
+                sp.Children.Add(Ui.Text("•  Model note: " + FlagText(r), 11.5, false, Ui.Muted, new Thickness(6, 0, 0, 1)));
+            sp.Children.Add(Ui.Text("Limits: facial regions are estimated from the detected face box; severity is not graded; the screening covers acne, hyperpigmentation and eczema only.", 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            return sp;
         }
 
         /// <summary>A separate, clearly labelled block: what the dermatologist recorded (or that nothing has been recorded yet). Never mixed into the AI result.</summary>
@@ -256,6 +371,13 @@ namespace SkinDevApp.V6
                     Ui.KV("Assessment", string.IsNullOrWhiteSpace(v.DermatologistAssessment) ? "Not recorded" : v.DermatologistAssessment),
                     Ui.KV("Agreement with the AI", string.IsNullOrWhiteSpace(v.AgreementWithAI) ? "Not recorded" : v.AgreementWithAI == "Uncertain" ? "Unable to determine" : v.AgreementWithAI)
                 }, 150, 12.5));
+            }
+            var conds = StudyRepository.LatestConditionReviews(d.Session.ScanSessionID);
+            if (v != null && conds.Count > 0)
+            {
+                sp.Children.Add(Ui.Text("Verification of each condition", 12, true, Ui.Muted, new Thickness(0, 8, 0, 2)));
+                foreach (ConditionReview cr in conds.Values.OrderBy(x => Array.IndexOf(V6Conditions.Names, x.Condition)))
+                    sp.Children.Add(Ui.Text("•  " + cr.Condition + ": " + cr.Status + (string.IsNullOrWhiteSpace(cr.Observation) ? "" : " — " + cr.Observation), 12.5, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
             }
             return new Border
             {
@@ -279,7 +401,7 @@ namespace SkinDevApp.V6
             return w;
         }
 
-        /// <summary>The compact reading under one photograph on the Results page.</summary>
+        /// <summary>The compact reading under one photograph on the Results page, in plain words.</summary>
         public static UIElement ViewColumn(UnifiedAssessment a, string recordFolder = null)
         {
             double[] face = null;
@@ -287,18 +409,24 @@ namespace SkinDevApp.V6
             ClinicalSummary c = ClinicalSummary.From(a, face);
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text(c.Title, 13, true, Ui.Brush(CategoryInk(c.Category)), new Thickness(0, 8, 0, 4)));
+            if (c.Category == ClinicalCategory.Retake)
+            {
+                sp.Children.Add(Ui.Text("This photograph is not clear enough to read. Please take it again.", 12, false, Ui.Ink, new Thickness(0, 0, 0, 2)));
+                return sp;
+            }
             foreach (ClinicalFinding f in c.Findings)
             {
-                var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 0, 0, 2) };
+                string word = f.Status == ClinicalSummary.Detected ? "found" : f.Status == ClinicalSummary.NotDetected ? "not found" : "possible, please check";
+                var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(0, 0, 0, 2) };
                 int idx = V6Conditions.IndexOf(f.Condition);
                 line.Inlines.Add(new System.Windows.Documents.Run(f.Condition + ": ") { FontWeight = FontWeights.SemiBold, Foreground = idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink });
-                line.Inlines.Add(new System.Windows.Documents.Run(ClinicalSummary.ConfidenceText(f) + " · " + ClinicalSummary.FindingLine(f)) { Foreground = Ui.Ink });
+                line.Inlines.Add(new System.Windows.Documents.Run(word) { Foreground = Ui.Ink });
                 sp.Children.Add(line);
             }
-            sp.Children.Add(Ui.Text(c.MarkedAreas == 0 ? "No areas marked" : c.MarkedAreas + (c.MarkedAreas == 1 ? " area marked: " : " areas marked: ") +
-                                    string.Join(", ", c.Findings.Where(x => x.BoxCount > 0).Select(x => x.Condition + " " + x.BoxCount)), 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
-            foreach (string r in c.ReviewReasons.Distinct().Take(3)) sp.Children.Add(Ui.Text("•  " + r, 11, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
-            foreach (string n in c.Notes) sp.Children.Add(Ui.Text(n, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            if (c.MarkedAreas > 0)
+                sp.Children.Add(Ui.Text(c.MarkedAreas + (c.MarkedAreas == 1 ? " spot marked on the photograph." : " spots marked on the photograph."), 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            if (c.Category == ClinicalCategory.NeedsReview || c.Findings.Any(x => x.Status == ClinicalSummary.Possible || x.Status == ClinicalSummary.Inconclusive))
+                sp.Children.Add(Ui.Text("A dermatologist should check this photograph.", 11.5, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
             return sp;
         }
 
@@ -315,7 +443,6 @@ namespace SkinDevApp.V6
             sp.Children.Add(FindingsList(s.Clinical));
             sp.Children.Add(ReviewNotes(s.Clinical.ReviewReasons, 12, s.Clinical.Category == ClinicalCategory.Retake ? "What to do" : null));
             sp.Children.Add(Footer(s, null));
-            sp.Children.Add(TechnicalDetails(s));
             return sp;
         }
     }

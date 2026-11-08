@@ -286,7 +286,7 @@ namespace SkinDevApp
         private void BuildDermForm()
         {
             DermForm.Children.Clear();
-            DermForm.Children.Add(Ui.Text("Licensed dermatologist validation", 16, true));
+            DermForm.Children.Add(Ui.Text("Dermatologist review", 16, true));
             DermForm.Children.Add(Ui.Text("A separate validation layer. It does not replace the researcher assessment and never overwrites the AI prediction.",
                 11.5, false, Ui.Muted));
 
@@ -303,9 +303,9 @@ namespace SkinDevApp
             right.Children.Add(Label("Validator Name (where permitted by protocol)"));
             _dName = Field(); right.Children.Add(_dName);
             left.Children.Add(Label("Professional Role"));
-            var role = Field(); role.Text = "Licensed Dermatologist"; role.IsReadOnly = true; role.Background = Ui.Brush("#F3F4F6");
+            var role = Field(); role.Text = "Dermatologist"; role.IsReadOnly = true; role.Background = Ui.Brush("#F3F4F6");
             left.Children.Add(role);
-            right.Children.Add(Label("License / Credential No. (if required by protocol)"));
+            right.Children.Add(Label("Registration no. (optional)"));
             _dCred = Field(); right.Children.Add(_dCred);
             DermForm.Children.Add(g);
 
@@ -358,7 +358,7 @@ namespace SkinDevApp
                     ScanSessionID = _sessionId,
                     DermatologistID = _dId.Text.Trim(),
                     ValidatorName = string.IsNullOrWhiteSpace(_dName.Text) ? null : _dName.Text.Trim(),
-                    ProfessionalRole = "Licensed Dermatologist",
+                    ProfessionalRole = "Dermatologist",
                     CredentialReference = string.IsNullOrWhiteSpace(_dCred.Text) ? null : _dCred.Text.Trim(),
                     DermatologistAssessment = labels.Count == 0 ? null : string.Join(", ", labels),
                     AgreementWithAI = (string)_dAgreeAi.SelectedItem,

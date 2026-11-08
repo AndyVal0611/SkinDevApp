@@ -150,7 +150,7 @@ namespace SkinDevApp.Views
             string haar = FrameQualityAnalyzer.FindCascade();
             bool hOk = false;
             try { using (var q = new FrameQualityAnalyzer()) hOk = q.CascadeAvailable; } catch { }
-            list.Add(Tuple.Create("Haar face finder", "Checks that the face is centred and at the right distance in the oval.", hOk,
+            list.Add(Tuple.Create("Haar face finder", "Checks that the face is centered and at the right distance in the oval.", hOk,
                 hOk ? "Ready" : "Not found", haar ?? "haarcascade_frontalface_default.xml (not found)"));
             return list;
         }

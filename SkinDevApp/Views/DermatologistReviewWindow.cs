@@ -1,4 +1,4 @@
-// DermatologistReviewWindow.cs - clinical review summary for the licensed dermatologist.
+// DermatologistReviewWindow.cs - clinical review summary for the dermatologist.
 //
 // Same stored data as the technical Researcher pages, presented without raw AI metrics: who/when, one plain AI-assisted summary,
 // a per-view table, the three views with the original image first (and toggles for the AI-identified region of interest and Grad-CAM++),
@@ -40,11 +40,11 @@ namespace SkinDevApp.Views
         private StackPanel _viewerHost;
 
         // assessment form
-        private readonly List<RadioButton> _refRadios = new List<RadioButton>();
         private static readonly string[] StatusShown = { "Verified - review completed", "Requires further review", "Save as draft (not yet verified)" };
         private static readonly string[] StatusStored = { ReviewStatus.ValidationCompleted, ReviewStatus.ValidationFurtherReview, ReviewStatus.ValidationDraft };
-        private ComboBox _agree, _localization, _gradcam, _status;
-        private TextBox _notes, _front, _left, _right, _id, _name, _cred;
+        private ComboBox _status;
+        private TextBox _notes, _id, _name, _cred;
+        private readonly List<Tuple<string, ComboBox, TextBox>> _condRows = new List<Tuple<string, ComboBox, TextBox>>();
 
         public DermatologistReviewWindow(string scanSessionId)
         {
@@ -338,48 +338,18 @@ namespace SkinDevApp.Views
         private UIElement AssessmentCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Licensed dermatologist assessment", 17, true));
-            sp.Children.Add(Ui.Text("Your own independent assessment. Nothing here is filled in from the AI result, and saving it never changes the AI output.", 12, false, Ui.Muted));
+            sp.Children.Add(Ui.Text("Dermatologist review", 17, true));
+            sp.Children.Add(Ui.Text("For each condition, choose whether you confirm what the AI reported. Nothing is filled in for you, and saving never changes the AI result.", 12, false, Ui.Muted));
 
-            sp.Children.Add(Label("Dermatologist Reference Assessment *"));
-            var wrap = new WrapPanel();
-            foreach (string r in ReferenceShown)
-            {
-                var rb = new RadioButton { Content = r, GroupName = "derm-ref", Margin = new Thickness(0, 4, 18, 4), FontSize = 13 };
-                _refRadios.Add(rb);
-                wrap.Children.Add(rb);
-            }
-            sp.Children.Add(wrap);
+            sp.Children.Add(ConditionVerification());
 
-            sp.Children.Add(Label("Does the AI classification agree with your assessment? *"));
-            _agree = Combo(AgreementShown); sp.Children.Add(_agree);
+            sp.Children.Add(Label("Notes (optional)"));
+            _notes = Field(true); _notes.MinHeight = 90; sp.Children.Add(_notes);
 
-            sp.Children.Add(Label("Are the AI-localized areas relevant to the visible finding?"));
-            _localization = Combo(LocalizationOptions); sp.Children.Add(_localization);
-
-            sp.Children.Add(Label("Was the Grad-CAM++ attribution useful for understanding the AI prediction?"));
-            _gradcam = Combo(GradCamOptions); sp.Children.Add(_gradcam);
-
-            sp.Children.Add(Label("Dermatologist Notes / Observations"));
-            _notes = Field(true); _notes.MinHeight = 110; sp.Children.Add(_notes);
-
-            sp.Children.Add(Label("Notes per view (optional)"));
-            var g = new UniformGrid { Columns = 3 };
-            _front = Field(true); _left = Field(true); _right = Field(true);
-            foreach (var pair in new[] { Tuple.Create("Front", _front), Tuple.Create("Left", _left), Tuple.Create("Right", _right) })
-            {
-                var col = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
-                col.Children.Add(Ui.Text(pair.Item1, 11.5, true, Ui.Muted));
-                pair.Item2.MinHeight = 60;
-                col.Children.Add(pair.Item2);
-                g.Children.Add(col);
-            }
-            sp.Children.Add(g);
-
-            sp.Children.Add(Label("Validator"));
+            sp.Children.Add(Label("Reviewer"));
             var idRow = new UniformGrid { Columns = 3 };
             _id = Field(); _name = Field(); _cred = Field();
-            foreach (var pair in new[] { Tuple.Create("Validator ID *", _id), Tuple.Create("Name (where permitted by protocol)", _name), Tuple.Create("License / credential no. (if required)", _cred) })
+            foreach (var pair in new[] { Tuple.Create("Reviewer ID *", _id), Tuple.Create("Name (optional)", _name), Tuple.Create("Registration no. (optional)", _cred) })
             {
                 var col = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
                 col.Children.Add(Ui.Text(pair.Item1, 11.5, false, Ui.Muted));
@@ -389,50 +359,116 @@ namespace SkinDevApp.Views
             sp.Children.Add(idRow);
 
             sp.Children.Add(Label("Outcome of this review *"));
-            _status = Combo(StatusShown); _status.SelectedIndex = 0; sp.Children.Add(_status);
-            sp.Children.Add(Ui.Text("Verified moves the scan to the verified records. Requires further review keeps it open for another look. A draft does not change the scan's status.",
-                                    11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            _status = Combo(StatusShown); _status.SelectedIndex = 1; sp.Children.Add(_status);
+            sp.Children.Add(Ui.Text("Completed needs a Confirmed or Not Confirmed answer for every condition. It moves the scan to the verified records.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
 
-            Button save = Ui.Btn("Save dermatologist assessment", (o, e) => Save(), "PrimaryButton");
+            Button save = Ui.Btn("Save assessment", (o, e) => Save(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
             save.HorizontalAlignment = HorizontalAlignment.Left;
             sp.Children.Add(save);
             return Ui.Card(sp, new Thickness(0, 0, 0, 12));
         }
 
+        private readonly Dictionary<string, string> _aiStatus = new Dictionary<string, string>();
+
+        /// <summary>One line per condition: what the AI reported (plain words, read-only) and the reviewer's own answer. Every answer starts as Pending Review.</summary>
+        private UIElement ConditionVerification()
+        {
+            var sp = new StackPanel { Margin = new Thickness(0, 12, 0, 4) };
+            _aiStatus.Clear();
+            var ai = new Dictionary<string, string>();
+            try
+            {
+                var v6 = SkinDevApp.V6.V6SessionSummary.For(_d);
+                if (v6 != null)
+                {
+                    var all = new List<SkinDevApp.V6.ClinicalFinding>(v6.Clinical.Findings);
+                    foreach (var vw in v6.Views) all.AddRange(vw.Clinical.Findings);
+                    foreach (var grp in all.GroupBy(f => f.Condition))
+                    {
+                        string st = grp.Any(f => f.Status == SkinDevApp.V6.ClinicalSummary.Detected) ? SkinDevApp.V6.ClinicalSummary.Detected
+                                  : grp.Any(f => f.Status == SkinDevApp.V6.ClinicalSummary.Possible || f.Status == SkinDevApp.V6.ClinicalSummary.Inconclusive) ? SkinDevApp.V6.ClinicalSummary.Possible
+                                  : SkinDevApp.V6.ClinicalSummary.NotDetected;
+                        _aiStatus[grp.Key] = st;
+                        ai[grp.Key] = st == SkinDevApp.V6.ClinicalSummary.Detected ? "AI result: found" : st == SkinDevApp.V6.ClinicalSummary.Possible ? "AI result: possible, not certain" : "AI result: not found";
+                    }
+                }
+            }
+            catch { }
+            _condRows.Clear();
+            foreach (string cond in new[] { "Acne", "Hyperpigmentation", "Eczema" })
+            {
+                var head = new DockPanel { Margin = new Thickness(0, 6, 0, 6) };
+                var combo = Combo(ConditionReview.All); combo.SelectedIndex = 0; combo.Width = 260; DockPanel.SetDock(combo, Dock.Right);
+                combo.SelectionChanged += (o, e) => SuggestOutcome();
+                head.Children.Add(combo);
+                var left = new StackPanel();
+                left.Children.Add(Ui.Text(cond, 14, true, Ui.Ink));
+                string aiText;
+                left.Children.Add(Ui.Text(ai.TryGetValue(cond, out aiText) ? aiText : "AI result: not recorded for this scan", 12, false, Ui.Muted));
+                head.Children.Add(left);
+                sp.Children.Add(head);
+                var comment = Field(true); comment.MinHeight = 44;
+                sp.Children.Add(Ui.Text("Comment (optional)", 11, false, Ui.Muted));
+                sp.Children.Add(comment);
+                sp.Children.Add(new Border { Height = 1, Background = Ui.Line, Margin = new Thickness(0, 10, 0, 4) });
+                _condRows.Add(Tuple.Create(cond, combo, comment));
+            }
+            return sp;
+        }
+
+        /// <summary>Preselect a sensible outcome from the answers (the reviewer can still change it).</summary>
+        private void SuggestOutcome()
+        {
+            if (_status == null) return;
+            bool decided = _condRows.All(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed || (string)r.Item2.SelectedItem == ConditionReview.NotConfirmed);
+            _status.SelectedIndex = decided ? 0 : 1;
+        }
+
+        /// <summary>What the reviewer's answers say about the AI result, worked out from those answers only: Agree / Partially agree / Disagree, or null while anything is open.</summary>
+        private string DeriveAgreement(out string assessment)
+        {
+            var confirmed = _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList();
+            assessment = confirmed.Count == 0 ? "No condition confirmed" : string.Join(", ", confirmed);
+            if (_condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment) || _aiStatus.Count == 0) return null;
+            int match = 0;
+            foreach (var r in _condRows)
+            {
+                bool aiFound; string st;
+                aiFound = _aiStatus.TryGetValue(r.Item1, out st) && st == SkinDevApp.V6.ClinicalSummary.Detected;
+                bool derm = (string)r.Item2.SelectedItem == ConditionReview.Confirmed;
+                if (aiFound == derm) match++;
+            }
+            return match == _condRows.Count ? "Agree" : match == 0 ? "Disagree" : "Partially agree";
+        }
+
         private void Save()
         {
-            int refIdx = _refRadios.FindIndex(r => r.IsChecked == true);
             string status = _status.SelectedIndex < 0 ? ReviewStatus.ValidationDraft : StatusStored[_status.SelectedIndex];
-            var missing = new List<string>();
-            if (string.IsNullOrWhiteSpace(_id.Text)) missing.Add("validator ID");
-            if (status != ReviewStatus.ValidationDraft && refIdx < 0) missing.Add("a reference assessment");
-            if (status != ReviewStatus.ValidationDraft && _agree.SelectedIndex < 0) missing.Add("agreement with the AI result");
-            if (missing.Count > 0) { LumyDialog.Show("Please provide " + string.Join(", ", missing) + ".", "LUMYVUE Dermatologist Review"); return; }
+            if (string.IsNullOrWhiteSpace(_id.Text)) { LumyDialog.Show("Please enter your reviewer ID.", "LUMYVUE Dermatologist Review"); return; }
+            if (status == ReviewStatus.ValidationCompleted && _condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment))
+            { LumyDialog.Show("A review can be marked completed only when every condition is Confirmed or Not Confirmed. Answer each condition, or choose \"Requires further review\" or \"Save as draft\".", "LUMYVUE Dermatologist Review"); return; }
 
             try
             {
-                string label = refIdx < 0 ? null : ReferenceStored[refIdx];
+                string label;
+                string agreement = DeriveAgreement(out label);
                 StudyRepository.SaveDermatologistValidation(new DermatologistValidation
                 {
                     ScanSessionID = _sessionId,
                     DermatologistID = _id.Text.Trim(),
                     ValidatorName = string.IsNullOrWhiteSpace(_name.Text) ? null : _name.Text.Trim(),
-                    ProfessionalRole = "Licensed Dermatologist",
+                    ProfessionalRole = "Dermatologist",
                     CredentialReference = string.IsNullOrWhiteSpace(_cred.Text) ? null : _cred.Text.Trim(),
                     DermatologistAssessment = label,
-                    AgreementWithAI = _agree.SelectedIndex < 0 ? null : AgreementStored[_agree.SelectedIndex],
+                    AgreementWithAI = agreement,
                     AgreementWithResearcher = _d.Evaluations.Count == 0 ? "No researcher assessment yet" : null,
-                    LocalizationRelevance = (string)_localization.SelectedItem,
-                    GradCamUsefulness = (string)_gradcam.SelectedItem,
                     Notes = _notes.Text,
-                    FrontComment = NullIfEmpty(_front.Text),
-                    LeftComment = NullIfEmpty(_left.Text),
-                    RightComment = NullIfEmpty(_right.Text),
-                    ValidationStatus = status
-                }, label == null ? null : new List<string> { label });
+                    ValidationStatus = status,
+                    ConditionReviews = _condRows.Select(r => new ConditionReview { Condition = r.Item1, Status = (string)r.Item2.SelectedItem, Observation = NullIfEmpty(r.Item3.Text) }).ToList()
+                }, _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList());
 
-                LumyDialog.Show("Dermatologist assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE Dermatologist Review",
+                LumyDialog.Show("Assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE Dermatologist Review",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
             }
@@ -461,16 +497,18 @@ namespace SkinDevApp.Views
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Previous dermatologist assessments for this scan", 14, true));
             if (_d.Validations.Count == 0) sp.Children.Add(Ui.Text("None yet.", 12.5, false, Ui.Muted));
-            foreach (DermatologistValidation v in _d.Validations)
-                sp.Children.Add(Ui.KeyValues(new[]
+            foreach (DermatologistValidation v in _d.Validations.Take(3))
+            {
+                var rows = new List<KeyValuePair<string, string>>
                 {
                     Ui.KV("Date / outcome", v.ValidationDate + "  ·  " + (ReviewStatus.FromValidation(v.ValidationStatus) ?? "Draft")),
-                    Ui.KV("Reference assessment", v.DermatologistAssessment ?? "—"),
-                    Ui.KV("Agreement with AI", v.AgreementWithAI == "Uncertain" ? "Unable to determine" : v.AgreementWithAI ?? "—"),
-                    Ui.KV("Localization relevance", v.LocalizationRelevance ?? "—"),
-                    Ui.KV("Grad-CAM++ usefulness", v.GradCamUsefulness ?? "—"),
-                    Ui.KV("Notes", string.IsNullOrWhiteSpace(v.Notes) ? "—" : v.Notes)
-                }, 170));
+                    Ui.KV("Confirmed", v.DermatologistAssessment ?? "—"),
+                    Ui.KV("Agreement with AI", v.AgreementWithAI == "Uncertain" ? "Not decided" : v.AgreementWithAI ?? "—")
+                };
+                if (!string.IsNullOrWhiteSpace(v.Notes)) rows.Add(Ui.KV("Notes", v.Notes));
+                sp.Children.Add(Ui.KeyValues(rows.ToArray(), 170));
+            }
+            if (_d.Validations.Count > 3) sp.Children.Add(Ui.Text("Older assessments are kept in the record.", 11.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
         }
     }

@@ -118,7 +118,7 @@ namespace SkinDevApp.Data
 
     public static class StudyDatabase
     {
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
 
         public static string DbPath { get; } = DataLocation.DbFile;
 
@@ -155,6 +155,11 @@ namespace SkinDevApp.Data
                         EnsureColumn(c, tx, "SkinProfiles", col, "TEXT");
                     // Version 2: the final model's results, the scan verification status and supporting indexes (additive; nothing is dropped).
                     Exec(c, tx, SchemaV2);
+                    // Version 3: the dermatologist's verification of each condition (additive).
+                    Exec(c, tx, @"CREATE TABLE IF NOT EXISTS DermatologistConditionReviews (
+                        ReviewID INTEGER PRIMARY KEY AUTOINCREMENT, ValidationID INTEGER NOT NULL, ScanSessionID TEXT NOT NULL,
+                        Condition TEXT NOT NULL, Status TEXT NOT NULL, Observation TEXT, UNIQUE (ValidationID, Condition));
+                        CREATE INDEX IF NOT EXISTS IX_DermCondReviews_Session ON DermatologistConditionReviews(ScanSessionID);");
                     foreach (string col in new[] { "AIResult", "AITitle", "AIConditions", "AIModel", "AIUpdatedAt", "ReviewStatus", "ReviewStatusAt", "ReviewStatusBy" })
                         EnsureColumn(c, tx, "ScanSessions", col, "TEXT");
                     EnsureColumn(c, tx, "AIFindings", "Source", "TEXT");          // model | lesion detector

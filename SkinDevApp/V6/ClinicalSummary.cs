@@ -297,7 +297,7 @@ namespace SkinDevApp.V6
         /// <summary>"Detected · High certainty · forehead, right cheek" (no numbers).</summary>
         public static string FindingLine(ClinicalFinding f)
         {
-            string line = f.ByDetector ? "Detected by the lesion detector" : f.Status;
+            string line = f.Status;
             if (f.Status == Detected || f.Status == NotDetected) line += " · " + f.Certainty.ToLowerInvariant() + " certainty";
             else line += " · review needed";
             if (f.Regions.Count > 0) line += " · " + f.RegionsText;
@@ -321,7 +321,7 @@ namespace SkinDevApp.V6
             if (s.Category == ClinicalCategory.NotCompleted) return "The AI analysis could not be completed.";
             var parts = new List<string>();
             foreach (ClinicalFinding f in s.Findings.Where(x => x.Status == Detected))
-                parts.Add(f.Condition + " detected" + (f.ByDetector ? " by the lesion detector" : "") + " (" + f.Certainty.ToLowerInvariant() + " certainty)");
+                parts.Add(f.Condition + " detected" + " (" + f.Certainty.ToLowerInvariant() + " certainty)");
             foreach (ClinicalFinding f in s.Findings.Where(x => x.Status == Possible || x.Status == Inconclusive))
                 parts.Add(f.Condition + " " + f.Status.ToLowerInvariant() + " (review needed)");
             string line = parts.Count == 0 ? "No condition detected" : string.Join("; ", parts);

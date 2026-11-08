@@ -73,7 +73,7 @@ namespace SkinDevApp.Tests
             Assert.Equal(ClinicalCategory.ConditionDetected, s.Category); Assert.Equal("Condition detected: Hyperpigmentation", s.Title);
             Assert.Empty(s.ReviewReasons);                                                     // the conflict is the reason it was detector-led, not a separate doubt
             Assert.Contains(s.Notes, n => n.StartsWith("Hyperpigmentation was found by its lesion detector"));
-            Assert.Equal("Detected by the lesion detector · low certainty · right cheek", ClinicalSummary.FindingLine(h));
+            Assert.Equal("Detected · low certainty · right cheek", ClinicalSummary.FindingLine(h));
 
             // with acne also present and eczema only possible: two conditions detected, still needs review because of eczema
             UnifiedAssessment b = Make(V6States.UncertainReviewRequired, new[] { 0.7, 0.2, 0.1 }, fired: new[] { true, true, true });
@@ -131,7 +131,7 @@ namespace SkinDevApp.Tests
             Assert.Equal("Detector 31%", ClinicalSummary.ConfidenceText(s.Findings[1]));        // detector-led: the detector's own confidence
             Assert.Equal("10% (below limit)", ClinicalSummary.ConfidenceText(s.Findings[2]));   // possible: below the decision limit
             Assert.Equal(2, s.MarkedAreas);
-            Assert.Equal("Acne detected (moderate certainty); Hyperpigmentation detected by the lesion detector (low certainty); Eczema possible (review needed). 2 areas were marked on the face.", ClinicalSummary.SummaryLine(s));
+            Assert.Equal("Acne detected (moderate certainty); Hyperpigmentation detected (low certainty); Eczema possible (review needed). 2 areas were marked on the face.", ClinicalSummary.SummaryLine(s));
             ClinicalSummary none = ClinicalSummary.From(Make(V6States.NoFindingsSupported, new[] { 0.05, 0.05, 0.05 }));
             Assert.Equal("95%", ClinicalSummary.ConfidenceText(none.Findings[0]));              // not detected: confidence that it is absent
             Assert.Equal("No condition detected. No areas were marked on the face.", ClinicalSummary.SummaryLine(none));
