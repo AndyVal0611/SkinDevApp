@@ -289,7 +289,6 @@ namespace SkinDevApp.Data
         public string ModelLabel { get; set; }
         public string ValidationStatus { get; set; }
         public string ReviewText => ValidationStatus == "Dermatologist Validated" ? "Reviewed by dermatologist"
-            : (ValidationStatus ?? "").StartsWith("Researcher Verified") ? "Awaiting dermatologist"
             : "Awaiting review";
 
         public string DateText => StartedAt != null && StartedAt.Length >= 10 ? StartedAt.Substring(0, 10) : StartedAt;
@@ -402,20 +401,6 @@ namespace SkinDevApp.Data
         public string SimilarityDebugMetadata { get; set; }
     }
 
-    public sealed class ResearcherEvaluation
-    {
-        public long EvaluationID { get; set; }
-        public string ScanSessionID { get; set; }
-        public string ResearcherID { get; set; }
-        public string ResearcherClassification { get; set; }  // comma-separated when several labels
-        public string AgreementWithAI { get; set; }           // Agree | Disagree | Partially agree | Uncertain
-        public string Notes { get; set; }
-        public string FrontComment { get; set; }
-        public string LeftComment { get; set; }
-        public string RightComment { get; set; }
-        public string EvaluationDate { get; set; }
-    }
-
     public sealed class DermatologistValidation
     {
         public long ValidationID { get; set; }
@@ -467,7 +452,6 @@ namespace SkinDevApp.Data
         public Participant Participant { get; set; }
         public ModelVersion Model { get; set; }
         public List<CaptureViewRow> Views { get; set; } = new List<CaptureViewRow>();
-        public List<ResearcherEvaluation> Evaluations { get; set; } = new List<ResearcherEvaluation>();
         public List<DermatologistValidation> Validations { get; set; } = new List<DermatologistValidation>();
         public Scanning.FusedResult Fusion { get; set; }
 

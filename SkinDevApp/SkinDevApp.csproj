@@ -178,6 +178,7 @@
     <Compile Include="Printing\ReceiptService.cs" />
     <Compile Include="Printing\ThermalPrinter.cs" />
     <Compile Include="Data\Profiles.cs" />
+    <Compile Include="Views\DatabaseExplorer.cs" />
     <Compile Include="Views\ProfileDialog.cs" />
     <Compile Include="Views\ReceiptHistoryWindow.cs" />
     <Compile Include="Views\ReceiptPanel.cs" />
@@ -240,12 +241,6 @@
     <Compile Include="RegionAttribution.cs" />
     <Compile Include="RegistrationPage.xaml.cs">
       <DependentUpon>RegistrationPage.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="ResearchDashboardPage.xaml.cs">
-      <DependentUpon>ResearchDashboardPage.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="ResearcherVerificationWindow.xaml.cs">
-      <DependentUpon>ResearcherVerificationWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ScanPipeline.cs" />
     <Compile Include="V6\V6Types.cs" />
@@ -333,14 +328,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="RegistrationPage.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ResearchDashboardPage.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ResearcherVerificationWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

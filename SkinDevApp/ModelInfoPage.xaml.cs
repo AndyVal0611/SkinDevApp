@@ -45,19 +45,31 @@ namespace SkinDevApp.Views
 
         private static string Pct(double v) => (v * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
-        /// <summary>Every lesion detector in the Model folder: what it finds, whether it is loaded, and its training notes.</summary>
+        private static int _detectorsReady;
+
+        /// <summary>The three lesion detectors in one compact table: what each finds, whether it is loaded, and its settings.</summary>
         private static UIElement LesionCard()
         {
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Lesion detectors", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
-            sp.Children.Add(Ui.Text("The three lesion detectors are part of the final model: their evidence feeds the fusion network, and their boxes name the facial regions on every result.",
-                11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
+            sp.Children.Add(Ui.Text("Part of the final model: their evidence feeds the fusion network, and their boxes name the facial regions on every result.",
+                11.5, false, Ui.Muted, new Thickness(0, 0, 0, 10)));
 
             try { LesionEngine.EnsureLoaded(); } catch { }
             var loaded = LesionEngine.LoadedDetectors();
             double[] thresholds = ScanSettings.Current.DetectorThresholds();
             string dir = Path.GetDirectoryName(LesionEngine.ModelPath);
             var tech = new System.Text.StringBuilder();
+            _detectorsReady = 0;
+
+            var g = new Grid();
+            double[] widths = { 190, 110, 150, 120, 1 };
+            for (int k = 0; k < 4; k++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(widths[k]) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            string[] head = { "Detector", "Picture size", "Trained copies", "Box threshold", "Status" };
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int k = 0; k < head.Length; k++) { var t = Ui.Text(head[k], 11, true, Ui.Muted, new Thickness(0, 0, 8, 6)); Grid.SetColumn(t, k); g.Children.Add(t); }
+            var rule = new Border { Height = 1, Background = Ui.Line, VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetColumnSpan(rule, 5); g.Children.Add(rule);
 
             for (int i = 0; i < 3; i++)
             {
@@ -65,72 +77,80 @@ namespace SkinDevApp.Views
                 LesionDetector det = loaded.FirstOrDefault(d => d.PaletteClasses.Length == 1 && d.PaletteClasses[0] == i)
                                      ?? loaded.FirstOrDefault(d => d.PaletteClasses.Contains(i));
                 JsonElement meta = default(JsonElement);
-                string metaPath = Path.Combine(dir, "lesion_detector_" + cls.ToLowerInvariant() + ".json");
                 bool hasMeta = false;
                 try
                 {
-                    if (File.Exists(metaPath))
-                    {
-                        using (JsonDocument doc = JsonDocument.Parse(File.ReadAllText(metaPath))) meta = doc.RootElement.Clone();
-                        hasMeta = true;
-                    }
+                    string metaPath = Path.Combine(dir, "lesion_detector_" + cls.ToLowerInvariant() + ".json");
+                    if (File.Exists(metaPath)) { using (JsonDocument doc = JsonDocument.Parse(File.ReadAllText(metaPath))) meta = doc.RootElement.Clone(); hasMeta = true; }
                 }
                 catch { }
 
-                var block = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
-                var head = new DockPanel { Margin = new Thickness(0, 6, 0, 4) };
-                var badge = Ui.IconBadge("Icon.Target", 30, det != null ? "#EAF1E4" : "#EFEADC", det != null ? "#4F7A4E" : "#8D8D76");
-                badge.Margin = new Thickness(0, 0, 10, 0);
-                DockPanel.SetDock(badge, Dock.Left);
-                head.Children.Add(badge);
-                var status = Ui.Text(det != null ? "Ready" : "Not installed", 12, true, det != null ? Ui.Good : Ui.Muted, new Thickness(0));
-                status.VerticalAlignment = VerticalAlignment.Center;
-                DockPanel.SetDock(status, Dock.Right);
-                head.Children.Add(status);
-                var name = Ui.Text(cls + " detector", 14, true, Ui.Ink, new Thickness(0));
-                name.VerticalAlignment = VerticalAlignment.Center;
-                head.Children.Add(name);
-                block.Children.Add(head);
-
-                if (det == null)
+                int row = i + 1;
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var name = Ui.Text(cls, 13.5, true, Ui.Brush(Imaging.ClassPalette.Hex[i]), new Thickness(0, 8, 8, 8));
+                string size = det == null ? "—" : det.ImageSize + " × " + det.ImageSize;
+                string copies = det == null ? "—" : det.EnsembleSize > 1 ? det.EnsembleSize + " (averaged)" : "1";
+                string thr = det == null ? "—" : Pct(thresholds[i]);
+                var cells = new UIElement[]
                 {
-                    block.Children.Add(Ui.Text("No detector is installed for " + cls.ToLowerInvariant() + ", so no " + cls.ToLowerInvariant() + " boxes are drawn.",
-                        12, false, Ui.Muted, new Thickness(40, 0, 0, 8)));
-                    sp.Children.Add(new Border { BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = block });
-                    continue;
-                }
-
-                string created = hasMeta && meta.TryGetProperty("created", out JsonElement c) ? c.GetString()
-                               : hasMeta && meta.TryGetProperty("installed", out JsonElement inst) ? inst.GetString() : null;
-                string baseModel = hasMeta && meta.TryGetProperty("base_model", out JsonElement bm) ? bm.GetString() : null;
-                var rows = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>
-                {
-                    Ui.KV("Type", "YOLOv8 object detector" + (baseModel != null && baseModel.StartsWith("yolov8s") ? " (small)" : "")),
-                    Ui.KV("Finds", string.Join(", ", det.PaletteClasses.Select(k => Imaging.ClassPalette.Names[k]))),
-                    Ui.KV("Models", det.EnsembleSize > 1 ? det.EnsembleSize + " trained copies, results averaged" : "1"),
-                    Ui.KV("Picture size", det.ImageSize + " × " + det.ImageSize),
-                    Ui.KV("Box threshold", Pct(thresholds[i]) + " (fixed for this study)")
+                    name,
+                    Ui.Text(size, 12.5, false, Ui.Ink, new Thickness(0, 8, 8, 8)),
+                    Ui.Text(copies, 12.5, false, Ui.Ink, new Thickness(0, 8, 8, 8)),
+                    Ui.Text(thr, 12.5, false, Ui.Ink, new Thickness(0, 8, 8, 8)),
+                    Ui.Text(det != null ? "● Ready" : "Not installed", 12.5, true, det != null ? Ui.Good : Ui.Bad, new Thickness(0, 8, 0, 8))
                 };
-                if (!string.IsNullOrEmpty(created)) rows.Add(Ui.KV("Created", Fmt.When(created.Replace("T", " "))));
-                var info = Ui.InfoRows(rows, 120, 12.5);
-                info.Margin = new Thickness(40, 0, 18, 8);
-                block.Children.Add(info);
-                sp.Children.Add(new Border { BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = block });
+                for (int k = 0; k < cells.Length; k++) { Grid.SetRow(cells[k], row); Grid.SetColumn(cells[k], k); g.Children.Add(cells[k]); }
+                if (i < 2) { var r2 = new Border { Height = 1, Background = Ui.Brush("#EFEADC"), VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetRow(r2, row); Grid.SetColumnSpan(r2, 5); g.Children.Add(r2); }
 
+                if (det == null) { tech.AppendLine(cls + " detector: not installed, so no " + cls.ToLowerInvariant() + " boxes are drawn."); tech.AppendLine(); continue; }
+                _detectorsReady++;
+                string created = hasMeta && meta.TryGetProperty("created", out JsonElement c2) ? c2.GetString()
+                               : hasMeta && meta.TryGetProperty("installed", out JsonElement inst) ? inst.GetString() : null;
                 tech.AppendLine(cls + " detector");
-                tech.AppendLine("  File:        " + det.ModelFile + (det.Peers.Count > 0 ? " + " + string.Join(", ", det.Peers.Select(p => p.ModelFile)) : ""));
+                tech.AppendLine("  Type:        YOLOv8 object detector");
+                if (!string.IsNullOrEmpty(created)) tech.AppendLine("  Created:     " + Fmt.When(created.Replace("T", " ")));
+                tech.AppendLine("  File:        " + det.ModelFile + (det.Peers.Count > 0 ? " + " + string.Join(", ", det.Peers.Select(pe => pe.ModelFile)) : ""));
                 tech.AppendLine("  SHA-256:     " + det.ModelSha256);
                 if (hasMeta && meta.TryGetProperty("note", out JsonElement note)) tech.AppendLine("  Notes:       " + note.GetString());
                 tech.AppendLine();
             }
+            sp.Children.Add(g);
+            sp.Children.Add(Ui.Text("The box threshold is fixed for this study. Boxes below it are not drawn.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
 
-            foreach (string problem in LesionEngine.LoadProblems)
-                tech.AppendLine("Could not load: " + problem);
-            if (!LesionEngine.IsAvailable && LesionEngine.LoadErrorMessage != null)
-                tech.AppendLine("Problem: " + LesionEngine.LoadErrorMessage);
+            foreach (string problem in LesionEngine.LoadProblems) tech.AppendLine("Could not load: " + problem);
+            if (!LesionEngine.IsAvailable && LesionEngine.LoadErrorMessage != null) tech.AppendLine("Problem: " + LesionEngine.LoadErrorMessage);
             tech.AppendLine("Runtime:       ONNX Runtime (CPU)");
-            tech.AppendLine("Folder:        " + dir);
             sp.Children.Add(Technical(tech.ToString().TrimEnd()));
+            return sp;
+        }
+
+        /// <summary>The path of a scan through the models, in plain words.</summary>
+        private static UIElement PipelineCard()
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("How a scan is read", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
+            sp.Children.Add(Ui.Text("Every photograph goes through these steps, in this order.", 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
+            string[][] steps =
+            {
+                new[] { "Check the photograph", "The face is found and centered, and the head angle is confirmed. Blurry or badly lit photographs are flagged." },
+                new[] { "Read the whole face", "A whole-face model (MobileNetV2) looks at the full photograph." },
+                new[] { "Look for spots", "Three lesion detectors (YOLOv8) mark areas that may show acne, hyperpigmentation or eczema." },
+                new[] { "Combine", "A trained fusion network weighs both readings and decides each condition against its own limit." },
+                new[] { "Report", "Detected, needs review or not detected, with certainty and the facial regions marked. A dermatologist confirms every result." }
+            };
+            for (int i = 0; i < steps.Length; i++)
+            {
+                var row = new DockPanel { Margin = new Thickness(0, 4, 0, 6) };
+                var badge = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Brush("#E7E8CF"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0),
+                    Child = new TextBlock { Text = (i + 1).ToString(), FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#5F6048"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+                DockPanel.SetDock(badge, Dock.Left);
+                row.Children.Add(badge);
+                var t = new StackPanel();
+                t.Children.Add(Ui.Text(steps[i][0], 13.5, true, Ui.Ink, new Thickness(0)));
+                t.Children.Add(Ui.Text(steps[i][1], 12, false, Ui.Muted, new Thickness(0, 1, 0, 0)));
+                row.Children.Add(t);
+                sp.Children.Add(row);
+            }
             return sp;
         }
 
@@ -195,37 +215,55 @@ namespace SkinDevApp.Views
             };
         }
 
+        private static UIElement ReadinessCard(bool finalOk, int detectors, int faceOk, int faceTotal)
+        {
+            bool all = finalOk && detectors == 3 && faceOk == faceTotal;
+            var row = new DockPanel();
+            var badge = Ui.IconBadge(all ? "Icon.CheckCircle" : "Icon.Alert", 44, all ? "#EAF1E4" : "#FBF1DE", all ? "#4F7A4E" : "#8A5A00");
+            badge.Margin = new Thickness(0, 0, 16, 0);
+            DockPanel.SetDock(badge, Dock.Left);
+            row.Children.Add(badge);
+            var chips = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+            Action<string, bool> chip = (text, ok) => chips.Children.Add(Ui.Pill((ok ? "✓ " : "✗ ") + text, ok ? Ui.Good : Ui.Bad, ok ? "#EEF6EC" : "#FDECEC"));
+            chip("Final model", finalOk);
+            chip("Lesion detectors " + detectors + " of 3", detectors == 3);
+            chip("Face models " + faceOk + " of " + faceTotal, faceOk == faceTotal);
+            var t = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            t.Children.Add(Ui.Text(all ? "All models are ready for scanning" : "Some models need attention", 17, true, all ? Ui.Good : Ui.Bad, new Thickness(0)));
+            t.Children.Add(chips);
+            row.Children.Add(t);
+            return Ui.Card(row, new Thickness(0, 0, 0, 12));
+        }
+
         private async System.Threading.Tasks.Task Render()
         {
             LeftColumn.Children.Clear();
             RightColumn.Children.Clear();
+            ReadyHost.Content = null;
             ModelInfo.Refresh();
             ModelInfo mi = ModelInfo.Current;
-
-            long currentId = 0;
-            try { currentId = StudyRepository.EnsureCurrentModelVersion(); } catch { }
 
             // the final model: the only model whose results are shown and stored
             await System.Threading.Tasks.Task.Run(() => { try { SkinDevApp.V6.V6Service.EnsureLoaded(); } catch { } });
             SkinDevApp.V6.V6Config v6c = SkinDevApp.V6.V6Service.Config;
             string variant = SkinDevApp.V6.V6Service.Variant;
+            bool finalOk = SkinDevApp.V6.V6Service.IsReady;
             var cls = new StackPanel();
             cls.Children.Add(Ui.Text("Final AI model", 16, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
             cls.Children.Add(Ui.InfoRows(new[]
             {
                 Ui.KV("Name", SkinDevApp.V6.AIResultStore.ModelLabel(variant)),
-                Ui.KV("How it works", "A MobileNetV2 whole-face reading and three YOLOv8 lesion detectors (acne, hyperpigmentation, eczema), combined by one trained fusion network, then calibrated."),
-                Ui.KV("Conditions", "Acne, Hyperpigmentation, Eczema (several can be present). Normal skin is derived when none is detected."),
-                Ui.KV("What it reports", "Condition detected / Needs review / No condition detected; per condition: result, certainty and the facial regions marked."),
-                Ui.KV("Status", SkinDevApp.V6.V6Service.IsReady ? "Ready" : "Not ready — " + (SkinDevApp.V6.V6Service.LastError ?? "the model could not be loaded")),
-                Ui.KV("Training run", v6c == null ? "—" : v6c.RunId)
-            }, 150));
+                Ui.KV("Status", finalOk ? "Ready" : "Not ready — " + (SkinDevApp.V6.V6Service.LastError ?? "the model could not be loaded")),
+                Ui.KV("Conditions", "Acne, Hyperpigmentation and Eczema (more than one can be present). Normal skin is reported when none is detected."),
+                Ui.KV("Each result shows", "Detected, needs review or not detected, with the certainty and the facial regions marked."),
+                Ui.KV("Reviewed by", "A dermatologist confirms every result. The model is a screening aid, not a diagnosis.")
+            }, 130));
             var v6tech = new System.Collections.Generic.List<string>
             {
+                "Training run:    " + (v6c == null ? "—" : v6c.RunId),
                 "Variant:         " + (variant ?? "not loaded") + "   (App.config key V6Variant: global_yolo | full)",
                 "Preprocessing:   BGR->RGB, bilinear 224 x 224, (pixel / 127.5) - 1",
-                "Runtime:         ONNX Runtime (CPU)",
-                "Model folder:    " + SkinDevApp.V6.V6Service.DeploymentDir
+                "Runtime:         ONNX Runtime (CPU)"
             };
             if (v6c != null)
             {
@@ -238,14 +276,9 @@ namespace SkinDevApp.Views
             cls.Children.Add(Technical(string.Join(Environment.NewLine, v6tech)));
             LeftColumn.Children.Add(Ui.Card(cls));
             LeftColumn.Children.Add(Ui.Card(LesionCard()));
+            int detectors = _detectorsReady;
 
-            var cam = new StackPanel();
-            cam.Children.Add(Ui.Text("Heat-map service", 16, true));
-            var checking = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
-            checking.Children.Add(Ui.Spinner(18));
-            checking.Children.Add(Ui.Text("Checking the heat-map service…", 12.5, false, Ui.Muted, new Thickness(10, 0, 0, 0)));
-            cam.Children.Add(checking);
-            // the earlier heat-map (Grad-CAM++) service is not used by the final model, so its card is no longer shown
+            RightColumn.Children.Add(Ui.Card(PipelineCard()));
 
             var face = new StackPanel();
             face.Children.Add(Ui.Text("Face and angle models", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
@@ -255,59 +288,11 @@ namespace SkinDevApp.Views
             face.Children.Add(faceRows);
             RightColumn.Children.Add(Ui.Card(face));
 
-            var hist = new StackPanel();
-            hist.Children.Add(Ui.Text("Model history", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
-            hist.Children.Add(Ui.Text("Every scan keeps the model version that produced it. A newer model never changes older results.", 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
-            try
-            {
-                var all = StudyRepository.AllModelVersions().ToList();
-                var tech = new System.Text.StringBuilder();
-                foreach (ModelVersion m in all)
-                {
-                    bool current = m.ModelVersionID == currentId;
-                    hist.Children.Add(new Border
-                    {
-                        BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 6, 0, 6),
-                        Child = Ui.InfoRows(new[]
-                        {
-                            Ui.KV("Version " + m.ModelVersionID, Fmt.ModelName(m.RunName) + (current ? "  (in use now)" : "")),
-                            Ui.KV("First used", Fmt.When(m.FirstSeenAt))
-                        }, 110)
-                    });
-                    tech.AppendLine("Version " + m.ModelVersionID + "  ONNX " + ModelVersion.Short(m.OnnxSha256) + "  Keras " + ModelVersion.Short(m.KerasSha256) +
-                                    "  service " + (m.ServiceVersion ?? "") + " " + ModelVersion.Short(m.ServiceSha256));
-                }
-                hist.Children.Add(Technical(tech.ToString().TrimEnd()));
-            }
-            catch (Exception ex) { hist.Children.Add(Ui.Text("The database could not be read: " + ex.Message, 12, false, Ui.Bad)); }
-            RightColumn.Children.Add(Ui.Card(hist));
-
             var faceInfo = await System.Threading.Tasks.Task.Run(() => FaceModels());
             faceRows.Children.Clear();
             foreach (Tuple<string, string, bool, string, string> f in faceInfo)
                 faceRows.Children.Add(ModelRow(f.Item1, f.Item2, f.Item3, f.Item4, f.Item5));
-
-            GradCamHealth h = await GradCamService.GetHealthAsync();
-            cam.Children.Clear();
-            cam.Children.Add(Ui.Text("Heat-map service", 16, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
-            bool ok = h != null && h.Ok;
-            cam.Children.Add(Ui.InfoRows(new[]
-            {
-                Ui.KV("Status", ok ? "Running" : "Not running"),
-                Ui.KV("What it does", "Creates the heat maps that show which parts of a photograph the computer looked at."),
-                Ui.KV("If it is not running", "Scans still work and results are still shown, but no heat maps are created.")
-            }, 150));
-            cam.Children.Add(Technical(string.Join(Environment.NewLine, new[]
-            {
-                "Address:         " + GradCamService.BaseUrl,
-                "Service version: " + (h?.ServiceVersion ?? mi.ServiceVersion),
-                "Model loaded:    " + (h == null ? "-" : (h.ModelLoaded ? "yes" : "no")),
-                "Target layer:    " + (h?.TargetLayer ?? "-"),
-                "Layer override:  " + (string.IsNullOrEmpty(GradCamServiceConfig.TargetLayer) ? "none (service default)" : GradCamServiceConfig.TargetLayer),
-                "Execution mode:  " + (h?.ExecMode ?? "-"),
-                "Script SHA-256:  " + mi.ServiceSha256,
-                "Method:          Grad-CAM++, one map per category"
-            })));
+            ReadyHost.Content = ReadinessCard(finalOk, detectors, faceInfo.Count(f => f.Item3), faceInfo.Count);
         }
     }
 }

@@ -352,7 +352,6 @@ namespace SkinDevApp.Tests
             double[] scores = d.Views[0].Scores.AsArray();
 
             d.Validations.Add(new DermatologistValidation { DermatologistAssessment = "Acne vulgaris", AgreementWithAI = "Disagree", ValidationStatus = "Completed" });
-            d.Evaluations.Add(new ResearcherEvaluation { ResearcherClassification = "Acne", AgreementWithAI = "Disagree" });
             ScanInterpretation after = SessionInterpretation.For(d);
 
             Assert.Equal(before.Category, after.Category);

@@ -11,9 +11,18 @@ namespace SkinDevApp.Views
 {
     public partial class HomePage : Page
     {
+        private double _pageWidth = 1400;
+
+        private void ApplyCardColumns()
+        {
+            if (CardsGrid != null) CardsGrid.Columns = _pageWidth < 1000 || CardsGrid.Children.Count < 2 ? 1 : 2;
+        }
+
         private void Page_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
         {
-            if (CardsGrid != null) CardsGrid.Columns = e.NewSize.Width < 1000 ? 1 : 2;
+            _pageWidth = e.NewSize.Width;
+            ApplyCardColumns();
+            if (StatsGrid != null) StatsGrid.Columns = e.NewSize.Width < 1000 ? 2 : 4;
         }
 
         public HomePage()
@@ -25,7 +34,6 @@ namespace SkinDevApp.Views
             _clock.Tick += (o, e) => UpdateClock();
             Loaded += (o, e) => { UpdateClock(); _clock.Start(); };
             Unloaded += (o, e) => _clock.Stop();
-            WelcomeTxt.Text = "Register a patient, run a scan, or open the records.";
             BuildNav();
             ShowCurrentParticipant();
         }
@@ -42,11 +50,10 @@ namespace SkinDevApp.Views
 
         private void UpdateGreeting()
         {
-            int hour = DateTime.Now.Hour;
-            string part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
             AccountProfile me = AccountProfiles.Get(AppSession.UserId);
-            string name = me.IsComplete ? me.FullName.Trim() : AppSession.UserId;
-            GreetingTxt.Text = part + (string.IsNullOrEmpty(name) ? "" : ", " + name);
+            string name = me.IsComplete ? ((me.Title ?? "").Trim() + " " + me.LastName.Trim()).Trim() : AppSession.UserId;      // e.g. "Dr. Bautista"
+            GreetingTxt.Text = "Good Day" + (string.IsNullOrEmpty(name) ? "!" : ", " + name + "!");
+            WelcomeTxt.Text = "Have a nice " + DateTime.Now.DayOfWeek + "!";
         }
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -80,14 +87,101 @@ namespace SkinDevApp.Views
         private void ShowCurrentParticipant()
         {
             CardsGrid.Children.Clear();
-            CardsGrid.Children.Add(PatientCard());
-            CardsGrid.Children.Add(MyProfileCard());
+            BuildStats();
+            CardsGrid.Children.Add(WaitingCard());
+            UIElement patient = PatientCard();             // only shown while a patient is selected
+            if (patient != null) CardsGrid.Children.Add(patient);
+            ApplyCardColumns();
+            RecentHost.Content = RecentCard();
         }
 
         private void ClearParticipantBtn_Click(object sender, RoutedEventArgs e)
         {
             AppSession.CurrentParticipantId = null;
             ShowCurrentParticipant();
+        }
+
+        // ------------------------------------------------------------ overview (real counts and lists from the saved records)
+
+        private static int Safe(Func<int> f) { try { return f(); } catch { return 0; } }
+
+        private void BuildStats()
+        {
+            StatsGrid.Children.Clear();
+            Action<string, string, string, Action> tile = (label, value, note, go) =>
+            {
+                var sp = new StackPanel();
+                sp.Children.Add(Ui.Text(label.ToUpperInvariant(), 11, true, Ui.Muted, new Thickness(0, 0, 0, 2)));
+                var num = new TextBlock { Text = value, FontSize = 34, FontFamily = (FontFamily)FindResource("DisplayFont"), Foreground = Ui.Ink };
+                sp.Children.Add(num);
+                sp.Children.Add(Ui.Text(note, 12, false, Ui.Muted, new Thickness(0, 0, 0, 0)));
+                Border card = Ui.Card(sp, new Thickness(8));
+                if (go != null) { card.Cursor = System.Windows.Input.Cursors.Hand; card.MouseLeftButtonUp += (o, e) => go(); }
+                StatsGrid.Children.Add(card);
+            };
+            int pending = Safe(StudyRepository.PendingVerificationCount);
+            tile("Scans today", Safe(StudyRepository.ScansToday).ToString(), "started today", null);
+            tile("Waiting for review", pending.ToString(), pending == 1 ? "scan needs your review" : "scans need your review", () => Nav.Go(new PatientRecordPage(pendingOnly: true)));
+            tile("Verified", Safe(StudyRepository.VerifiedScans).ToString(), "scans reviewed and completed", null);
+            tile("Patients", Safe(StudyRepository.TotalParticipants).ToString(), "registered", () => Nav.Go(new PatientRecordPage()));
+        }
+
+        private static string Who(ScanSessionRow s)
+        {
+            Participant p = null;
+            if (!string.IsNullOrEmpty(s.ParticipantID)) { try { p = StudyRepository.GetParticipant(s.ParticipantID); } catch { } }
+            return p != null ? p.FullName : (string.IsNullOrEmpty(s.ParticipantID) ? "Unassigned scan" : s.ParticipantID);
+        }
+
+        private UIElement ScanRow(ScanSessionRow s, bool withReview)
+        {
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 0) };
+            var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            string id = s.ScanSessionID;
+            if (withReview)
+            {
+                Button rv = Ui.Btn("Review", (o, e) => { new DermatologistReviewWindow(id) { Owner = Application.Current.MainWindow }.ShowDialog(); ShowCurrentParticipant(); BuildNav(); }, "PrimaryButton");
+                rv.Height = 38; rv.Margin = new Thickness(0, 0, 8, 0);
+                right.Children.Add(rv);
+            }
+            Button open = Ui.Btn("Open", (o, e) => Nav.Go(new ResultsPage(id)), "GhostButton");
+            open.Height = 38;
+            right.Children.Add(open);
+            DockPanel.SetDock(right, Dock.Right);
+            row.Children.Add(right);
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 8, 6) };
+            text.Children.Add(Ui.Text(Who(s), 13.5, true, Ui.Ink, new Thickness(0)));
+            string res = string.IsNullOrWhiteSpace(s.AITitle) ? "Result pending" : s.AITitle;
+            text.Children.Add(Ui.Text(res + "  ·  " + Fmt.When(s.StartedAt), 12, false, Ui.Muted, new Thickness(0, 1, 0, 0)));
+            row.Children.Add(text);
+            return new Border { BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = row };
+        }
+
+        private UIElement WaitingCard()
+        {
+            List<ScanSessionRow> pending = new List<ScanSessionRow>();
+            try { pending = StudyRepository.PendingVerification(); } catch { }
+            var body = new StackPanel();
+            if (pending.Count == 0) body.Children.Add(Ui.Text("Nothing is waiting. Every scan has been reviewed.", 13, false, Ui.Ink, new Thickness(0, 4, 0, 4)));
+            foreach (ScanSessionRow s in pending.Take(5)) body.Children.Add(ScanRow(s, true));
+            if (pending.Count > 5)
+            {
+                Button all = Ui.Btn("See all " + pending.Count, (o, e) => Nav.Go(new PatientRecordPage(pendingOnly: true)), "GhostButton");
+                all.Margin = new Thickness(0, 10, 0, 0); all.HorizontalAlignment = HorizontalAlignment.Left;
+                body.Children.Add(all);
+            }
+            return CardShell("WAITING FOR YOUR REVIEW", pending.Count == 0 ? "All caught up" : pending.Count + (pending.Count == 1 ? " scan" : " scans"),
+                             "Scans needing a dermatologist's verdict, those marked for further review first", body);
+        }
+
+        private UIElement RecentCard()
+        {
+            List<ScanSessionRow> recent = new List<ScanSessionRow>();
+            try { recent = StudyRepository.RecentSessions(6); } catch { }
+            var body = new StackPanel();
+            if (recent.Count == 0) body.Children.Add(Ui.Text("No scans yet. Register a patient and start a skin analysis.", 13, false, Ui.Ink, new Thickness(0, 4, 0, 4)));
+            foreach (ScanSessionRow s in recent) body.Children.Add(ScanRow(s, false));
+            return CardShell("RECENT ACTIVITY", "Latest scans", "The most recent scans, newest first", body);
         }
 
         private static Border CardShell(string eyebrow, string title, string subtitle, UIElement body, Brush chipInk = null)
@@ -133,12 +227,7 @@ namespace SkinDevApp.Views
             Participant p = null;
             if (!string.IsNullOrEmpty(id)) { try { p = StudyRepository.GetParticipant(id); } catch { } }
             var body = new StackPanel();
-            if (p == null)
-            {
-                body.Children.Add(Ui.Text("No patient is selected. Use New registration, or Skin analysis to choose a registered patient.", 13, false, Ui.Ink, new Thickness(0, 4, 0, 10)));
-                body.Children.Add(Ui.Btn("Open patient records", (o, e) => Nav.Go(new PatientRecordPage()), "GhostButton"));
-                return CardShell("PATIENT", "No patient selected", null, body);
-            }
+            if (p == null) return null;
             List<ScanSessionRow> scans = new List<ScanSessionRow>();
             try { scans = StudyRepository.SessionsForParticipant(id) ?? scans; } catch { }
             ScanSessionRow last = scans.OrderByDescending(x => x.StartedAt).FirstOrDefault();
@@ -167,9 +256,10 @@ namespace SkinDevApp.Views
             AddSide("Icon.Home", "Dashboard", null, true);
             AddSide("Icon.Users", "Patient records", () => Nav.Go(new PatientRecordPage()), r);
             AddSide("Icon.Clock", "Waiting for review", () => Nav.Go(new PatientRecordPage(pendingOnly: true)), r, PendingCount());
-            AddSide("Icon.Archive", "Records & database", () => { if (ReauthDialog.Confirm("Records & database")) Nav.Go(new RecordsDatabasePage()); }, r);
+            AddSide("Icon.Archive", "Records", () => { if (ReauthDialog.Confirm("Records")) Nav.Go(new RecordsDatabasePage()); }, r);
             AddSide("Icon.Layers", "Model information", () => Nav.Go(new ModelInfoPage()), r);
             AddSide("Icon.Sliders", "Settings", () => Nav.Go(new SettingsPage()), r);
+            AddSide("Icon.User", "My details", () => { if (ProfileDialog.EditCurrentUser(Application.Current.MainWindow)) { UpdateGreeting(); ShowCurrentParticipant(); } }, true);
             AddSide("Icon.Info", "About LUMYVUE", ShowAbout, true);
             OldLogBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
         }

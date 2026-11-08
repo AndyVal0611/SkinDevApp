@@ -468,7 +468,6 @@ namespace SkinDevApp.Views
                     CredentialReference = string.IsNullOrWhiteSpace(_cred.Text) ? null : _cred.Text.Trim(),
                     DermatologistAssessment = label,
                     AgreementWithAI = agreement,
-                    AgreementWithResearcher = _d.Evaluations.Count == 0 ? "No researcher assessment yet" : null,
                     Notes = _notes.Text,
                     ValidationStatus = status,
                     ConditionReviews = _condRows.Select(r => new ConditionReview { Condition = r.Item1, Status = (string)r.Item2.SelectedItem, Observation = NullIfEmpty(r.Item3.Text) }).ToList()

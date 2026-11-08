@@ -432,7 +432,6 @@ namespace SkinDevApp
                 : ClinicalText.Name(s.OverallPredictedClass) + (s.OverallScore.HasValue
                     ? " — " + ClinicalText.Strength(s.OverallScore.Value) + " match (" + s.OverallScore.Value.ToString("0", CultureInfo.InvariantCulture) + "%)" : "");
 
-            ResearcherEvaluation ev = d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = d.Validations.FirstOrDefault();
             sp.Children.Add(Ui.InfoRows(new[]
             {

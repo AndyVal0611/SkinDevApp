@@ -35,11 +35,11 @@ namespace SkinDevApp.Views
         public RecordsDatabasePage(string startTab = null)
         {
             _startTab = startTab;
-            Title = "Records & database";
+            Title = "Records";
             var root = new Grid();
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            root.Children.Add(Ui.Header("Records & database"));
+            root.Children.Add(Ui.Header("Records"));
             var body = new StackPanel { Margin = new Thickness(28, 18, 28, 24) };
             var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Grid.SetRow(scroll, 1);
@@ -58,6 +58,7 @@ namespace SkinDevApp.Views
             _tabs.Items.Add(FindingsTab());
             _tabs.Items.Add(VerificationsTab());
             _tabs.Items.Add(AuditTab());
+            _tabs.Items.Add(DatabaseExplorer.Tab());
             if (_startTab != null) foreach (TabItem t in _tabs.Items) if ((string)t.Tag == _startTab) _tabs.SelectedItem = t;
             Loaded += (s, e) => { RenderSummary(); foreach (Action a in _reloads) a(); };
             SkinDevApp.V6.RecordsMaintenance.StatusChanged += OnMaintenance;
@@ -74,9 +75,7 @@ namespace SkinDevApp.Views
             var head = new DockPanel();
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(SmallBtn("Refresh", (s, e) => { RenderSummary(); foreach (Action a in _reloads) a(); }));
-            buttons.Children.Add(SmallBtn("Open records folder", (s, e) => OpenFolder(DataLocation.RecordsDir)));
             buttons.Children.Add(SmallBtn("Back up now", (s, e) => Backup()));
-            buttons.Children.Add(SmallBtn("Check database", (s, e) => Check()));
             DockPanel.SetDock(buttons, Dock.Right);
             head.Children.Add(buttons);
             head.Children.Add(Ui.Text("Study records", 16, true, Ui.Ink, new Thickness(0, 4, 0, 0)));
@@ -101,7 +100,6 @@ namespace SkinDevApp.Views
                 _summary.Children.Add(wrap);
             }
             catch (Exception ex) { _summary.Children.Add(Ui.Text("The database could not be read: " + ex.Message, 13, false, Ui.Bad)); }
-            _summary.Children.Add(Ui.Text("Files: " + DataLocation.RecordsDir + "   ·   Database: " + StudyDatabase.DbPath, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             _summary.Children.Add(Ui.Text("Background upkeep: " + SkinDevApp.V6.RecordsMaintenance.Status + "   ·   The database is backed up automatically every day (last backup: " + (RecordsQueries.LastBackupText() ?? "none yet") + ").", 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
         }
 
@@ -114,7 +112,7 @@ namespace SkinDevApp.Views
 
         private void Backup()
         {
-            try { string f = RecordsQueries.BackupNow(); LumyDialog.Show("A full copy of the database was saved:\n" + f, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information); }
+            try { string f = RecordsQueries.BackupNow(); LumyDialog.Show("A full copy of the database was saved (" + DateTime.Now.ToString("d MMM yyyy, h:mm tt", System.Globalization.CultureInfo.InvariantCulture) + ").", "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information); }
             catch (Exception ex) { LumyDialog.Show("The backup could not be made: " + ex.Message, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
@@ -306,7 +304,6 @@ namespace SkinDevApp.Views
 
                 d.Children.Add(Action("Open results", (s, e) => Nav.Go(new ResultsPage(id)), "PrimaryButton"));
                 d.Children.Add(Action("Dermatologist review", (s, e) => { new DermatologistReviewWindow(id) { Owner = Application.Current.MainWindow }.ShowDialog(); reload(); RenderSummary(); }));
-                d.Children.Add(Action("Open scan folder", (s, e) => OpenFolder(sd.Session.SessionFolder), "GhostButton"));
 
                 // verification status (normally set by the dermatologist review; a manual change needs a reason and is logged)
                 d.Children.Add(Ui.Text("Verification status", 12.5, true, Ui.Ink, new Thickness(0, 16, 0, 2)));

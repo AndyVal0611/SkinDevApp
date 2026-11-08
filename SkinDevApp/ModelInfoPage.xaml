@@ -11,6 +11,7 @@
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"
                            Text="Every model LUMYVUE uses during a scan, and whether each one is ready."/>
             </StackPanel>
+            <ContentControl x:Name="ReadyHost" Margin="0,0,0,0"/>
             <Grid x:Name="SplitGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

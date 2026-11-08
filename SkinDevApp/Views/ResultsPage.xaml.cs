@@ -355,11 +355,9 @@ namespace SkinDevApp.Views
             human.Children.Add(Ui.Text("Clinical review", 16, true));
             human.Children.Add(SkinDevApp.V6.V6ResultsView.StatusChip(_d.Session.ReviewStatus));
             human.Children.Add(new Border { Height = 8 });
-            ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             human.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Researcher", ev == null ? "Not added yet" : ev.ResearcherClassification + " (" + ev.AgreementWithAI + ")"),
                 Ui.KV("Dermatologist", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft, not yet completed").ToLowerInvariant())
             }, 110, 12.5));
             human.Children.Add(Ui.Text("Reviews are saved separately and never change the AI result. The verification status follows the latest completed dermatologist review.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
@@ -387,11 +385,5 @@ namespace SkinDevApp.Views
             }
         }
 
-        private void OpenVerification()
-        {
-            var w = new ResearcherVerificationWindow(_sessionId) { Owner = Application.Current.MainWindow };
-            w.ShowDialog();
-            Render();
-        }
     }
 }

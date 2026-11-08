@@ -445,7 +445,6 @@ namespace SkinDevApp.Views
             }
             else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised by the AI. Every result still waits for dermatologist review.", 8.5, false, TextInk, 2));
 
-            ResearcherEvaluation ev = _d.Evaluations.FirstOrDefault();
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             SkinProfile skin = string.IsNullOrEmpty(s.ParticipantID) ? null : StudyRepository.GetSkinProfile(s.ParticipantID);
             sp.Children.Add(Heading("Human assessment"));
@@ -862,7 +861,7 @@ namespace SkinDevApp.Views
             }, 130, 9));
             sp.Children.Add(Rule(4, 6));
             sp.Children.Add(T(dermatologist
-                ? "A separate validation layer. It does not replace the researcher assessment and never overwrites the AI prediction."
+                ? "A separate validation layer. It never overwrites the AI prediction."
                 : "Select the reference label(s) you assign to this scan. More than one label may be selected if the protocol allows it.",
                 8, false, Muted, 8));
 
@@ -879,12 +878,6 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(FormLabel("Agreement with AI *"));
             sp.Children.Add(Boxes(FormAgreement));
-
-            if (dermatologist)
-            {
-                sp.Children.Add(FormLabel("Agreement with Researcher (if applicable)"));
-                sp.Children.Add(Boxes(FormAgreement.Concat(new[] { "No researcher assessment yet" })));
-            }
 
             sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Researcher notes", dermatologist ? 8 : 5));
 

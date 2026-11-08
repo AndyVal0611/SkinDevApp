@@ -487,9 +487,7 @@ namespace SkinDevApp.Data
                    (COALESCE(m.RunName,'unknown') || ' / ' || substr(COALESCE(m.OnnxSha256,'unknown'),1,12)) AS ModelLabel,
                    CASE WHEN EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed')
                              THEN 'Dermatologist Validated'
-                        WHEN EXISTS (SELECT 1 FROM ResearcherEvaluations e WHERE e.ScanSessionID=s.ScanSessionID)
-                             THEN 'Researcher Verified - Dermatologist Validation Pending'
-                        ELSE 'AI Analysis Complete - Researcher Verification Pending' END AS ValidationStatus
+                        ELSE 'AI Analysis Complete - Dermatologist Validation Pending' END AS ValidationStatus
             FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID ";
 
         private static ScanSessionRow ReadSession(SQLiteDataReader r) => new ScanSessionRow
@@ -578,7 +576,6 @@ namespace SkinDevApp.Data
                 Session = s,
                 Participant = string.IsNullOrEmpty(s.ParticipantID) ? null : GetParticipant(s.ParticipantID),
                 Model = GetModelVersion(s.ModelVersionID),
-                Evaluations = EvaluationsFor(scanSessionId),
                 Validations = ValidationsFor(scanSessionId)
             };
 
@@ -754,29 +751,6 @@ namespace SkinDevApp.Data
 
         // ------------------------------------------------- human assessments --
 
-        public static long SaveResearcherEvaluation(ResearcherEvaluation e, IEnumerable<string> labels)
-        {
-            e.EvaluationDate = Now();
-            using (var c = StudyDatabase.Open())
-            using (var tx = c.BeginTransaction())
-            {
-                long id;
-                using (var cmd = Cmd(c, @"INSERT INTO ResearcherEvaluations
-                    (ScanSessionID, ResearcherID, ResearcherClassification, AgreementWithAI, Notes, FrontComment, LeftComment, RightComment, EvaluationDate)
-                    VALUES (@s,@r,@cls,@ag,@n,@f,@l,@ri,@d); SELECT last_insert_rowid();", tx,
-                    "@s", e.ScanSessionID, "@r", e.ResearcherID, "@cls", e.ResearcherClassification, "@ag", e.AgreementWithAI,
-                    "@n", e.Notes, "@f", e.FrontComment, "@l", e.LeftComment, "@ri", e.RightComment, "@d", e.EvaluationDate))
-                    id = Convert.ToInt64(cmd.ExecuteScalar());
-
-                InsertLabels(c, tx, "Researcher", id, labels);
-                Audit(c, tx, "Researcher evaluation", "ScanSession", e.ScanSessionID, e.ResearcherClassification + " / " + e.AgreementWithAI);
-                tx.Commit();
-                ExportReview(e.ScanSessionID, "researcher_review", id, new { e.ScanSessionID, e.ResearcherID, e.ResearcherClassification, e.AgreementWithAI, e.Notes,
-                                                                                  e.FrontComment, e.LeftComment, e.RightComment, e.EvaluationDate, Labels = labels == null ? null : labels.ToList() });
-                return id;
-            }
-        }
-
         public static long SaveDermatologistValidation(DermatologistValidation v, IEnumerable<string> labels)
         {
             v.ValidationDate = Now();
@@ -834,29 +808,6 @@ namespace SkinDevApp.Data
                 using (var cmd = Cmd(c, "INSERT INTO AssessmentLabels(OwnerType, OwnerID, Label) VALUES (@o,@i,@l);", tx,
                     "@o", owner, "@i", id, "@l", l))
                     cmd.ExecuteNonQuery();
-        }
-
-        public static List<ResearcherEvaluation> EvaluationsFor(string scanSessionId)
-        {
-            var list = new List<ResearcherEvaluation>();
-            using (var c = StudyDatabase.Open())
-            using (var cmd = Cmd(c, "SELECT * FROM ResearcherEvaluations WHERE ScanSessionID=@s ORDER BY EvaluationID DESC;", null, "@s", scanSessionId))
-            using (var r = cmd.ExecuteReader())
-                while (r.Read())
-                    list.Add(new ResearcherEvaluation
-                    {
-                        EvaluationID = L(r, "EvaluationID") ?? 0,
-                        ScanSessionID = S(r, "ScanSessionID"),
-                        ResearcherID = S(r, "ResearcherID"),
-                        ResearcherClassification = S(r, "ResearcherClassification"),
-                        AgreementWithAI = S(r, "AgreementWithAI"),
-                        Notes = S(r, "Notes"),
-                        FrontComment = S(r, "FrontComment"),
-                        LeftComment = S(r, "LeftComment"),
-                        RightComment = S(r, "RightComment"),
-                        EvaluationDate = S(r, "EvaluationDate")
-                    });
-            return list;
         }
 
         public static List<DermatologistValidation> ValidationsFor(string scanSessionId)
@@ -955,6 +906,24 @@ namespace SkinDevApp.Data
         /// <summary>Scans not yet verified by a dermatologist (Pending verification or Requires further review).</summary>
         public static int PendingVerificationCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND COALESCE(s.ReviewStatus, 'Pending verification') <> 'Verified';");
+        /// <summary>Scans with at least one photograph that were started today.</summary>
+        public static int ScansToday() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
+            AND substr(s.StartedAt,1,10) = date('now','localtime');");
+
+        public static int VerifiedScans() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
+            AND s.ReviewStatus = 'Verified';");
+
+        /// <summary>The most recent scans, newest first.</summary>
+        public static List<ScanSessionRow> RecentSessions(int count)
+        {
+            var list = new List<ScanSessionRow>();
+            using (var c = StudyDatabase.Open())
+            using (var cmd = Cmd(c, SessionSelect + @" WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @" ORDER BY s.StartedAt DESC LIMIT @n;", null, "@n", count))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) list.Add(ReadSession(r));
+            return list;
+        }
+
         public static int PendingDermatologistCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND NOT EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed');");
 
@@ -1005,14 +974,6 @@ namespace SkinDevApp.Data
                         WHEN (lower({0}) LIKE 'normal%' AND COALESCE(s.AIConditions,'') = '') OR {0} = s.AIConditions THEN 'Agree'
                         ELSE 'Disagree' END";
 
-        /// <summary>Latest researcher label per session (a later evaluation supersedes an earlier one for statistics).</summary>
-        public static List<CountRow> ResearcherDistribution() => Group(@"
-            SELECT e.ResearcherClassification AS Label, COUNT(*) AS N
-            FROM ResearcherEvaluations e JOIN ScanSessions s ON s.ScanSessionID = e.ScanSessionID
-            WHERE " + ActiveSession + @"
-              AND e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = e.ScanSessionID)
-            GROUP BY 1 ORDER BY 2 DESC;");
-
         public static List<CountRow> DermatologistDistribution() => Group(@"
             SELECT d.DermatologistAssessment AS Label, COUNT(*) AS N
             FROM DermatologistValidations d JOIN ScanSessions s ON s.ScanSessionID = d.ScanSessionID
@@ -1042,14 +1003,6 @@ namespace SkinDevApp.Data
             SELECT COALESCE(m.RunName,'unknown') || ' / ' || substr(COALESCE(m.OnnxSha256,'unknown'),1,12) AS Label, COUNT(*) AS N
             FROM ScanSessions s LEFT JOIN ModelVersions m ON m.ModelVersionID = s.ModelVersionID
             WHERE " + ActiveSession + " GROUP BY 1 ORDER BY 2 DESC;");
-
-        /// <summary>AI overall class vs the latest researcher label (single-label evaluations only).</summary>
-        public static List<CountRow> AiVsResearcherAgreement() => Group(@"
-            SELECT " + string.Format(AiAgreementCase, "e.ResearcherClassification") + @" AS Label, COUNT(*) AS N
-            FROM ScanSessions s JOIN ResearcherEvaluations e ON e.ScanSessionID = s.ScanSessionID
-            WHERE " + ActiveSession + @"
-              AND e.EvaluationID = (SELECT MAX(EvaluationID) FROM ResearcherEvaluations x WHERE x.ScanSessionID = s.ScanSessionID)
-            GROUP BY 1 ORDER BY 2 DESC;");
 
         public static List<CountRow> AiVsDermatologistAgreement() => Group(@"
             SELECT " + string.Format(AiAgreementCase, "d.DermatologistAssessment") + @" AS Label, COUNT(*) AS N

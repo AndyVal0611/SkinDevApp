@@ -102,19 +102,8 @@ namespace SkinDevApp
             await Task.Run(() => { try { AI.LesionEngine.EnsureLoaded(); } catch { } });
             splash.Step("Preparing AI models", 0.78, AiEngine.IsAvailable ? "Skin model ready" : "Skin model not available: " + (AiEngine.LoadErrorMessage ?? "not loaded"));
 
-            // 4. is the heat-map service already running? (only checked here; it is started from the preparation screen as before)
-            splash.Step("Checking heat-map service", 0.84, " ");
-            bool heatmaps = false;
-            try
-            {
-                var health = Explainability.GradCamService.GetHealthAsync();
-                if (await Task.WhenAny(health, Task.Delay(1500)) == health && health.Result != null) heatmaps = health.Result.Ok;
-            }
-            catch { }
-            splash.Step("Checking heat-map service", 0.88, heatmaps ? "Heat-map service running" : "Heat-map service will start when a scan is prepared");
-
-            // 5. the workspace
-            splash.Step("Loading workspace", 0.94, "Opening LUMYVUE");
+            // 4. the workspace
+            splash.Step("Loading workspace", 0.92, "Opening LUMYVUE");
             var main = new MainWindow();
             MainWindow = main;
             main.Show();

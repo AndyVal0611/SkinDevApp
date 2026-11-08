@@ -190,7 +190,9 @@
                 </Grid>
 
                 <!-- Profiles: you, the current patient, the dermatologist (kept apart and labelled) -->
-                <UniformGrid x:Name="CardsGrid" Columns="3" Margin="0,8,0,0"/>
+                <UniformGrid x:Name="StatsGrid" Columns="4" Margin="0,8,0,0"/>
+                <UniformGrid x:Name="CardsGrid" Columns="3" Margin="0,0,0,0"/>
+                <ContentControl x:Name="RecentHost"/>
 
                 <DockPanel Margin="10,14,8,0">
                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Info}" Foreground="#8D8D76" Width="15" Height="15" Margin="0,0,8,0"/>
