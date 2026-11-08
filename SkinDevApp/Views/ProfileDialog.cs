@@ -185,6 +185,70 @@ namespace SkinDevApp.Views
             return d._saved;
         }
 
+        // ---------------------------------------------------------------- an administrator creates an account
+
+        private static ProfileDialog BuildCreate()
+        {
+            var d = Build(new AccountProfile(), "Create an account",
+                "For a dermatologist or another administrator who will use this prototype. Enter the account details and the person's personal and professional details. Fields marked * are required.");
+
+            var types = new WrapPanel();
+            var derm = new RadioButton { Content = "Dermatologist (reviews scans)", GroupName = "new-acct-type", IsChecked = true, Margin = new Thickness(0, 6, 18, 6), FontSize = 14 };
+            var admin = new RadioButton { Content = "Administrator (also manages accounts)", GroupName = "new-acct-type", Margin = new Thickness(0, 6, 0, 6), FontSize = 14 };
+            types.Children.Add(derm); types.Children.Add(admin);
+            var user = d.Text("acct-user", "");
+            var pw = new PasswordBox { Style = (Style)Application.Current.FindResource("FieldPassword"), Height = 40 };
+            var pw2 = new PasswordBox { Style = (Style)Application.Current.FindResource("FieldPassword"), Height = 40 };
+            d.Section("Account", "How this person signs in. Give them the username and the temporary password; they can change the password in Settings.",
+                Row(1, Cell("Account type", true, types)),
+                Row(3, Cell("Username", true, user, "Letters, digits and . _ -"),
+                       Cell("Temporary password", true, pw, "At least " + AuthService.MinPasswordLength + " characters"),
+                       Cell("Confirm password", true, pw2)));
+            // the account section goes first, under the heading
+            var card = d._body.Children[d._body.Children.Count - 1];
+            d._body.Children.RemoveAt(d._body.Children.Count - 1);
+            d._body.Children.Insert(2, card);
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(26, 10, 26, 16), HorizontalAlignment = HorizontalAlignment.Left };
+            row.Children.Add(Ui.Btn("Create account", (o, e) =>
+            {
+                string u = user.Text.Trim();
+                AccountProfile p = d.Read(u);
+                string err = AuthService.CheckUsername(u) ?? AuthService.CheckNewPassword(u, pw.Password);
+                if (err == null && pw.Password != pw2.Password) err = "The two passwords do not match.";
+                if (err == null) err = AccountProfile.Check(p);
+                if (err != null) { LumyDialog.Show(err, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+                string type = admin.IsChecked == true ? AuthService.TypeAdministrator : AuthService.TypeDermatologist;
+                try { AuthService.CreateAccount(u, pw.Password, AppSession.ActorId, type, p.FullName); }
+                catch (Exception ex) { LumyDialog.Show(ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+                try { AccountProfiles.Save(p); }
+                catch (Exception ex)
+                {
+                    LumyDialog.Show("The account was created, but the details could not be saved (" + ex.Message + "). The person will be asked for them when they first sign in.", "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    d._saved = true; d.Close(); return;
+                }
+                d._saved = true;
+                LumyDialog.Show("The account \"" + u + "\" (" + type + ") was created with the full details.", "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
+                d.Close();
+            }, "PrimaryButton"));
+            var cancel = Ui.Btn("Cancel", (o, e) => d.Close(), "GhostButton"); cancel.Margin = new Thickness(10, 0, 0, 0);
+            row.Children.Add(cancel);
+            DockPanel.SetDock(row, Dock.Bottom);
+            ((DockPanel)d.Content).Children.Insert(0, row);
+            return d;
+        }
+
+        /// <summary>Shows the create-account form. True when an account was created.</summary>
+        public static bool CreateAccount(Window owner)
+        {
+            var d = BuildCreate();
+            d.Owner = owner;
+            d.ShowDialog();
+            return d._saved;
+        }
+
+        public static Window BuildCreateForPreview() => BuildCreate();
+
         /// <summary>For tests and previews: the dialog built for a profile (not shown).</summary>
         public static Window BuildForPreview(AccountProfile cur)
         {

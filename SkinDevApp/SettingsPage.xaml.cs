@@ -458,7 +458,7 @@ namespace SkinDevApp
             var rows = new System.Collections.Generic.List<UIElement>();
             if (AppSession.IsAdministrator)
             {
-                Button addBtn = Ui.Btn("Create account", (s, e) => { if (CreateAccountDialog.Run(Application.Current.MainWindow)) { RefreshAccounts(); AcctMessage("The account was created.", true); } }, "PrimaryButton", 200);
+                Button addBtn = Ui.Btn("Create account", (s, e) => { if (ProfileDialog.CreateAccount(Application.Current.MainWindow)) { RefreshAccounts(); AcctMessage("The account was created.", true); } }, "PrimaryButton", 200);
                 addBtn.HorizontalAlignment = HorizontalAlignment.Left;
                 addBtn.Margin = new Thickness(0, 10, 0, 0);
                 var host = new StackPanel();

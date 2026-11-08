@@ -615,6 +615,19 @@ namespace SkinDevApp.Views
             return sp;
         }
 
+        /// <summary>A bullet with a hanging indent: the dot in its own narrow column so wrapped lines line up under the text.</summary>
+        private FrameworkElement NoteBullet(string text)
+        {
+            var g = new Grid { Margin = new Thickness(0, 0, 0, 5) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(11) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var dot = T("•", 8.5, false, TextInk, 0);
+            var t = T(text, 8.5, false, TextInk, 0);
+            Grid.SetColumn(t, 1);
+            g.Children.Add(dot); g.Children.Add(t);
+            return g;
+        }
+
         private FrameworkElement V6MarkedAreasBody()
         {
             var sp = new StackPanel();
@@ -632,12 +645,12 @@ namespace SkinDevApp.Views
                 cells.Add(cell);
             }
             var note = new StackPanel();
-            note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
-            note.Children.Add(T("•  Candidate locations only: not lesion segmentation, not a diagnosis, not a lesion count.", 8.5, false, TextInk, 4));
-            note.Children.Add(T("•  Lesions can be missed and boxes can be wrong. Eczema is a pilot class (smallest training set).", 8.5, false, TextInk, 4));
-            note.Children.Add(T("•  A photograph with no box does not prove that a condition is absent.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("About these boxes", 10.5, true, Navy, 6));
+            note.Children.Add(NoteBullet("Boxes show possible locations only. They are not an outline of a lesion, a count, a measure of severity or a diagnosis."));
+            note.Children.Add(NoteBullet("Lesions can be missed, and a box can be wrong. Eczema findings are less established than acne and hyperpigmentation."));
+            note.Children.Add(NoteBullet("A photograph with no box does not prove that a condition is absent."));
             var nb = Panel(note, PanelBg, null, 10);
-            nb.Width = ImgW; nb.VerticalAlignment = VerticalAlignment.Top; nb.MinHeight = OriginalH;
+            nb.Width = ImgW; nb.VerticalAlignment = VerticalAlignment.Top;      // sized to its text, so no empty space
             cells.Add(nb);
 
             var grid = new Grid();
