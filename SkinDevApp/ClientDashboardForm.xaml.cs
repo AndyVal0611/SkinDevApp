@@ -158,7 +158,7 @@ namespace SkinDevApp.Views
             if (string.IsNullOrEmpty(_participantId))
                 problem = AppSession.IsResearcher
                     ? "No patient is selected. A live scan is filed under a Patient ID, so please register or select a patient first. (An uploaded image can still be analyzed; it is saved as a scan without a patient.)"
-                    : "No participant selected. Register or select a participant from the Dashboard first.";
+                    : "No patient is selected. Register or select a patient from the Dashboard first.";
             else if (IsWithdrawn(_participantId))
                 problem = _participantId + " has withdrawn from the study. Image capture is blocked.";
             else if (!Workflow.HasScanConsent(_participantId))
@@ -330,6 +330,7 @@ namespace SkinDevApp.Views
 
         private void UpdateStatusPanel(LiveSnapshot s)
         {
+            LiveReadingPanel.Visibility = Visibility.Visible;
             StatusPanel.Visibility = Visibility.Visible;
             ScanDecision d = s.Decision;
             ScanGates g = d.Gates;
@@ -1135,6 +1136,7 @@ namespace SkinDevApp.Views
         private void ApplyV6Bars()
         {
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
+            if (a != null) LiveReadingPanel.Visibility = Visibility.Visible;       // shown once there is a reading to show
             ScoresTitleTxt.Text = "Live AI reading";
             ScoresNoteTxt.Text = "Updates every few seconds while you scan. The full result appears after the photographs are taken. Not a diagnosis.";
             NormalRow.Visibility = Visibility.Collapsed; NormalBar.Visibility = Visibility.Collapsed;
@@ -1425,7 +1427,7 @@ namespace SkinDevApp.Views
             UpdateScanInfo();
 
             if (!_live.PoseCheckAvailable)
-                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Take photo now when the view is right.)";
+                ViewStepTxt.Text += "\n(Head-pose model not found: angles are not verified. Use Capture when the view is right.)";
         }
 
         private void UpdateViewStep()

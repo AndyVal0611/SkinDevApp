@@ -109,8 +109,8 @@ namespace SkinDevApp
             _p = null;
             RecordPanel.Children.Clear();
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(found.Count + " participants match \"" + text + "\"", 18, true));
-            sp.Children.Add(Ui.Text("Click the participant to open the record.", 13, false, Ui.Muted));
+            sp.Children.Add(Ui.Text(found.Count + " patients match \"" + text + "\"", 18, true));
+            sp.Children.Add(Ui.Text("Click a patient to open the record.", 13, false, Ui.Muted));
             foreach (Participant p in found.Take(100))
             {
                 string id = p.ParticipantID;
@@ -149,7 +149,7 @@ namespace SkinDevApp
             {
                 var nf = new StackPanel();
                 nf.Children.Add(Ui.Text("Patient not found", 18, true, Ui.Bad));
-                nf.Children.Add(Ui.Text("No participant has the ID " + id + ". Check the ID, or register a new participant (a new ID is generated; nothing is created from this search).",
+                nf.Children.Add(Ui.Text("No patient has the ID " + id + ". Check the ID, or register a new patient (a new ID is generated; nothing is created from this search).",
                     13, false, Ui.Ink));
                 Button reg = Ui.Btn("Register new patient", (s, e) => Nav.Go(new RegistrationPage()), "PrimaryButton");
                 reg.HorizontalAlignment = HorizontalAlignment.Left;
@@ -206,11 +206,11 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            string overall = string.IsNullOrEmpty(s.AITitle) ? "AI result pending (analyzed in the background)" : s.AITitle;
+            string overall = string.IsNullOrEmpty(s.AITitle) ? "Pending" : s.AITitle;
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("AI result", overall), Ui.KV("Verification", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected), Ui.KV("Model", string.IsNullOrEmpty(s.AIModel) ? "Final model (pending)" : s.AIModel) }, 100, 12.5)));
+                Ui.InfoRows(new[] { Ui.KV("Result", overall), Ui.KV("Review status", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
+                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected) }, 100, 12.5)));
             return Ui.Card(sp);
         }
 
@@ -230,7 +230,7 @@ namespace SkinDevApp
                 Ui.KV("Name", p.FullName),
                 Ui.KV("Age", p.Age.HasValue ? p.Age.Value.ToString(CultureInfo.InvariantCulture) + " years" : null),
                 Ui.KV(ch != null ? "Birthday" : "Date of birth", Fmt.Date(p.DateOfBirth)),
-                Ui.KV(ch != null ? "Sex" : "Gender", p.Sex)
+                Ui.KV("Sex", p.Sex)
             };
             if (ch != null) rows.AddRange(new[]
             {
@@ -300,7 +300,12 @@ namespace SkinDevApp
                 sp.Children.Add(Ui.Callout(c.Pregnant == "Yes" && c.Breastfeeding == "Yes" ? "Pregnant and breastfeeding" : c.Pregnant == "Yes" ? "Pregnant" : "Breastfeeding",
                     "Tell the care team before any treatment.", 1));
 
-            sp.Children.Add(Ui.InfoRows(new[]
+            if (notRecorded)
+            {
+                sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+                return Ui.Card(sp);
+            }
+            sp.Children.Add(Ui.InfoRowsFilled(new[]
             {
                 Ui.KV("Date of onset", c.OnsetDate),
                 Ui.KV("Affected area", c.AffectedArea),
@@ -316,7 +321,7 @@ namespace SkinDevApp
                 Ui.KV("Surgery", string.IsNullOrWhiteSpace(c.SurgeryYear) ? c.Surgery : string.IsNullOrWhiteSpace(c.Surgery) ? "Year " + c.SurgeryYear : c.Surgery + " (" + c.SurgeryYear + ")"),
                 Ui.KV("Last menstrual period", c.LastMenstrualPeriod),
                 Ui.KV("Family history", Join(c.FamilyHistory, c.FamilyHistoryOther))
-            }, 170, 12.5));
+            }, 170, 12.5, "No history has been recorded for this patient."));
             sp.Children.Add(Ui.Text("This is the saved registration. It can only be changed with the Edit button, and changing it never alters scan results.", 10.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             return Ui.Card(sp);
         }
@@ -438,7 +443,6 @@ namespace SkinDevApp
                 Ui.KV("Patient", s.ParticipantID ?? "Not assigned to a patient"),
                 Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Date and time", Fmt.ScanWhen(s.StartedAt, s.CompletedAt)),
-                Ui.KV("Model", string.IsNullOrEmpty(s.AIModel) ? "Final model (pending)" : s.AIModel),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
                 Ui.KV("Overall result", overall),
                 Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),

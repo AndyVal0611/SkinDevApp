@@ -23,7 +23,7 @@ namespace SkinDevApp
             Participant p = string.IsNullOrEmpty(participantId) ? null : StudyRepository.GetParticipant(participantId);
             if (p == null)
             {
-                ParticipantTxt.Text = "No participant selected. Register or select a participant first.";
+                ParticipantTxt.Text = "No patient is selected. Register or select a patient first.";
                 AgreeBtn.IsEnabled = false;
                 return;
             }
@@ -33,11 +33,11 @@ namespace SkinDevApp
             if (p.Status == "Withdrawn")
             {
                 ParticipantTxt.Text += "  ·  WITHDRAWN";
-                PreviousConsentTxt.Text = "This participant has withdrawn from the study. Consent cannot be recorded and no images can be captured. " +
-                                          "A researcher can change the record status in Participant Records (Edit) if the withdrawal was entered by mistake.";
+                PreviousConsentTxt.Text = "This patient has withdrawn from the study. Consent cannot be recorded and no images can be captured. " +
+                                          "A researcher can change the record status in Patient records (Edit) if the withdrawal was entered by mistake.";
                 AgreeBtn.IsEnabled = false;
                 foreach (CheckBox box in new[] { UnderstoodChk, VoluntaryChk, CaptureChk, ProcessingChk, FutureUseChk }) box.IsEnabled = false;
-                HintTxt.Text = "Consent cannot be recorded for a withdrawn participant.";
+                HintTxt.Text = "Consent cannot be recorded for a withdrawn patient.";
                 return;
             }
 
@@ -96,7 +96,7 @@ namespace SkinDevApp
         private void DeclineBtn_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(_participantId) || IsWithdrawnNow()) { Nav.Home(); return; }
-            if (LumyDialog.Show("Record that the participant declined? No images will be captured.", "LUMYVUE Consent",
+            if (LumyDialog.Show("Record that the patient declined? No images will be captured.", "LUMYVUE Consent",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 

@@ -41,7 +41,7 @@
             <Border x:Name="SidebarCard" Style="{StaticResource Card}" Padding="14">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="Browse patients" Style="{StaticResource H2}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Browse patients" FontSize="16" FontWeight="SemiBold" Foreground="#2F3024" Margin="0,0,0,8"/>
                         <TextBlock Text="Filter by ID or name" Style="{StaticResource FieldLabel}" Margin="0,0,0,4"/>
                         <TextBox x:Name="FilterTxt" Style="{StaticResource Field}" ToolTip="ID or name" TextChanged="Filter_Changed"/>
                         <Grid Margin="0,6,0,0">

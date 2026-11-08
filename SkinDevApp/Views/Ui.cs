@@ -451,6 +451,14 @@ namespace SkinDevApp.Views
             return g;
         }
 
+        /// <summary>Like InfoRows, but rows with no value are left out. When nothing is filled in, a single quiet line says so.</summary>
+        public static UIElement InfoRowsFilled(IEnumerable<KeyValuePair<string, string>> rows, double labelWidth = 150, double size = 13, string emptyText = "No entries recorded.")
+        {
+            var filled = rows.Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToList();
+            if (filled.Count == 0) return Text(emptyText, size, false, Muted, new Thickness(0, 4, 0, 4));
+            return InfoRows(filled, labelWidth, size);
+        }
+
         /// <summary>A soft coloured message box. level: 0 = all fine (green), 1 = look closer (amber), 2 = needs attention (red).</summary>
         public static Border Callout(string headline, string detail, int level)
         {
