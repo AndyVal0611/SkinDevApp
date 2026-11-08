@@ -466,9 +466,6 @@ namespace SkinDevApp
                 host.Children.Add(addBtn);
                 rows.Add(Row("Accounts", "Everyone listed here can sign in. Create an account for a dermatologist or another administrator who will use the prototype.", host));
             }
-            Button codeBtn = Ui.Btn("New recovery code", (s2, e2) => PasswordDialogs.NewCodeForMe(Application.Current.MainWindow), "SecondaryButton", 220);
-            codeBtn.HorizontalAlignment = HorizontalAlignment.Left;
-            rows.Add(Row("Recovery code", "A code that lets you set a new password if you forget it, without asking an administrator. Keep it written down somewhere safe. Making a new code cancels the old one.", codeBtn));
             rows.Add(Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change));
             rows.Add(new Border { Child = _acctMsg });
             return RowCard(rows.ToArray());
