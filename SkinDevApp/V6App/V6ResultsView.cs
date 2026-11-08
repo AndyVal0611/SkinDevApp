@@ -120,23 +120,21 @@ namespace SkinDevApp.V6
             s.Category == ClinicalCategory.Retake ? "No condition is reported for this photograph because it must be retaken."
             : "No result is available for this photograph.";
 
-        /// <summary>Condition · AI result · Certainty · Facial regions.</summary>
+        /// <summary>The findings at a glance: condition, detection status and facial regions. Confidence figures are one click away (ConfidenceDetails).</summary>
         public static Grid FindingsTable(ClinicalSummary s, double fontSize = 13)
         {
             var g = new Grid { Margin = new Thickness(0, 2, 0, 6) };
             if (s.Findings.Count == 0) { g.Children.Add(Ui.Text(NoFindingsText(s), 13, false, Ui.Muted, new Thickness(0, 2, 0, 4))); return g; }
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            string[] head = { "Condition", "Detection status", "Confidence", "Certainty", "Facial regions" };
+            string[] head = { "Condition", "Detection status", "Facial regions" };
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             for (int c = 0; c < head.Length; c++)
             {
                 var t = Ui.Text(head[c], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, c); g.Children.Add(t);
             }
-            var rule = new Border { Height = 1, Background = Ui.Line, VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetColumnSpan(rule, 5); g.Children.Add(rule);
+            var rule = new Border { Height = 1, Background = Ui.Line, VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetColumnSpan(rule, 3); g.Children.Add(rule);
             int row = 1;
             foreach (ClinicalFinding f in s.Findings)
             {
@@ -144,19 +142,52 @@ namespace SkinDevApp.V6
                 int idx = V6Conditions.IndexOf(f.Condition);
                 var name = Ui.Text(f.Condition, fontSize, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 7, 8, 7));
                 Border result = ResultPill(f); result.Margin = new Thickness(0, 5, 8, 5);
-                var cert = Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty : "—", fontSize, false, Ui.Ink, new Thickness(0, 7, 8, 7));
                 var regions = Ui.Text(RegionText(f), fontSize, false, Ui.Ink, new Thickness(0, 7, 0, 7));
-                var conf = Ui.Text(ClinicalSummary.ConfidenceText(f), fontSize, true, Ui.Ink, new Thickness(0, 7, 8, 7));
-                Grid.SetRow(name, row); Grid.SetRow(result, row); Grid.SetRow(conf, row); Grid.SetRow(cert, row); Grid.SetRow(regions, row);
-                Grid.SetColumn(result, 1); Grid.SetColumn(conf, 2); Grid.SetColumn(cert, 3); Grid.SetColumn(regions, 4);
-                g.Children.Add(name); g.Children.Add(result); g.Children.Add(conf); g.Children.Add(cert); g.Children.Add(regions);
+                Grid.SetRow(name, row); Grid.SetRow(result, row); Grid.SetRow(regions, row);
+                Grid.SetColumn(result, 1); Grid.SetColumn(regions, 2);
+                g.Children.Add(name); g.Children.Add(result); g.Children.Add(regions);
                 if (row < s.Findings.Count)
                 {
-                    var r2 = new Border { Height = 1, Background = Ui.Brush("#EFEADC"), VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetRow(r2, row); Grid.SetColumnSpan(r2, 5); g.Children.Add(r2);
+                    var r2 = new Border { Height = 1, Background = Ui.Brush("#EFEADC"), VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetRow(r2, row); Grid.SetColumnSpan(r2, 3); g.Children.Add(r2);
                 }
                 row++;
             }
             return g;
+        }
+
+        /// <summary>Optional (closed by default): the confidence and certainty behind each detection status.</summary>
+        public static UIElement ConfidenceDetails(ClinicalSummary s)
+        {
+            if (s.Findings.Count == 0) return new StackPanel();
+            var sp = new StackPanel { Margin = new Thickness(4, 6, 0, 0) };
+            var g = new Grid();
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            string[] head = { "Condition", "Confidence", "Certainty" };
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int c = 0; c < head.Length; c++) { var t = Ui.Text(head[c], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, c); g.Children.Add(t); }
+            int row = 1;
+            foreach (ClinicalFinding f in s.Findings)
+            {
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                int idx = V6Conditions.IndexOf(f.Condition);
+                var cells = new UIElement[]
+                {
+                    Ui.Text(f.Condition, 12.5, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 4, 8, 4)),
+                    Ui.Text(ClinicalSummary.ConfidenceText(f), 12.5, false, Ui.Ink, new Thickness(0, 4, 8, 4)),
+                    Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty : "—", 12.5, false, Ui.Ink, new Thickness(0, 4, 0, 4))
+                };
+                for (int k = 0; k < cells.Length; k++) { Grid.SetRow(cells[k], row); Grid.SetColumn(cells[k], k); g.Children.Add(cells[k]); }
+                row++;
+            }
+            sp.Children.Add(g);
+            sp.Children.Add(Ui.Text("Confidence is the system's own measure for the finding. It supports the detection status and is not a measure of severity.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            return new Expander
+            {
+                Header = new TextBlock { Text = "Show confidence details", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Muted },
+                IsExpanded = false, Margin = new Thickness(0, 2, 0, 0), Content = sp
+            };
         }
 
         private static UIElement ReviewNotes(IEnumerable<string> reasons, double size = 12.5, string heading = null)
@@ -217,6 +248,7 @@ namespace SkinDevApp.V6
             sp.Children.Add(head);
             sp.Children.Add(OutcomeBanner(s.Clinical));
             sp.Children.Add(FindingsTable(s.Clinical));
+            sp.Children.Add(ConfidenceDetails(s.Clinical));
             sp.Children.Add(ReviewNotes(s.Clinical.ReviewReasons, 12.5, s.Clinical.Category == ClinicalCategory.Retake ? "What to do" : null));
             sp.Children.Add(DermatologistPanel(d));
 

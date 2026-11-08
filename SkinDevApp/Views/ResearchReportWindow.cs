@@ -657,6 +657,29 @@ namespace SkinDevApp.Views
             return band;
         }
 
+        /// <summary>Under each marked-areas photograph: one short line per condition that has marked areas (color key, condition, where), or "No areas marked".</summary>
+        private FrameworkElement AreasCaption(SkinDevApp.V6.V6ViewSummary vs)
+        {
+            var sp = new StackPanel { Margin = new Thickness(0, 2, 0, 0) };
+            var marked = vs.Clinical.Findings.Where(f => f.Regions.Count > 0 || f.BoxCount > 0).ToList();
+            if (marked.Count == 0) { sp.Children.Add(T("No areas marked", 8.5, false, Muted, 0)); return sp; }
+            foreach (SkinDevApp.V6.ClinicalFinding f in marked)
+            {
+                int idx = SkinDevApp.V6.V6Conditions.IndexOf(f.Condition);
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var swatch = new Border { Width = 8, Height = 8, Background = C(idx >= 0 ? SkinDevApp.Imaging.ClassPalette.Hex[idx] : "#6B7280"), Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+                var text = new StackPanel();
+                text.Children.Add(T(f.Condition, 8.5, true, TextInk, 0));
+                text.Children.Add(T(f.Regions.Count > 0 ? string.Join(", ", f.Regions) : "area marked", 8.5, false, TextInk, 0));
+                Grid.SetColumn(text, 1);
+                row.Children.Add(swatch); row.Children.Add(text);
+                sp.Children.Add(row);
+            }
+            return sp;
+        }
+
         private FrameworkElement V6MarkedAreasBody()
         {
             var sp = new StackPanel();
@@ -673,7 +696,7 @@ namespace SkinDevApp.Views
                 var cell = new StackPanel { Width = cw };
                 cell.Children.Add(ImageBox(SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), "marked-areas image not available", ch, "#6B7280"));
                 cell.Children.Add(T(vs.View == "Single" ? "Captured image" : vs.Label, 9.5, true, Navy, 1));
-                cell.Children.Add(T(vs.BoxesLine, 8.5, false, TextInk, 0));
+                cell.Children.Add(AreasCaption(vs));
                 cells.Add(cell);
             }
 
