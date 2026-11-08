@@ -120,6 +120,24 @@ namespace SkinDevApp.Tests
         }
 
         [Fact]
+        public void Confidence_and_summary_use_only_what_the_model_produces()
+        {
+            UnifiedAssessment a = Make(V6States.UncertainReviewRequired, new[] { 0.72, 0.2, 0.1 }, fired: new[] { true, true, true });
+            a.Boxes.Add(new V6Box { Condition = "Acne", X0 = 20, Y0 = 45, X1 = 30, Y1 = 55, Confidence = 0.6f, Deployed = true });
+            a.Boxes.Add(new V6Box { Condition = "Hyperpigmentation", X0 = 45, Y0 = 10, X1 = 55, Y1 = 20, Confidence = 0.31f, Deployed = true });
+            a.Boxes.Add(new V6Box { Condition = "Hyperpigmentation", X0 = 1, Y0 = 99, X1 = 2, Y1 = 100, Confidence = 0.9f, Deployed = true });     // far outside the face: not counted, not drawn
+            ClinicalSummary s = ClinicalSummary.From(a, Face);
+            Assert.Equal("72%", ClinicalSummary.ConfidenceText(s.Findings[0]));                 // detected by the model: the calibrated probability
+            Assert.Equal("Detector 31%", ClinicalSummary.ConfidenceText(s.Findings[1]));        // detector-led: the detector's own confidence
+            Assert.Equal("10% (below limit)", ClinicalSummary.ConfidenceText(s.Findings[2]));   // possible: below the decision limit
+            Assert.Equal(2, s.MarkedAreas);
+            Assert.Equal("Acne detected (moderate certainty); Hyperpigmentation detected by the lesion detector (low certainty); Eczema possible (review needed). 2 areas were marked on the face.", ClinicalSummary.SummaryLine(s));
+            ClinicalSummary none = ClinicalSummary.From(Make(V6States.NoFindingsSupported, new[] { 0.05, 0.05, 0.05 }));
+            Assert.Equal("95%", ClinicalSummary.ConfidenceText(none.Findings[0]));              // not detected: confidence that it is absent
+            Assert.Equal("No condition detected. No areas were marked on the face.", ClinicalSummary.SummaryLine(none));
+        }
+
+        [Fact]
         public void Review_status_follows_the_dermatologist_record()
         {
             Assert.Equal(ReviewStatus.Verified, ReviewStatus.FromValidation("Completed"));

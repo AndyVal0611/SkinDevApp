@@ -31,6 +31,8 @@ namespace SkinDevApp.V6
         public double Probability;       // calibrated, 0..1 (shown only in technical detail)
         public double Threshold;
         public bool NeedsReview;
+        public int BoxCount;             // areas the detector marked on the face for this condition (as drawn on the marked-areas picture)
+        public double BestBoxConfidence; // highest confidence among those areas (0 when none)
         public List<string> Regions = new List<string>();
         /// <summary>"model" (the fusion decided) or "lesion detector" (a detector-led condition whose detector marked an area the fusion did not confirm).</summary>
         public string Source = ClinicalSummary.SourceModel;
@@ -54,6 +56,9 @@ namespace SkinDevApp.V6
 
         /// <summary>Version of these reading rules; stored results are re-read when it changes (RecordsMaintenance).</summary>
         public const int RulesVersion = 2;
+
+        /// <summary>Areas marked on the face over all photographs of the scan (a count of boxes, never a lesion count).</summary>
+        public int MarkedAreas;
 
         /// <summary>Plain notes about how the result was reached (shown under the findings; not reasons for review).</summary>
         public List<string> Notes = new List<string>();
@@ -139,10 +144,14 @@ namespace SkinDevApp.V6
             {
                 string status = c.Verdict == "present" ? Detected : c.Verdict == "possible" ? Possible : c.Verdict == "absent" ? NotDetected : Inconclusive;
                 string source = SourceModel, certainty = CertaintyFor(status, c.CalibratedProbability);
+                var onFace = a.FrameWidth > 0 && a.FrameHeight > 0
+                    ? a.Boxes.Where(b => b.Condition == c.Condition && b.Deployed &&
+                                         RegionOf((b.X0 + b.X1) / 2.0 / a.FrameWidth, (b.Y0 + b.Y1) / 2.0 / a.FrameHeight, faceBox) != null).ToList()
+                    : a.Boxes.Where(b => b.Condition == c.Condition && b.Deployed).ToList();
                 if (status != Detected && c.DetectorAvailable && c.DetectorFired && DetectorLed.Contains(c.Condition))
                 {
-                    // detector-led condition: the marked area counts as a finding; certainty from the detector's own confidence, never "high"
-                    double conf = a.Boxes.Where(b => b.Condition == c.Condition && b.Deployed).Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
+                    // detector-led condition: the marked area counts as a finding; certainty from the detector's own confidence on the face, never "high"
+                    double conf = onFace.Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
                     status = Detected; source = SourceDetector; certainty = conf >= 0.50 ? "Moderate" : "Low";
                     s.Notes.Add(c.Condition + " was found by its lesion detector; the whole-face reading did not confirm it.");
                 }
@@ -152,9 +161,11 @@ namespace SkinDevApp.V6
                     Certainty = certainty, NeedsReview = status == Possible || status == Inconclusive
                 };
                 if (status == Detected || status == Possible) f.Regions = RegionsFor(a, c.Condition, faceBox);
+                f.BoxCount = onFace.Count; f.BestBoxConfidence = onFace.Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
                 s.Findings.Add(f);
             }
             s.ReviewReasons = ReviewReasonsFor(a, s.Findings);
+            s.MarkedAreas = s.Findings.Sum(f => f.BoxCount);
             // an uncertain model state with no specific reason left still needs review, unless the uncertainty was a detector-led finding resolved above
             if (a.State == V6States.UncertainReviewRequired && s.ReviewReasons.Count == 0 && !s.Findings.Any(f => f.ByDetector))
                 s.ReviewReasons.Add("The AI marked this result as uncertain.");
@@ -242,6 +253,7 @@ namespace SkinDevApp.V6
                 var f2 = new ClinicalFinding
                 {
                     Condition = cond, Status = best.Status, Certainty = best.Certainty, Probability = best.Probability, Threshold = best.Threshold, Source = best.Source,
+                    BoxCount = per.Sum(x => x.F.BoxCount), BestBoxConfidence = per.Max(x => x.F.BestBoxConfidence),
                     NeedsReview = per.Any(x => x.F.NeedsReview)
                 };
                 foreach (var x in per.Where(x => x.F.Regions.Count > 0)) f2.Regions.Add(x.View + ": " + x.F.RegionsText);
@@ -256,6 +268,7 @@ namespace SkinDevApp.V6
             }
 
             foreach (var v in views) foreach (string n in v.Value.Notes) if (!s.Notes.Contains(n)) s.Notes.Add(n);
+            s.MarkedAreas = views.Sum(v => v.Value.MarkedAreas);
             List<string> detected = s.DetectedFindings.Select(f => f.Condition).ToList();
             bool anyProblem = views.Any(v => v.Value.Category == ClinicalCategory.NeedsReview || v.Value.Category == ClinicalCategory.Retake || v.Value.Category == ClinicalCategory.NotCompleted);
             if (views.All(v => v.Value.Category == ClinicalCategory.NotCompleted)) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "The AI analysis could not be completed for this scan."; }
@@ -288,6 +301,31 @@ namespace SkinDevApp.V6
             if (f.Status == Detected || f.Status == NotDetected) line += " · " + f.Certainty.ToLowerInvariant() + " certainty";
             else line += " · review needed";
             if (f.Regions.Count > 0) line += " · " + f.RegionsText;
+            return line;
+        }
+
+        /// <summary>The confidence shown for a finding: the calibrated model probability when the model decided; the detector's own box confidence when the lesion detector found it;
+        /// for "not detected" the confidence that the condition is absent (1 - probability); for possible / inconclusive the model probability, which is below the decision limit.</summary>
+        public static string ConfidenceText(ClinicalFinding f)
+        {
+            if (f.ByDetector) return "Detector " + Percent(f.BestBoxConfidence);
+            if (f.Status == Detected) return Percent(f.Probability);
+            if (f.Status == NotDetected) return Percent(1.0 - f.Probability);
+            return Percent(f.Probability) + " (below limit)";
+        }
+
+        /// <summary>One concise sentence: what was found, with certainty, and how many areas were marked.</summary>
+        public static string SummaryLine(ClinicalSummary s)
+        {
+            if (s.Category == ClinicalCategory.Retake) return "No condition is reported: the photograph has to be retaken.";
+            if (s.Category == ClinicalCategory.NotCompleted) return "The AI analysis could not be completed.";
+            var parts = new List<string>();
+            foreach (ClinicalFinding f in s.Findings.Where(x => x.Status == Detected))
+                parts.Add(f.Condition + " detected" + (f.ByDetector ? " by the lesion detector" : "") + " (" + f.Certainty.ToLowerInvariant() + " certainty)");
+            foreach (ClinicalFinding f in s.Findings.Where(x => x.Status == Possible || x.Status == Inconclusive))
+                parts.Add(f.Condition + " " + f.Status.ToLowerInvariant() + " (review needed)");
+            string line = parts.Count == 0 ? "No condition detected" : string.Join("; ", parts);
+            line += s.MarkedAreas == 0 ? ". No areas were marked on the face." : ". " + s.MarkedAreas + (s.MarkedAreas == 1 ? " area was" : " areas were") + " marked on the face.";
             return line;
         }
 

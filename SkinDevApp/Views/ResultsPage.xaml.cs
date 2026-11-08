@@ -63,6 +63,7 @@ namespace SkinDevApp.Views
                                "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalised)");
 
             _v6 = SkinDevApp.V6.V6ResultsView.Load(_d, out _v6Problems);
+            if (_v6 != null) _viewMode = "Localization";          // the AI result opens on the photograph with the detector's boxes
             MainColumn.Children.Add(_v6 != null ? SkinDevApp.V6.V6ResultsView.OverallCard(_d, _v6, _v6Problems) : OverallCard());
             MainColumn.Children.Add(PerViewCard());
             BuildSide();
@@ -143,7 +144,7 @@ namespace SkinDevApp.Views
                     Content = mode == "V6Heat" ? "Heat map" : mode == "V6Both" ? "Both" : mode == "Grad-CAM++" ? (_v6 != null ? "Classifier map (V5)" : "Heat map")
                             : mode == "Localization" ? "Marked areas" : mode == "Combined" ? "Both" : mode,
                     GroupName = "viewmode",
-                    IsChecked = mode == "Original",
+                    IsChecked = mode == _viewMode,
                     Margin = new Thickness(0, 0, 18, 0),
                     FontSize = 13,
                     ToolTip = mode == "V6Heat" ? "Where the lesion detectors found evidence for the chosen condition. Colour = the condition, strength = detector confidence. It is one input of the unified assessment, not an explanation of the model."
@@ -159,6 +160,7 @@ namespace SkinDevApp.Views
                 toggle.Children.Add(rb);
             }
             sp.Children.Add(toggle);
+            if (_v6 != null) sp.Children.Add(SkinDevApp.V6.V6ResultsView.BoxLegend());
             if (_v6 != null)
                 sp.Children.Add(Ui.Text("Marked areas: boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count and not a diagnosis.",
                                         11, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
@@ -174,8 +176,15 @@ namespace SkinDevApp.Views
                 if (_v6 != null && v != null) _v6.TryGetValue(v.ViewType ?? name, out frameA);
                 string frameHex = frameA != null ? SkinDevApp.V6.V6ResultsView.CategoryInk(SkinDevApp.V6.ClinicalSummary.From(frameA).Category)
                                 : _v6 == null && v?.Scores != null ? Ui.ClassColor(v.Scores.PredictedClass) : "#E5E7EB";
-                Border thumb = Ui.Thumb(v?.AnalysedImagePath ?? v?.OriginalImagePath, 150, frameHex,
+                string firstPath = v == null ? null : (PathFor(v, _viewMode) ?? v.AnalysedImagePath ?? v.OriginalImagePath);
+                Border thumb = Ui.Thumb(firstPath, _v6 != null ? (_d.Session.ScanMode == "Single" ? 380 : 230) : 150, frameHex,
                     v == null ? "Not captured" : null);
+                if (v != null)
+                {
+                    thumb.Tag = firstPath; thumb.Cursor = System.Windows.Input.Cursors.Hand; thumb.ToolTip = "Click to enlarge";
+                    string popupTitle = name == "Single" ? "Photograph" : name + " view";
+                    thumb.MouseLeftButtonUp += (s2, e2) => { if (thumb.Tag is string tp && !string.IsNullOrEmpty(tp)) ImagePopup.Show(tp, popupTitle); };
+                }
                 col.Children.Add(thumb);
                 if (v != null) _viewThumbs.Add(new KeyValuePair<CaptureViewRow, Border>(v, thumb));
 
@@ -258,7 +267,8 @@ namespace SkinDevApp.Views
             foreach (var kv in _viewThumbs)
             {
                 string path = PathFor(kv.Key, _viewMode);
-                var src = path != null ? Ui.LoadImage(path, 480) : null;
+                kv.Value.Tag = path;
+                var src = path != null ? Ui.LoadImage(path, _v6 != null ? 900 : 480) : null;
                 kv.Value.Child = src != null
                     ? (UIElement)new System.Windows.Controls.Image { Source = src, Stretch = System.Windows.Media.Stretch.Uniform }
                     : Ui.Text(_viewMode == "Original" ? "image not available" : (_viewMode == "Localization" ? "Marked areas" : _viewMode) + " is not available for this view", 11, false, Ui.Muted, new Thickness(8));

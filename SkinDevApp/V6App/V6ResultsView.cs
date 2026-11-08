@@ -86,7 +86,7 @@ namespace SkinDevApp.V6
         {
             Background = Ui.Brush(f.Status == ClinicalSummary.Detected ? "#FBEDEA" : f.Status == ClinicalSummary.NotDetected ? "#EEF3E8" : "#FFF6E6"),
             CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock { Text = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive ? f.Status + " · review" : f.Status,
+            Child = new TextBlock { Text = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive ? f.Status + " · review" : f.ByDetector ? "Detected · detector" : f.Status,
                                     FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(FindingInk(f)) }
         };
 
@@ -107,7 +107,7 @@ namespace SkinDevApp.V6
                 top.Children.Add(pill);
                 top.Children.Add(Ui.Text(f.Condition, 13, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 2, 8, 0)));
                 item.Children.Add(top);
-                string detail = (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + " certainty" + (f.ByDetector ? " · found by the lesion detector" : "") : "Review needed") +
+                string detail = "Confidence " + ClinicalSummary.ConfidenceText(f) + " · " + (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + " certainty" + (f.ByDetector ? " · found by the lesion detector" : "") : "Review needed") +
                                 (f.Regions.Count > 0 ? " · " + string.Join("; ", f.Regions) : "");
                 item.Children.Add(Ui.Text(detail, 12, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
                 sp.Children.Add(item);
@@ -127,15 +127,16 @@ namespace SkinDevApp.V6
             if (s.Findings.Count == 0) { g.Children.Add(Ui.Text(NoFindingsText(s), 13, false, Ui.Muted, new Thickness(0, 2, 0, 4))); return g; }
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            string[] head = { "Condition", "AI result", "Certainty", "Facial regions" };
+            string[] head = { "Condition", "Detection status", "Confidence", "Certainty", "Facial regions" };
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             for (int c = 0; c < head.Length; c++)
             {
                 var t = Ui.Text(head[c], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, c); g.Children.Add(t);
             }
-            var rule = new Border { Height = 1, Background = Ui.Line, VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetColumnSpan(rule, 4); g.Children.Add(rule);
+            var rule = new Border { Height = 1, Background = Ui.Line, VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetColumnSpan(rule, 5); g.Children.Add(rule);
             int row = 1;
             foreach (ClinicalFinding f in s.Findings)
             {
@@ -143,14 +144,15 @@ namespace SkinDevApp.V6
                 int idx = V6Conditions.IndexOf(f.Condition);
                 var name = Ui.Text(f.Condition, fontSize, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 7, 8, 7));
                 Border result = ResultPill(f); result.Margin = new Thickness(0, 5, 8, 5);
-                var cert = Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + (f.ByDetector ? " · lesion detector" : "") : "—", fontSize, false, Ui.Ink, new Thickness(0, 7, 8, 7));
+                var cert = Ui.Text(f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty : "—", fontSize, false, Ui.Ink, new Thickness(0, 7, 8, 7));
                 var regions = Ui.Text(RegionText(f), fontSize, false, Ui.Ink, new Thickness(0, 7, 0, 7));
-                Grid.SetRow(name, row); Grid.SetRow(result, row); Grid.SetRow(cert, row); Grid.SetRow(regions, row);
-                Grid.SetColumn(result, 1); Grid.SetColumn(cert, 2); Grid.SetColumn(regions, 3);
-                g.Children.Add(name); g.Children.Add(result); g.Children.Add(cert); g.Children.Add(regions);
+                var conf = Ui.Text(ClinicalSummary.ConfidenceText(f), fontSize, true, Ui.Ink, new Thickness(0, 7, 8, 7));
+                Grid.SetRow(name, row); Grid.SetRow(result, row); Grid.SetRow(conf, row); Grid.SetRow(cert, row); Grid.SetRow(regions, row);
+                Grid.SetColumn(result, 1); Grid.SetColumn(conf, 2); Grid.SetColumn(cert, 3); Grid.SetColumn(regions, 4);
+                g.Children.Add(name); g.Children.Add(result); g.Children.Add(conf); g.Children.Add(cert); g.Children.Add(regions);
                 if (row < s.Findings.Count)
                 {
-                    var r2 = new Border { Height = 1, Background = Ui.Brush("#EFEADC"), VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetRow(r2, row); Grid.SetColumnSpan(r2, 4); g.Children.Add(r2);
+                    var r2 = new Border { Height = 1, Background = Ui.Brush("#EFEADC"), VerticalAlignment = VerticalAlignment.Bottom }; Grid.SetRow(r2, row); Grid.SetColumnSpan(r2, 5); g.Children.Add(r2);
                 }
                 row++;
             }
@@ -211,9 +213,11 @@ namespace SkinDevApp.V6
             var head = new DockPanel();
             Border chip = StatusChip(s.ReviewStatus); DockPanel.SetDock(chip, Dock.Right); chip.VerticalAlignment = VerticalAlignment.Center;
             head.Children.Add(chip);
-            head.Children.Add(Ui.Text("AI screening result", 16, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
+            head.Children.Add(Ui.Text("AI screening result · generated by the system", 16, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
             sp.Children.Add(head);
             sp.Children.Add(OutcomeBanner(s.Clinical));
+            sp.Children.Add(Ui.Text("Summary", 12, true, Ui.Muted, new Thickness(0, 0, 0, 2)));
+            sp.Children.Add(Ui.Text(ClinicalSummary.SummaryLine(s.Clinical), 13, false, Ui.Ink, new Thickness(0, 0, 0, 8)));
             sp.Children.Add(FindingsTable(s.Clinical));
             sp.Children.Add(ReviewNotes(s.Clinical.ReviewReasons, 12.5, s.Clinical.Category == ClinicalCategory.Retake ? "What to do" : null));
             if (!s.Single)
@@ -228,8 +232,51 @@ namespace SkinDevApp.V6
                 sp.Children.Add(chips);
             }
             sp.Children.Add(Footer(s, d.Session.AIModel));
+            sp.Children.Add(DermatologistPanel(d));
             sp.Children.Add(TechnicalDetails(s));
             return Ui.Card(sp);
+        }
+
+        /// <summary>A separate, clearly labelled block: what the dermatologist recorded (or that nothing has been recorded yet). Never mixed into the AI result.</summary>
+        public static UIElement DermatologistPanel(SessionDetail d)
+        {
+            DermatologistValidation v = d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft);
+            string status = ReviewStatus.Normalise(d.Session.ReviewStatus);
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Dermatologist assessment · recorded separately by a person", 13, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
+            if (v == null)
+                sp.Children.Add(Ui.Text("Not reviewed yet. Everything above is the AI's result only. It is not a dermatologist's assessment and not a diagnosis.", 12.5, false, Ui.Muted, new Thickness(0)));
+            else
+            {
+                string who = string.IsNullOrWhiteSpace(v.ValidatorName) ? v.DermatologistID : v.ValidatorName + " (" + v.DermatologistID + ")";
+                sp.Children.Add(Ui.InfoRows(new[]
+                {
+                    Ui.KV("Outcome", ReviewStatus.FromValidation(v.ValidationStatus) ?? status),
+                    Ui.KV("Reviewed by", who + " · " + Fmt.When(v.ValidationDate)),
+                    Ui.KV("Assessment", string.IsNullOrWhiteSpace(v.DermatologistAssessment) ? "Not recorded" : v.DermatologistAssessment),
+                    Ui.KV("Agreement with the AI", string.IsNullOrWhiteSpace(v.AgreementWithAI) ? "Not recorded" : v.AgreementWithAI == "Uncertain" ? "Unable to determine" : v.AgreementWithAI)
+                }, 150, 12.5));
+            }
+            return new Border
+            {
+                Background = Ui.Brush("#F7F5EC"), BorderBrush = Ui.Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 10, 0, 0), Child = sp
+            };
+        }
+
+        /// <summary>Colour key for the boxes on the marked-areas picture: one colour per condition.</summary>
+        public static UIElement BoxLegend()
+        {
+            var w = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+            w.Children.Add(Ui.Text("Box colour:", 11, true, Ui.Muted, new Thickness(0, 1, 8, 0)));
+            for (int i = 0; i < V6Conditions.Count; i++)
+            {
+                var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 14, 0) };
+                item.Children.Add(new System.Windows.Shapes.Rectangle { Width = 14, Height = 10, Stroke = Ui.Brush(ClassPalette.Hex[i]), StrokeThickness = 2, Margin = new Thickness(0, 3, 6, 0) });
+                item.Children.Add(Ui.Text(V6Conditions.Names[i], 11, false, Ui.Ink, new Thickness(0)));
+                w.Children.Add(item);
+            }
+            return w;
         }
 
         /// <summary>The compact reading under one photograph on the Results page.</summary>
@@ -245,9 +292,11 @@ namespace SkinDevApp.V6
                 var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 0, 0, 2) };
                 int idx = V6Conditions.IndexOf(f.Condition);
                 line.Inlines.Add(new System.Windows.Documents.Run(f.Condition + ": ") { FontWeight = FontWeights.SemiBold, Foreground = idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink });
-                line.Inlines.Add(new System.Windows.Documents.Run(ClinicalSummary.FindingLine(f)) { Foreground = Ui.Ink });
+                line.Inlines.Add(new System.Windows.Documents.Run(ClinicalSummary.ConfidenceText(f) + " · " + ClinicalSummary.FindingLine(f)) { Foreground = Ui.Ink });
                 sp.Children.Add(line);
             }
+            sp.Children.Add(Ui.Text(c.MarkedAreas == 0 ? "No areas marked" : c.MarkedAreas + (c.MarkedAreas == 1 ? " area marked: " : " areas marked: ") +
+                                    string.Join(", ", c.Findings.Where(x => x.BoxCount > 0).Select(x => x.Condition + " " + x.BoxCount)), 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             foreach (string r in c.ReviewReasons.Distinct().Take(3)) sp.Children.Add(Ui.Text("•  " + r, 11, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
             foreach (string n in c.Notes) sp.Children.Add(Ui.Text(n, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return sp;
