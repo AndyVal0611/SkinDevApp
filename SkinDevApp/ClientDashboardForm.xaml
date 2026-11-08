@@ -332,8 +332,8 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Camera and picture size (the sharpest picture is used unless another size is chosen) -->
-                        <Border x:Name="CameraBox" Style="{StaticResource Panel}" Margin="0,0,0,14">
+                        <!-- Camera and picture size: hidden. The preferred camera and its sharpest picture are chosen automatically (the camera can still be changed on the Preparation screen). -->
+                        <Border x:Name="CameraBox" Visibility="Collapsed" Style="{StaticResource Panel}" Margin="0,0,0,14">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,6">
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Camera}" Foreground="#6F6F58" Width="16" Height="16" Margin="0,0,8,0"/>

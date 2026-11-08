@@ -130,7 +130,7 @@ namespace SkinDevApp.Views
         }
     }
 
-    /// <summary>The registration -> consent -> preparation -> scan route, with the consent gate.</summary>
+    /// <summary>The registration -> consent -> scan route, with the consent gate.</summary>
     public static class Workflow
     {
         public static void ContinueToScan(string participantId)
@@ -154,7 +154,7 @@ namespace SkinDevApp.Views
             if (k == null || !k.AllowsScanning)
                 Nav.Go(new ConsentPage(p.ParticipantID));
             else
-                Nav.Go(new PreparationPage());
+                Nav.Go(new ClientDashboardForm());
         }
 
         /// <summary>True when the participant has a current consent that allows image acquisition.</summary>

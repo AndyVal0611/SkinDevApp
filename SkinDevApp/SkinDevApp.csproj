@@ -235,9 +235,6 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Predictionstabilizer.cs" />
-    <Compile Include="PrepearationPage.xaml.cs">
-      <DependentUpon>PrepearationPage.xaml</DependentUpon>
-    </Compile>
     <Compile Include="RegionAttribution.cs" />
     <Compile Include="RegistrationPage.xaml.cs">
       <DependentUpon>RegistrationPage.xaml</DependentUpon>
@@ -330,10 +327,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="PatientRecordPage.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="PrepearationPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

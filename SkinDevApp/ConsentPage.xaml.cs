@@ -84,7 +84,7 @@ namespace SkinDevApp
             {
                 StudyRepository.SaveConsent(Build("Agreed"));
                 AppSession.CurrentParticipantId = _participantId;
-                Nav.Go(new PreparationPage());
+                Nav.Go(new ClientDashboardForm());
             }
             catch (Exception ex)
             {

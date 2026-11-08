@@ -77,7 +77,7 @@ namespace SkinDevApp
             splash.Step("Initializing system", 0.26, dbProblem == null ? "Database ready" : "Database problem: " + dbProblem);
 
             // Safety net: re-index scans that are on disk (and belong to a registered participant) but missing from the database.
-            Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } })
+            _ = Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } })
                 .ContinueWith(_ => SkinDevApp.V6.RecordsMaintenance.RunAsync());      // final-model results in the database, folders organised, older scans re-analysed
 
             // 2. camera: find the webcam the scan screen will use (it is opened later, on the scan screen)
