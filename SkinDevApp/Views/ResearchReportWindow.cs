@@ -615,17 +615,46 @@ namespace SkinDevApp.Views
             return sp;
         }
 
-        /// <summary>A bullet with a hanging indent: the dot in its own narrow column so wrapped lines line up under the text.</summary>
-        private FrameworkElement NoteBullet(string text)
+        /// <summary>A full-width band under the marked-area photographs: the color key, then three short notes side by side.</summary>
+        private FrameworkElement MarkedAreasNotes()
         {
-            var g = new Grid { Margin = new Thickness(0, 0, 0, 5) };
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(11) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var dot = T("•", 8.5, false, TextInk, 0);
-            var t = T(text, 8.5, false, TextInk, 0);
-            Grid.SetColumn(t, 1);
-            g.Children.Add(dot); g.Children.Add(t);
-            return g;
+            var sp = new StackPanel();
+            sp.Children.Add(T("How to read the marked areas", 10.5, true, Navy, 6));
+
+            var key = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+            for (int ci = 0; ci < 3; ci++)
+            {
+                var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 18, 0) };
+                item.Children.Add(new Border { Width = 14, Height = 10, BorderBrush = C(SkinDevApp.Imaging.ClassPalette.Hex[ci]), BorderThickness = new Thickness(2), Margin = new Thickness(0, 2, 6, 0) });
+                item.Children.Add(T(SkinDevApp.V6.V6Conditions.Names[ci], 9, false, TextInk, 0));
+                key.Children.Add(item);
+            }
+            sp.Children.Add(key);
+
+            string[][] notes =
+            {
+                new[] { "Possible locations", "Boxes show where a lesion may be. They are not an outline, a count, a measure of severity or a diagnosis." },
+                new[] { "Lesions can be missed", "A box can be wrong. Eczema findings are less established than those for acne and hyperpigmentation." },
+                new[] { "No box is not proof", "A photograph with no box does not prove that a condition is absent." }
+            };
+            var g = new Grid();
+            for (int i = 0; i < 3; i++)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                if (i < 2) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                var col = new StackPanel();
+                col.Children.Add(T(notes[i][0], 9, true, Navy, 2));
+                col.Children.Add(T(notes[i][1], 8.5, false, TextInk, 0));
+                Grid.SetColumn(col, i * 2);
+                g.Children.Add(col);
+            }
+            sp.Children.Add(g);
+            var band = Panel(sp, PanelBg, null, 12);
+            band.Margin = new Thickness(0, 4, 0, 0);
+            return band;
         }
 
         private FrameworkElement V6MarkedAreasBody()
@@ -644,14 +673,6 @@ namespace SkinDevApp.Views
                 cell.Children.Add(T(vs.BoxesLine, 8.5, false, TextInk, 0));
                 cells.Add(cell);
             }
-            var note = new StackPanel();
-            note.Children.Add(T("About these boxes", 10.5, true, Navy, 6));
-            note.Children.Add(NoteBullet("Boxes show possible locations only. They are not an outline of a lesion, a count, a measure of severity or a diagnosis."));
-            note.Children.Add(NoteBullet("Lesions can be missed, and a box can be wrong. Eczema findings are less established than acne and hyperpigmentation."));
-            note.Children.Add(NoteBullet("A photograph with no box does not prove that a condition is absent."));
-            var nb = Panel(note, PanelBg, null, 10);
-            nb.Width = ImgW; nb.VerticalAlignment = VerticalAlignment.Top;      // sized to its text, so no empty space
-            cells.Add(nb);
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
@@ -666,6 +687,7 @@ namespace SkinDevApp.Views
                 grid.Children.Add(cells[i]);
             }
             sp.Children.Add(grid);
+            sp.Children.Add(MarkedAreasNotes());
             return sp;
         }
 
