@@ -177,6 +177,8 @@
     <Compile Include="Printing\ReceiptContent.cs" />
     <Compile Include="Printing\ReceiptService.cs" />
     <Compile Include="Printing\ThermalPrinter.cs" />
+    <Compile Include="Data\Profiles.cs" />
+    <Compile Include="Views\ProfileDialog.cs" />
     <Compile Include="Views\ReceiptHistoryWindow.cs" />
     <Compile Include="Views\ReceiptPanel.cs" />
     <Compile Include="Views\ReceiptPreviewWindow.cs" />

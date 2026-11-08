@@ -118,7 +118,7 @@ namespace SkinDevApp.Data
 
     public static class StudyDatabase
     {
-        public const int SchemaVersion = 3;
+        public const int SchemaVersion = 4;
 
         public static string DbPath { get; } = DataLocation.DbFile;
 
@@ -155,6 +155,9 @@ namespace SkinDevApp.Data
                         EnsureColumn(c, tx, "SkinProfiles", col, "TEXT");
                     // Version 2: the final model's results, the scan verification status and supporting indexes (additive; nothing is dropped).
                     Exec(c, tx, SchemaV2);
+                    // Version 4: the personal details of each account holder (additive columns on the existing accounts table).
+                    foreach (string col in SkinDevApp.Data.AccountProfiles.Columns)
+                        EnsureColumn(c, tx, "ResearcherAccounts", col, "TEXT");
                     // Version 3: the dermatologist's verification of each condition (additive).
                     Exec(c, tx, @"CREATE TABLE IF NOT EXISTS DermatologistConditionReviews (
                         ReviewID INTEGER PRIMARY KEY AUTOINCREMENT, ValidationID INTEGER NOT NULL, ScanSessionID TEXT NOT NULL,

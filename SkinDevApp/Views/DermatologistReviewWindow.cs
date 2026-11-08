@@ -346,9 +346,11 @@ namespace SkinDevApp.Views
             sp.Children.Add(Label("Notes (optional)"));
             _notes = Field(true); _notes.MinHeight = 90; sp.Children.Add(_notes);
 
-            sp.Children.Add(Label("Reviewer"));
+            AccountProfile me = AccountProfiles.Get(AppSession.UserId);
+            sp.Children.Add(Label("Reviewer (from your profile)"));
             var idRow = new UniformGrid { Columns = 3 };
             _id = Field(); _name = Field(); _cred = Field();
+            _id.Text = AppSession.UserId ?? ""; _name.Text = me.FullName ?? ""; _cred.Text = me.Registration ?? "";
             foreach (var pair in new[] { Tuple.Create("Reviewer ID *", _id), Tuple.Create("Name (optional)", _name), Tuple.Create("Registration no. (optional)", _cred) })
             {
                 var col = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
