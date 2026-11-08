@@ -663,18 +663,39 @@ namespace SkinDevApp.Views
             sp.Children.Add(T("Marked Areas", 17, true, Navy, 0));
             sp.Children.Add(T("Places on each photograph where a lesion may be. Acne is marked red, hyperpigmentation blue and eczema orange.", 8.5, false, Muted, 6));
 
+            // three photographs go side by side in one row (smaller), so the notes below always fit on the page
+            bool three = _f.V6.Views.Count >= 3;
+            double cw = three ? 166 : ImgW, ch = three ? 166 : OriginalH;
             var cells = new List<FrameworkElement>();
             foreach (SkinDevApp.V6.V6ViewSummary vs in _f.V6.Views)
             {
                 CaptureViewRow v = _d.View(vs.View) ?? _d.Views.FirstOrDefault();
-                var cell = new StackPanel { Width = ImgW };
-                cell.Children.Add(ImageBox(SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), "marked-areas image not available", OriginalH, "#6B7280"));
+                var cell = new StackPanel { Width = cw };
+                cell.Children.Add(ImageBox(SkinDevApp.V6.V6ResultsView.MarkedAreasPath(v), "marked-areas image not available", ch, "#6B7280"));
                 cell.Children.Add(T(vs.View == "Single" ? "Captured image" : vs.Label, 9.5, true, Navy, 1));
                 cell.Children.Add(T(vs.BoxesLine, 8.5, false, TextInk, 0));
                 cells.Add(cell);
             }
 
             var grid = new Grid();
+            if (three)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(cw) });
+                    if (i < 2) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                }
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (int i = 0; i < Math.Min(3, cells.Count); i++)
+                {
+                    cells[i].Margin = new Thickness(0, 0, 0, 12);
+                    Grid.SetColumn(cells[i], i * 2);
+                    grid.Children.Add(cells[i]);
+                }
+                sp.Children.Add(grid);
+                sp.Children.Add(MarkedAreasNotes());
+                return sp;
+            }
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ImgW) });
