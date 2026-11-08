@@ -339,7 +339,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Dermatologist review", 17, true));
-            sp.Children.Add(Ui.Text("For each condition, choose whether you confirm what the AI reported. Nothing is filled in for you, and saving never changes the AI result.", 12, false, Ui.Muted));
+            sp.Children.Add(Ui.Text("For each condition the AI detected, choose whether you confirm it. Nothing is filled in for you, and saving never changes the AI result.", 12, false, Ui.Muted));
 
             sp.Children.Add(ConditionVerification());
 
@@ -396,7 +396,11 @@ namespace SkinDevApp.Views
             }
             catch { }
             _condRows.Clear();
-            foreach (string cond in new[] { "Acne", "Hyperpigmentation", "Eczema" })
+            // only the conditions the AI reported as detected are asked about (all three when this scan has no saved AI reading)
+            var asked = new[] { "Acne", "Hyperpigmentation", "Eczema" }.Where(c2 => _aiStatus.Count == 0 || (_aiStatus.TryGetValue(c2, out string st2) && st2 == SkinDevApp.V6.ClinicalSummary.Detected)).ToList();
+            if (asked.Count == 0)
+                sp.Children.Add(Ui.Text("The AI did not detect any condition in this scan, so there is nothing to confirm. You can still add notes below.", 13, false, Ui.Ink, new Thickness(0, 6, 0, 6)));
+            foreach (string cond in asked)
             {
                 var head = new DockPanel { Margin = new Thickness(0, 6, 0, 6) };
                 var combo = Combo(ConditionReview.All); combo.SelectedIndex = 0; combo.Width = 260; DockPanel.SetDock(combo, Dock.Right);
@@ -430,7 +434,7 @@ namespace SkinDevApp.Views
         {
             var confirmed = _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList();
             assessment = confirmed.Count == 0 ? "No condition confirmed" : string.Join(", ", confirmed);
-            if (_condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment) || _aiStatus.Count == 0) return null;
+            if (_condRows.Count == 0 || _condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment) || _aiStatus.Count == 0) return null;
             int match = 0;
             foreach (var r in _condRows)
             {

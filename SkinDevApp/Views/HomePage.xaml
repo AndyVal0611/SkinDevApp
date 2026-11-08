@@ -154,8 +154,13 @@
             </Grid>
 
             <!-- Secondary navigation -->
-            <TextBlock Text="WORKSPACE" Style="{StaticResource Eyebrow}" Margin="10,18,8,6"/>
+            <TextBlock Text="PATIENTS AND RECORDS" Style="{StaticResource Eyebrow}" Margin="10,18,8,6"/>
             <UniformGrid x:Name="NavGrid" Columns="3"/>
+
+            <TextBlock Text="SYSTEM" Style="{StaticResource Eyebrow}" Margin="10,14,8,6"/>
+            <UniformGrid x:Name="SystemGrid" Columns="3"/>
+            <Button x:Name="OldLogBtn" Style="{StaticResource GhostButton}" Content="Old report log (earlier versions, read only)" HorizontalAlignment="Left"
+                    Height="40" Padding="16,0" Margin="10,10,0,0" Visibility="Collapsed" Click="OldLogBtn_Click"/>
 
             <DockPanel Margin="10,16,8,0">
                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Info}" Foreground="#8D8D76" Width="15" Height="15" Margin="0,0,8,0"/>

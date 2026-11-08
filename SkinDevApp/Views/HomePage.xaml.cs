@@ -70,16 +70,19 @@ namespace SkinDevApp.Views
         private void BuildNav()
         {
             NavGrid.Children.Clear();
+            SystemGrid.Children.Clear();
             bool r = AppSession.IsResearcher;
 
             AddTile("Icon.Users", "#E7E8CF", "Patient records", "Find a patient, see their scans and results", r, () => Nav.Go(new PatientRecordPage()));
             AddTile("Icon.Archive", "#EFEADC", "Records & database", "Browse and manage patients, scans, AI findings and reviews", r, () => { if (ReauthDialog.Confirm("Records & database")) Nav.Go(new RecordsDatabasePage()); });
             AddTile("Icon.Clock", "#EFEADC", "Waiting for review", PendingText(), r, () => Nav.Go(new PatientRecordPage(pendingOnly: true)));
-            AddTile("Icon.Layers", "#E7E8CF", "Model information", "Which AI model is in use", r, () => Nav.Go(new ModelInfoPage()));
-            AddTile("Icon.Sliders", "#F8EBE6", "Settings", "Camera, capture and accounts", r, () => Nav.Go(new SettingsPage()));
-            AddTile("Icon.Info", "#EFEADC", "About LUMYVUE", "What this system is and is not", true, ShowAbout);
-            if (r) AddTile("Icon.Archive", "#E7E8CF", "Old report log", "Reports saved by earlier versions (read only)", true, () => Nav.Go(new UserDashboardForm()));
+            AddTile("Icon.Layers", "#E7E8CF", "Model information", "Which AI model is in use", r, () => Nav.Go(new ModelInfoPage()), SystemGrid);
+            AddTile("Icon.Sliders", "#F8EBE6", "Settings", "Camera, capture and accounts", r, () => Nav.Go(new SettingsPage()), SystemGrid);
+            AddTile("Icon.Info", "#EFEADC", "About LUMYVUE", "What this system is and is not", true, ShowAbout, SystemGrid);
+            OldLogBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        private void OldLogBtn_Click(object sender, RoutedEventArgs e) { Nav.Go(new UserDashboardForm()); }
 
         private static string PendingText()
         {
@@ -87,7 +90,7 @@ namespace SkinDevApp.Views
             catch { return "Scans waiting for review"; }
         }
 
-        private void AddTile(string icon, string tint, string title, string subtitle, bool enabled, Action go)
+        private void AddTile(string icon, string tint, string title, string subtitle, bool enabled, Action go, Panel target = null)
         {
             var dock = new DockPanel();
             var chevron = Ui.Icon("Icon.ChevronRight", 18, Ui.Brush("#AFA78F"));
@@ -103,7 +106,7 @@ namespace SkinDevApp.Views
             dock.Children.Add(sp);
             var b = new Button { Style = (Style)FindResource("NavTile"), Content = dock, IsEnabled = enabled };
             b.Click += (s, e) => go();
-            NavGrid.Children.Add(b);
+            (target ?? NavGrid).Children.Add(b);
         }
 
         private static void ShowAbout()
