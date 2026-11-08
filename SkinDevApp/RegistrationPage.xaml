@@ -323,7 +323,7 @@
                                 <StackPanel Style="{StaticResource Cell}">
                                     <TextBlock Text="Date of onset" Style="{StaticResource FieldLabel}"/>
                                     <TextBox x:Name="OnsetTxt" Style="{StaticResource Field}"/>
-                                    <TextBlock Style="{StaticResource Hint}" Text="An exact or approximate date, e.g. June 2026."/>
+                                    <TextBlock Style="{StaticResource Hint}" Text="An exact or approximate date, for example, June 2026."/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Cell}">
                                     <TextBlock Text="Affected area" Style="{StaticResource FieldLabel}"/>
@@ -445,7 +445,7 @@
                     <!-- ===================================================== 8. family medical history -->
                     <Border x:Name="SecFamily" Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,6" Text="Tick Father and/or Mother for each condition in the family."/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,6" Text="Select Father, Mother, or both for each condition present in the family."/>
                             <ContentControl x:Name="FamilyHost"/>
                             <TextBlock Text="Other conditions in the family" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="FamilyOtherTxt" Style="{StaticResource Field}"/>
@@ -489,7 +489,7 @@
                                     <RadioButton Content="Non-erythematous" GroupName="Redness" Style="{StaticResource Choice}"/>
                                 </WrapPanel>
 
-                                <TextBlock Grid.Row="3" Text="Colour" Style="{StaticResource ExamLabel}"/>
+                                <TextBlock Grid.Row="3" Text="Color" Style="{StaticResource ExamLabel}"/>
                                 <WrapPanel x:Name="ColorPanel" Grid.Row="3" Grid.Column="1" Tag="Optional">
                                     <RadioButton Content="Skin-colored" GroupName="Color" Style="{StaticResource Choice}"/>
                                     <RadioButton Content="Hyperpigmented" GroupName="Color" Style="{StaticResource Choice}"/>

@@ -273,13 +273,13 @@ namespace SkinDevApp.Views
                     ScanView captured = v; string path = img; string title = ScanViews.Title(v);
                     if (!string.IsNullOrEmpty(path) && File.Exists(path))
                     {
-                        var inspect = new Button { Style = (Style)FindResource("GhostButton"), Height = 36, Padding = new Thickness(12, 0, 12, 0), Margin = new Thickness(0, 0, 8, 0), Content = "Inspect" };
+                        var inspect = new Button { Style = (Style)FindResource("GhostButton"), Height = 44, Padding = new Thickness(14, 0, 14, 0), Margin = new Thickness(0, 0, 8, 0), Content = "Inspect" };
                         inspect.Click += (s, e) => ImagePopup.Show(path, title);
                         btns.Children.Add(inspect);
                     }
                     if (_live != null)
                     {
-                        var retake = new Button { Style = (Style)FindResource("GhostButton"), Height = 36, Padding = new Thickness(12, 0, 12, 0), Content = "Retake" };
+                        var retake = new Button { Style = (Style)FindResource("GhostButton"), Height = 44, Padding = new Thickness(14, 0, 14, 0), Content = "Retake" };
                         retake.Click += (s, e) => RetakeView(captured);
                         btns.Children.Add(retake);
                     }

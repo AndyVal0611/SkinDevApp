@@ -285,7 +285,7 @@ namespace SkinDevApp.Views
                     title = "Heat map" + (lead == null ? "" : " · " + lead);
                     path = lead == null ? null : SkinDevApp.V6.V6Heatmaps.OverlayPath(cur.RecordFolder, lead);
                     note = path == null ? "No heat map is stored for this view." :
-                           "Where the lesion detectors found evidence for " + lead + " (colour = the condition, strength = detector confidence). It is not an outline of the affected skin.";
+                           "Where the lesion detectors found evidence for " + lead + " (color = the condition, strength = detector confidence). It is not an outline of the affected skin.";
                     break;
                 case "Affected Area / Localization":
                     title = "AI-identified region of interest";
@@ -293,7 +293,7 @@ namespace SkinDevApp.Views
                     {
                         path = !string.IsNullOrEmpty(cur.Localization.OverlayPath) ? cur.Localization.OverlayPath : cur.Localization.CombinedPath;
                         int n = cur.Lesions.Count;
-                        note = (n == 0 ? "The model localized no suspected affected area in this view." : "Model-localized suspected affected area(s): " + n + ". ") +
+                        note = (n == 0 ? "The model localized no suspected affected area in this view." : "Marked areas: " + n + ". ") +
                                "These are model outputs, not clinically confirmed lesions.";
                     }
                     else note = "No localization is available for this view.";
@@ -490,7 +490,7 @@ namespace SkinDevApp.Views
         private UIElement DisclaimerCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("AI-Assisted Research Output", 13, true, Ui.Ink));
+            sp.Children.Add(Ui.Text("Important notice", 13, true, Ui.Ink));
             sp.Children.Add(Ui.Text(Disclaimer, 11.5, false, Ui.Muted, new Thickness(0, 3, 0, 0)));
             var b = Ui.Card(sp, new Thickness(0, 0, 0, 12));
             b.Background = Ui.Brush("#F8FAFC");

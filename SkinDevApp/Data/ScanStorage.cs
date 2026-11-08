@@ -166,7 +166,7 @@ namespace SkinDevApp.Data
                 string after = Place(id);
                 if (after != null && !string.Equals(before, after, StringComparison.OrdinalIgnoreCase)) moved++;
             }
-            if (moved > 0) StudyRepository.Audit("Scan storage organised", "ScanSessions", null, moved + " scan folder(s) placed under Patient Records");
+            if (moved > 0) StudyRepository.Audit("Scan storage organized", "ScanSessions", null, moved + " scan folder(s) placed under Patient Records");
             return moved;
         }
 

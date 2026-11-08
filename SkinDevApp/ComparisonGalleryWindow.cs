@@ -62,7 +62,7 @@ namespace SkinDevApp.Views
 
         /// <summary>
         /// Class-coloured overlay from the saved 8-bit per-class heatmap:
-        /// alpha = heat^gamma (the same shaping as the saved overlay files), colour = class colour.
+        /// alpha = heat^gamma (the same shaping as the saved overlay files), color = class colour.
         /// Shown with Image.Opacity so the researcher can fade it in and out.
         /// </summary>
         public static BitmapSource BuildOverlay(string heatmapPath, string colorHex)
@@ -574,7 +574,7 @@ namespace SkinDevApp.Views
                 _info.Text = card.Title + ": no heatmap was saved for this class.";
             else
                 _info.Text = card.Title + "   " + card.ScoreText + "   " + card.Note +
-                             "   (Colour = this class; the map is normalised per class, so compare its shape, not its brightness, with other classes.)";
+                             "   (Color = this class; the map is normalized per class, so compare its shape, not its brightness, with other classes.)";
         }
     }
 }

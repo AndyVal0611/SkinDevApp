@@ -426,8 +426,7 @@ namespace SkinDevApp
         // ---------------------------------------------------------- accounts tab --
 
         private TextBlock _acctMsg, _acctList;
-        private PasswordBox _curPw, _newPw, _newPw2, _addPw, _addPw2;
-        private TextBox _addUser;
+        private PasswordBox _curPw, _newPw, _newPw2;
 
         private static PasswordBox Pw() => new PasswordBox { Style = (Style)Application.Current.FindResource("FieldPassword"), Height = 36, Width = 300, Margin = new Thickness(0, 0, 0, 8) };
 
@@ -442,41 +441,64 @@ namespace SkinDevApp
             return sp;
         }
 
+        private StackPanel _acctHost;
+
         private UIElement BuildAccountsTab()
         {
-            _acctList = Ui.Text("", 13, false, Ui.Ink, new Thickness(0));
-
             _curPw = Pw(); _newPw = Pw(); _newPw2 = Pw();
             var change = Labeled(Tuple.Create("Current password", (UIElement)_curPw), Tuple.Create("New password", (UIElement)_newPw), Tuple.Create("Confirm new password", (UIElement)_newPw2));
             Button changeBtn = Ui.Btn("Change password", (s, e) => ChangeMyPassword(), "SecondaryButton", 190);
             changeBtn.HorizontalAlignment = HorizontalAlignment.Left;
             change.Children.Add(changeBtn);
 
-            _addUser = new TextBox { Style = (Style)FindResource("Field"), Height = 36, Width = 300, Margin = new Thickness(0, 0, 0, 8) };
-            _addPw = Pw(); _addPw2 = Pw();
-            var add = Labeled(Tuple.Create("Username", (UIElement)_addUser),
-                              Tuple.Create("Password (at least " + AuthService.MinPasswordLength + " characters)", (UIElement)_addPw),
-                              Tuple.Create("Confirm password", (UIElement)_addPw2));
-            Button addBtn = Ui.Btn("Add account", (s, e) => AddAccount(), "SecondaryButton", 190);
-            addBtn.HorizontalAlignment = HorizontalAlignment.Left;
-            add.Children.Add(addBtn);
-
             _acctMsg = Ui.Text("", 12, false, Ui.Muted, new Thickness(0, 12, 0, 6));
-
+            _acctHost = new StackPanel();
             RefreshAccounts();
-            return RowCard(new UIElement[]
+
+            var rows = new System.Collections.Generic.List<UIElement>();
+            if (AppSession.IsAdministrator)
             {
-                Row("Accounts", "Everyone listed here can sign in and use every screen.", _acctList),
-                Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change),
-                Row("Add an account", "Create an account for another dermatologist or assistant. Passwords are stored only as salted hashes.", add),
-                new Border { Child = _acctMsg }
-            });
+                Button addBtn = Ui.Btn("Create account", (s, e) => { if (CreateAccountDialog.Run(Application.Current.MainWindow)) { RefreshAccounts(); AcctMessage("The account was created.", true); } }, "PrimaryButton", 200);
+                addBtn.HorizontalAlignment = HorizontalAlignment.Left;
+                addBtn.Margin = new Thickness(0, 10, 0, 0);
+                var host = new StackPanel();
+                host.Children.Add(_acctHost);
+                host.Children.Add(addBtn);
+                rows.Add(Row("Accounts", "Everyone listed here can sign in. Create an account for a dermatologist or another administrator who will use the prototype.", host));
+            }
+            rows.Add(Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change));
+            rows.Add(new Border { Child = _acctMsg });
+            return RowCard(rows.ToArray());
         }
 
         private void RefreshAccounts()
         {
-            try { _acctList.Text = string.Join(",  ", AuthService.Usernames()); }
-            catch (Exception ex) { _acctList.Text = "The accounts could not be read: " + ex.Message; }
+            if (_acctHost == null) return;
+            _acctHost.Children.Clear();
+            try
+            {
+                var g = new Grid();
+                double[] w = { 150, 230, 140 };
+                foreach (double x in w) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(x) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                string[] head = { "Username", "Name", "Type", "Created" };
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (int k = 0; k < head.Length; k++) { var t = Ui.Text(head[k], 11, true, Ui.Muted, new Thickness(0, 0, 8, 4)); Grid.SetColumn(t, k); g.Children.Add(t); }
+                int row = 1;
+                foreach (string[] a in AuthService.Accounts())
+                {
+                    g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    string[] cells = { a[0], string.IsNullOrWhiteSpace(a[1]) ? "—" : a[1], a[2], a[3].Length >= 10 ? a[3].Substring(0, 10) : a[3] };
+                    for (int k = 0; k < cells.Length; k++)
+                    {
+                        var t = Ui.Text(cells[k], 12.5, k == 0, Ui.Ink, new Thickness(0, 5, 8, 5));
+                        Grid.SetRow(t, row); Grid.SetColumn(t, k); g.Children.Add(t);
+                    }
+                    row++;
+                }
+                _acctHost.Children.Add(g);
+            }
+            catch (Exception ex) { _acctHost.Children.Add(Ui.Text("The accounts could not be read: " + ex.Message, 12.5, false, Ui.Bad)); }
         }
 
         private void AcctMessage(string text, bool ok)
@@ -494,19 +516,6 @@ namespace SkinDevApp
                 AuthService.ChangePassword(AppSession.UserId, _curPw.Password, _newPw.Password);
                 _curPw.Clear(); _newPw.Clear(); _newPw2.Clear();
                 AcctMessage("Your password was changed.", true);
-            }
-            catch (Exception ex) { AcctMessage(ex.Message, false); }
-        }
-
-        private void AddAccount()
-        {
-            if (_addPw.Password != _addPw2.Password) { AcctMessage("The two passwords do not match.", false); return; }
-            try
-            {
-                AuthService.CreateAccount(_addUser.Text, _addPw.Password, AppSession.ActorId);
-                AcctMessage("The account \"" + _addUser.Text.Trim() + "\" was created.", true);
-                _addUser.Clear(); _addPw.Clear(); _addPw2.Clear();
-                RefreshAccounts();
             }
             catch (Exception ex) { AcctMessage(ex.Message, false); }
         }

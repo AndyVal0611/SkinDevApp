@@ -93,7 +93,7 @@ namespace SkinDevApp.V6
             return ClinicalCategory.NotCompleted;
         }
 
-        public const string Disclaimer = "AI-assisted screening result, not a diagnosis. It is not clinically validated and must be confirmed by a dermatologist.";
+        public const string Disclaimer = "AI-assisted screening result. It is not a diagnosis, has not been clinically validated, and must be confirmed by a dermatologist.";
 
         // ------------------------------------------------------------------ certainty and regions
 
@@ -138,7 +138,7 @@ namespace SkinDevApp.V6
         public static ClinicalSummary From(UnifiedAssessment a, double[] faceBox = null)
         {
             var s = new ClinicalSummary();
-            if (a == null) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "No result from the final model is stored for this photograph."; return s; }
+            if (a == null) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "No result is stored for this photograph."; return s; }
 
             foreach (ConditionAssessment c in a.Conditions)
             {
@@ -153,7 +153,6 @@ namespace SkinDevApp.V6
                     // detector-led condition: the marked area counts as a finding; certainty from the detector's own confidence on the face, never "high"
                     double conf = onFace.Select(b => (double)b.Confidence).DefaultIfEmpty(0).Max();
                     status = Detected; source = SourceDetector; certainty = conf >= 0.50 ? "Moderate" : "Low";
-                    s.Notes.Add(c.Condition + " was found by its lesion detector; the whole-face reading did not confirm it.");
                 }
                 var f = new ClinicalFinding
                 {
@@ -168,18 +167,18 @@ namespace SkinDevApp.V6
             s.MarkedAreas = s.Findings.Sum(f => f.BoxCount);
             // an uncertain model state with no specific reason left still needs review, unless the uncertainty was a detector-led finding resolved above
             if (a.State == V6States.UncertainReviewRequired && s.ReviewReasons.Count == 0 && !s.Findings.Any(f => f.ByDetector))
-                s.ReviewReasons.Add("The AI marked this result as uncertain.");
+                s.ReviewReasons.Add("The result is uncertain.");
 
             switch (a.State)
             {
                 case V6States.RecaptureRequired:
                     // no condition reading is reported for a photograph that has to be retaken: only why
-                    s.Category = ClinicalCategory.Retake; s.Title = "Photograph needs to be retaken";
+                    s.Category = ClinicalCategory.Retake; s.Title = "Photograph must be retaken";
                     s.Explanation = "The photograph quality was not good enough for a reliable reading, so no condition is reported for it.";
                     s.Findings.Clear(); s.ReviewReasons = QualityReasons(a); return s;
                 case V6States.InferenceError:
                     s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed";
-                    s.Explanation = "The AI analysis could not be completed for this photograph."; s.Findings.Clear(); s.ReviewReasons.Clear(); return s;
+                    s.Explanation = "The analysis could not be completed for this photograph."; s.Findings.Clear(); s.ReviewReasons.Clear(); return s;
             }
 
             List<string> detected = s.DetectedFindings.Select(f => f.Condition).ToList();
@@ -189,21 +188,21 @@ namespace SkinDevApp.V6
             {
                 s.Category = ClinicalCategory.ConditionDetected;
                 s.Title = "Condition detected: " + Join(detected);
-                s.Explanation = "The AI found signs of " + Join(detected).ToLowerInvariant() + ". A dermatologist must confirm this.";
+                s.Explanation = "The screening found signs of " + Join(detected).ToLowerInvariant() + ". A dermatologist must confirm this.";
             }
             else if (!review)
             {
                 s.Category = ClinicalCategory.NoConditionDetected;
                 s.Title = "No condition detected";
-                s.Explanation = "The AI found no signs of acne, hyperpigmentation or eczema in this photograph. This does not rule out a skin condition.";
+                s.Explanation = "The screening found no signs of acne, hyperpigmentation or eczema in this photograph. This does not rule out a skin condition.";
             }
             else
             {
                 s.Category = ClinicalCategory.NeedsReview;
                 s.Title = detected.Count > 0 ? Join(detected) + " detected · needs review" : "Needs dermatologist review";
                 s.Explanation = detected.Count > 0
-                    ? "The AI found signs of " + Join(detected).ToLowerInvariant() + ", and part of the result needs a dermatologist's review."
-                    : "The AI result is not clear enough to call. A dermatologist should review this photograph.";
+                    ? "The screening found signs of " + Join(detected).ToLowerInvariant() + ", and part of the result needs a dermatologist's review."
+                    : "The result is not clear enough to classify. Dermatologist review is recommended for this photograph.";
             }
             return s;
         }
@@ -213,7 +212,7 @@ namespace SkinDevApp.V6
             var r = new List<string>();
             foreach (string q in a.Flags.Where(x => x.StartsWith("quality_") && !x.StartsWith("quality_warning")))
                 r.Add(V6QualityMapper.Advice(q.Substring("quality_".Length)) ?? "Photo quality: " + q.Substring("quality_".Length));
-            if (r.Count == 0) r.Add("Please retake the photograph with even lighting, the face in focus and filling the guide.");
+            if (r.Count == 0) r.Add("Please retake the photograph with even lighting and the face in focus, filling the guide.");
             return r;
         }
 
@@ -221,17 +220,17 @@ namespace SkinDevApp.V6
         {
             var r = new List<string>();
             foreach (ClinicalFinding f in findings.Where(x => x.Status == Possible))
-                r.Add(f.Condition + ": a lesion detector marked an area, but the overall model did not confirm it.");
+                r.Add(f.Condition + ": an area was marked on the photograph and requires clinical review.");
             List<string> inconclusive = findings.Where(x => x.Status == Inconclusive).Select(x => x.Condition).ToList();
             if (inconclusive.Count > 0) r.Add(Join(inconclusive) + ": the result was inconclusive.");
             List<string> conflict = a.Flags.Where(x => x.StartsWith("cnn_yolo_conflict_")).Select(x => x.Substring("cnn_yolo_conflict_".Length))
                                      .Where(c => !findings.Any(f => f.Condition == c && (f.Status == Possible || f.ByDetector))).ToList();
-            if (conflict.Count > 0) r.Add(Join(conflict) + ": the whole-face reading and the lesion detector disagree.");
+            if (conflict.Count > 0) r.Add(Join(conflict) + ": the findings are inconclusive and require clinical review.");
             if (a.Flags.Contains("ood") || a.State == V6States.OutOfScopeReviewRequired) r.Add("The photograph looks unlike the photographs the system was trained on.");
             foreach (string q in a.Flags.Where(x => x.StartsWith("quality_") && !x.StartsWith("quality_warning")))
                 r.Add(V6QualityMapper.Advice(q.Substring("quality_".Length)) ?? "Photo quality: " + q.Substring("quality_".Length));
             if (a.Flags.Any(x => x.StartsWith("quality_warning:face_not_found"))) r.Add("No face was found, so photo quality could not be fully checked.");
-            if (a.Reasons.Any(x => x.StartsWith("detector unavailable"))) r.Add("A lesion detector was not available, so absence cannot be confirmed.");
+            if (a.Reasons.Any(x => x.StartsWith("detector unavailable"))) r.Add("The absence of this condition could not be confirmed for this photograph.");
             if (a.Reasons.Any(x => x.StartsWith("image quality was not assessed"))) r.Add("Photo quality could not be checked, so a clear result cannot be confirmed.");
             return r;
         }
@@ -242,7 +241,7 @@ namespace SkinDevApp.V6
         public static ClinicalSummary ForScan(IList<KeyValuePair<string, ClinicalSummary>> views)
         {
             var s = new ClinicalSummary();
-            if (views == null || views.Count == 0) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "No result from the final model is stored for this scan."; return s; }
+            if (views == null || views.Count == 0) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "No result is stored for this scan."; return s; }
             if (views.Count == 1) return views[0].Value;
 
             foreach (string cond in V6Conditions.Names)
@@ -271,7 +270,7 @@ namespace SkinDevApp.V6
             s.MarkedAreas = views.Sum(v => v.Value.MarkedAreas);
             List<string> detected = s.DetectedFindings.Select(f => f.Condition).ToList();
             bool anyProblem = views.Any(v => v.Value.Category == ClinicalCategory.NeedsReview || v.Value.Category == ClinicalCategory.Retake || v.Value.Category == ClinicalCategory.NotCompleted);
-            if (views.All(v => v.Value.Category == ClinicalCategory.NotCompleted)) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "The AI analysis could not be completed for this scan."; }
+            if (views.All(v => v.Value.Category == ClinicalCategory.NotCompleted)) { s.Category = ClinicalCategory.NotCompleted; s.Title = "Analysis not completed"; s.Explanation = "The analysis could not be completed for this scan."; }
             else if (anyProblem)
             {
                 s.Category = ClinicalCategory.NeedsReview;
@@ -281,9 +280,9 @@ namespace SkinDevApp.V6
             else if (detected.Count > 0)
             {
                 s.Category = ClinicalCategory.ConditionDetected; s.Title = "Condition detected: " + Join(detected);
-                s.Explanation = "The AI found signs of " + Join(detected).ToLowerInvariant() + ". A dermatologist must confirm this.";
+                s.Explanation = "The screening found signs of " + Join(detected).ToLowerInvariant() + ". A dermatologist must confirm this.";
             }
-            else { s.Category = ClinicalCategory.NoConditionDetected; s.Title = "No condition detected"; s.Explanation = "The AI found no signs of acne, hyperpigmentation or eczema in these photographs. This does not rule out a skin condition."; }
+            else { s.Category = ClinicalCategory.NoConditionDetected; s.Title = "No condition detected"; s.Explanation = "The screening found no signs of acne, hyperpigmentation or eczema in these photographs. This does not rule out a skin condition."; }
             return s;
         }
 
@@ -308,7 +307,7 @@ namespace SkinDevApp.V6
         /// for "not detected" the confidence that the condition is absent (1 - probability); for possible / inconclusive the model probability, which is below the decision limit.</summary>
         public static string ConfidenceText(ClinicalFinding f)
         {
-            if (f.ByDetector) return "Detector " + Percent(f.BestBoxConfidence);
+            if (f.ByDetector) return Percent(f.BestBoxConfidence);
             if (f.Status == Detected) return Percent(f.Probability);
             if (f.Status == NotDetected) return Percent(1.0 - f.Probability);
             return Percent(f.Probability) + " (below limit)";
@@ -317,8 +316,8 @@ namespace SkinDevApp.V6
         /// <summary>One concise sentence: what was found, with certainty, and how many areas were marked.</summary>
         public static string SummaryLine(ClinicalSummary s)
         {
-            if (s.Category == ClinicalCategory.Retake) return "No condition is reported: the photograph has to be retaken.";
-            if (s.Category == ClinicalCategory.NotCompleted) return "The AI analysis could not be completed.";
+            if (s.Category == ClinicalCategory.Retake) return "No condition is reported because the photograph must be retaken.";
+            if (s.Category == ClinicalCategory.NotCompleted) return "The analysis could not be completed.";
             var parts = new List<string>();
             foreach (ClinicalFinding f in s.Findings.Where(x => x.Status == Detected))
                 parts.Add(f.Condition + " detected" + " (" + f.Certainty.ToLowerInvariant() + " certainty)");

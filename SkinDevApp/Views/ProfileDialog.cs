@@ -29,6 +29,8 @@ namespace SkinDevApp.Views
             Height = 800;
             MinWidth = 700;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            WindowStyle = WindowStyle.None;
+            BorderBrush = Ui.Line; BorderThickness = new Thickness(1);
             Background = (System.Windows.Media.Brush)Application.Current.FindResource("PageWash");
             var root = new DockPanel();
             _body = new StackPanel { Margin = new Thickness(26, 20, 26, 10) };

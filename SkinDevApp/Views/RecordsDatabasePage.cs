@@ -100,7 +100,7 @@ namespace SkinDevApp.Views
                 _summary.Children.Add(wrap);
             }
             catch (Exception ex) { _summary.Children.Add(Ui.Text("The database could not be read: " + ex.Message, 13, false, Ui.Bad)); }
-            _summary.Children.Add(Ui.Text("Background upkeep: " + SkinDevApp.V6.RecordsMaintenance.Status + "   ·   The database is backed up automatically every day (last backup: " + (RecordsQueries.LastBackupText() ?? "none yet") + ").", 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            _summary.Children.Add(Ui.Text("Maintenance: " + SkinDevApp.V6.RecordsMaintenance.Status + "   ·   The database is backed up automatically every day (last backup: " + (RecordsQueries.LastBackupText() ?? "none yet") + ").", 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
         }
 
         private static Button SmallBtn(string text, RoutedEventHandler click)

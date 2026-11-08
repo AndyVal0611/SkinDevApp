@@ -21,6 +21,7 @@ namespace SkinDevApp.Views
         private void Page_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
         {
             _pageWidth = e.NewSize.Width;
+            if (Sidebar != null) Sidebar.Width = _pageWidth < 1300 ? 210 : 244;
             ApplyCardColumns();
             if (StatsGrid != null) StatsGrid.Columns = e.NewSize.Width < 1000 ? 2 : 4;
         }
@@ -141,11 +142,11 @@ namespace SkinDevApp.Views
             if (withReview)
             {
                 Button rv = Ui.Btn("Review", (o, e) => { new DermatologistReviewWindow(id) { Owner = Application.Current.MainWindow }.ShowDialog(); ShowCurrentParticipant(); BuildNav(); }, "PrimaryButton");
-                rv.Height = 38; rv.Margin = new Thickness(0, 0, 8, 0);
+                rv.Height = 44; rv.Margin = new Thickness(0, 0, 8, 0);
                 right.Children.Add(rv);
             }
             Button open = Ui.Btn("Open", (o, e) => Nav.Go(new ResultsPage(id)), "GhostButton");
-            open.Height = 38;
+            open.Height = 44;
             right.Children.Add(open);
             DockPanel.SetDock(right, Dock.Right);
             row.Children.Add(right);

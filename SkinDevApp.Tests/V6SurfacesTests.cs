@@ -85,7 +85,7 @@ namespace SkinDevApp.Tests
             Assert.Contains(s.Notes, n => n.Contains("do not all show the same findings"));
             Assert.Equal("Needs review: Hyperpigmentation", s.ShortLabel);
             Assert.Equal("Left side", s.Views[1].Label); Assert.Single(s.Views[1].FlagLines);
-            Assert.Contains("Eczema: the whole-face reading and the lesion detector disagree (Left side).", s.Clinical.ReviewReasons);
+            Assert.Contains("Eczema: the findings are inconclusive and require clinical review (Left side).", s.Clinical.ReviewReasons);
         }
 
         [Fact]
@@ -133,10 +133,10 @@ namespace SkinDevApp.Tests
                 V6FeatureFlag.Provider = () => true;
                 ReportFindings f = ReportFindings.Build(Session("Single", dir));
                 Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside the final model's result
-                Assert.Contains(f.Lines, l => l.StartsWith("AI screening result (needs review): Acne detected · needs review"));
-                Assert.Contains(f.Lines, l => l.StartsWith("Verification status: Pending verification"));
-                Assert.Contains(f.Lines, l => l.Contains("Acne: Detected")); Assert.Contains(f.Lines, l => l.Contains("confirmed by a dermatologist"));
-                Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("Eczema: the whole-face reading and the lesion detector disagree"));
+                Assert.Contains(f.Lines, l => l.StartsWith("Screening result: Acne detected · needs review"));
+                Assert.Contains(f.Lines, l => l.StartsWith("Review status: Pending verification"));
+                Assert.Contains(f.Lines, l => l.Contains("Detected: Acne")); Assert.Contains(f.Lines, l => l.Contains("A dermatologist must confirm it"));
+                Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("Eczema: the findings are inconclusive"));
                 Assert.Null(f.Interpretation);                                                                              // the V5 interpretation is not built
                 V6FeatureFlag.Provider = () => false;
                 ReportFindings off = ReportFindings.Build(Session("Single", dir));

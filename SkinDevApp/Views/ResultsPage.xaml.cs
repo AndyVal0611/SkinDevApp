@@ -60,7 +60,7 @@ namespace SkinDevApp.Views
             SubtitleTxt.Text = (s.ParticipantID ?? "Scan without a patient" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")")) +
                                (_d.Participant != null ? "  ·  " + _d.Participant.FullName : "") +
                                "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (string.IsNullOrEmpty(s.AIModel) ? "Final model result pending" : s.AIModel) +
-                               "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalised)");
+                               "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalized)");
 
             _v6 = SkinDevApp.V6.V6ResultsView.Load(_d, out _v6Problems);
             if (_v6 != null) _viewMode = "Localization";          // the AI result opens on the photograph with the detector's boxes
@@ -147,7 +147,7 @@ namespace SkinDevApp.Views
                     IsChecked = mode == _viewMode,
                     Margin = new Thickness(0, 0, 18, 0),
                     FontSize = 13,
-                    ToolTip = mode == "V6Heat" ? "Where the lesion detectors found evidence for the chosen condition. Colour = the condition, strength = detector confidence. It is one input of the unified assessment, not an explanation of the model."
+                    ToolTip = mode == "V6Heat" ? "Where the lesion detectors found evidence for the chosen condition. Color = the condition, strength = detector confidence. It is one input of the unified assessment, not an explanation of the model."
                             : mode == "V6Both" ? "The same evidence map with the marked boxes on top."
                             : mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
                             : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the chosen condition. Kept from V5 for comparison; it explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
@@ -307,6 +307,7 @@ namespace SkinDevApp.Views
             {
                 actions.Children.Add(Ui.Text(title, 11, true, Ui.Brush("#9B9B84"), new Thickness(2, actions.Children.Count > 2 ? 8 : 0, 0, 6)));
             }
+            StackPanel target = actions;
             void Add(string text, RoutedEventHandler h, string style = "SecondaryButton", bool enabled = true)
             {
                 Button b = Ui.Btn(text, h, style);
@@ -315,7 +316,7 @@ namespace SkinDevApp.Views
                 b.Margin = new Thickness(0, 0, 0, 8);
                 if (style == "GhostButton") { b.Height = 46; b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Padding = new Thickness(18, 0, 18, 0); }
                 b.IsEnabled = enabled;
-                actions.Children.Add(b);
+                target.Children.Add(b);
             }
 
             bool hasFolder = !string.IsNullOrEmpty(_d.Session.SessionFolder) && System.IO.Directory.Exists(_d.Session.SessionFolder);
@@ -329,12 +330,13 @@ namespace SkinDevApp.Views
                 }, "PrimaryButton");
                 Add("Compare photographs and marked areas", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
-            Group("PATIENT RESULTS & REPORTS");
+            var printHost = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+            target = printHost;
             // thermal receipts: preliminary (AI only) and final (after the dermatologist review); printing always starts from the preview
             ReceiptState rs = ReceiptService.State(_d);
             PrinterSettings ps = PrinterSettings.Load();
             foreach (Tuple<string, int> line in ReceiptPanel.Status(rs, ps))
-                actions.Children.Add(Ui.Text(line.Item1, 11.5, false, ReceiptPanel.LevelBrush(line.Item2), new Thickness(2, 0, 0, 6)));
+                printHost.Children.Add(Ui.Text(line.Item1, 11.5, false, ReceiptPanel.LevelBrush(line.Item2), new Thickness(2, 0, 0, 6)));
             foreach (ReceiptPanel.Item it in ReceiptPanel.Items(_d, rs, ps, Render))
             {
                 ReceiptPanel.Item item = it;
@@ -342,6 +344,12 @@ namespace SkinDevApp.Views
                 Add(it.Text, (s, e) => item.Run?.Invoke(), it.Preferred && it.Enabled ? "PrimaryButton" : it.Text.StartsWith("Print") ? "SecondaryButton" : "GhostButton", it.Enabled);
             }
             Add("Detailed A4 report", (s, e) => ResearchReportWindow.Open(_sessionId), "AccentButton");
+            target = actions;
+            actions.Children.Add(new Expander
+            {
+                Header = new TextBlock { Text = "Print and reports", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
+                IsExpanded = false, Margin = new Thickness(0, 4, 0, 6), Content = printHost
+            });
             Group("GO TO");
             if (r && !string.IsNullOrEmpty(_d.Session.ParticipantID))
                 Add("Patient record", (s, e) => Nav.Go(new PatientRecordPage(_d.Session.ParticipantID)), "GhostButton");

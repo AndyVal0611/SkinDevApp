@@ -3,7 +3,7 @@
 //
 // The V6 LIVE reading: every few seconds it runs the full V6 assessment (Global model + the three detector ensembles + trained fusion) on the newest camera
 // frame, publishes it for the live panel, and keeps its evidence heat map for the live preview. One assessment at a time, newest frame wins, paused while a
-// capture is being finalised. It only runs when V6FeatureFlag is on. It never decides when to capture (that stays with V5's steadiness logic) and never saves
+// capture is being finalized. It only runs when V6FeatureFlag is on. It never decides when to capture (that stays with V5's steadiness logic) and never saves
 // anything: the saved result comes from the final analysis of the captured frame, as before.
 //
 // Timing: one assessment takes about 2 s on CPU, so the reading refreshes every 2-3 s, not per frame.

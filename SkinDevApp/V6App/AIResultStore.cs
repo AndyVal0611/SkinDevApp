@@ -159,7 +159,6 @@ namespace SkinDevApp.V6
                                 Probability = StudyRepository.D(r, "Probability") ?? 0, Threshold = StudyRepository.D(r, "Threshold") ?? 0,
                                 Source = StudyRepository.S(r, "Source") ?? ClinicalSummary.SourceModel
                             };
-                            if (f.ByDetector) v.Summary.Notes.Add(f.Condition + " was found by its lesion detector; the whole-face reading did not confirm it.");
                             f.NeedsReview = f.Status == ClinicalSummary.Possible || f.Status == ClinicalSummary.Inconclusive;
                             string regions = StudyRepository.S(r, "Regions");
                             if (!string.IsNullOrEmpty(regions)) f.Regions = regions.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).ToList();

@@ -70,6 +70,20 @@ namespace SkinDevApp.Views
 
         private static string P(double v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
+        /// <summary>One plain sentence per photograph for a dermatologist: what was found, how sure, where; no model wording.</summary>
+        private static string PlainViewLine(SkinDevApp.V6.V6ViewSummary v)
+        {
+            SkinDevApp.V6.ClinicalSummary c = v.Clinical;
+            if (c.Category == SkinDevApp.V6.ClinicalCategory.Retake) return "Not clear enough to read; please retake the photograph.";
+            var det = c.Findings.Where(x => x.IsDetected)
+                .Select(x => x.Condition + " (" + x.Certainty.ToLowerInvariant() + " certainty" + (x.Regions.Count > 0 ? "; " + string.Join(", ", x.Regions) : "") + ")").ToList();
+            var poss = c.Findings.Where(x => x.Status == SkinDevApp.V6.ClinicalSummary.Possible || x.Status == SkinDevApp.V6.ClinicalSummary.Inconclusive)
+                .Select(x => x.Condition + (x.Regions.Count > 0 ? " (" + string.Join(", ", x.Regions) + ")" : "")).ToList();
+            string text = det.Count > 0 ? "Detected: " + string.Join(", ", det) + "." : "No condition detected.";
+            if (poss.Count > 0) text += " Possible, please check: " + string.Join(", ", poss) + ".";
+            return text;
+        }
+
         public static ReportFindings Build(SessionDetail d)
         {
             var f = new ReportFindings();
@@ -83,19 +97,18 @@ namespace SkinDevApp.Views
             {
                 // V6 flag on: the report states the one unified assessment; the V5 classifier lines and the Grad-CAM++ attribution pages are not part of it
                 f.HasResult = true;
-                f.Lines.Add("AI screening result (" + f.V6.Clinical.CategoryLabel.ToLowerInvariant() + "): " + f.V6.Headline + ".");
-                f.Lines.Add("Verification status: " + f.V6.ReviewStatus + ".");
+                f.Lines.Add("Screening result: " + f.V6.Headline + ".");
+                f.Lines.Add("Review status: " + f.V6.ReviewStatus + ".");
                 foreach (SkinDevApp.V6.V6ViewSummary v in f.V6.Views)
                 {
-                    if (!f.V6.Single) f.Lines.Add(v.Label + ": " + v.Headline);              // one photograph: the headline above already says it
-                    foreach (string c in v.ConditionLines) f.Lines.Add(c);
-                    f.Lines.Add(v.BoxesLine);
+                    f.Lines.Add((f.V6.Single ? "" : v.Label + ": ") + PlainViewLine(v));
                     foreach (string flag in v.FlagLines) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + flag);
                     if (v.ReviewRequired && v.FlagLines.Count == 0) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + v.Headline + ".");
                 }
-                foreach (string n in f.V6.Notes) f.Lines.Add(n);
+                if (!f.V6.Single && f.V6.Views.Select(v => string.Join("|", v.Clinical.DetectedFindings.Select(x => x.Condition))).Distinct().Count() > 1)
+                    f.Lines.Add("The photographs do not all show the same findings; each is listed separately.");
                 foreach (string p in f.V6.Problems) f.Flags.Add(p);
-                f.Lines.Add(SkinDevApp.V6.ClinicalSummary.Disclaimer);
+                f.Lines.Add("This is a screening result, not a diagnosis. A dermatologist must confirm it.");
 
                 return f;
             }

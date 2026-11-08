@@ -151,7 +151,7 @@ namespace SkinDevApp.Data
 
         /// <summary>
         /// Start-up safety net: scans that are on disk and belong to a registered participant but are missing
-        /// from the database (a save failed, or the app was closed mid-scan) are indexed again, finalised as
+        /// from the database (a save failed, or the app was closed mid-scan) are indexed again, finalized as
         /// "incomplete" if they never finished. Returns how many were recovered.
         /// </summary>
         public static int RecoverLinkedSessions()

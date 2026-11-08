@@ -359,7 +359,7 @@ namespace SkinDevApp
                     Ui.KV("Number of lesions", c.LesionCount == "Multiple" && !string.IsNullOrWhiteSpace(c.LesionNumber) ? "Multiple (" + c.LesionNumber + ")" : c.LesionCount),
                     Ui.KV("Itch", c.Pruritus),
                     Ui.KV("Redness", c.Erythema),
-                    Ui.KV("Colour", c.LesionColor),
+                    Ui.KV("Color", c.LesionColor),
                     Ui.KV("Type of lesions", c.LesionTypes),
                     Ui.KV("Distribution", c.Distribution)
                 }, 130, 12.5),

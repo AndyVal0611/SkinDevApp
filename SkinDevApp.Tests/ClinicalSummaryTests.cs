@@ -43,7 +43,7 @@ namespace SkinDevApp.Tests
             ClinicalSummary unsure = ClinicalSummary.From(Make(V6States.UncertainReviewRequired, new[] { 0.65, 0.1, 0.05 }, flags: new[] { "cnn_yolo_conflict_Eczema" }));
             Assert.Equal(ClinicalCategory.NeedsReview, unsure.Category); Assert.Equal("Acne detected · needs review", unsure.Title);
             Assert.Equal("Moderate", unsure.Findings[0].Certainty);
-            Assert.Contains(unsure.ReviewReasons, r => r.StartsWith("Eczema: the whole-face reading and the lesion detector disagree"));
+            Assert.Contains(unsure.ReviewReasons, r => r.StartsWith("Eczema: the findings are inconclusive"));
 
             Assert.Equal(ClinicalCategory.Retake, ClinicalSummary.From(Make(V6States.RecaptureRequired, new[] { 0.1, 0.1, 0.1 })).Category);
             Assert.Equal(ClinicalCategory.NotCompleted, ClinicalSummary.From(UnifiedAssessment.Failed("x")).Category);
@@ -57,7 +57,7 @@ namespace SkinDevApp.Tests
             ClinicalSummary s = ClinicalSummary.From(a);
             Assert.Equal("Possible", s.Findings[2].Status); Assert.True(s.Findings[2].NeedsReview);
             Assert.Equal(ClinicalCategory.NeedsReview, s.Category); Assert.Equal("Needs dermatologist review", s.Title);
-            Assert.Contains(s.ReviewReasons, r => r.StartsWith("Eczema: a lesion detector marked an area"));
+            Assert.Contains(s.ReviewReasons, r => r.StartsWith("Eczema: an area was marked"));
             Assert.Equal("Possible · review needed", ClinicalSummary.FindingLine(s.Findings[2]));
         }
 
@@ -72,7 +72,6 @@ namespace SkinDevApp.Tests
             Assert.Equal("Low", h.Certainty);                                                  // detector confidence 0.31: never more than moderate
             Assert.Equal(ClinicalCategory.ConditionDetected, s.Category); Assert.Equal("Condition detected: Hyperpigmentation", s.Title);
             Assert.Empty(s.ReviewReasons);                                                     // the conflict is the reason it was detector-led, not a separate doubt
-            Assert.Contains(s.Notes, n => n.StartsWith("Hyperpigmentation was found by its lesion detector"));
             Assert.Equal("Detected · low certainty · right cheek", ClinicalSummary.FindingLine(h));
 
             // with acne also present and eczema only possible: two conditions detected, still needs review because of eczema
@@ -128,7 +127,7 @@ namespace SkinDevApp.Tests
             a.Boxes.Add(new V6Box { Condition = "Hyperpigmentation", X0 = 1, Y0 = 99, X1 = 2, Y1 = 100, Confidence = 0.9f, Deployed = true });     // far outside the face: not counted, not drawn
             ClinicalSummary s = ClinicalSummary.From(a, Face);
             Assert.Equal("72%", ClinicalSummary.ConfidenceText(s.Findings[0]));                 // detected by the model: the calibrated probability
-            Assert.Equal("Detector 31%", ClinicalSummary.ConfidenceText(s.Findings[1]));        // detector-led: the detector's own confidence
+            Assert.Equal("31%", ClinicalSummary.ConfidenceText(s.Findings[1]));        // detector-led: the detector's own confidence
             Assert.Equal("10% (below limit)", ClinicalSummary.ConfidenceText(s.Findings[2]));   // possible: below the decision limit
             Assert.Equal(2, s.MarkedAreas);
             Assert.Equal("Acne detected (moderate certainty); Hyperpigmentation detected (low certainty); Eczema possible (review needed). 2 areas were marked on the face.", ClinicalSummary.SummaryLine(s));

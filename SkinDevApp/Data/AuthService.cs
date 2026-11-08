@@ -109,7 +109,22 @@ namespace SkinDevApp.Data
 
         // ------------------------------------------------------------- accounts --
 
-        public static void CreateAccount(string username, string password, string createdBy)
+        public const string TypeDermatologist = "Dermatologist", TypeAdministrator = "Administrator";
+
+        /// <summary>Everyone who can sign in: username, full name, type and when the account was made.</summary>
+        public static List<string[]> Accounts()
+        {
+            var list = new List<string[]>();
+            using (var c = StudyDatabase.Open())
+            using (var cmd = StudyRepository.Cmd(c, "SELECT Username, COALESCE(FullName,''), COALESCE(AccountType,'Administrator'), COALESCE(CreatedAt,'') FROM ResearcherAccounts ORDER BY CreatedAt;"))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) list.Add(new[] { r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3) });
+            return list;
+        }
+
+        public static void CreateAccount(string username, string password, string createdBy) => CreateAccount(username, password, createdBy, TypeAdministrator, null);
+
+        public static void CreateAccount(string username, string password, string createdBy, string accountType, string fullName)
         {
             string u = (username ?? "").Trim();
             string err = CheckUsername(u) ?? CheckNewPassword(u, password);
@@ -127,12 +142,13 @@ namespace SkinDevApp.Data
                         throw new InvalidOperationException("An account named '" + u + "' already exists.");
 
                 using (var cmd = StudyRepository.Cmd(c, @"INSERT INTO ResearcherAccounts
-                    (Username, Salt, Hash, Iterations, CreatedAt, CreatedBy, PasswordChangedAt)
-                    VALUES (@u,@s,@h,@i,@at,@by,@at);", tx,
-                    "@u", u, "@s", salt, "@h", hash, "@i", Iterations, "@at", StudyRepository.Now(), "@by", createdBy))
+                    (Username, Salt, Hash, Iterations, CreatedAt, CreatedBy, PasswordChangedAt, AccountType, FullName)
+                    VALUES (@u,@s,@h,@i,@at,@by,@at,@ty,@fn);", tx,
+                    "@u", u, "@s", salt, "@h", hash, "@i", Iterations, "@at", StudyRepository.Now(), "@by", createdBy,
+                    "@ty", accountType == TypeDermatologist ? TypeDermatologist : TypeAdministrator, "@fn", string.IsNullOrWhiteSpace(fullName) ? null : fullName.Trim()))
                     cmd.ExecuteNonQuery();
 
-                StudyRepository.Audit(c, tx, "Account created", "ResearcherAccount", u, "created by " + (string.IsNullOrEmpty(createdBy) ? "first-run setup" : createdBy));
+                StudyRepository.Audit(c, tx, "Account created", "ResearcherAccount", u, accountType + " account created by " + (string.IsNullOrEmpty(createdBy) ? "first-run setup" : createdBy));
                 tx.Commit();
             }
         }

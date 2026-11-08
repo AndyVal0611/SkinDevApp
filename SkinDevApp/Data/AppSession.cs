@@ -26,6 +26,16 @@ namespace SkinDevApp.Data
 
         public static bool IsResearcher => Role == UserRole.Researcher;
 
+        /// <summary>True for administrator accounts (and accounts made before account types existed). Only they create accounts.</summary>
+        public static bool IsAdministrator
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(UserId)) return false;
+                try { return AccountProfiles.Get(UserId).IsAdministrator; } catch { return false; }
+            }
+        }
+
         public static string RoleTitle => IsResearcher ? "Researcher / Admin" : "Operator";
 
         /// <summary>Recorded in the audit log and as OperatorID on new rows.</summary>

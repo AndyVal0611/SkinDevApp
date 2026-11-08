@@ -28,6 +28,8 @@ namespace SkinDevApp.Data
         public string Registration { get; set; }      // professional registration / license number
         public string Clinic { get; set; }
         public string Availability { get; set; }
+        public string AccountType { get; set; }        // Dermatologist | Administrator (empty = an account made before types existed: Administrator)
+        public bool IsAdministrator => string.IsNullOrWhiteSpace(AccountType) || AccountType == "Administrator";
         public string FullNameStored { get; set; }    // the name as saved (also kept for accounts made before the detailed form)
 
         /// <summary>"Dr. Maria S. Santos" from the parts, or the stored name when the parts are empty.</summary>
@@ -112,7 +114,7 @@ namespace SkinDevApp.Data
     public static class AccountProfiles
     {
         public static readonly string[] Columns = { "Title", "FirstName", "MiddleName", "LastName", "DateOfBirth", "Sex", "Birthplace", "CivilStatus", "Citizenship", "HomeAddress", "HomeTel",
-                                                    "FullName", "JobTitle", "Email", "Phone", "Registration", "Clinic", "Availability" };
+                                                    "FullName", "JobTitle", "Email", "Phone", "Registration", "Clinic", "Availability", "AccountType" };
 
         private static string S(System.Data.SQLite.SQLiteDataReader r, int i) => r.IsDBNull(i) ? null : Convert.ToString(r.GetValue(i));
 
@@ -129,7 +131,7 @@ namespace SkinDevApp.Data
                     {
                         p.Title = S(r, 0); p.FirstName = S(r, 1); p.MiddleName = S(r, 2); p.LastName = S(r, 3); p.DateOfBirth = S(r, 4); p.Sex = S(r, 5);
                         p.Birthplace = S(r, 6); p.CivilStatus = S(r, 7); p.Citizenship = S(r, 8); p.HomeAddress = S(r, 9); p.HomeTel = S(r, 10);
-                        p.FullNameStored = S(r, 11); p.JobTitle = S(r, 12); p.Email = S(r, 13); p.Phone = S(r, 14); p.Registration = S(r, 15); p.Clinic = S(r, 16); p.Availability = S(r, 17);
+                        p.FullNameStored = S(r, 11); p.JobTitle = S(r, 12); p.Email = S(r, 13); p.Phone = S(r, 14); p.Registration = S(r, 15); p.Clinic = S(r, 16); p.Availability = S(r, 17); p.AccountType = S(r, 18);
                     }
             }
             catch { }

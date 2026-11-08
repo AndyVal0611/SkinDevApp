@@ -220,7 +220,7 @@ namespace SkinDevApp.Views
             layout.Children.Add(nav);
             layout.Children.Add(main);
 
-            var tab = new TabItem { Header = "All tables", Tag = "tables", Content = layout };
+            var tab = new TabItem { Header = "Database tables", Tag = "tables", Content = layout };
             bool built = false;
             tab.Loaded += (o, e) => { if (!built) { built = true; buildNav(); } };
             return tab;
@@ -358,7 +358,7 @@ namespace SkinDevApp.Views
             var boxes = new Dictionary<string, TextBox>();
             var w = new Window
             {
-                Title = (add ? "Add to " : "Edit ") + st.Rule.Name, Width = 640, Height = 720, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current.MainWindow,
+                Title = (add ? "Add to " : "Edit ") + st.Rule.Name, Width = 640, Height = 720, WindowStartupLocation = WindowStartupLocation.CenterOwner, WindowStyle = WindowStyle.None, BorderBrush = Ui.Line, BorderThickness = new Thickness(1), Owner = Application.Current.MainWindow,
                 Background = (System.Windows.Media.Brush)Application.Current.FindResource("PageWash")
             };
             var panel = new StackPanel { Margin = new Thickness(22, 18, 22, 10) };

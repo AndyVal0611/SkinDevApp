@@ -129,14 +129,14 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("How a scan is read", 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
-            sp.Children.Add(Ui.Text("Every photograph goes through these steps, in this order.", 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
+            sp.Children.Add(Ui.Text("Each photograph passes through the following steps, in this order.", 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
             string[][] steps =
             {
-                new[] { "Check the photograph", "The face is found and centered, and the head angle is confirmed. Blurry or badly lit photographs are flagged." },
+                new[] { "Check the photograph", "The face is located and centered, and the head angle is confirmed. Blurred or poorly lit photographs are flagged." },
                 new[] { "Read the whole face", "A whole-face model (MobileNetV2) looks at the full photograph." },
                 new[] { "Look for spots", "Three lesion detectors (YOLOv8) mark areas that may show acne, hyperpigmentation or eczema." },
-                new[] { "Combine", "A trained fusion network weighs both readings and decides each condition against its own limit." },
-                new[] { "Report", "Detected, needs review or not detected, with certainty and the facial regions marked. A dermatologist confirms every result." }
+                new[] { "Combine", "A trained fusion network combines both readings and evaluates each condition against its own threshold." },
+                new[] { "Report", "Each condition is reported as detected, needs review, or not detected, with its certainty and the facial regions marked. A dermatologist confirms every result." }
             };
             for (int i = 0; i < steps.Length; i++)
             {
@@ -254,9 +254,9 @@ namespace SkinDevApp.Views
             {
                 Ui.KV("Name", SkinDevApp.V6.AIResultStore.ModelLabel(variant)),
                 Ui.KV("Status", finalOk ? "Ready" : "Not ready — " + (SkinDevApp.V6.V6Service.LastError ?? "the model could not be loaded")),
-                Ui.KV("Conditions", "Acne, Hyperpigmentation and Eczema (more than one can be present). Normal skin is reported when none is detected."),
-                Ui.KV("Each result shows", "Detected, needs review or not detected, with the certainty and the facial regions marked."),
-                Ui.KV("Reviewed by", "A dermatologist confirms every result. The model is a screening aid, not a diagnosis.")
+                Ui.KV("Conditions", "Acne, hyperpigmentation and eczema (more than one may be present). Normal skin is reported when none is detected."),
+                Ui.KV("Each result shows", "Detected, needs review, or not detected, with the certainty and the facial regions marked."),
+                Ui.KV("Reviewed by", "A dermatologist confirms every result. The model is a screening aid and not a diagnostic tool.")
             }, 130));
             var v6tech = new System.Collections.Generic.List<string>
             {

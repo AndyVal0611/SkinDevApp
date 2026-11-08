@@ -158,6 +158,8 @@ namespace SkinDevApp.Views
         {
             if (StepperGrid == null) return;
             StepperGrid.Children.Clear();
+            StepperGrid.Visibility = Visibility.Collapsed;       // the photograph slots in the right-hand panel show the same status
+            return;
             // before a scan starts the three stages are still shown (all waiting), so the workflow is clear at a glance
             if (_session == null && MultiViewChk.IsChecked != true) { StepperGrid.Visibility = Visibility.Collapsed; return; }
 

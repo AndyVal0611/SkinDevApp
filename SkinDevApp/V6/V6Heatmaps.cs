@@ -119,7 +119,7 @@ namespace SkinDevApp.V6
             }
         }
 
-        /// <summary>Same blending rule as V5's overlays: opacity = strength^gamma * peak opacity, colour = the condition; strength = detector confidence / 0.70, capped at 1.</summary>
+        /// <summary>Same blending rule as V5's overlays: opacity = strength^gamma * peak opacity, color = the condition; strength = detector confidence / 0.70, capped at 1.</summary>
         public static Mat Overlay(Mat frameBgr, Mat heat, int conditionIndex)
         {
             using (Mat alpha = Alpha(heat)) return Blend(frameBgr, alpha, conditionIndex);

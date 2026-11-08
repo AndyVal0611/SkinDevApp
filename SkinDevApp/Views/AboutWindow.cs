@@ -98,8 +98,8 @@ namespace SkinDevApp.Views
         private static UIElement Steps()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("LUMYVUE photographs the face from three angles. For each photograph, one trained AI model combines a whole-face reading with three " +
-                                    "lesion detectors and reports acne, hyperpigmentation and eczema separately, with the facial regions involved, so that a dermatologist can judge it.",
+            sp.Children.Add(Ui.Text("LUMYVUE photographs the face from three angles. For each photograph, the system analyzes the whole face together with three " +
+                                    "lesion detectors and reports acne, hyperpigmentation and eczema separately, with the facial regions involved, so that a dermatologist can judge each result.",
                                     13, false, Ui.Ink, new Thickness(0, 0, 0, 12)));
 
             string[][] steps =
@@ -151,8 +151,7 @@ namespace SkinDevApp.Views
 
         private static UIElement ModelNote()
         {
-            var note = Ui.Text("Model: LUMYVUE final model (V6) — a MobileNetV2 whole-face reading fused with three YOLOv8 lesion detectors; three conditions, " +
-                               "with normal skin derived when none is found. Technical details and version information are on the Model information screen.", 12, false, Ui.Muted, new Thickness(2, 2, 2, 0));
+            var note = Ui.Text("Technical details and version information are on the Model information screen.", 12, false, Ui.Muted, new Thickness(2, 2, 2, 0));
             return note;
         }
     }

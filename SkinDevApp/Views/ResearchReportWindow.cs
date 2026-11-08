@@ -78,7 +78,7 @@ namespace SkinDevApp.Views
         {
             _d = d;
             _f = ReportFindings.Build(d);
-            Title = "LUMYVUE Research Analysis Report — " + d.Session.DisplayId;
+            Title = "LUMYVUE Analysis Report — " + d.Session.DisplayId;
             Width = 820;
             Height = 940;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -101,7 +101,7 @@ namespace SkinDevApp.Views
                 pagesPanel.Children.Add(sheet);
             }
 
-            var band = Ui.WindowBand("Research analysis report", "Scan " + d.Session.DisplayId + "  ·  Patient " + (d.Session.ParticipantID ?? "not assigned") +
+            var band = Ui.WindowBand("Analysis report", "Scan " + d.Session.DisplayId + "  ·  Patient " + (d.Session.ParticipantID ?? "not assigned") +
                                      "  ·  " + pages.Count + (pages.Count == 1 ? " page" : " pages"));
             band.Margin = new Thickness(16, 16, 16, 0);
 
@@ -225,13 +225,12 @@ namespace SkinDevApp.Views
             // header
             var head = new StackPanel();
             var top = new DockPanel();
-            var right = T("Research Analysis Report", 9, false, Muted, 0);
+            var right = T("Analysis Report", 9, false, Muted, 0);
             right.VerticalAlignment = VerticalAlignment.Bottom;
             DockPanel.SetDock(right, Dock.Right);
             top.Children.Add(right);
             top.Children.Add(T("LUMYVUE", 15, true, Navy, 0));
             head.Children.Add(top);
-            head.Children.Add(T("Researchers: " + ResearchTeam, 7.5, false, Muted, 3));
             head.Children.Add(new Border { Height = 1.5, Background = C(Navy), Margin = new Thickness(0, 0, 0, 10) });
             Grid.SetRow(head, 0);
             g.Children.Add(head);
@@ -249,7 +248,7 @@ namespace SkinDevApp.Views
             DockPanel.SetDock(page, Dock.Right);
             line.Children.Add(page);
             line.Children.Add(T("Patient " + FirstUnlinked(_d.Session) + "   ·   Scan " + _d.Session.DisplayId +
-                                "   ·   Research prototype, not a diagnostic report", 8, false, Muted, 0));
+                                "   ·   Screening aid, not a diagnostic report", 8, false, Muted, 0));
             foot.Children.Add(line);
             Grid.SetRow(foot, 2);
             g.Children.Add(foot);
@@ -272,8 +271,8 @@ namespace SkinDevApp.Views
             ModelVersion m = _d.Model;
             var sp = new StackPanel();
 
-            sp.Children.Add(T("Research Analysis Report", 21, true, Navy, 0));
-            sp.Children.Add(T("Multi-view AI skin-image classification  ·  generated " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), 9, false, Muted, 8));
+            sp.Children.Add(T("Analysis Report", 21, true, Navy, 0));
+            sp.Children.Add(T("Skin screening  ·  generated " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), 9, false, Muted, 8));
             if (_d.Participant != null && _d.Participant.Status == "Withdrawn")
             {
                 sp.Children.Add(Panel(T("This participant has withdrawn from the study. Do not include this scan in any analysis.", 9, true, WarnInk, 0), WarnBg, WarnLine, 7));
@@ -300,16 +299,13 @@ namespace SkinDevApp.Views
             }, 104));
             two.Children.Add(left);
 
-            string layer = _d.Views.SelectMany(v => v.Maps).Select(x => x.TargetLayer).FirstOrDefault(x => !string.IsNullOrEmpty(x));
             var right = new StackPanel();
-            right.Children.Add(Heading("Model", 0));
+            right.Children.Add(Heading("Result at a glance", 0));
             right.Children.Add(Table(new[]
             {
-                Ui.KV("Model name", m == null ? "unknown" : m.ModelName + " (" + m.Architecture + ")"),
-                Ui.KV("Model version", m == null ? "unknown" : "run " + m.RunName),
-                Ui.KV("Model hash", m == null ? "unknown" : ModelVersion.Short(m.OnnxSha256) + "…  (ONNX SHA-256)"),
-                Ui.KV("Grad-CAM++ service", m == null ? null : "v" + (m.ServiceVersion ?? "?") + " · " + ModelVersion.Short(m.ServiceSha256)),
-                Ui.KV("Target layer", layer)
+                Ui.KV("Screening result", _f.V6 != null ? _f.V6.Clinical.CategoryLabel : "—"),
+                Ui.KV("Review status", _f.V6 != null ? _f.V6.ReviewStatus : (s.ReviewStatus ?? ReviewStatus.Pending)),
+                Ui.KV("Photographs read", s.ScanMode == "Single" ? "1" : s.CompletionText.Replace(" / ", " of "))
             }, 104));
             Grid.SetColumn(right, 2);
             two.Children.Add(right);
@@ -320,15 +316,15 @@ namespace SkinDevApp.Views
             {
                 // The final model's clinical reading: outcome, findings table (result, certainty, facial regions), review reasons, verification status
                 SkinDevApp.V6.ClinicalSummary cs = _f.V6.Clinical;
-                sp.Children.Add(Heading("AI screening result"));
+                sp.Children.Add(Heading("Screening result"));
                 sp.Children.Add(T(cs.CategoryLabel.ToUpperInvariant() + "  ·  Verification: " + _f.V6.ReviewStatus, 8.5, true,
                                   cs.Category == SkinDevApp.V6.ClinicalCategory.NoConditionDetected ? TextInk : WarnInk, 1));
                 sp.Children.Add(T(cs.Title, 13, true, Navy, 2));
-                sp.Children.Add(T(cs.Explanation, 9, false, TextInk, 5));
+                sp.Children.Add(T(cs.Explanation.Replace("The AI found", "The screening found").Replace("The AI ", "The screening "), 9, false, TextInk, 5));
                 var ft = new Grid();
                 foreach (double w in new[] { 120.0, 110.0, 80.0 }) ft.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
                 ft.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string[] fh = { "Condition", "AI result", "Certainty", "Facial regions" };
+                string[] fh = { "Condition", "Result", "Certainty", "Facial regions" };
                 ft.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 for (int ci = 0; ci < fh.Length; ci++) { var h = T(fh[ci], 8, true, Muted, 2); Grid.SetColumn(h, ci); ft.Children.Add(h); }
                 int fr = 1;
@@ -338,7 +334,7 @@ namespace SkinDevApp.Views
                     var cells = new[]
                     {
                         T(cf.Condition, 9, true, TextInk, 1),
-                        T(cf.Status + (cf.NeedsReview ? " (review)" : cf.ByDetector ? " (lesion detector)" : ""), 9, cf.IsDetected, cf.IsDetected ? Navy : cf.NeedsReview ? WarnInk : TextInk, 1),
+                        T(cf.Status + (cf.NeedsReview ? " (review)" : ""), 9, cf.IsDetected, cf.IsDetected ? Navy : cf.NeedsReview ? WarnInk : TextInk, 1),
                         T(cf.Status == SkinDevApp.V6.ClinicalSummary.Detected || cf.Status == SkinDevApp.V6.ClinicalSummary.NotDetected ? cf.Certainty : "—", 9, false, TextInk, 1),
                         T(cf.Regions.Count == 0 ? "—" : string.Join("; ", cf.Regions), 9, false, TextInk, 1)
                     };
@@ -347,10 +343,6 @@ namespace SkinDevApp.Views
                 }
                 sp.Children.Add(ft);
                 foreach (string rr in cs.ReviewReasons.Distinct()) sp.Children.Add(T("•  " + rr, 8.5, false, WarnInk, 1));
-                foreach (string cn in cs.Notes) sp.Children.Add(T(cn, 8.5, false, TextInk, 1));
-                foreach (string n6 in _f.V6.Notes) sp.Children.Add(T(n6, 8.5, false, Muted, 2));
-                if (!string.IsNullOrEmpty(s.AIModel)) sp.Children.Add(T("Analyzed by: " + s.AIModel, 7.5, false, Muted, 1));
-                sp.Children.Add(T(_f.V6.Disclaimer, 7.5, false, Muted, 4));
             }
             else
             {
@@ -443,7 +435,7 @@ namespace SkinDevApp.Views
                 foreach (string flag in _f.Flags) w.Children.Add(T("•  " + flag, 8.5, false, WarnInk, 2));
                 sp.Children.Add(Panel(w, WarnBg, WarnLine, 8));
             }
-            else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised by the AI. Every result still waits for dermatologist review.", 8.5, false, TextInk, 2));
+            else if (_f.V6 != null) sp.Children.Add(T("No review flags were raised. Every result still waits for dermatologist review.", 8.5, false, TextInk, 2));
 
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             SkinProfile skin = string.IsNullOrEmpty(s.ParticipantID) ? null : StudyRepository.GetSkinProfile(s.ParticipantID);
@@ -460,12 +452,10 @@ namespace SkinDevApp.Views
             {
                 Children =
                 {
-                    T("Research prototype disclaimer", 8.5, true, Navy, 2),
-                    T(StudyText.PrototypeNotice + " " + (_f.V6 != null ? SkinDevApp.V6.V6Text.Disclaimer : StudyText.ScoresNote + " " + StudyText.AttributionNote), 8, false, TextInk, 0)
+                    T("Note", 8.5, true, Navy, 2),
+                    T(_f.V6 != null ? "This report is a screening aid and not a diagnosis. Every result must be confirmed by a dermatologist." : StudyText.PrototypeNotice + " " + StudyText.ScoresNote + " " + StudyText.AttributionNote, 8, false, TextInk, 0)
                 }
             }));
-            if (m != null && !string.IsNullOrEmpty(m.OnnxSha256))
-                sp.Children.Add(T("Model identity (full): ONNX SHA-256 " + m.OnnxSha256, 6.5, false, Muted, 0));
             sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 6, 0, 0));
             return sp;
         }
@@ -593,8 +583,8 @@ namespace SkinDevApp.Views
             LocalizationRunRow any = _d.Views.Select(x => x.Localization).FirstOrDefault(x => x != null && x.Status == "OK");
             var note = new StackPanel();
             note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
-            note.Children.Add(T("•  Candidate locations only: not lesion segmentation, not a diagnosis, not a lesion count.", 8.5, false, TextInk, 4));
-            note.Children.Add(T("•  Lesions can be missed and boxes can be wrong. Eczema is a pilot class (smallest training set).", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  These are possible locations only: not an outline of a lesion, not a count, not a measure of severity and not a diagnosis.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  Lesions can be missed and a box can be wrong. Eczema findings are less established than acne and hyperpigmentation.", 8.5, false, TextInk, 4));
             note.Children.Add(T("•  Independent of Grad-CAM++ and of the class scores: neither is changed by the other.", 8.5, false, TextInk, 4));
             if (any != null)
             {
@@ -628,8 +618,8 @@ namespace SkinDevApp.Views
         private FrameworkElement V6MarkedAreasBody()
         {
             var sp = new StackPanel();
-            sp.Children.Add(T("Marked Areas (Unified AI Assessment)", 17, true, Navy, 0));
-            sp.Children.Add(T("Possible lesion locations that supported the unified assessment, on the frame that was analyzed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+            sp.Children.Add(T("Marked Areas", 17, true, Navy, 0));
+            sp.Children.Add(T("Places on each photograph where a lesion may be. Acne is marked red, hyperpigmentation blue and eczema orange.", 8.5, false, Muted, 6));
 
             var cells = new List<FrameworkElement>();
             foreach (SkinDevApp.V6.V6ViewSummary vs in _f.V6.Views)
@@ -645,7 +635,7 @@ namespace SkinDevApp.Views
             note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
             note.Children.Add(T("•  Candidate locations only: not lesion segmentation, not a diagnosis, not a lesion count.", 8.5, false, TextInk, 4));
             note.Children.Add(T("•  Lesions can be missed and boxes can be wrong. Eczema is a pilot class (smallest training set).", 8.5, false, TextInk, 4));
-            note.Children.Add(T("•  The detector boxes are one input of the unified assessment (the model also weighs the whole photograph). A missing box is never treated as proof that a condition is absent.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  A photograph with no box does not prove that a condition is absent.", 8.5, false, TextInk, 4));
             var nb = Panel(note, PanelBg, null, 10);
             nb.Width = ImgW; nb.VerticalAlignment = VerticalAlignment.Top; nb.MinHeight = OriginalH;
             cells.Add(nb);
@@ -669,14 +659,58 @@ namespace SkinDevApp.Views
         private FrameworkElement FindingsBox()
         {
             var sp = new StackPanel();
-            sp.Children.Add(T("Major Findings", 10.5, true, Navy, 5));
-            foreach (string line in _f.Lines)
-                sp.Children.Add(T("•  " + line, 8.5, false, TextInk, 4));
+            sp.Children.Add(T("Major Findings", 10.5, true, Navy, 6));
+            if (_f.V6 != null)
+            {
+                // structured: the outcome, the review status, then one short block per photograph (detected / for review)
+                SkinDevApp.V6.ClinicalSummary cs = _f.V6.Clinical;
+                sp.Children.Add(T(cs.Title, 10, true, cs.Category == SkinDevApp.V6.ClinicalCategory.NoConditionDetected ? TextInk : WarnInk, 2));
+                sp.Children.Add(T("Review status: " + _f.V6.ReviewStatus, 8.5, false, Muted, 8));
+                foreach (SkinDevApp.V6.V6ViewSummary v in _f.V6.Views)
+                {
+                    sp.Children.Add(new Border { Height = 1, Background = C(RuleGray), Margin = new Thickness(0, 0, 0, 5) });
+                    sp.Children.Add(T(v.View == "Single" ? "Photograph" : v.Label, 9, true, Navy, 2));
+                    SkinDevApp.V6.ClinicalSummary c = v.Clinical;
+                    if (c.Category == SkinDevApp.V6.ClinicalCategory.Retake)
+                    {
+                        sp.Children.Add(T("Not clear enough to interpret. Please retake the photograph.", 8.5, false, TextInk, 6));
+                        continue;
+                    }
+                    var det = c.Findings.Where(x => x.IsDetected)
+                        .Select(x => x.Condition + " (" + x.Certainty.ToLowerInvariant() + " certainty" + (x.Regions.Count > 0 ? "; " + string.Join(", ", x.Regions) : "") + ")").ToList();
+                    var rev = c.Findings.Where(x => x.Status == SkinDevApp.V6.ClinicalSummary.Possible || x.Status == SkinDevApp.V6.ClinicalSummary.Inconclusive)
+                        .Select(x => x.Condition + (x.Regions.Count > 0 ? " (" + string.Join(", ", x.Regions) + ")" : "")).ToList();
+                    sp.Children.Add(LabelledLine("Detected", det.Count > 0 ? string.Join("; ", det) : "None", det.Count > 0 ? TextInk : Muted));
+                    if (rev.Count > 0) sp.Children.Add(LabelledLine("For review", string.Join("; ", rev), WarnInk));
+                    sp.Children.Add(new Border { Height = 5 });
+                }
+                if (!_f.V6.Single && _f.Lines.Any(l => l.StartsWith("The photographs do not all show")))
+                    sp.Children.Add(T("The findings differ between photographs; each is listed separately.", 8, false, Muted, 4));
+                sp.Children.Add(T("Screening result, not a diagnosis. A dermatologist must confirm it.", 8, false, Muted, 0));
+            }
+            else
+            {
+                foreach (string line in _f.Lines)
+                    sp.Children.Add(T("•  " + line, 8.5, false, TextInk, 4));
+            }
             var b = Panel(sp, PanelBg, null, 10);
             b.Width = ImgW;
             b.VerticalAlignment = VerticalAlignment.Top;
             b.MinHeight = _f.ReviewRecommended ? OriginalHWithBanner : OriginalH;
             return b;
+        }
+
+        /// <summary>"Detected   Acne (moderate certainty; nose)" - a small label column and a wrapping value.</summary>
+        private FrameworkElement LabelledLine(string label, string value, string valueColor)
+        {
+            var g = new Grid { Margin = new Thickness(0, 0, 0, 3) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var l = T(label, 8, true, Muted, 0);
+            var v = T(value, 8.5, false, valueColor, 0);
+            Grid.SetColumn(v, 1);
+            g.Children.Add(l); g.Children.Add(v);
+            return g;
         }
 
         // ------------------------------------------------------- page 3 onward --
@@ -709,7 +743,7 @@ namespace SkinDevApp.Views
                 sp.Children.Add(T((_f.V6 != null ? "Detector Evidence Maps" : "Selected AI Attribution Evidence") + (pageCount > 1 ? "  (" + (p + 1) + " of " + pageCount + ")" : ""), 17, true, Navy, 0));
                 if (_f.V6 != null)
                 {
-                    sp.Children.Add(T("One map per photograph, for the condition the unified assessment ranks highest: where the lesion detectors found evidence (the same evidence the assessment uses). Colour = the condition, strength = detector confidence.", 8.5, false, Muted, 4));
+                    sp.Children.Add(T("One map per photograph, for the condition the unified assessment ranks highest: where the lesion detectors found evidence (the same evidence the assessment uses). Color = the condition, strength = detector confidence.", 8.5, false, Muted, 4));
                     sp.Children.Add(T("This is an evidence map, not an explanation of the model, and not a lesion segmentation. Lesions can be missed and boxes can be wrong.", 8, false, Muted, 8));
                 }
                 else
@@ -777,7 +811,7 @@ namespace SkinDevApp.Views
             {
                 cap.Children.Add(T("Detector evidence map", 8.5, true, TextInk, 0));
                 cap.Children.Add(T("Target condition: " + Lbl(it.ClassName) + "   ·   Highest detector confidence: " + Pc(it.Score) + "   ·   View: " + it.View.ViewType, 8, false, TextInk, 0));
-                cap.Children.Add(T("Colour = the condition, strength = detector confidence (full strength from 0.70). Boxes centered outside the face region are not drawn.", 8, false, Muted, 0));
+                cap.Children.Add(T("Color = the condition, strength = detector confidence (full strength from 0.70). Boxes centered outside the face region are not drawn.", 8, false, Muted, 0));
             }
             else
             {
