@@ -64,7 +64,7 @@ namespace SkinDevApp.Printing
         public static PrinterStatus Status(PrinterSettings s)
         {
             if (!s.Enabled)
-                return new PrinterStatus { CanSend = false, Level = 2, Headline = "Printer turned off", Detail = "Receipts can be previewed. Turn the printer on in Settings > Thermal printer to print." };
+                return new PrinterStatus { CanSend = false, Level = 2, Headline = "Turned off", Detail = "Receipts can be previewed. Turn the printer on in Settings > Thermal printer to print." };
             if (s.Simulation)
                 return new PrinterStatus { CanSend = true, Level = 1, Headline = "Simulation mode: nothing is printed", Detail = "Receipts are saved as files for testing. Turn simulation off in Settings to print on the QR701." };
             if (string.IsNullOrWhiteSpace(s.PortName))

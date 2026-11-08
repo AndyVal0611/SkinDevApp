@@ -78,18 +78,18 @@ namespace SkinDevApp.Views
             var lines = new List<Tuple<string, int>>();
             if (!st.Saved) lines.Add(Tuple.Create(st.NotSavedReason + " Printing is turned off for this scan.", 2));
             else if (st.ReviewCompleted)
-                lines.Add(Tuple.Create("Dermatologist review completed on " + Fmt.Date(st.Review.ValidationDate) + ". " +
-                                       (ps.FinalByDefault ? "The final receipt is the recommended choice." : "The final receipt is available."), 0));
+                lines.Add(Tuple.Create("The dermatologist review was completed on " + Fmt.Date(st.Review.ValidationDate) + ". " +
+                                       (ps.FinalByDefault ? "The final receipt is recommended." : "The final receipt is available."), 0));
             else
-                lines.Add(Tuple.Create("Dermatologist review pending. A preliminary receipt can be printed now; the final receipt becomes available after the review.", 1));
+                lines.Add(Tuple.Create("The dermatologist review is pending. A preliminary receipt can be printed now. The final receipt will be available after the review.", 1));
 
-            if (st.Restricted) lines.Add(Tuple.Create(st.RestrictionReason + " Printing needs a researcher's authorization.", 2));
+            if (st.Restricted) lines.Add(Tuple.Create(st.RestrictionReason + " Printing requires an administrator's authorization.", 2));
 
             PrinterStatus p = ThermalPrinter.Status(ps);
-            lines.Add(Tuple.Create("Printer: " + p.Headline + (p.CanSend ? "." : ". Preview only."), p.Level));
+            lines.Add(Tuple.Create("Printer: " + p.Headline + (p.CanSend ? "." : ". Receipts can be previewed but not printed."), p.Level));
 
             if (st.Receipts.Count > 0)
-                lines.Add(Tuple.Create("Receipts: " + string.Join(", ", st.Receipts.OrderBy(r => r.Seq).Select(r => r.ReceiptType + " v" + r.ReceiptVersion)) + ".", -1));
+                lines.Add(Tuple.Create("Saved receipts: " + string.Join(", ", st.Receipts.OrderBy(r => r.Seq).Select(r => r.ReceiptType + " v" + r.ReceiptVersion)) + ".", -1));
             if (st.LastAttempt != null)
             {
                 ReceiptRecord which = st.Receipts.FirstOrDefault(r => r.ReceiptID == st.LastAttempt.ReceiptID);
@@ -127,7 +127,7 @@ namespace SkinDevApp.Views
                 buttons.Children.Add(b);
             }
             sp.Children.Add(buttons);
-            sp.Children.Add(Ui.Text("Receipts show the saved AI result and, once complete, the dermatologist's review. They never change the scan or its results.",
+            sp.Children.Add(Ui.Text("Receipts show the saved AI result and, once the review is complete, the dermatologist's assessment. Printing a receipt never changes the scan or its results.",
                 10.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return Ui.Card(sp);
         }

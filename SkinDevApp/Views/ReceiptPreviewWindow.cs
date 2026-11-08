@@ -209,7 +209,7 @@ namespace SkinDevApp.Views
                     _notes.Children.Add(Ui.Callout("Already sent to the printer", "Printing again makes a copy, marked \"COPY\" on the paper.", 1));
                 ReceiptState st = _d != null ? ReceiptService.State(_d) : null;
                 if (st != null && st.Restricted)
-                    _notes.Children.Add(Ui.Callout("Restricted record", st.RestrictionReason + " Printing needs a researcher's authorization.", 2));
+                    _notes.Children.Add(Ui.Callout("Restricted record", st.RestrictionReason + " Printing requires an administrator's authorization.", 2));
                 if (_r.LayoutWidth != _ps.CharsPerLine)
                     _notes.Children.Add(Ui.Callout("Different paper width", "This receipt was laid out for " + _r.LayoutWidth + " characters per line; the printer is now set to " + _ps.CharsPerLine + ". It prints as laid out.", 1));
             }
