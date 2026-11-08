@@ -213,7 +213,7 @@ namespace SkinDevApp.V6
             var head = new DockPanel();
             Border chip = StatusChip(s.ReviewStatus); DockPanel.SetDock(chip, Dock.Right); chip.VerticalAlignment = VerticalAlignment.Center;
             head.Children.Add(chip);
-            head.Children.Add(Ui.Text("Automated screening result", 16, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
+            head.Children.Add(Ui.Text("Screening result (AI-generated)", 16, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
             sp.Children.Add(head);
             sp.Children.Add(OutcomeBanner(s.Clinical));
             sp.Children.Add(FindingsTable(s.Clinical));
@@ -443,7 +443,7 @@ namespace SkinDevApp.V6
             var head = new DockPanel();
             Border chip = StatusChip(s.ReviewStatus); DockPanel.SetDock(chip, Dock.Right); chip.VerticalAlignment = VerticalAlignment.Center;
             head.Children.Add(chip);
-            head.Children.Add(Ui.Text("Automated screening result", 14, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
+            head.Children.Add(Ui.Text("Screening result (AI-generated)", 14, true, Ui.Ink, new Thickness(0, 2, 0, 0)));
             sp.Children.Add(head);
             sp.Children.Add(OutcomeBanner(s.Clinical));
             sp.Children.Add(FindingsList(s.Clinical));
