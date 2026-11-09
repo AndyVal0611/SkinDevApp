@@ -261,10 +261,7 @@ namespace SkinDevApp.Views
             AddSide("Icon.Sliders", "Settings", () => Nav.Go(new SettingsPage()), r);
             AddSide("Icon.User", "My details", () => { if (ProfileDialog.EditCurrentUser(Application.Current.MainWindow)) { UpdateGreeting(); ShowCurrentParticipant(); } }, true);
             AddSide("Icon.Info", "About LUMYVUE", ShowAbout, true);
-            OldLogBtn.Visibility = r ? Visibility.Visible : Visibility.Collapsed;
         }
-
-        private void OldLogBtn_Click(object sender, RoutedEventArgs e) { Nav.Go(new UserDashboardForm()); }
 
         private static int PendingCount()
         {

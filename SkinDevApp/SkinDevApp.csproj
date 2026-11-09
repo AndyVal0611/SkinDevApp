@@ -162,7 +162,6 @@
     <Compile Include="ConsentPage.xaml.cs">
       <DependentUpon>ConsentPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="DatabaseHelper.cs" />
     <Compile Include="Data\AppSession.cs" />
     <Compile Include="Data\AuthService.cs" />
     <Compile Include="Data\SaveQueue.cs" />
@@ -282,9 +281,6 @@
     <Compile Include="SettingsPage.xaml.cs">
       <DependentUpon>SettingsPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="UserDashboardForm.xaml.cs">
-      <DependentUpon>UserDashboardForm.xaml</DependentUpon>
-    </Compile>
     <Page Include="Themes\Lumyvue.Tokens.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -333,10 +329,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="SettingsPage.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UserDashboardForm.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

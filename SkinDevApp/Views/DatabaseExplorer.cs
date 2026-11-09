@@ -39,7 +39,6 @@ namespace SkinDevApp.Views
             { "MedicalIntakes", R("Medical intake", CPatients, edit: true) },
             { "SkinProfiles", R("Skin profiles", CPatients, edit: true) },
             { "Consents", R("Consents", CPatients) },
-            { "PatientLogs", R("Patient log", CPatients) },
             { "ScanSessions", R("Scans", CScans) },
             { "CaptureViews", R("Images", CScans) },
             { "AnalysisImages", R("Image files", CScans) },
@@ -79,9 +78,7 @@ namespace SkinDevApp.Views
         {
             "SkinProfiles",
             // earlier-model (V5) tables: still filled by the capture pipeline, but the final model's results are in the AI tables above
-            "AnalysisResults", "AnalysisImages", "AttributionMaps", "ClassScores", "LesionDetections", "LocalizationRuns", "FitzpatrickAssessments",
-            // researcher assessments are no longer part of LUMYVUE
-            "ResearcherEvaluations"
+            "AnalysisResults", "AnalysisImages", "AttributionMaps", "ClassScores", "LesionDetections", "LocalizationRuns", "FitzpatrickAssessments"
         };
 
         private const int MaxRows = 2000;

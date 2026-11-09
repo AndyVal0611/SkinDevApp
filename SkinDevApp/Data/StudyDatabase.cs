@@ -2,12 +2,12 @@
 // StudyDatabase.cs  -  namespace SkinDevApp.Data
 //
 // Schema for the PrecisionSkin study database. Lives in the same SQLite file as
-// the legacy PatientLogs table (DatabaseHelper.cs), which is left untouched.
+// the system tables.
 //
 // Tables (UI Architecture v3, section J):
 //    1 Participants             8 AnalysisImages
 //    2 SkinProfiles             9 AttributionMaps
-//    3 Consents                10 ResearcherEvaluations
+//    3 Consents                10 (removed)
 //    4 ScanSessions            11 DermatologistValidations
 //    5 CaptureViews            12 ModelVersions
 //    6 AnalysisResults         13 FitzpatrickAssessments  (manual / dermatologist only)
@@ -176,6 +176,10 @@ namespace SkinDevApp.Data
                     Exec(c, tx, "INSERT OR IGNORE INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('schema_version', '" +
                                 SchemaVersion + "', datetime('now','localtime'), 'system');");
                     Exec(c, tx, "UPDATE SystemSettings SET Value='" + SchemaVersion + "', UpdatedAt=datetime('now','localtime'), UpdatedBy='system' WHERE Key='schema_version' AND CAST(Value AS INTEGER) < " + SchemaVersion + ";");
+                    // Two tables are no longer used by LUMYVUE (the original prototype's report log and the researcher assessments).
+                    // They are removed only when they hold no rows, so nothing recorded is ever lost.
+                    DropIfEmpty(c, tx, "PatientLogs");
+                    DropIfEmpty(c, tx, "ResearcherEvaluations");
                     tx.Commit();
                 }
 
@@ -188,6 +192,21 @@ namespace SkinDevApp.Data
                 LastError = ex.Message;
                 System.Diagnostics.Debug.WriteLine("[StudyDatabase] " + ex);
             }
+        }
+
+        /// <summary>Drops an unused table, but only if it exists and has no rows.</summary>
+        private static void DropIfEmpty(SQLiteConnection c, SQLiteTransaction tx, string table)
+        {
+            long exists;
+            using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@n;", c, tx))
+            {
+                cmd.Parameters.AddWithValue("@n", table);
+                exists = (long)cmd.ExecuteScalar();
+            }
+            if (exists == 0) return;
+            long rows;
+            using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM \"" + table + "\";", c, tx)) rows = (long)cmd.ExecuteScalar();
+            if (rows == 0) Exec(c, tx, "DROP TABLE \"" + table + "\";");
         }
 
         /// <summary>Before an older database is upgraded, a full copy is kept in Backups\ next to it (once per upgrade).</summary>
@@ -611,20 +630,6 @@ CREATE TABLE IF NOT EXISTS ReceiptPrintAttempts (
     ErrorDetail     TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_ReceiptPrintAttempts_Receipt ON ReceiptPrintAttempts(ReceiptID);
-
-CREATE TABLE IF NOT EXISTS ResearcherEvaluations (
-    EvaluationID             INTEGER PRIMARY KEY AUTOINCREMENT,
-    ScanSessionID            TEXT NOT NULL REFERENCES ScanSessions(ScanSessionID),
-    ResearcherID             TEXT NOT NULL,
-    ResearcherClassification TEXT NOT NULL,
-    AgreementWithAI          TEXT,
-    Notes                    TEXT,
-    FrontComment             TEXT,
-    LeftComment              TEXT,
-    RightComment             TEXT,
-    EvaluationDate           TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS IX_ResearcherEvaluations_Session ON ResearcherEvaluations(ScanSessionID);
 
 CREATE TABLE IF NOT EXISTS DermatologistValidations (
     ValidationID             INTEGER PRIMARY KEY AUTOINCREMENT,

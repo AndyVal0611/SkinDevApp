@@ -116,11 +116,6 @@
                 <StackPanel DockPanel.Dock="Top" Margin="8,0,8,16">
                     <TextBlock Text="MENU" FontSize="11" FontWeight="SemiBold" Foreground="#DDDCC2"/>
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                    <Button x:Name="OldLogBtn" Style="{StaticResource SideNavBtn}" Visibility="Collapsed" Click="OldLogBtn_Click">
-                        <TextBlock Text="Old report log (read only)" FontSize="12.5" Foreground="#DDDCC2"/>
-                    </Button>
-                </StackPanel>
                 <StackPanel x:Name="SideNav"/>
             </DockPanel>
         </Border>

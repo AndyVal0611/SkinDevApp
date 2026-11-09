@@ -81,7 +81,6 @@ namespace SkinDevApp
             {
                 try
                 {
-                    DatabaseHelper.InitializeDatabase(); // Creates lumyvue_db.sqlite table automatically
                     Data.StudyDatabase.Initialize();     // participant / scan / validation tables (same file)
                     Data.ScanSettings.Current.ApplyGlobal();
                     return null;
