@@ -169,8 +169,6 @@
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="New registration" FontSize="25" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
-                                <TextBlock Text="Register a patient. A Patient ID is created automatically, then consent is recorded."
-                                           FontSize="13" Foreground="#EDEBD3" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
                         </DockPanel>
                     </Button>
@@ -182,8 +180,6 @@
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Skin analysis" FontSize="25" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
-                                <TextBlock Text="Choose a patient (or continue with the current one) and take the front, left and right photographs."
-                                           FontSize="13" Foreground="#FFF1EB" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
                         </DockPanel>
                     </Button>
@@ -193,12 +189,6 @@
                 <UniformGrid x:Name="StatsGrid" Columns="4" Margin="0,8,0,0"/>
                 <UniformGrid x:Name="CardsGrid" Columns="3" Margin="0,0,0,0"/>
                 <ContentControl x:Name="RecentHost"/>
-
-                <DockPanel Margin="10,14,8,0">
-                    <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Info}" Foreground="#8D8D76" Width="15" Height="15" Margin="0,0,8,0"/>
-                    <TextBlock Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
-                               Text="LUMYVUE is a research prototype that assists with automated skin-image classification. It does not replace professional medical evaluation."/>
-                </DockPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

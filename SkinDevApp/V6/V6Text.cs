@@ -13,10 +13,9 @@ namespace SkinDevApp.V6
 {
     public static class V6Text
     {
-        public const string Disclaimer = "Research assessment from a trained image model combined with lesion-detector evidence. It is not a diagnosis, and it is not clinically validated. " +
-                                         "Every assessment waits for dermatologist review. Boxes are possible locations only and are not a lesion count or a measure of severity.";
+        public const string Disclaimer = "AI-assisted result. A dermatologist must confirm it.";
 
-        public const string DisclaimerShort = "Research assessment, not a diagnosis. It waits for dermatologist review.";
+        public const string DisclaimerShort = "AI-assisted result. A dermatologist must confirm it.";
 
         public static string StateHeadline(UnifiedAssessment a)
         {
@@ -26,7 +25,7 @@ namespace SkinDevApp.V6
                 case V6States.MultipleFindingsSupported: return "Several findings supported: " + string.Join(", ", a.PresentConditions);
                 case V6States.NoFindingsSupported: return "No findings supported (normal-looking skin in the AI evidence)";
                 case V6States.UncertainReviewRequired: return "Uncertain: review recommended";
-                case V6States.RecaptureRequired: return "Please retake the photograph";
+                case V6States.RecaptureRequired: return "Please retake the image";
                 case V6States.OutOfScopeReviewRequired: return "Outside what the system was trained on: review required";
                 default: return "The analysis could not be completed";
             }
@@ -63,16 +62,16 @@ namespace SkinDevApp.V6
             {
                 if (f.StartsWith("cnn_yolo_conflict_")) conflict.Add(f.Substring("cnn_yolo_conflict_".Length));
                 else if (f.StartsWith("near_threshold_")) near.Add(f.Substring("near_threshold_".Length));
-                else if (f == "ood") other.Add("This photograph looks unlike the photographs the system was trained on.");
+                else if (f == "ood") other.Add("This image looks unlike the images the system was trained on.");
                 else if (f.StartsWith("quality_warning:"))
                 {
                     string w = f.Substring("quality_warning:".Length);
-                    other.Add(w == "face_not_found" ? "No face was found in this photograph, so the image quality could not be fully checked." : "Photo quality warning: " + w.Replace(",", ", "));
+                    other.Add(w == "face_not_found" ? "No face was found in this image, so the image quality could not be fully checked." : "Photo quality warning: " + w.Replace(",", ", "));
                 }
                 else if (f.StartsWith("quality_")) other.Add(V6QualityMapper.Advice(f.Substring("quality_".Length)) ?? ("Photo quality: " + f.Substring("quality_".Length)));
                 else other.Add(f);
             }
-            if (conflict.Count > 0) yield return "For " + JoinNames(conflict) + ", the whole-photograph model and the lesion detector point different ways.";
+            if (conflict.Count > 0) yield return "For " + JoinNames(conflict) + ", the whole-image model and the lesion detector point different ways.";
             if (near.Count > 0) yield return JoinNames(near) + (near.Count == 1 ? " is" : " are") + " close to the decision limit.";
             foreach (string o in other) yield return o;
             foreach (string r in a.Reasons)

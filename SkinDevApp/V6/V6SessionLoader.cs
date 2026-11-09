@@ -26,7 +26,7 @@ namespace SkinDevApp.V6
                 string why;
                 UnifiedAssessment a = V6Archive.Read(v.RecordFolder, out why);
                 if (a != null) map[v.ViewType ?? "Single"] = a;
-                else if (!string.IsNullOrEmpty(v.RecordFolder) && File.Exists(Path.Combine(v.RecordFolder, V6Archive.FileName))) problems.Add((v.ViewType ?? "Photograph") + ": " + why);
+                else if (!string.IsNullOrEmpty(v.RecordFolder) && File.Exists(Path.Combine(v.RecordFolder, V6Archive.FileName))) problems.Add((v.ViewType ?? "Image") + ": " + why);
             }
             return map.Count > 0 ? map : null;
         }

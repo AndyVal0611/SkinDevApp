@@ -50,7 +50,7 @@ namespace SkinDevApp.Views
             titles.Children.Add(Ui.Text("Choose a patient", 21, true, Ui.Brush("#2F3024"), new Thickness(0, 1, 0, 0)));
             head.Children.Add(titles);
             sp.Children.Add(head);
-            sp.Children.Add(Ui.Text("Search by Patient ID or name (for example PS-0001 or Elaiza). Partial text works.", 13, false, Ui.Muted, new Thickness(0, 0, 0, 12)));
+            sp.Children.Add(Ui.Text("Search by Patient ID or name (for example, PS-0001 or Elaiza).", 13, false, Ui.Muted, new Thickness(0, 0, 0, 12)));
 
             // search box with an icon inside, and a search button
             var row = new DockPanel();
@@ -203,21 +203,23 @@ namespace SkinDevApp.Views
 
             var p = (Participant)item.Tag;
             Consent k = StudyRepository.GetLatestConsent(p.ParticipantID);
-            string head = "Selected:  " + p.ParticipantID + "  ·  " + p.FullName +
-                          (p.Age.HasValue ? "  ·  age " + p.Age : "") + (string.IsNullOrEmpty(p.Sex) ? "" : "  ·  " + p.Sex) +
-                          "\nRegistered " + Fmt.Date(p.RegisteredAt) + "  ·  " + p.Status + "\n";
+            string head = "Patient ID:  " + p.ParticipantID + "\n" +
+                          "Name:  " + p.FullName + "\n" +
+                          "Age and sex:  " + (p.Age.HasValue ? p.Age + " years" : "Not recorded") + (string.IsNullOrEmpty(p.Sex) ? "" : ", " + p.Sex) + "\n" +
+                          "Registered:  " + Fmt.Date(p.RegisteredAt) + "\n" +
+                          "Status:  " + p.Status + "\n";
 
             if (p.Status == "Withdrawn")
             {
                 _summary.Foreground = Ui.Bad;
-                _summary.Text = head + "This patient has withdrawn from the study. No new scans can be recorded.";
+                _summary.Text = head + "This patient has withdrawn from the study. New scans cannot be recorded.";
                 return;                                            // Continue stays disabled
             }
 
             _summary.Foreground = Ui.Ink;
-            _summary.Text = head + "Consent: " + (k == null ? "not recorded — the consent screen will open next"
-                                                  : k.AllowsScanning ? "given " + Fmt.When(k.RecordedAt)
-                                                  : k.Decision + " " + Fmt.When(k.RecordedAt) + " — consent will be asked again");
+            _summary.Text = head + "Consent:  " + (k == null ? "Not recorded. The consent screen will open next."
+                                                  : k.AllowsScanning ? "Given on " + Fmt.When(k.RecordedAt)
+                                                  : k.Decision + " on " + Fmt.When(k.RecordedAt) + ". Consent will be requested again.");
             _selected = p;
             _continue.IsEnabled = true;
         }

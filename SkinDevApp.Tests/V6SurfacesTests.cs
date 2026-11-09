@@ -43,7 +43,7 @@ namespace SkinDevApp.Tests
             Assert.Contains("Acne: Not found (AI support 10% (decision limit 40%); detector ran: nothing marked)", a.Conditions.Select(V6Text.ConditionLine));
             Assert.Equal("Uncertain: review recommended", V6Text.StateHeadline(Make(V6States.UncertainReviewRequired, new string[0])));
             Assert.Equal("The analysis could not be completed", V6Text.StateHeadline(UnifiedAssessment.Failed("x")));
-            Assert.Contains("not a diagnosis", V6Text.Disclaimer); Assert.Contains("dermatologist review", V6Text.DisclaimerShort);
+            Assert.Contains("dermatologist must confirm", V6Text.Disclaimer); Assert.Contains("dermatologist must confirm", V6Text.DisclaimerShort);
         }
 
         [Fact]
@@ -54,8 +54,8 @@ namespace SkinDevApp.Tests
             a.Reasons.Add("blocking quality: blur");                                     // the plain advice already covers it: the raw reason must not be repeated
             string[] lines = V6Text.FlagLines(a).ToArray();
             Assert.DoesNotContain(lines, l => l.ToLowerInvariant().StartsWith("blocking quality"));
-            Assert.Contains(lines, l => l.Contains("For Acne, the whole-photograph model and the lesion detector point different ways"));
-            Assert.Contains(lines, l => l.Contains("unlike the photographs the system was trained on"));
+            Assert.Contains(lines, l => l.Contains("For Acne, the whole-image model and the lesion detector point different ways"));
+            Assert.Contains(lines, l => l.Contains("unlike the images the system was trained on"));
             Assert.Contains(lines, l => l.Contains("retake") || l.Contains("refocus"));
             Assert.Contains(lines, l => l.StartsWith("Detector unavailable for Eczema"));
         }
@@ -65,7 +65,7 @@ namespace SkinDevApp.Tests
         {
             UnifiedAssessment a = Make(V6States.UncertainReviewRequired, new string[0], new[] { "cnn_yolo_conflict_Acne", "cnn_yolo_conflict_Hyperpigmentation", "cnn_yolo_conflict_Eczema", "near_threshold_Acne", "near_threshold_Eczema" });
             string[] lines = V6Text.FlagLines(a).ToArray();
-            Assert.Equal("For Acne, Hyperpigmentation and Eczema, the whole-photograph model and the lesion detector point different ways.", lines[0]);
+            Assert.Equal("For Acne, Hyperpigmentation and Eczema, the whole-image model and the lesion detector point different ways.", lines[0]);
             Assert.Equal("Acne and Eczema are close to the decision limit.", lines[1]); Assert.Equal(2, lines.Length);
             var c = new ConditionAssessment { Condition = "Acne", CalibratedProbability = 0.4213, Threshold = 0.42, Status = ConditionStatus.Present, DetectorAvailable = true };
             Assert.Equal("AI support 42.1% (decision limit 42.0%)", V6Text.SupportText(c));                       // 42% against 42% would look like a tie
@@ -135,7 +135,7 @@ namespace SkinDevApp.Tests
                 Assert.NotNull(f.V6); Assert.True(f.HasResult); Assert.Empty(f.Evidence);                                   // no Grad-CAM++ attribution pages beside the final model's result
                 Assert.Contains(f.Lines, l => l.StartsWith("Screening result: Acne detected · needs review"));
                 Assert.Contains(f.Lines, l => l.StartsWith("Review status: Pending verification"));
-                Assert.Contains(f.Lines, l => l.Contains("Detected: Acne")); Assert.Contains(f.Lines, l => l.Contains("A dermatologist must confirm it"));
+                Assert.Contains(f.Lines, l => l.Contains("Detected: Acne")); Assert.Contains(f.Lines, l => l.Contains("A dermatologist must confirm this result"));
                 Assert.True(f.ReviewRecommended); Assert.Contains(f.Flags, x => x.Contains("Eczema: the findings are inconclusive"));
                 Assert.Null(f.Interpretation);                                                                              // the V5 interpretation is not built
                 V6FeatureFlag.Provider = () => false;

@@ -117,8 +117,8 @@ namespace SkinDevApp.V6
         }
 
         private static string NoFindingsText(ClinicalSummary s) =>
-            s.Category == ClinicalCategory.Retake ? "No condition is reported for this photograph because it must be retaken."
-            : "No result is available for this photograph.";
+            s.Category == ClinicalCategory.Retake ? "No condition is reported for this image because it must be retaken."
+            : "No result is available for this image.";
 
         /// <summary>The findings at a glance: condition, detection status and facial regions. Confidence figures are one click away (ConfidenceDetails).</summary>
         public static Grid FindingsTable(ClinicalSummary s, double fontSize = 13)
@@ -210,7 +210,7 @@ namespace SkinDevApp.V6
                 if (!s.Single) sp.Children.Add(Ui.Text(v.Label, 12, true, Ui.Ink, new Thickness(0, 4, 0, 2)));
                 foreach (ConditionAssessment c in v.Assessment.Conditions)
                     sp.Children.Add(Ui.Text(c.Condition + ": " + V6Text.SupportText(c).Replace("AI support", "probability") + " · " + V6Text.DetectorText(c), 11.5, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
-                sp.Children.Add(Ui.Text("Model state: " + v.Assessment.State + " · variant " + v.Assessment.Variant + (v.Origin == AIResultStore.OriginReanalysis ? " · re-analyzed later from the saved photograph" : ""),
+                sp.Children.Add(Ui.Text("Model state: " + v.Assessment.State + " · variant " + v.Assessment.Variant + (v.Origin == AIResultStore.OriginReanalysis ? " · re-analyzed later from the saved image" : ""),
                                         11, false, Ui.Muted, new Thickness(6, 2, 0, 2)));
             }
             return new Expander
@@ -257,7 +257,7 @@ namespace SkinDevApp.V6
             if (!s.Single)
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-                chips.Children.Add(Ui.Text("Photographs analyzed:", 12, true, Ui.Ink, new Thickness(0, 3, 8, 0)));
+                chips.Children.Add(Ui.Text("Images analyzed:", 12, true, Ui.Ink, new Thickness(0, 3, 8, 0)));
                 foreach (string vw in StudyText.Views)
                 {
                     bool ok = map.ContainsKey(vw);
@@ -370,7 +370,7 @@ namespace SkinDevApp.V6
         {
             if (f.StartsWith("cnn_yolo_conflict_")) return "The findings for " + f.Substring(18) + " are inconclusive.";
             if (f.StartsWith("near_threshold_")) return "The result for " + f.Substring(15) + " is close to the reporting limit.";
-            if (f == "ood") return "The photograph differs from those the system was trained on.";
+            if (f == "ood") return "The image differs from those the system was trained on.";
             return f.Replace('_', ' ');
         }
 
@@ -382,7 +382,7 @@ namespace SkinDevApp.V6
             foreach (CaptureViewRow v in d.Views.OrderBy(x => Array.IndexOf(StudyText.Views, x.ViewType)))
             {
                 string q = string.IsNullOrWhiteSpace(v.QualityStatus) ? "Not evaluated" : ClinicalText.PlainQuality(v.QualityStatus);
-                sp.Children.Add(Ui.Text("•  " + (string.IsNullOrEmpty(v.ViewType) ? "Photograph" : V6SessionSummary.LabelFor(v.ViewType)) + ": " + q, 12, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
+                sp.Children.Add(Ui.Text("•  " + (string.IsNullOrEmpty(v.ViewType) ? "Image" : V6SessionSummary.LabelFor(v.ViewType)) + ": " + q, 12, false, Ui.Ink, new Thickness(6, 0, 0, 1)));
             }
             foreach (string r in s.Views.SelectMany(x => x.Assessment.Flags).Distinct().Take(6))
                 sp.Children.Add(Ui.Text("•  Note: " + FlagText(r), 11.5, false, Ui.Muted, new Thickness(6, 0, 0, 1)));
@@ -398,7 +398,7 @@ namespace SkinDevApp.V6
             var sp = new StackPanel();
             sp.Children.Add(Ui.Text("Dermatologist assessment · recorded separately by a person", 13, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
             if (v == null)
-                sp.Children.Add(Ui.Text("Not yet reviewed. Everything above is the AI result only. It is neither a dermatologist's assessment nor a diagnosis.", 12.5, false, Ui.Muted, new Thickness(0)));
+                sp.Children.Add(Ui.Text("Not yet reviewed. Everything above is the AI result.", 12.5, false, Ui.Muted, new Thickness(0)));
             else
             {
                 string who = string.IsNullOrWhiteSpace(v.ValidatorName) ? v.DermatologistID : v.ValidatorName + " (" + v.DermatologistID + ")";
@@ -449,7 +449,7 @@ namespace SkinDevApp.V6
             sp.Children.Add(Ui.Text(c.Title, 13, true, Ui.Brush(CategoryInk(c.Category)), new Thickness(0, 8, 0, 4)));
             if (c.Category == ClinicalCategory.Retake)
             {
-                sp.Children.Add(Ui.Text("This photograph is not clear enough to interpret. Please retake it.", 12, false, Ui.Ink, new Thickness(0, 0, 0, 2)));
+                sp.Children.Add(Ui.Text("This image is not clear enough to interpret. Please retake it.", 12, false, Ui.Ink, new Thickness(0, 0, 0, 2)));
                 return sp;
             }
             foreach (ClinicalFinding f in c.Findings)
@@ -462,9 +462,9 @@ namespace SkinDevApp.V6
                 sp.Children.Add(line);
             }
             if (c.MarkedAreas > 0)
-                sp.Children.Add(Ui.Text(c.MarkedAreas + (c.MarkedAreas == 1 ? " area marked on the photograph." : " areas marked on the photograph."), 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+                sp.Children.Add(Ui.Text(c.MarkedAreas + (c.MarkedAreas == 1 ? " area marked on the image." : " areas marked on the image."), 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             if (c.Category == ClinicalCategory.NeedsReview || c.Findings.Any(x => x.Status == ClinicalSummary.Possible || x.Status == ClinicalSummary.Inconclusive))
-                sp.Children.Add(Ui.Text("Dermatologist review is recommended for this photograph.", 11.5, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
+                sp.Children.Add(Ui.Text("Dermatologist review is recommended for this image.", 11.5, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
             return sp;
         }
 

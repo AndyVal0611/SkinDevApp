@@ -74,7 +74,7 @@ namespace SkinDevApp.Views
         private static string PlainViewLine(SkinDevApp.V6.V6ViewSummary v)
         {
             SkinDevApp.V6.ClinicalSummary c = v.Clinical;
-            if (c.Category == SkinDevApp.V6.ClinicalCategory.Retake) return "Not clear enough to read; please retake the photograph.";
+            if (c.Category == SkinDevApp.V6.ClinicalCategory.Retake) return "Not clear enough to read; please retake the image.";
             var det = c.Findings.Where(x => x.IsDetected)
                 .Select(x => x.Condition + " (" + x.Certainty.ToLowerInvariant() + " certainty" + (x.Regions.Count > 0 ? "; " + string.Join(", ", x.Regions) : "") + ")").ToList();
             var poss = c.Findings.Where(x => x.Status == SkinDevApp.V6.ClinicalSummary.Possible || x.Status == SkinDevApp.V6.ClinicalSummary.Inconclusive)
@@ -106,9 +106,9 @@ namespace SkinDevApp.Views
                     if (v.ReviewRequired && v.FlagLines.Count == 0) f.Flags.Add((f.V6.Single ? "" : v.Label + ": ") + v.Headline + ".");
                 }
                 if (!f.V6.Single && f.V6.Views.Select(v => string.Join("|", v.Clinical.DetectedFindings.Select(x => x.Condition))).Distinct().Count() > 1)
-                    f.Lines.Add("The photographs do not all show the same findings; each is listed separately.");
+                    f.Lines.Add("The images do not all show the same findings; each is listed separately.");
                 foreach (string p in f.V6.Problems) f.Flags.Add(p);
-                f.Lines.Add("This is a screening result, not a diagnosis. A dermatologist must confirm it.");
+                f.Lines.Add("A dermatologist must confirm this result.");
 
                 return f;
             }

@@ -73,10 +73,6 @@
 
         <StackPanel Grid.Row="1" Margin="8,0,8,10">
             <TextBlock x:Name="PageTitle" Text="Patient registration" Style="{StaticResource H1}"/>
-            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0">
-                This form follows the clinic's patient's chart. Fields marked <Run Text="*" Style="{StaticResource Req}"/> are required. The patient signs the separate paper consent form; no signature is collected on screen.
-                Photographs are filed under the Patient ID, never under the name.
-            </TextBlock>
         </StackPanel>
 
         <Grid Grid.Row="2" x:Name="SplitGrid">

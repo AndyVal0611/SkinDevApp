@@ -226,7 +226,7 @@
                         </Border>
                         <TextBlock Text="Ready when you are" FontSize="22" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic"
                                    Foreground="#F7F5E9" HorizontalAlignment="Center" Margin="0,18,0,6"/>
-                        <TextBlock Text="Start the live camera, or upload a photograph to evaluate."
+                        <TextBlock Text="Start the live camera, or upload an image to evaluate."
                                    FontSize="14" Foreground="#BDBCA4" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
@@ -237,7 +237,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="SCAN" Style="{StaticResource Eyebrow}"/>
-                        <TextBlock Text="Take the photographs" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+                        <TextBlock Text="Take the images" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
 
                         <!-- Participant / consent gate message -->
                         <Border x:Name="GateBox" Style="{StaticResource NoticeBox}" Margin="0,0,0,12" Visibility="Collapsed">
@@ -272,7 +272,7 @@
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Image}" Foreground="#B9897A" Width="20" Height="20" Margin="0,0,10,0"/>
                                     <TextBlock Text="Image review" FontSize="18" FontWeight="SemiBold" Foreground="#2F3024"/>
                                 </DockPanel>
-                                <TextBlock Text="Check each photograph. Retake any view without repeating registration. Results are finalized when you accept."
+                                <TextBlock Text="Check each image. Retake any view without repeating registration. Results are finalized when you accept."
                                            FontSize="12" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,4,0,10"/>
                                 <StackPanel x:Name="ReviewList"/>
                                 <Button x:Name="AcceptBtn" Content="Accept views and view results  ›" Style="{StaticResource PrimaryButton}"
@@ -305,12 +305,12 @@
                         <Button x:Name="UploadBtn" Style="{StaticResource GhostButton}" Height="50" Margin="0,0,0,16" Click="UploadBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Upload}" Width="19" Height="19" Margin="0,0,10,0"/>
-                                <TextBlock Text="Upload photograph" VerticalAlignment="Center"/>
+                                <TextBlock Text="Upload image" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
                         <!-- front / left / right stages -->
-                        <TextBlock Text="PHOTOGRAPHS" Style="{StaticResource Eyebrow}" Visibility="Collapsed"/>
+                        <TextBlock Text="IMAGES" Style="{StaticResource Eyebrow}" Visibility="Collapsed"/>
                         <UniformGrid x:Name="StepperGrid" Columns="3" Margin="0,0,0,8" Visibility="Collapsed"/>
                         <TextBlock x:Name="ViewStepTxt" Text="" FontSize="14" FontWeight="SemiBold" Foreground="#5F6048"
                                    TextWrapping="Wrap" Margin="2,0,0,14"/>
@@ -342,7 +342,7 @@
                         <Button x:Name="AnalyzeBtn" Style="{StaticResource SecondaryButton}" Height="54" IsEnabled="False" Margin="0,0,0,4" Click="AnalyzeBtn_Click">
                             <StackPanel Orientation="Horizontal">
                                 <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Sparkle}" Width="19" Height="19" Margin="0,0,10,0"/>
-                                <TextBlock Text="Analyze uploaded photograph" VerticalAlignment="Center"/>
+                                <TextBlock Text="Analyze uploaded image" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
@@ -350,15 +350,15 @@
                         <TextBlock Text="OPTIONS" Style="{StaticResource Eyebrow}" Margin="0,16,0,6"/>
                         <Border Style="{StaticResource Panel}" Margin="0,0,0,4" Padding="14,6">
                             <StackPanel>
-                                <CheckBox x:Name="AutoCaptureChk" Content="Take each photograph automatically when the face is steady" IsChecked="True"
+                                <CheckBox x:Name="AutoCaptureChk" Content="Capture each image automatically when the face is steady" IsChecked="True"
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="AutoCaptureChk_Changed" Unchecked="AutoCaptureChk_Changed"/>
 
-                                <CheckBox x:Name="MultiViewChk" Content="Three photographs: front, left side and right side" IsChecked="True"
+                                <CheckBox x:Name="MultiViewChk" Content="Capture three images: front, left and right" IsChecked="True"
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="MultiViewChk_Changed" Unchecked="MultiViewChk_Changed"/>
 
-                                <CheckBox x:Name="CentreChk" Content="Show center lines on the camera view" IsChecked="True"
+                                <CheckBox x:Name="CentreChk" Content="Show center guide lines on the camera view" IsChecked="True"
                                           FontSize="14" Foreground="#2F3024" Margin="0,2,0,2"
                                           Checked="CentreChk_Changed" Unchecked="CentreChk_Changed"/>
                             </StackPanel>
@@ -395,7 +395,7 @@
                             <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Chart}" Foreground="#818263" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock x:Name="ScoresTitleTxt" Text="Live AI reading" FontSize="16" FontWeight="SemiBold" Foreground="#2F3024"/>
                         </DockPanel>
-                        <TextBlock x:Name="ScoresNoteTxt" Text="Updates every few seconds while you scan. The full result appears after the photographs are taken."
+                        <TextBlock x:Name="ScoresNoteTxt" Text="Updates every few seconds while you scan. The full result appears after the images are taken."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,2,0,12"/>
 
                         <!-- Progress Bars for 4 target classes (colours = heatmap colours) -->
@@ -437,13 +437,13 @@
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Pulse}" Foreground="#5F6048" Width="18" Height="18" HorizontalAlignment="Center"/>
                                 </Border>
                                 <StackPanel>
-                                    <TextBlock x:Name="VerdictTxt" Text="Awaiting the camera or a photograph." FontSize="13" FontWeight="SemiBold" Foreground="#2F3024" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="VerdictTxt" Text="Awaiting the camera or an image." FontSize="13" FontWeight="SemiBold" Foreground="#2F3024" TextWrapping="Wrap"/>
                                     <TextBlock x:Name="RegionTxt" Text="" FontSize="12" FontStyle="Italic" Foreground="#5A5A45" TextWrapping="Wrap" Margin="0,6,0,0"/>
                                 </StackPanel>
                             </DockPanel>
                         </Border>
 
-                        <TextBlock x:Name="DisclaimerTxt"
+                        <TextBlock x:Name="DisclaimerTxt" Visibility="Collapsed"
                                    Text="Screening aid only. Not a medical diagnosis. Every result is pending dermatologist review."
                                    FontSize="11" Foreground="#6F6F58" TextWrapping="Wrap" Margin="2,0,0,14"/>
 

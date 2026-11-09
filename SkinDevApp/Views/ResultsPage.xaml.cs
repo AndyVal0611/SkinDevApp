@@ -84,11 +84,11 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(s.ScanMode == "Single" ? "Result for the photograph" : "Overall result of the three photographs", 16, true));
+            sp.Children.Add(Ui.Text(s.ScanMode == "Single" ? "Result for the image" : "Overall result of the three images", 16, true));
 
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
-                sp.Children.Add(Ui.Text("None of the photographs could be analyzed. Please retake the scan.", 13, false, Ui.Bad));
+                sp.Children.Add(Ui.Text("None of the images could be analyzed. Please retake the scan.", 13, false, Ui.Bad));
                 return Ui.Card(sp);
             }
 
@@ -98,7 +98,7 @@ namespace SkinDevApp.Views
             top.Children.Add(Ui.Text("   " + (s.OverallScore.HasValue ? char.ToUpper(ClinicalText.Strength(s.OverallScore.Value)[0]) + ClinicalText.Strength(s.OverallScore.Value).Substring(1) + " match (" + s.ScoreText + ")" : s.ScoreText), 13, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             sp.Children.Add(top);
 
-            sp.Children.Add(Ui.Text("Image-level classification: how closely the photographs resemble each category", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
+            sp.Children.Add(Ui.Text("Image-level classification: how closely the images resemble each category", 12.5, true, Ui.Ink, new Thickness(0, 4, 0, 6)));
             sp.Children.Add(Ui.ScoreBars(OverallPercents()));
 
             // classifier and lesion detector are independent; say plainly whether they agree (never overrides either)
@@ -108,7 +108,7 @@ namespace SkinDevApp.Views
             if (s.ScanMode != "Single")
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 4) };
-                chips.Children.Add(Ui.Text("Photographs analyzed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
+                chips.Children.Add(Ui.Text("Images analyzed:  ", 12.5, true, Ui.Ink, new Thickness(0, 3, 0, 0)));
                 foreach (string v in StudyText.Views)
                 {
                     bool ok = _d.View(v)?.Scores != null;
@@ -131,7 +131,7 @@ namespace SkinDevApp.Views
         private Border PerViewCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "The photograph" : "Reading of each photograph", 16, true));
+            sp.Children.Add(Ui.Text(_d.Session.ScanMode == "Single" ? "The image" : "Reading of each image", 16, true));
 
             // Two independent pieces of evidence for the SAME frame: Grad-CAM++ (explains the classifier) and the lesion detector (candidate locations).
             // V6 view: "Heat map" and "Both" are V6's own detector-evidence maps (same form as V5's); V5's Grad-CAM++ stays available as "Classifier map (V5)".
@@ -162,7 +162,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(toggle);
             if (_v6 != null) sp.Children.Add(SkinDevApp.V6.V6ResultsView.BoxLegend());
             if (_v6 != null)
-                sp.Children.Add(Ui.Text("Marked areas: boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count and not a diagnosis.",
+                sp.Children.Add(Ui.Text("Marked areas: boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count.",
                                         11, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
 
             var grid = new UniformGrid { Columns = Math.Max(1, _d.Session.ScanMode == "Single" ? 1 : 3) };
@@ -171,7 +171,7 @@ namespace SkinDevApp.Views
             {
                 CaptureViewRow v = _d.View(name);
                 var col = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
-                col.Children.Add(Ui.Text(name == "Single" ? "Photograph" : name + " view", 13, true));
+                col.Children.Add(Ui.Text(name == "Single" ? "Image" : name + " view", 13, true));
                 SkinDevApp.V6.UnifiedAssessment frameA = null;
                 if (_v6 != null && v != null) _v6.TryGetValue(v.ViewType ?? name, out frameA);
                 string frameHex = frameA != null ? SkinDevApp.V6.V6ResultsView.CategoryInk(SkinDevApp.V6.ClinicalSummary.From(frameA).Category)
@@ -182,7 +182,7 @@ namespace SkinDevApp.Views
                 if (v != null)
                 {
                     thumb.Tag = firstPath; thumb.Cursor = System.Windows.Input.Cursors.Hand; thumb.ToolTip = "Click to enlarge";
-                    string popupTitle = name == "Single" ? "Photograph" : name + " view";
+                    string popupTitle = name == "Single" ? "Image" : name + " view";
                     thumb.MouseLeftButtonUp += (s2, e2) => { if (thumb.Tag is string tp && !string.IsNullOrEmpty(tp)) ImagePopup.Show(tp, popupTitle); };
                 }
                 col.Children.Add(thumb);
@@ -192,7 +192,7 @@ namespace SkinDevApp.Views
                 {
                     SkinDevApp.V6.UnifiedAssessment v6a;
                     if (_v6.TryGetValue(v?.ViewType ?? name, out v6a)) col.Children.Add(SkinDevApp.V6.V6ResultsView.ViewColumn(v6a, v?.RecordFolder));
-                    else col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "No AI result is stored for this photograph yet. It is analyzed in the background; reopen this page in a moment.", 12, false, Ui.Warn, new Thickness(0, 6, 0, 0)));
+                    else col.Children.Add(Ui.Text(v == null ? "This image was not taken." : "No AI result is stored for this image yet. It is analyzed in the background; reopen this page in a moment.", 12, false, Ui.Warn, new Thickness(0, 6, 0, 0)));
                 }
                 else if (v?.Scores != null)
                 {
@@ -207,21 +207,21 @@ namespace SkinDevApp.Views
                     col.Children.Add(Ui.ScoreBars(v.Scores.AsArray(), 6, compact: true));
                     col.Children.Add(Ui.Text("Photo quality: " + ClinicalText.PlainQuality(v.QualityStatus), 10.5, false,
                         v.QualityStatus == "Good" ? Ui.Good : Ui.Warn, new Thickness(0, 2, 0, 0)));
-                    col.Children.Add(Ui.Text(v.Maps.Count > 0 ? "Heat map saved (shows what the computer looked at)" : "Heat map not available for this photograph",
+                    col.Children.Add(Ui.Text(v.Maps.Count > 0 ? "Heat map saved (shows what the computer looked at)" : "Heat map not available for this image",
                         10.5, false, v.Maps.Count > 0 ? Ui.Muted : Ui.Warn, new Thickness(0)));
                     bool locWarn;
                     col.Children.Add(Ui.Text(LocalizationLine(v, out locWarn), 10.5, false, locWarn ? Ui.Warn : Ui.Muted, new Thickness(0, 2, 0, 0)));
                 }
                 else
                 {
-                    col.Children.Add(Ui.Text(v == null ? "This photograph was not taken." : "This photograph could not be analyzed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
+                    col.Children.Add(Ui.Text(v == null ? "This image was not taken." : "This image could not be analyzed.", 12, false, Ui.Bad, new Thickness(0, 6, 0, 0)));
                 }
                 grid.Children.Add(col);
             }
             sp.Children.Add(grid);
             if (_v6 == null)   // the V6 card carries its own wording (Disclaimer); the V5 note compares the classifier bars with box confidence
                         sp.Children.Add(Ui.Text("Marked areas are places that may contain lesions (acne red, hyperpigmentation blue, eczema orange). " +
-                                    "Some lesions may be missed or mislabelled, so the boxes are not a lesion count, not a measure of severity and not a diagnosis. " +
+                                    "Some lesions may be missed or mislabelled, so the boxes are not a lesion count and not a measure of severity. " +
                                     "Box confidence (detector) and the percentage bars (classifier) are different measures and are not comparable.",
                                     10.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             return Ui.Card(sp);
@@ -298,7 +298,7 @@ namespace SkinDevApp.Views
 
             var icons = new Dictionary<string, string>
             {
-                { "Compare photographs and marked areas", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
+                { "Compare images and marked areas", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
                 { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
                 { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" },
                 { "Detailed A4 report", "Icon.Report" }
@@ -328,7 +328,7 @@ namespace SkinDevApp.Views
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
                 }, "PrimaryButton");
-                Add("Compare photographs and marked areas", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
+                Add("Compare images and marked areas", (s, e) => OpenGallery(), "SecondaryButton", hasFolder);
             }
             var printHost = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
             target = printHost;
@@ -370,14 +370,6 @@ namespace SkinDevApp.Views
             }, 110, 12.5));
             human.Children.Add(Ui.Text("Reviews are saved separately and never change the AI result. The verification status follows the latest completed dermatologist review.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
-
-            // Notice
-            var notice = new Border { Style = (Style)FindResource("NoticeBox"), Margin = new Thickness(8) };
-            var n = new StackPanel();
-            n.Children.Add(Ui.Text("Research prototype", 13, true));
-            n.Children.Add(Ui.Text(StudyText.PrototypeNotice, 11.5, false, Ui.Ink));
-            notice.Child = n;
-            SideColumn.Children.Add(notice);
         }
 
         private void OpenGallery()

@@ -40,7 +40,7 @@ namespace SkinDevApp.V6
             switch (flag)
             {
                 case "low_resolution": return "Move closer or use a higher-resolution camera setting.";
-                case "blur": return "Hold still, refocus and retake the photograph.";
+                case "blur": return "Hold still, refocus and retake the image.";
                 case "underexposed": return "Improve the lighting so that it falls evenly on the face.";
                 case "overexposed": return "Reduce direct light and avoid reflections.";
                 case "face_not_found_or_wrong_crop": return "Face the camera with the whole face in the frame.";

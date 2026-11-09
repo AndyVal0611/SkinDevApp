@@ -115,7 +115,6 @@ namespace SkinDevApp.Views
                 sp.Children.Add(Ui.Text(label.ToUpperInvariant(), 11, true, Ui.Muted, new Thickness(0, 0, 0, 2)));
                 var num = new TextBlock { Text = value, FontSize = 34, FontFamily = (FontFamily)FindResource("DisplayFont"), Foreground = Ui.Ink };
                 sp.Children.Add(num);
-                sp.Children.Add(Ui.Text(note, 12, false, Ui.Muted, new Thickness(0, 0, 0, 0)));
                 Border card = Ui.Card(sp, new Thickness(8));
                 if (go != null) { card.Cursor = System.Windows.Input.Cursors.Hand; card.MouseLeftButtonUp += (o, e) => go(); }
                 StatsGrid.Children.Add(card);
@@ -172,7 +171,7 @@ namespace SkinDevApp.Views
                 body.Children.Add(all);
             }
             return CardShell("WAITING FOR YOUR REVIEW", pending.Count == 0 ? "All caught up" : pending.Count + (pending.Count == 1 ? " scan" : " scans"),
-                             "Scans needing a dermatologist's verdict, those marked for further review first", body);
+                             "Scans awaiting a dermatologist's review, with those marked for further review listed first.", body);
         }
 
         private UIElement RecentCard()
@@ -182,7 +181,7 @@ namespace SkinDevApp.Views
             var body = new StackPanel();
             if (recent.Count == 0) body.Children.Add(Ui.Text("No scans yet. Register a patient and start a skin analysis.", 13, false, Ui.Ink, new Thickness(0, 4, 0, 4)));
             foreach (ScanSessionRow s in recent) body.Children.Add(ScanRow(s, false));
-            return CardShell("RECENT ACTIVITY", "Latest scans", "The most recent scans, newest first", body);
+            return CardShell("RECENT ACTIVITY", "Latest scans", null, body);
         }
 
         private static Border CardShell(string eyebrow, string title, string subtitle, UIElement body, Brush chipInk = null)
@@ -247,7 +246,7 @@ namespace SkinDevApp.Views
             clear.Margin = new Thickness(10, 0, 0, 0);
             row.Children.Add(clear);
             body.Children.Add(row);
-            return CardShell("PATIENT", p.FullName, "Registered patient the workflow is on", body);
+            return CardShell("PATIENT", p.FullName, "Current patient", body);
         }
 
         private void BuildNav()

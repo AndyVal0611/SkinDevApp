@@ -88,7 +88,7 @@ namespace SkinDevApp.V6
         {
             problem = null;
             string path = string.IsNullOrEmpty(folder) ? null : Path.Combine(folder, FileName);
-            if (path == null || !File.Exists(path)) { problem = "no V6 assessment saved for this photograph"; return null; }
+            if (path == null || !File.Exists(path)) { problem = "no V6 assessment saved for this image"; return null; }
             try
             {
                 using (JsonDocument doc = JsonDocument.Parse(File.ReadAllBytes(path)))

@@ -248,7 +248,7 @@ namespace SkinDevApp.Views
             DockPanel.SetDock(page, Dock.Right);
             line.Children.Add(page);
             line.Children.Add(T("Patient " + FirstUnlinked(_d.Session) + "   ·   Scan " + _d.Session.DisplayId +
-                                "   ·   Screening aid, not a diagnostic report", 8, false, Muted, 0));
+                                "", 8, false, Muted, 0));
             foot.Children.Add(line);
             Grid.SetRow(foot, 2);
             g.Children.Add(foot);
@@ -305,7 +305,7 @@ namespace SkinDevApp.Views
             {
                 Ui.KV("Screening result", _f.V6 != null ? _f.V6.Clinical.CategoryLabel : "—"),
                 Ui.KV("Review status", _f.V6 != null ? _f.V6.ReviewStatus : (s.ReviewStatus ?? ReviewStatus.Pending)),
-                Ui.KV("Photographs read", s.ScanMode == "Single" ? "1" : s.CompletionText.Replace(" / ", " of "))
+                Ui.KV("Images read", s.ScanMode == "Single" ? "1" : s.CompletionText.Replace(" / ", " of "))
             }, 104));
             Grid.SetColumn(right, 2);
             two.Children.Add(right);
@@ -453,7 +453,7 @@ namespace SkinDevApp.Views
                 Children =
                 {
                     T("Note", 8.5, true, Navy, 2),
-                    T(_f.V6 != null ? "This report is a screening aid and not a diagnosis. Every result must be confirmed by a dermatologist." : StudyText.PrototypeNotice + " " + StudyText.ScoresNote + " " + StudyText.AttributionNote, 8, false, TextInk, 0)
+                    T(_f.V6 != null ? "Every result must be confirmed by a dermatologist." : StudyText.PrototypeNotice + " " + StudyText.ScoresNote + " " + StudyText.AttributionNote, 8, false, TextInk, 0)
                 }
             }));
             sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 6, 0, 0));
@@ -500,7 +500,7 @@ namespace SkinDevApp.Views
                 // V6 flag on: no V5 predicted class or Model Class Score under the photograph, only the capture quality and the unified headline
                 if (v != null && !string.IsNullOrEmpty(v.QualityStatus)) cell.Children.Add(T("Capture quality: " + v.QualityStatus, 8.5, false, v.QualityStatus == "Good" ? TextInk : WarnInk, 1));
                 SkinDevApp.V6.V6ViewSummary vs = _f.V6.Views.FirstOrDefault(x => x.View == (v?.ViewType ?? viewName));
-                cell.Children.Add(T(vs != null ? vs.Headline : "No AI result is stored for this photograph", 8.5, false, vs != null && vs.ReviewRequired ? WarnInk : TextInk, 0));
+                cell.Children.Add(T(vs != null ? vs.Headline : "No AI result is stored for this image", 8.5, false, vs != null && vs.ReviewRequired ? WarnInk : TextInk, 0));
             }
             else if (v?.Scores != null)
             {
@@ -583,7 +583,7 @@ namespace SkinDevApp.Views
             LocalizationRunRow any = _d.Views.Select(x => x.Localization).FirstOrDefault(x => x != null && x.Status == "OK");
             var note = new StackPanel();
             note.Children.Add(T("About these boxes", 10.5, true, Navy, 5));
-            note.Children.Add(T("•  These are possible locations only: not an outline of a lesion, not a count, not a measure of severity and not a diagnosis.", 8.5, false, TextInk, 4));
+            note.Children.Add(T("•  These are possible locations only: not an outline of a lesion, not a count and not a measure of severity.", 8.5, false, TextInk, 4));
             note.Children.Add(T("•  Lesions can be missed and a box can be wrong. Eczema findings are less established than acne and hyperpigmentation.", 8.5, false, TextInk, 4));
             note.Children.Add(T("•  Independent of Grad-CAM++ and of the class scores: neither is changed by the other.", 8.5, false, TextInk, 4));
             if (any != null)
@@ -633,9 +633,9 @@ namespace SkinDevApp.Views
 
             string[][] notes =
             {
-                new[] { "Possible locations", "Boxes show where a lesion may be. They are not an outline, a count, a measure of severity or a diagnosis." },
+                new[] { "Possible locations", "Boxes show where a lesion may be. They are not an outline, a count or a measure of severity." },
                 new[] { "Lesions can be missed", "A box can be wrong. Eczema findings are less established than those for acne and hyperpigmentation." },
-                new[] { "No box is not proof", "A photograph with no box does not prove that a condition is absent." }
+                new[] { "No box is not proof", "An image with no box does not prove that a condition is absent." }
             };
             var g = new Grid();
             for (int i = 0; i < 3; i++)
@@ -684,7 +684,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(T("Marked Areas", 17, true, Navy, 0));
-            sp.Children.Add(T("Places on each photograph where a lesion may be. Acne is marked red, hyperpigmentation blue and eczema orange.", 8.5, false, Muted, 6));
+            sp.Children.Add(T("Places on each image where a lesion may be. Acne is marked red, hyperpigmentation blue and eczema orange.", 8.5, false, Muted, 6));
 
             // three photographs go side by side in one row (smaller), so the notes below always fit on the page
             bool three = _f.V6.Views.Count >= 3;
@@ -748,11 +748,11 @@ namespace SkinDevApp.Views
                 foreach (SkinDevApp.V6.V6ViewSummary v in _f.V6.Views)
                 {
                     sp.Children.Add(new Border { Height = 1, Background = C(RuleGray), Margin = new Thickness(0, 0, 0, 5) });
-                    sp.Children.Add(T(v.View == "Single" ? "Photograph" : v.Label, 9, true, Navy, 2));
+                    sp.Children.Add(T(v.View == "Single" ? "Image" : v.Label, 9, true, Navy, 2));
                     SkinDevApp.V6.ClinicalSummary c = v.Clinical;
                     if (c.Category == SkinDevApp.V6.ClinicalCategory.Retake)
                     {
-                        sp.Children.Add(T("Not clear enough to interpret. Please retake the photograph.", 8.5, false, TextInk, 6));
+                        sp.Children.Add(T("Not clear enough to interpret. Please retake the image.", 8.5, false, TextInk, 6));
                         continue;
                     }
                     var det = c.Findings.Where(x => x.IsDetected)
@@ -763,9 +763,9 @@ namespace SkinDevApp.Views
                     if (rev.Count > 0) sp.Children.Add(LabelledLine("For review", string.Join("; ", rev), WarnInk));
                     sp.Children.Add(new Border { Height = 5 });
                 }
-                if (!_f.V6.Single && _f.Lines.Any(l => l.StartsWith("The photographs do not all show")))
-                    sp.Children.Add(T("The findings differ between photographs; each is listed separately.", 8, false, Muted, 4));
-                sp.Children.Add(T("Screening result, not a diagnosis. A dermatologist must confirm it.", 8, false, Muted, 0));
+                if (!_f.V6.Single && _f.Lines.Any(l => l.StartsWith("The images do not all show")))
+                    sp.Children.Add(T("The findings differ between images; each is listed separately.", 8, false, Muted, 4));
+                sp.Children.Add(T("A dermatologist must confirm this result.", 8, false, Muted, 0));
             }
             else
             {
@@ -822,7 +822,7 @@ namespace SkinDevApp.Views
                 sp.Children.Add(T((_f.V6 != null ? "Detector Evidence Maps" : "Selected AI Attribution Evidence") + (pageCount > 1 ? "  (" + (p + 1) + " of " + pageCount + ")" : ""), 17, true, Navy, 0));
                 if (_f.V6 != null)
                 {
-                    sp.Children.Add(T("One map per photograph, for the condition the unified assessment ranks highest: where the lesion detectors found evidence (the same evidence the assessment uses). Color = the condition, strength = detector confidence.", 8.5, false, Muted, 4));
+                    sp.Children.Add(T("One map per image, for the condition the unified assessment ranks highest: where the lesion detectors found evidence (the same evidence the assessment uses). Color = the condition, strength = detector confidence.", 8.5, false, Muted, 4));
                     sp.Children.Add(T("This is an evidence map, not an explanation of the model, and not a lesion segmentation. Lesions can be missed and boxes can be wrong.", 8, false, Muted, 8));
                 }
                 else

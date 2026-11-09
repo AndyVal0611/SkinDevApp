@@ -76,7 +76,7 @@ namespace SkinDevApp.Scanning
     public sealed class GalleryModel
     {
         public const string AttributionStatement =
-            "Heat maps show which parts of the photograph the computer looked at for each category. " +
+            "Heat maps show which parts of the image the computer looked at for each category. " +
             "They do not outline skin lesions and are not a map of affected skin. A faint or spread-out map is shown as it is.";
 
         public string Title { get; set; } = "";
@@ -115,9 +115,9 @@ namespace SkinDevApp.Scanning
             {
                 CaptureRecord rec = ReviewStore.LoadRecord(folder);
                 if (rec == null) throw new InvalidOperationException("record.json not found in " + folder);
-                m.Title = "Single photograph  ·  " + SkinDevApp.Views.Fmt.When(rec.TimestampUtc);
+                m.Title = "Single image  ·  " + SkinDevApp.Views.Fmt.When(rec.TimestampUtc);
                 GalleryView gv = LoadView(folder, ScanView.Any);
-                gv.TabTitle = "Photograph";
+                gv.TabTitle = "Image";
                 m.Views.Add(gv);
             }
 
@@ -129,7 +129,7 @@ namespace SkinDevApp.Scanning
             var gv = new GalleryView
             {
                 View = view,
-                TabTitle = view == ScanView.Any ? "Photograph" : ScanViews.Title(view).Replace(" side", " view"),
+                TabTitle = view == ScanView.Any ? "Image" : ScanViews.Title(view).Replace(" side", " view"),
                 Folder = folder
             };
 
@@ -137,7 +137,7 @@ namespace SkinDevApp.Scanning
             if (rec == null)
             {
                 gv.Available = false;
-                gv.SummaryLine = "This photograph was not taken.";
+                gv.SummaryLine = "This image was not taken.";
                 return gv;
             }
 
@@ -255,7 +255,7 @@ namespace SkinDevApp.Scanning
             // header texts
             gv.SummaryLine = rec.Primary != null
                 ? SkinDevApp.Views.ClinicalText.Name(rec.Primary.OnnxTopClass) + " — " + SkinDevApp.Views.ClinicalText.Strength(rec.Primary.OnnxConfidencePercent) + " match (" + rec.Primary.OnnxConfidencePercent.ToString("0") + "%)"
-                : "No result was saved for this photograph";
+                : "No result was saved for this image";
 
             if (rec.Quality != null)
                 gv.QualityText = "Sharpness " + rec.Quality.Sharpness.ToString("0.0")

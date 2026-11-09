@@ -133,7 +133,7 @@ namespace SkinDevApp.Views
 
             // header
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-            header.Children.Add(Ui.WindowBand("Compare photographs and marked areas", _model.Title));
+            header.Children.Add(Ui.WindowBand("Compare images and marked areas", _model.Title));
             header.Children.Add(new Border
             {
                 Background = GalleryUi.Brush("#F8EBE6"),
@@ -187,7 +187,7 @@ namespace SkinDevApp.Views
             {
                 SkinDevApp.V6.ClinicalSummary gcs = SkinDevApp.V6.ClinicalSummary.From(v6a, SkinDevApp.V6.AIResultStore.FaceBoxOf(v.Folder));
                 sp.Children.Add(GalleryUi.Text(gcs.CategoryLabel + ": " + gcs.Title, 14, true, "#3A3B2C", new Thickness(0, 2, 0, 2)));
-                sp.Children.Add(GalleryUi.Text("Boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count and not a diagnosis.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
+                sp.Children.Add(GalleryUi.Text("Boxes where the lesion detectors found a possible lesion. They are possible locations, not a lesion count.", 11, false, "#6F6F58", new Thickness(0, 0, 0, 6)));
                 var v6wrap = new WrapPanel();
                 string marked = System.IO.Path.Combine(v.Folder, SkinDevApp.V6.V6Archive.MarkedFileName);
                 if (System.IO.File.Exists(marked)) v6wrap.Children.Add(BuildLocalizationCard(new GalleryCard { Title = "Marked areas", ColorHex = "#9CA3AF", ImagePath = marked, ScoreText = SkinDevApp.V6.V6SessionSummary.AreasLine(gcs), Note = "Boxes that supported the assessment" }));
@@ -323,9 +323,9 @@ namespace SkinDevApp.Views
             FusedResult f = _model.Fusion;
             SessionIndex s = _model.Session;
 
-            sp.Children.Add(GalleryUi.Text("Summary of the three photographs", 16, true));
+            sp.Children.Add(GalleryUi.Text("Summary of the three images", 16, true));
             sp.Children.Add(GalleryUi.Text(
-                "Each photograph is read on its own (see the Front, Left and Right tabs). The three photographs are never merged into one heat map.",
+                "Each image is read on its own (see the Front, Left and Right tabs). The three images are never merged into one heat map.",
                 12, false, "#5A5A45", new Thickness(0, 2, 0, 10)));
 
             if (f == null || f.ViewsUsed == 0)
@@ -335,7 +335,7 @@ namespace SkinDevApp.Views
             else
             {
                 sp.Children.Add(GalleryUi.Text(ClinicalText.Name(f.TopClass) + " — " + ClinicalText.Strength(f.TopClassPercent) + " match (" +
-                    f.TopClassPercent.ToString("0") + "%), from " + f.ViewsUsed + " of " + f.ViewsExpected + " photographs", 15, true));
+                    f.TopClassPercent.ToString("0") + "%), from " + f.ViewsUsed + " of " + f.ViewsExpected + " images", 15, true));
             }
 
             var seen = s == null ? new List<ViewOutcome>() : s.Views.Where(o => o.PredictedClass != null).ToList();
@@ -344,15 +344,15 @@ namespace SkinDevApp.Views
                 int distinct = seen.Select(o => o.PredictedClass).Distinct().Count();
                 double spread = seen.Max(o => o.ConfidencePercent) - seen.Min(o => o.ConfidencePercent);
                 if (distinct > 1)
-                    sp.Children.Add(Ui.Callout("The photographs do not agree", "The photographs point to different categories. Please compare each photograph before relying on the overall result.", 2));
+                    sp.Children.Add(Ui.Callout("The images do not agree", "The images point to different categories. Please compare each image before relying on the overall result.", 2));
                 else if (spread >= 25)
-                    sp.Children.Add(Ui.Callout("Same category, different strength", "All photographs point to " + ClinicalText.Name(seen[0].PredictedClass) + ", but the match varies from " +
+                    sp.Children.Add(Ui.Callout("Same category, different strength", "All images point to " + ClinicalText.Name(seen[0].PredictedClass) + ", but the match varies from " +
                         seen.Min(o => o.ConfidencePercent).ToString("0") + "% to " + seen.Max(o => o.ConfidencePercent).ToString("0") + "%.", 1));
                 else
-                    sp.Children.Add(Ui.Callout("The photographs agree", "Every photograph points to " + ClinicalText.Name(seen[0].PredictedClass) + " with a similar strength.", 0));
+                    sp.Children.Add(Ui.Callout("The images agree", "Every image points to " + ClinicalText.Name(seen[0].PredictedClass) + " with a similar strength.", 0));
             }
 
-            sp.Children.Add(GalleryUi.Text("Reading of each photograph", 14, true, "#3A3B2C", new Thickness(0, 12, 0, 4)));
+            sp.Children.Add(GalleryUi.Text("Reading of each image", 14, true, "#3A3B2C", new Thickness(0, 12, 0, 4)));
             if (s != null)
                 foreach (ViewOutcome o in s.Views)
                     sp.Children.Add(GalleryUi.Text(o.View + " view:  " + (o.PredictedClass == null ? "no result"
@@ -373,9 +373,9 @@ namespace SkinDevApp.Views
                         + ((f.MaxPercent.ContainsKey(cls) ? f.MaxPercent[cls].ToString("0.0") : "-") + "%").PadLeft(10)
                         + "  " + (f.MaxFromView.ContainsKey(cls) ? f.MaxFromView[cls] : ""));
                 tech.AppendLine();
-                tech.AppendLine("Weighted = average of the photographs, counting clearer photographs more.");
-                tech.AppendLine("Average = plain average.  Highest = the strongest single photograph.");
-                tech.AppendLine("A finding seen in only one photograph shows under Highest even when the weighted figure is low.");
+                tech.AppendLine("Weighted = average of the images, counting clearer images more.");
+                tech.AppendLine("Average = plain average.  Highest = the strongest single image.");
+                tech.AppendLine("A finding seen in only one image shows under Highest even when the weighted figure is low.");
                 tech.AppendLine("Method: " + f.Method);
                 foreach (string n in f.Notes) tech.AppendLine("Note: " + n);
             }

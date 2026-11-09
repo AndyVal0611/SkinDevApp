@@ -96,7 +96,7 @@ namespace SkinDevApp.Views
                 Stat("verified", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ReviewStatus='Verified';"), "#3E6B3D");
                 Stat("require further review", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ReviewStatus='Requires further review';"), "#9B2F25");
                 Stat("unassigned scans", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ParticipantID IS NULL;"), "#5F5E5A");
-                Stat("photographs with an AI result", RecordsQueries.Count("SELECT COUNT(*) FROM AIAssessments;"), "#3A3B2C");
+                Stat("images with an AI result", RecordsQueries.Count("SELECT COUNT(*) FROM AIAssessments;"), "#3A3B2C");
                 _summary.Children.Add(wrap);
             }
             catch (Exception ex) { _summary.Children.Add(Ui.Text("The database could not be read: " + ex.Message, 13, false, Ui.Bad)); }
@@ -307,7 +307,7 @@ namespace SkinDevApp.Views
             Action reload = null;
             TextBox q = Search("Scan, patient or AI summary", () => reload());
             ComboBox rv = Filter(new[] { "All" }.Concat(ReviewStatus.All).Concat(new[] { "Unassigned scans" }), () => reload());
-            ComboBox ai = Filter(new[] { "All", "Condition detected", "Needs review", "No condition detected", "Retake photograph", "Analysis not completed", "Pending" }, () => reload());
+            ComboBox ai = Filter(new[] { "All", "Condition detected", "Needs review", "No condition detected", "Retake image", "Analysis not completed", "Pending" }, () => reload());
             var bar = FilterBar(Labelled("Search", q), Labelled("Verification", rv), Labelled("AI result", ai));
             TabItem tab = Tab("Scans", "scans", bar, () => RecordsQueries.Scans(q.Text, (string)rv.SelectedItem, (string)ai.SelectedItem), (row, d) =>
             {
@@ -315,7 +315,7 @@ namespace SkinDevApp.Views
                 SessionDetail sd = StudyRepository.GetSessionDetail(id);
                 if (sd == null) { d.Children.Add(Ui.Text("This scan is no longer in the database.", 13, false, Ui.Bad)); return; }
                 d.Children.Add(Ui.Text(sd.Session.DisplayId + " · " + (sd.Session.ParticipantID ?? "Unassigned"), 16, true, Ui.Ink, new Thickness(0, 0, 0, 2)));
-                d.Children.Add(Ui.Text(Fmt.When(sd.Session.StartedAt) + " · " + (sd.Session.ScanMode == "Single" ? "1 photograph" : sd.Session.ViewsCompleted + " of " + sd.Session.ViewsExpected + " photographs"),
+                d.Children.Add(Ui.Text(Fmt.When(sd.Session.StartedAt) + " · " + (sd.Session.ScanMode == "Single" ? "1 image" : sd.Session.ViewsCompleted + " of " + sd.Session.ViewsExpected + " images"),
                                        12, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
                 SkinDevApp.V6.V6SessionSummary v6 = null;
                 try { v6 = SkinDevApp.V6.V6SessionSummary.For(sd); } catch { }
@@ -372,7 +372,7 @@ namespace SkinDevApp.Views
             {
                 d.Children.Add(Ui.Text(Str(row, "Condition") + " · " + Str(row, "AI result"), 16, true, Ui.Ink, new Thickness(0, 0, 0, 8)));
                 Rows(d, row);
-                d.Children.Add(Ui.Text("A screening finding, not a diagnosis. Origin \"Re-analysis\" means the photograph was taken before the final model was installed and was analyzed later.",
+                d.Children.Add(Ui.Text("Origin \"Re-analysis\" means the image was taken before the final model was installed and was analyzed later.",
                                        11, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
                 string id = Str(row, "_id");
                 d.Children.Add(Action("Open the scan's results", (s, e) => Nav.Go(new ResultsPage(id)), "PrimaryButton"));

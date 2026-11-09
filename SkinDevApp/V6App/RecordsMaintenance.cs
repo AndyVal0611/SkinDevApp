@@ -47,7 +47,7 @@ namespace SkinDevApp.V6
                 try { moved = ScanStorage.PlaceAll(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[PlaceAll] " + ex.Message); }
 
                 int done = Reanalyse();
-                Report("Up to date" + (moved > 0 ? " · " + moved + " folder(s) organized" : "") + (done > 0 ? " · " + done + " older photograph(s) re-analyzed" : ""));
+                Report("Up to date" + (moved > 0 ? " · " + moved + " folder(s) organized" : "") + (done > 0 ? " · " + done + " older image(s) re-analyzed" : ""));
             }
             catch (Exception ex) { Report("Stopped: " + ex.Message); }
             finally { Interlocked.Exchange(ref _running, 0); }

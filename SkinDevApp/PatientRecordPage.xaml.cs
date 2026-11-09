@@ -210,7 +210,7 @@ namespace SkinDevApp
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
                 Ui.InfoRows(new[] { Ui.KV("Result", overall), Ui.KV("Review status", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
-                Ui.InfoRows(new[] { Ui.KV("Photographs", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected) }, 100, 12.5)));
+                Ui.InfoRows(new[] { Ui.KV("Images", s.ScanMode == "Single" ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected) }, 100, 12.5)));
             return Ui.Card(sp);
         }
 
@@ -259,7 +259,7 @@ namespace SkinDevApp
                 Ui.KV("Consent", consent == null ? "Not recorded"
                     : (consent.Decision == "Agreed" ? "Given on " : "Declined on ") + Fmt.When(consent.RecordedAt) +
                       (consent.AllowsScanning ? "" : " (scanning is not allowed)") +
-                      ". Use of the photographs for future model improvement: " + (consent.FutureModelUseConsent ? "agreed." : "not agreed."))
+                      ". Use of the images for future model improvement: " + (consent.FutureModelUseConsent ? "agreed." : "not agreed."))
             });
             sp.Children.Add(Ui.InfoRows(rows, 130, 12.5));
 
@@ -445,7 +445,7 @@ namespace SkinDevApp
                 Ui.KV("Date and time", Fmt.ScanWhen(s.StartedAt, s.CompletedAt)),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending),
                 Ui.KV("Overall result", overall),
-                Ui.KV("Photographs", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),
+                Ui.KV("Images", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),
                 Ui.KV("Scan status", s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus),
                 Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
             }, 160, 12.5));
@@ -465,8 +465,8 @@ namespace SkinDevApp
             foreach (CaptureViewRow v in d.Views)
             {
                 var col = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
-                col.Children.Add(Ui.Text(v.ViewType == "Single" ? "Photograph" : v.ViewType + " view", 13, true));
-                if (v.Scores == null) col.Children.Add(Ui.Text("This photograph could not be analyzed.", 11.5, false, Ui.Bad));
+                col.Children.Add(Ui.Text(v.ViewType == "Single" ? "Image" : v.ViewType + " view", 13, true));
+                if (v.Scores == null) col.Children.Add(Ui.Text("This image could not be analyzed.", 11.5, false, Ui.Bad));
                 else
                 {
                     var r = readings.First(x => x.View == v.ViewType);
@@ -488,7 +488,7 @@ namespace SkinDevApp
             var sp = new StackPanel();
             var head = new DockPanel();
             bool hasFolder = !string.IsNullOrEmpty(d.Session.SessionFolder) && System.IO.Directory.Exists(d.Session.SessionFolder);
-            Button gallery = Ui.Btn("Compare photographs and marked areas", (o, e) =>
+            Button gallery = Ui.Btn("Compare images and marked areas", (o, e) =>
             {
                 try { new ComparisonGalleryWindow(d.Session.SessionFolder) { Owner = Application.Current.MainWindow }.Show(); }
                 catch (Exception ex) { LumyDialog.Show("The comparison could not be opened: " + ex.Message, "LUMYVUE"); }
@@ -508,7 +508,7 @@ namespace SkinDevApp
             Func<CaptureViewRow, bool> hasMarks = v => v.Localization != null && v.Localization.Status == "OK" && !string.IsNullOrEmpty(v.Localization.OverlayPath);
             int images = d.Views.Sum(v => (string.IsNullOrEmpty(v.AnalysedImagePath ?? v.OriginalImagePath) ? 0 : 1) + (shownMap(v) != null ? 1 : 0)
                                           + (hasMarks(v) ? 1 : 0) + (hasMarks(v) && !string.IsNullOrEmpty(v.Localization.CombinedPath) ? 1 : 0));
-            head.Children.Add(Ui.Text("Photographs and marked areas (" + images + " images)", 16, true));
+            head.Children.Add(Ui.Text("Images and marked areas (" + images + " images)", 16, true));
             sp.Children.Add(head);
 
             var tabs = new TabControl { Margin = new Thickness(0, 6, 0, 0), BorderThickness = new Thickness(0) };
@@ -537,7 +537,7 @@ namespace SkinDevApp
                 string marksNote;
                 if (v.Localization == null) marksNote = "Not available (scan saved before this feature)";
                 else if (v.Localization.Status == "Failed") marksNote = "The detector could not run";
-                else if (v.Localization.Status != "OK") marksNote = "Not run for this photograph";
+                else if (v.Localization.Status != "OK") marksNote = "Not run for this image";
                 else if (v.Lesions.Count == 0) marksNote = "None found";
                 else marksNote = v.Lesions.Count + (v.Lesions.Count == 1 ? " area" : " areas") + ": " + string.Join(", ", v.Lesions.GroupBy(x => x.ClassName).Select(g => g.Key + " " + g.Count()));
                 bool marks = hasMarks(v);
@@ -546,10 +546,10 @@ namespace SkinDevApp
                 row.Children.Add(EvidenceCell("Heat map and marked areas", both ? v.Localization.CombinedPath : null, "#9CA3AF", both ? null : "Not available", both ? v.Localization.CombinedPath : null));
                 tabs.Items.Add(new TabItem { Header = "  " + v.ViewType.ToUpperInvariant() + "  ", Content = row });
             }
-            if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No photographs were saved for this scan.", 12, false, Ui.Muted));
+            if (tabs.Items.Count == 0) sp.Children.Add(Ui.Text("No images were saved for this scan.", 12, false, Ui.Muted));
             else sp.Children.Add(tabs);
 
-            sp.Children.Add(Ui.Text("The original photograph is not changed. The heat map shows where the computer looked. The marked areas are places that may contain lesions: some may be missed or wrongly marked, so they are not a lesion count and not a diagnosis.", 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
+            sp.Children.Add(Ui.Text("The original image is not changed. The heat map shows where the computer looked. The marked areas are places that may contain lesions: some may be missed or wrongly marked, so they are not a lesion count and not a diagnosis.", 10.5, false, Ui.Muted, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }
 

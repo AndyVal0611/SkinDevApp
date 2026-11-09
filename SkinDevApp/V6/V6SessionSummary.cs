@@ -60,7 +60,7 @@ namespace SkinDevApp.V6
 
         private static readonly string[] Order = { "Single", "Front", "Left", "Right" };
 
-        public static string LabelFor(string key) => key == "Single" ? "Photograph" : key == "Left" ? "Left side" : key == "Right" ? "Right side" : key == "Front" ? "Front" : key;
+        public static string LabelFor(string key) => key == "Single" ? "Image" : key == "Left" ? "Left side" : key == "Right" ? "Right side" : key == "Front" ? "Front" : key;
 
         public static V6SessionSummary From(Dictionary<string, UnifiedAssessment> map, bool single, IList<string> problems = null, IDictionary<string, string> folders = null)
         {
@@ -90,9 +90,9 @@ namespace SkinDevApp.V6
             s.ShortLabel = s.Clinical.CategoryLabel + (s.PresentUnion.Count > 0 ? ": " + string.Join(", ", s.PresentUnion) : "");
             s.Reanalysed = s.Views.Any(v => v.Origin == "Re-analysis");
             if (!s.Single && s.Views.Select(v => string.Join("|", v.Clinical.DetectedFindings.Select(x => x.Condition))).Distinct().Count() > 1)
-                s.Notes.Add("The photographs do not all show the same findings; each photograph is listed separately.");
+                s.Notes.Add("The images do not all show the same findings; each image is listed separately.");
             if (s.Reanalysed)
-                s.Notes.Add("This scan was re-analyzed from its saved photographs.");
+                s.Notes.Add("This scan was re-analyzed from its saved images.");
             return s;
         }
 

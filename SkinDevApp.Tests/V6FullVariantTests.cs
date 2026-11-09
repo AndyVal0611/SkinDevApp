@@ -37,7 +37,7 @@ namespace SkinDevApp.Tests
         {
             string root = Environment.GetEnvironmentVariable("LUMYVUE_PARITY_PHOTOS");
             if (string.IsNullOrEmpty(root)) root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "PrecisionSkin", "Classes");
-            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Parity photographs not found. Set LUMYVUE_PARITY_PHOTOS to the PrecisionSkin\\Classes folder. Looked in: " + root);
+            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Parity images not found. Set LUMYVUE_PARITY_PHOTOS to the PrecisionSkin\\Classes folder. Looked in: " + root);
             return root;
         }
 

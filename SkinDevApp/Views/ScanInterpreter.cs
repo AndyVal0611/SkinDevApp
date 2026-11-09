@@ -188,7 +188,7 @@ namespace SkinDevApp.Views
             {
                 r.Category = InterpretationCategory.Unavailable;
                 r.Headline = "No AI result";
-                r.Detail = "This photograph was not scored by the classifier.";
+                r.Detail = "This image was not scored by the classifier.";
                 r.Caveat = null;
                 r.ProvisionalNote = null;
                 return r;
@@ -225,7 +225,7 @@ namespace SkinDevApp.Views
             r.DetectedConditions = r.Conditions.Where(e => e.State == DetectorState.Detected).Select(e => e.ClassName).ToList();
             string found = string.Join(", ", r.DetectedConditions).ToLowerInvariant();
 
-            r.ClassifierLine = "Image-level classification (how closely the whole photograph resembles each category; the four add up to 100%): " +
+            r.ClassifierLine = "Image-level classification (how closely the whole image resembles each category; the four add up to 100%): " +
                 string.Join(", ", Enumerable.Range(0, 4).OrderByDescending(i => percent[i]).Select(i => Name(Classes[i]) + " " + Pct(percent[i]))) + ".";
 
             // ---- uncertainty flags: independent of the category ----------------------------
@@ -279,7 +279,7 @@ namespace SkinDevApp.Views
             if (topEv != null)
             {
                 if (topEv.State == DetectorState.NotAvailable)
-                    return head + "No " + topEv.ClassName.ToLowerInvariant() + " detector was available or run for this photograph, so nothing supports or contradicts this from the detectors.";
+                    return head + "No " + topEv.ClassName.ToLowerInvariant() + " detector was available or run for this image, so nothing supports or contradicts this from the detectors.";
                 return head + "The " + topEv.ClassName.ToLowerInvariant() + " detector ran but kept no qualifying detections. That neither confirms nor rules out " +
                        topEv.ClassName.ToLowerInvariant() + "; it may not mark every presentation.";
             }
@@ -343,7 +343,7 @@ namespace SkinDevApp.Views
             var l = Summary(i);
             if (i.Category == InterpretationCategory.Unavailable) return l;
             l.Add(i.ClassifierLine);
-            l.Add("Lesion detectors (separate models; confidence is per box, not a percentage of the photograph):");
+            l.Add("Lesion detectors (separate models; confidence is per box, not a percentage of the image):");
             l.AddRange(DetectorLines(i).Select(x => "  " + x));
             l.Add(i.Caveat);
             l.Add(i.ProvisionalNote);

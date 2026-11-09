@@ -208,7 +208,7 @@ namespace SkinDevApp.Data
                     "  Verified                 reviewed and completed by a dermatologist\r\n" +
                     "  Requires further review  the dermatologist asked for further review\r\n" +
                     "  Unassigned scans         scans not linked to a registered patient\r\n\r\n" +
-                    "A scan folder holds the photographs (original.png, analysed.png), the final AI result (v6_assessment.json, sealed with SHA-256),\r\n" +
+                    "A scan folder holds the images (original.png, analysed.png), the final AI result (v6_assessment.json, sealed with SHA-256),\r\n" +
                     "the evidence maps (v6_*.png), and the subfolders Receipts, Reports and Verification.\r\n" +
                     "LUMYVUE moves the folder itself when the verification status changes. Do not rename or move folders by hand:\r\n" +
                     "the database stores where each file is. Use the Records & database screen in the app instead.\r\n");

@@ -28,7 +28,7 @@ namespace SkinDevApp.Views
     public static class ClinicalText
     {
         public const string HowToReadScores =
-            "How to read these percentages: each bar shows how closely the photograph resembles one skin category, compared with the other three. " +
+            "How to read these percentages: each bar shows how closely the image resembles one skin category, compared with the other three. " +
             "The four bars always add up to 100%. A longer bar means a stronger visual match. It is a decision aid, not a diagnosis and not the chance that the patient has the condition.";
 
         public static string Name(string cls) => cls == "Normal" ? "Normal Skin" : cls;
@@ -76,11 +76,11 @@ namespace SkinDevApp.Views
             string strength = Strength(v.TopPercent);
             ScanInterpretation mixed = v.Interpretation;
             if (mixed != null && mixed.Category == InterpretationCategory.Mixed) return mixed.Headline + ". " + mixed.Detail;
-            if (v.TopPercent < 40) return "No category stands out clearly in this photograph. Please judge it directly.";
+            if (v.TopPercent < 40) return "No category stands out clearly in this image. Please judge it directly.";
             if (c == "Normal")
-                return "The photograph looks most like healthy skin; the model did not find a " + (v.TopPercent >= 85 ? "notable" : "clear") + " match to acne, eczema or hyperpigmentation.";
-            return "The photograph resembles " + Name(c).ToLowerInvariant() + " more than the other categories (" + strength + " match). " +
-                   (v.TopPercent < 60 ? "Treat this as a tentative impression." : "Please confirm on the photograph.");
+                return "The image looks most like healthy skin; the model did not find a " + (v.TopPercent >= 85 ? "notable" : "clear") + " match to acne, eczema or hyperpigmentation.";
+            return "The image resembles " + Name(c).ToLowerInvariant() + " more than the other categories (" + strength + " match). " +
+                   (v.TopPercent < 60 ? "Treat this as a tentative impression." : "Please confirm on the image.");
         }
 
         /// <summary>The main message about whether the photographs point the same way.</summary>
@@ -88,14 +88,14 @@ namespace SkinDevApp.Views
         {
             // level: 0 = fine, 1 = look closer, 2 = disagree
             headline = ""; detail = ""; level = 0;
-            if (single || views.Count < 2) { headline = "Single photograph"; detail = "Only one photograph was analyzed, so there is nothing to compare."; return; }
+            if (single || views.Count < 2) { headline = "Single image"; detail = "Only one image was analyzed, so there is nothing to compare."; return; }
 
             var tops = views.Select(v => v.TopClass).Distinct().ToList();
             if (tops.Count > 1)
             {
                 level = 2;
-                headline = "The photographs do not agree";
-                detail = string.Join(";  ", views.Select(v => v.View + " looks most like " + Name(v.TopClass))) + ". Please compare each photograph.";
+                headline = "The images do not agree";
+                detail = string.Join(";  ", views.Select(v => v.View + " looks most like " + Name(v.TopClass))) + ". Please compare each image.";
                 return;
             }
 
@@ -108,26 +108,26 @@ namespace SkinDevApp.Views
                 ViewReading strongest = views.First(v => v.Percent[ci] == hi), weakest = views.First(v => v.Percent[ci] == lo);
                 headline = "Same category, different strength";
                 detail = "All views point to " + Name(cls) + ", but the match is " + P(hi) + " in the " + strongest.View + " view and only " + P(lo) +
-                         " in the " + weakest.View + " view. Compare the two photographs.";
+                         " in the " + weakest.View + " view. Compare the two images.";
                 return;
             }
-            headline = "The photographs agree";
-            detail = "Every photograph points to " + Name(cls) + ".";
+            headline = "The images agree";
+            detail = "Every image points to " + Name(cls) + ".";
         }
 
         /// <summary>Short plain-language findings for the whole scan (for summaries). Built from the readings only.</summary>
         public static List<string> Findings(IList<ViewReading> views, string overallClass)
         {
             var lines = new List<string>();
-            if (views.Count == 0) { lines.Add("No photograph produced a usable result."); return lines; }
+            if (views.Count == 0) { lines.Add("No image produced a usable result."); return lines; }
 
             string cls = overallClass ?? views.GroupBy(v => v.TopClass).OrderByDescending(g => g.Count()).First().Key;
             int ci = Array.IndexOf(StudyText.Classes, cls);
             ViewReading best = views.OrderByDescending(v => v.Percent[ci]).First();
 
             lines.Add(cls == "Normal"
-                ? "Overall, the photographs look most like healthy skin. The model found no clear match to acne, eczema or hyperpigmentation."
-                : "Overall, the photographs resemble " + Name(cls).ToLowerInvariant() + " more than the other categories. The clearest view is " + best.View + " (" + Strength(best.Percent[ci]) + " match, " + P(best.Percent[ci]) + ").");
+                ? "Overall, the images look most like healthy skin. The model found no clear match to acne, eczema or hyperpigmentation."
+                : "Overall, the images resemble " + Name(cls).ToLowerInvariant() + " more than the other categories. The clearest view is " + best.View + " (" + Strength(best.Percent[ci]) + " match, " + P(best.Percent[ci]) + ").");
 
             var others = new List<string>();
             for (int i = 0; i < StudyText.Classes.Length; i++)
@@ -142,10 +142,10 @@ namespace SkinDevApp.Views
             var mixedViews = views.Where(v => v.Interpretation != null && v.Interpretation.Category == InterpretationCategory.Mixed).ToList();
             if (mixedViews.Count > 0)
                 lines.Add(ScanInterpreter.MixedHeadline + ": in the " + string.Join(", ", mixedViews.Select(v => v.View)) +
-                          " view the classifier scores and the lesion detector's marked areas disagree. The two are independent outputs; please judge the photograph directly.");
+                          " view the classifier scores and the lesion detector's marked areas disagree. The two are independent outputs; please judge the image directly.");
 
             var poor = views.Where(v => !string.IsNullOrEmpty(v.Quality) && v.Quality != "Good").ToList();
-            lines.Add(poor.Count == 0 ? "All photographs were taken in suitable conditions."
+            lines.Add(poor.Count == 0 ? "All images were taken in suitable conditions."
                                       : "Photo quality to keep in mind: " + string.Join("; ", poor.Select(v => v.View + " (" + PlainQuality(v.Quality) + ")")) + ".");
             return lines;
         }

@@ -200,11 +200,11 @@ namespace SkinDevApp.Views
             {
                 int n = 1;
                 foreach (ScanView v in ScanViews.Sequence) { if (v == _session.Current) break; n++; }
-                sb.Append("   ·   Photograph ").Append(n).Append(" of ").Append(ScanViews.Sequence.Length).Append(": ").Append(ScanViews.Title(_session.Current));
+                sb.Append("   ·   Image ").Append(n).Append(" of ").Append(ScanViews.Sequence.Length).Append(": ").Append(ScanViews.Title(_session.Current));
             }
             else if (_session != null)
             {
-                sb.Append("   ·   All photographs taken");
+                sb.Append("   ·   All images taken");
             }
             ScanInfoTxt.Text = sb.ToString();
             UpdatePhotoSlots();
@@ -219,7 +219,7 @@ namespace SkinDevApp.Views
         {
             note = null;
             if (o == null) return SlotNotYet;
-            if (!o.Ok) { note = string.IsNullOrWhiteSpace(o.Error) ? "the photograph could not be analysed" : o.Error; return SlotRecapture; }
+            if (!o.Ok) { note = string.IsNullOrWhiteSpace(o.Error) ? "the image could not be analysed" : o.Error; return SlotRecapture; }
             if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath)) return SlotUnavailable;
             if (rec != null && rec.Quality != null)
             {
@@ -1138,7 +1138,7 @@ namespace SkinDevApp.Views
             SkinDevApp.V6.UnifiedAssessment a = Volatile.Read(ref _latestV6);
             if (a != null) LiveReadingPanel.Visibility = Visibility.Visible;       // shown once there is a reading to show
             ScoresTitleTxt.Text = "Live AI reading";
-            ScoresNoteTxt.Text = "Updates every few seconds while you scan. The full result appears after the photographs are taken. Not a diagnosis.";
+            ScoresNoteTxt.Text = "Updates every few seconds while you scan. The full result appears after the images are taken.";
             NormalRow.Visibility = Visibility.Collapsed; NormalBar.Visibility = Visibility.Collapsed;
             bool ok = a != null && a.Conditions.Length >= 3 && a.State != SkinDevApp.V6.V6States.InferenceError && a.State != SkinDevApp.V6.V6States.RecaptureRequired;
             SkinDevApp.V6.ClinicalSummary cs = ok ? SkinDevApp.V6.ClinicalSummary.From(a) : null;
@@ -1435,7 +1435,7 @@ namespace SkinDevApp.Views
             if (_session == null || _live == null) { ViewStepTxt.Text = ""; return; }
 
             // the Front / Left / Right indicator above shows progress; this line gives the instruction for the current photograph
-            ViewStepTxt.Text = _session.IsComplete ? "All three photographs are done." : ScanViews.Instruction(_session.Current);
+            ViewStepTxt.Text = _session.IsComplete ? "All three images are done." : ScanViews.Instruction(_session.Current);
             RefreshStepper();
         }
 
@@ -1848,7 +1848,7 @@ namespace SkinDevApp.Views
             }
 
             // Nothing saved yet (e.g. the scan was cancelled before any photograph was kept): there is no result to report.
-            LumyDialog.Show("There is no saved scan to report yet. Take the photographs first; the report is built from the saved scan.", "LUMYVUE Report",
+            LumyDialog.Show("There is no saved scan to report yet. Take the images first; the report is built from the saved scan.", "LUMYVUE Report",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

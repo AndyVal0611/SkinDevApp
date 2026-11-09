@@ -76,7 +76,7 @@ namespace SkinDevApp.Views
             }
 
             root.Children.Add(Ui.WindowBand("Dermatologist review",
-                "Scan " + _d.Session.DisplayId + "  ·  The computer's reading of this scan, for your review. It is a decision aid and not a diagnosis."));
+                "Scan " + _d.Session.DisplayId + "  ·  The computer's reading of this scan, for your review."));
 
             root.Children.Add(IdentityCard());
             root.Children.Add(SummaryCard());
@@ -88,7 +88,6 @@ namespace SkinDevApp.Views
             RenderViewer();
 
             root.Children.Add(AssessmentCard());
-            root.Children.Add(DisclaimerCard());
             root.Children.Add(HistoryCard());
         }
 
@@ -107,7 +106,7 @@ namespace SkinDevApp.Views
                 Ui.KV("Age and sex", p == null ? "—" : (p.Age.HasValue ? p.Age + " years" : "Age not recorded") + (string.IsNullOrEmpty(p.Sex) ? "" : ", " + p.Sex)),
                 Ui.KV("Scan", s.DisplayId),
                 Ui.KV("Date and time", Fmt.When(s.StartedAt)),
-                Ui.KV("Photographs", ViewsText())
+                Ui.KV("Images", ViewsText())
             }, 150));
             return Ui.Card(sp, new Thickness(0, 0, 0, 12));
         }
@@ -139,7 +138,7 @@ namespace SkinDevApp.Views
             if (string.IsNullOrEmpty(s.OverallPredictedClass))
             {
                 sp.Children.Add(Ui.Text("No usable result for this scan.", 15, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
-                sp.Children.Add(Ui.Text("The photographs could not be classified. Please look at the original images and record your own assessment below.", 12.5, false, Ui.Muted));
+                sp.Children.Add(Ui.Text("The images could not be classified. Please look at the original images and record your own assessment below.", 12.5, false, Ui.Muted));
                 return Ui.Card(sp, new Thickness(0, 0, 0, 12));
             }
 
@@ -190,12 +189,12 @@ namespace SkinDevApp.Views
         {
             if (SkinDevApp.V6.V6SessionSummary.For(_d) != null) return new StackPanel();    // V6: each photograph's reading is already in the summary above
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Reading of each photograph", 15, true));
+            sp.Children.Add(Ui.Text("Reading of each image", 15, true));
             var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             double[] w = { 1, 2, 1.4, 1.6, 1 };
             foreach (double x in w) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(x, GridUnitType.Star) });
 
-            string[] heads = { "Photograph", "Most resembles", "Match strength", "Photo quality", "" };
+            string[] heads = { "Image", "Most resembles", "Match strength", "Photo quality", "" };
             for (int c = 0; c < heads.Length; c++)
             {
                 TextBlock t = Ui.Text(heads[c], 11.5, true, Ui.Muted, new Thickness(0, 0, 0, 6));
@@ -210,7 +209,7 @@ namespace SkinDevApp.Views
                 string view = v.ViewType;
                 string[] cells =
                 {
-                    view == "Single" ? "Photograph" : view + " view",
+                    view == "Single" ? "Image" : view + " view",
                     v.Scores == null ? "No result" : Shown(v.Scores.PredictedClass),
                     v.Scores == null ? "—" : ClinicalText.Strength(v.Scores.Confidence) + " (" + Ui.Pct(v.Scores.Confidence) + ")",
                     string.IsNullOrEmpty(v.QualityStatus) ? "Not recorded" : ClinicalText.PlainQuality(v.QualityStatus)

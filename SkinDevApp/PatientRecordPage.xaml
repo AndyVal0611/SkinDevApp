@@ -27,7 +27,7 @@
                     </StackPanel>
                 </Button>
                 <TextBox x:Name="IdSearchTxt" Style="{StaticResource Field}" Height="46" FontSize="14" KeyDown="IdSearchTxt_KeyDown"
-                         ToolTip="Enter a Patient ID (PS-0001 or 0001) or a name (for example, Elaiza or Bautista). Partial text is accepted."/>
+                         ToolTip="Enter a Patient ID (PS-0001 or 0001) or a name (for example, Elaiza or Bautista)."/>
             </DockPanel>
         </Border>
 

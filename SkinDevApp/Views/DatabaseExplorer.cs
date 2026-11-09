@@ -29,7 +29,7 @@ namespace SkinDevApp.Views
         private static Rule R(string name, string cat, bool edit = false, bool delete = false, bool add = false, params string[] hidden) =>
             new Rule { Name = name, Category = cat, CanEdit = edit, CanDelete = delete, CanAdd = add, Hidden = hidden };
 
-        private const string CPatients = "Patients", CScans = "Scans and photographs", CAI = "AI results", CReviews = "Reviews", CSystem = "Accounts and system", CLogs = "Logs and receipts";
+        private const string CPatients = "Patients", CScans = "Scans and images", CAI = "AI results", CReviews = "Reviews", CSystem = "Accounts and system", CLogs = "Logs and receipts";
         private static readonly string[] CategoryOrder = { CPatients, CScans, CAI, CReviews, CSystem, CLogs };
 
         private static readonly Dictionary<string, Rule> Rules = new Dictionary<string, Rule>(StringComparer.OrdinalIgnoreCase)
@@ -41,9 +41,9 @@ namespace SkinDevApp.Views
             { "Consents", R("Consents", CPatients) },
             { "PatientLogs", R("Patient log", CPatients) },
             { "ScanSessions", R("Scans", CScans) },
-            { "CaptureViews", R("Photographs", CScans) },
-            { "AnalysisImages", R("Photograph files", CScans) },
-            { "AIAssessments", R("AI results per photograph", CAI) },
+            { "CaptureViews", R("Images", CScans) },
+            { "AnalysisImages", R("Image files", CScans) },
+            { "AIAssessments", R("AI results per image", CAI) },
             { "AIFindings", R("AI findings", CAI) },
             { "AIMarkedAreas", R("AI marked areas", CAI) },
             { "AnalysisResults", R("Earlier analysis results", CAI) },

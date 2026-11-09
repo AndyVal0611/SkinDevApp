@@ -23,9 +23,9 @@ namespace SkinDevApp
         private static readonly Dictionary<string, string> Friendly = new Dictionary<string, string>
         {
             { "camera.name", "Camera" }, { "camera.width", "Camera width" }, { "camera.height", "Camera height" },
-            { "capture.auto", "Automatic capture" }, { "capture.review_before_finish", "Review photographs before results" },
+            { "capture.auto", "Automatic capture" }, { "capture.review_before_finish", "Review images before results" },
             { "capture.stable_frames", "Steady frames needed" }, { "capture.hold_ms", "Hold-still time" },
-            { "capture.cooldown_s", "Pause between photographs" }, { "capture.min_sharpness", "Minimum sharpness" },
+            { "capture.cooldown_s", "Pause between images" }, { "capture.min_sharpness", "Minimum sharpness" },
             { "capture.min_brightness", "Minimum brightness" }, { "capture.max_brightness", "Maximum brightness" },
             { "pose.front_max_yaw", "Front view: largest head turn" }, { "pose.side_min_yaw", "Side views: smallest head turn" },
             { "printer.enabled", "Receipt printer" }, { "printer.simulation", "Printer simulation mode" }, { "printer.port", "Printer COM port" },
@@ -180,8 +180,8 @@ namespace SkinDevApp
                 BoolRow("camera.max_resolution", "Sharpest picture", "Use the sharpest picture the camera can give (for example Full HD). Turn this off to use the size below."),
                 NumRow("camera.width", "Picture width (pixels)", "Used only when the sharpest picture is turned off. The closest supported camera mode is used. Default 640."),
                 NumRow("camera.height", "Picture height (pixels)", "Used only when the sharpest picture is turned off. Default 480."),
-                Note("Frame rate and exposure follow the camera driver, which keeps every photograph consistent."),
-                NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the photograph that is taken. Default 1."),
+                Note("Frame rate and exposure follow the camera driver, which keeps every image consistent."),
+                NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the image that is taken. Default 1."),
                 NumRow("preview.zoom_max", "Largest zoom of the live picture", "How far the picture can be enlarged by pinching with two fingers or using the + button. Default 4."),
                 BoolRow("preview.zoom_buttons", "Show the zoom buttons", "Show + and − buttons on the live picture. Pinching with two fingers always works."),
                 BoolRow("touch.always_keyboard", "Always show the on-screen keyboard", "Open the on-screen keyboard whenever a text box is selected, also with a mouse. " +
@@ -195,16 +195,16 @@ namespace SkinDevApp
         {
             return RowCard(new[]
             {
-                BoolRow("capture.auto", "Automatic capture", "Take each photograph automatically once the face is steady. The manual button always stays available."),
-                BoolRow("capture.review_before_finish", "Review photographs before the results", "Show each photograph so it can be accepted or retaken before the results appear."),
-                NumRow("capture.stable_frames", "Steady frames needed", "How many steady readings in a row are needed before a photograph is taken. Default 8."),
+                BoolRow("capture.auto", "Automatic capture", "Take each image automatically once the face is steady. The manual button always stays available."),
+                BoolRow("capture.review_before_finish", "Review images before the results", "Show each image so it can be accepted or retaken before the results appear."),
+                NumRow("capture.stable_frames", "Steady frames needed", "How many steady readings in a row are needed before an image is taken. Default 8."),
                 NumRow("capture.hold_ms", "Hold-still time (milliseconds)", "How long the face must stay still before capture. Default 1200."),
-                NumRow("capture.cooldown_s", "Pause between photographs (seconds)", "Prevents duplicate photographs. Default 4."),
-                NumRow("capture.min_sharpness", "Minimum sharpness", "A photograph must be at least this sharp to be accepted. Default 25."),
+                NumRow("capture.cooldown_s", "Pause between images (seconds)", "Prevents duplicate images. Default 4."),
+                NumRow("capture.min_sharpness", "Minimum sharpness", "An image must be at least this sharp to be accepted. Default 25."),
                 NumRow("capture.min_brightness", "Minimum brightness", "Average brightness from 0 (black) to 255 (white). Default 45."),
                 NumRow("capture.max_brightness", "Maximum brightness", "Average brightness from 0 (black) to 255 (white). Default 215."),
                 NumRow("pose.front_max_yaw", "Front view: largest head turn", "How far the head may turn and still count as facing the camera. Default 0.12."),
-                NumRow("pose.side_min_yaw", "Side views: smallest head turn", "How far the head must turn for a left or right photograph. Default 0.20."),
+                NumRow("pose.side_min_yaw", "Side views: smallest head turn", "How far the head must turn for a left or right image. Default 0.20."),
                 Note("Image analysis, heatmap and lesion-marking settings are fixed for this study and cannot be changed here.")
             });
         }

@@ -42,7 +42,7 @@ namespace SkinDevApp.Tests
         {
             string root = Environment.GetEnvironmentVariable("LUMYVUE_PARITY_PHOTOS");
             if (string.IsNullOrEmpty(root)) root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "PrecisionSkin", "Classes");
-            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Parity photographs not found. Set LUMYVUE_PARITY_PHOTOS to the PrecisionSkin\\Classes folder. Looked in: " + root);
+            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Parity images not found. Set LUMYVUE_PARITY_PHOTOS to the PrecisionSkin\\Classes folder. Looked in: " + root);
             return root;
         }
 
@@ -147,7 +147,7 @@ namespace SkinDevApp.Tests
                         for (int k = 0; k < 21; k++) Assert.True(Math.Abs(ev[k] - p.DetEv[k]) <= 2e-3, $"{p.ImageId}: det_ev[{k}] C# {ev[k]} vs Python {p.DetEv[k]}");
                     }
                 }
-            _out.WriteLine($"{photos.Count} photographs, {boxes} candidate boxes compared; worst coordinate difference {worstPx:0.0000} px, worst confidence difference {worstConf:0.000000}");
+            _out.WriteLine($"{photos.Count} images, {boxes} candidate boxes compared; worst coordinate difference {worstPx:0.0000} px, worst confidence difference {worstConf:0.000000}");
             Assert.True(boxes > 50);
         }
 
@@ -176,7 +176,7 @@ namespace SkinDevApp.Tests
                         Assert.Equal(p.State == V6States.NoFindingsSupported, a.NormalSupported);
                         states++;
                     }
-            _out.WriteLine($"{states} photographs: states, flags, decisions, probabilities and boxes agree with Python. Full V6 assessment time (CPU, 9 detector members + Global + 2 fusions): median {times.OrderBy(x => x).ElementAt(times.Count / 2):0} ms, max {times.Max():0} ms");
+            _out.WriteLine($"{states} images: states, flags, decisions, probabilities and boxes agree with Python. Full V6 assessment time (CPU, 9 detector members + Global + 2 fusions): median {times.OrderBy(x => x).ElementAt(times.Count / 2):0} ms, max {times.Max():0} ms");
         }
 
         // ------------------------------------------------------------------ flag off / historical scans

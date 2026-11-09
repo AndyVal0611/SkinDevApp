@@ -64,7 +64,7 @@ namespace SkinDevApp.Tests
             DecisionResult d = V6Decision.Decide(none, thr, 0.0, all, flags, false, up);
             Assert.Equal(V6States.UncertainReviewRequired, d.State);
             var a = new UnifiedAssessment { State = d.State }; a.Flags.AddRange(flags);
-            Assert.Contains(V6Text.FlagLines(a), l => l.StartsWith("No face was found in this photograph"));
+            Assert.Contains(V6Text.FlagLines(a), l => l.StartsWith("No face was found in this image"));
         }
 
         [Fact]

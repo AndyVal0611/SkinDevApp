@@ -30,19 +30,19 @@ namespace SkinDevApp.Views
             // ---------------------------------------------------------------- about
             var about = new StackPanel();
             about.Children.Add(Para("LUMYVUE is an AI-assisted facial skin health monitoring system designed to support dermatological assessment through automated image analysis. " +
-                                    "The system examines facial photographs captured from three angles to identify visual patterns associated with acne, hyperpigmentation and eczema."));
-            about.Children.Add(Para("For each photograph, the system combines a whole-face analysis with three specialized lesion detectors (YOLOv8). " +
+                                    "The system examines facial images captured from three angles to identify visual patterns associated with acne, hyperpigmentation and eczema."));
+            about.Children.Add(Para("For each image, the system combines a whole-face analysis with three specialized lesion detectors (YOLOv8). " +
                                     "A trained fusion model combines these readings to produce a separate finding for each supported condition."));
-            about.Children.Add(Para("The system also provides visual evidence through marked areas on the photograph, condition-specific certainty levels and approximate facial regions. " +
-                                    "These results help dermatologists examine the photographs, understand the AI-generated findings and make their own professional assessment."));
+            about.Children.Add(Para("The system also provides visual evidence through marked areas on the image, condition-specific certainty levels and approximate facial regions. " +
+                                    "These results help dermatologists examine the images, understand the AI-generated findings and make their own professional assessment."));
             page.Children.Add(Section("About LUMYVUE", about));
 
             // ---------------------------------------------------------------- how it works
             page.Children.Add(Section("How LUMYVUE works", Steps(
-                new[] { "1", "Facial image capture", "The system captures three facial photographs in sequence: front, left side and right side. Proper positioning, sufficient lighting and clear facial visibility are important for usable images." },
-                new[] { "2", "AI-powered image analysis", "Before analysis, the system checks each photograph for sharpness, lighting and whether the face is visible. A photograph that is too poor to read is flagged for recapture. " +
+                new[] { "1", "Facial image capture", "The system captures three facial images in sequence: front, left side and right side. Proper positioning, sufficient lighting and clear facial visibility are important for usable images." },
+                new[] { "2", "AI-powered image analysis", "Before analysis, the system checks each image for sharpness, lighting and whether the face is visible. An image that is too poor to read is flagged for recapture. " +
                              "The whole-face reading and the three lesion detectors are then combined to give a separate result for each condition, with its certainty and visual evidence." },
-                new[] { "3", "Dermatologist review and verification", "The dermatologist reviews the three photographs, inspects the marked areas and the findings for each condition, and records an independent assessment. " +
+                new[] { "3", "Dermatologist review and verification", "The dermatologist reviews the three images, inspects the marked areas and the findings for each condition, and records an independent assessment. " +
                              "AI-generated findings remain separate from the dermatologist's assessment." })));
 
             // ---------------------------------------------------------------- how to read the results
@@ -54,11 +54,11 @@ namespace SkinDevApp.Views
                 new[] { "Condition detected", "at least one supported condition was identified, based on the system's configured criteria." },
                 new[] { "Needs review", "the system found uncertainty, conflicting evidence, or findings that need closer examination. The results should not be interpreted without professional review." },
                 new[] { "No condition detected", "no supported condition was identified. This does not guarantee that the skin is free from dermatological conditions." },
-                new[] { "Photograph must be retaken", "a photograph was not clear enough to read reliably, so no condition is reported for it." },
+                new[] { "Image must be retaken", "an image was not clear enough to read reliably, so no condition is reported for it." },
                 new[] { "Analysis not completed", "the analysis could not be completed." }));
 
             read.Children.Add(Sub("2. Condition-specific results"));
-            read.Children.Add(Para("Acne, hyperpigmentation and eczema are evaluated independently, and each has its own detection status. More than one condition can be identified in the same photograph or scan."));
+            read.Children.Add(Para("Acne, hyperpigmentation and eczema are evaluated independently, and each has its own detection status. More than one condition can be identified in the same image or scan."));
             read.Children.Add(Bullets(
                 new[] { "Detected", "the system found evidence that meets the configured criteria for the condition." },
                 new[] { "Possible", "a lesion detector marked an area, but the combined result did not confirm the condition. Dermatologist review is recommended." },
@@ -101,14 +101,14 @@ namespace SkinDevApp.Views
             lim.Children.Add(Para("LUMYVUE does not diagnose conditions, prescribe medication, recommend treatment or replace an in-person consultation with a dermatologist. " +
                                   "All findings are preliminary screening information and must be evaluated by a qualified healthcare professional."));
             lim.Children.Add(Sub("3. Image quality"));
-            lim.Children.Add(Para("The quality of the photographs affects how reliable the results are. For clear and consistent images:"));
+            lim.Children.Add(Para("The quality of the images affects how reliable the results are. For clear and consistent images:"));
             lim.Children.Add(Bullets(
                 new[] { "Lighting", "use adequate, even lighting, and avoid strong shadows, glare or direct light." },
                 new[] { "Accessories", "remove glasses, face masks and anything else that covers the face." },
                 new[] { "Hair", "keep hair away from the forehead, cheeks and other visible areas." },
                 new[] { "Position", "keep the face within the frame, at the recommended distance and position." },
-                new[] { "Steadiness", "avoid movement, and make sure the photograph is in focus." }));
-            lim.Children.Add(Note("A blurred, poorly lit or partly covered photograph can make the analysis unreliable. The system flags such photographs for recapture."));
+                new[] { "Steadiness", "avoid movement, and make sure the image is in focus." }));
+            lim.Children.Add(Note("A blurred, poorly lit or partly covered image can make the analysis unreliable. The system flags such images for recapture."));
             lim.Children.Add(Sub("4. Supported conditions and scope"));
             lim.Children.Add(Para("LUMYVUE is configured to analyze three categories: acne, hyperpigmentation and eczema. It does not identify other conditions and does not grade severity. " +
                                   "A result of no condition detected must not be read as confirmation of healthy skin."));

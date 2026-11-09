@@ -171,7 +171,7 @@ namespace SkinDevApp.V6
         }
 
         public static string ViewLabel(string viewType) =>
-            string.IsNullOrEmpty(viewType) || viewType == "Single" ? "Photograph" : viewType == "Left" ? "Left side" : viewType == "Right" ? "Right side" : viewType;
+            string.IsNullOrEmpty(viewType) || viewType == "Single" ? "Image" : viewType == "Left" ? "Left side" : viewType == "Right" ? "Right side" : viewType;
 
         /// <summary>The scan-level reading (one photograph: its own; several: combined).</summary>
         public static ClinicalSummary ScanSummary(List<StoredView> views) =>
@@ -242,7 +242,7 @@ namespace SkinDevApp.V6
                     "@v", ClinicalSummary.RulesVersion.ToString(CultureInfo.InvariantCulture), "@at", StudyRepository.Now()))
                     cmd.ExecuteNonQuery();
                 StudyRepository.Audit(c, null, "AI reading rules updated", "AIAssessments", null,
-                    "version " + ClinicalSummary.RulesVersion + ": " + n + " photograph(s) re-read from their sealed results (detector-led hyperpigmentation)");
+                    "version " + ClinicalSummary.RulesVersion + ": " + n + " image(s) re-read from their sealed results (detector-led hyperpigmentation)");
             }
             return n;
         }
