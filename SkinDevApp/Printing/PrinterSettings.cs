@@ -1,9 +1,8 @@
 // ============================================================================
 // PrinterSettings.cs  -  namespace SkinDevApp.Printing
 //
-// Thermal receipt printer (Kamenda QR701, 58 mm, TTL serial, ESC/POS) settings,
-// stored in SystemSettings like the camera settings (every change is audited by
-// StudyRepository.SaveSettings).
+// Thermal receipt printer (Kamenda QR701, 58 mm, TTL serial, ESC/POS): one fixed
+// configuration (see Load). There are no printer settings to change in the app.
 //
 // None of the serial values is confirmed for the QR701: no manufacturer
 // datasheet was available. They must match the printer's own self-test page.
@@ -46,29 +45,19 @@ namespace SkinDevApp.Printing
                          DataBits.ToString(CultureInfo.InvariantCulture) + (Parity ?? "N").Substring(0, 1) + (StopBits == "Two" ? "2" : "1") +
                          (Handshake == "None" ? "" : " " + Handshake);
 
+        /// <summary>
+        /// The receipt printer has one fixed configuration (nothing is read from or saved in Settings):
+        /// the QR701 on 9600 baud, 8N1, no flow control, 32 characters per line, plain text, 4 lines of feed.
+        /// The serial port is the one the Windows serial adapter provides: when there is more than one, the highest-numbered
+        /// (most recently added) is used.
+        /// </summary>
         public static PrinterSettings Load()
         {
-            var s = new PrinterSettings();
+            var s = new PrinterSettings { Enabled = true, Simulation = false };
             try
             {
-                if (!StudyDatabase.IsReady) return s;
-                Dictionary<string, string> d = StudyRepository.LoadSettings();
-                s.Enabled = Bool(d, "printer.enabled", s.Enabled);
-                s.Simulation = Bool(d, "printer.simulation", s.Simulation);
-                s.PortName = Str(d, "printer.port", s.PortName);
-                s.BaudRate = Int(d, "printer.baud", s.BaudRate);
-                s.DataBits = Int(d, "printer.data_bits", s.DataBits);
-                s.Parity = Str(d, "printer.parity", s.Parity);
-                s.StopBits = Str(d, "printer.stop_bits", s.StopBits);
-                s.Handshake = Str(d, "printer.handshake", s.Handshake);
-                s.CharsPerLine = Int(d, "printer.chars_per_line", s.CharsPerLine);
-                s.Styles = Bool(d, "printer.styles", s.Styles);
-                s.SendReset = Bool(d, "printer.reset", s.SendReset);
-                s.FeedLines = Int(d, "printer.feed_lines", s.FeedLines);
-                s.LineDelayMs = Int(d, "printer.line_delay_ms", s.LineDelayMs);
-                s.FinalByDefault = Bool(d, "printer.final_default", s.FinalByDefault);
-                s.ShowScores = Bool(d, "printer.show_scores", s.ShowScores);
-                s.ShowAssessment = Bool(d, "printer.show_assessment", s.ShowAssessment);
+                string[] ports = ThermalPrinter.PortNames();
+                if (ports.Length > 0) s.PortName = ports[ports.Length - 1];
             }
             catch (Exception ex)
             {
