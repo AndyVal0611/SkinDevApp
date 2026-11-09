@@ -185,7 +185,7 @@ namespace SkinDevApp.V6
             sp.Children.Add(Ui.Text("Confidence is the system's own measure for the finding. It supports the detection status and is not a measure of severity.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             return new Expander
             {
-                Header = new TextBlock { Text = "Show confidence details", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Muted },
+                Header = new TextBlock { Text = "Show confidence details", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Muted },
                 IsExpanded = false, Margin = new Thickness(0, 2, 0, 0), Content = sp
             };
         }
@@ -316,7 +316,7 @@ namespace SkinDevApp.V6
             }
             return new Expander
             {
-                Header = new TextBlock { Text = "Show the AI's reading as bars (optional)", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
+                Header = new TextBlock { Text = "Show the AI's reading as bars (optional)", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
                 IsExpanded = false, Margin = new Thickness(0, 10, 0, 0), Content = sp
             };
         }
@@ -361,7 +361,7 @@ namespace SkinDevApp.V6
             }
             return new Expander
             {
-                Header = new TextBlock { Text = "How the AI reached this reading (global, localized and fusion)", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
+                Header = new TextBlock { Text = "How the AI reached this reading (global, localized and fusion)", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Ink },
                 IsExpanded = true, Margin = new Thickness(0, 10, 0, 0), Content = sp
             };
         }
@@ -455,7 +455,7 @@ namespace SkinDevApp.V6
             foreach (ClinicalFinding f in c.Findings)
             {
                 string word = f.Status == ClinicalSummary.Detected ? "found" : f.Status == ClinicalSummary.NotDetected ? "not found" : "possible; review recommended";
-                var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(0, 0, 0, 2) };
+                var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Margin = new Thickness(0, 0, 0, 2) };
                 int idx = V6Conditions.IndexOf(f.Condition);
                 line.Inlines.Add(new System.Windows.Documents.Run(f.Condition + ": ") { FontWeight = FontWeights.SemiBold, Foreground = idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink });
                 line.Inlines.Add(new System.Windows.Documents.Run(word) { Foreground = Ui.Ink });

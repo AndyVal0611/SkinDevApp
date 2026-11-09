@@ -161,25 +161,25 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="NewRegistrationBtn" Style="{StaticResource BigAction}" Height="130" Background="{StaticResource HeroSage}" Click="NewRegistrationBtn_Click">
+                    <Button x:Name="NewRegistrationBtn" Style="{StaticResource BigAction}" Height="156" Background="{StaticResource HeroSage}" Click="NewRegistrationBtn_Click">
                         <DockPanel>
-                            <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#F7F5E9" Width="24" Height="24" Margin="14,0,0,0"/>
-                            <Border DockPanel.Dock="Left" Width="56" Height="56" CornerRadius="28" Background="#26FFFFFF" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.UserPlus}" Foreground="White" Width="26" Height="26" HorizontalAlignment="Center"/>
+                            <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#F7F5E9" Width="32" Height="32" Margin="14,0,0,0"/>
+                            <Border DockPanel.Dock="Left" Width="78" Height="78" CornerRadius="39" Background="#2EFFFFFF" Margin="0,0,26,0" VerticalAlignment="Center">
+                                <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.UserPlus}" Foreground="White" Width="38" Height="38" HorizontalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="New registration" FontSize="25" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
+                                <TextBlock Text="New registration" FontSize="36" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                             </StackPanel>
                         </DockPanel>
                     </Button>
-                    <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Height="130" Background="{StaticResource HeroBlush}" Click="SkinAnalysisBtn_Click">
+                    <Button x:Name="SkinAnalysisBtn" Grid.Column="1" Style="{StaticResource BigAction}" Height="156" Background="{StaticResource HeroBlush}" Click="SkinAnalysisBtn_Click">
                         <DockPanel>
-                            <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#FFF8F4" Width="24" Height="24" Margin="14,0,0,0"/>
-                            <Border DockPanel.Dock="Left" Width="56" Height="56" CornerRadius="28" Background="#2EFFFFFF" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ScanFace}" Foreground="White" Width="26" Height="26" HorizontalAlignment="Center"/>
+                            <ContentControl DockPanel.Dock="Right" Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ChevronRight}" Foreground="#FFF8F4" Width="32" Height="32" Margin="14,0,0,0"/>
+                            <Border DockPanel.Dock="Left" Width="78" Height="78" CornerRadius="39" Background="#2EFFFFFF" Margin="0,0,26,0" VerticalAlignment="Center">
+                                <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.ScanFace}" Foreground="White" Width="38" Height="38" HorizontalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Skin analysis" FontSize="25" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
+                                <TextBlock Text="Skin analysis" FontSize="36" FontFamily="{StaticResource DisplayFont}" FontStyle="Italic" Foreground="White"/>
                             </StackPanel>
                         </DockPanel>
                     </Button>

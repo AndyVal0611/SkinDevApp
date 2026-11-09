@@ -15,9 +15,23 @@ namespace SkinDevApp
     /// </summary>
     public partial class App : Application
     {
+        /// <summary>One body font for every window, dialog and control, including the ones built in code. Returns false if it could not be applied.</summary>
+        public static bool ApplyBodyFont()
+        {
+            try
+            {
+                var body = (System.Windows.Media.FontFamily)Application.Current.FindResource("BodyFont");
+                System.Windows.Documents.TextElement.FontFamilyProperty.OverrideMetadata(typeof(System.Windows.Documents.TextElement), new FrameworkPropertyMetadata(body));
+                System.Windows.Controls.TextBlock.FontFamilyProperty.OverrideMetadata(typeof(System.Windows.Controls.TextBlock), new FrameworkPropertyMetadata(body));
+                return true;
+            }
+            catch { return false; }
+        }
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            ApplyBodyFont();
 
             // "SkinDevApp.exe --diagnose <image>": headless, read-only replay of the classifier and detectors (see CnnDiagnostics.cs)
             if (SkinDevApp.AI.CnnDiagnostics.TryRunFromArgs(e.Args)) { Shutdown(0); return; }

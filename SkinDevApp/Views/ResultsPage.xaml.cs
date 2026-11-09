@@ -59,7 +59,7 @@ namespace SkinDevApp.Views
             TitleTxt.Text = "Results · " + s.DisplayId;
             SubtitleTxt.Text = (s.ParticipantID ?? "Scan without a patient" + (string.IsNullOrEmpty(s.LegacyPatientLabel) ? "" : " (" + s.LegacyPatientLabel + ")")) +
                                (_d.Participant != null ? "  ·  " + _d.Participant.FullName : "") +
-                               "  ·  " + Fmt.When(s.StartedAt) + "  ·  " + (string.IsNullOrEmpty(s.AIModel) ? "Final model result pending" : s.AIModel) +
+                               "  ·  " + Fmt.When(s.StartedAt) +
                                "  ·  " + (s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus) + (s.Finalized ? "" : " (not finalized)");
 
             _v6 = SkinDevApp.V6.V6ResultsView.Load(_d, out _v6Problems);

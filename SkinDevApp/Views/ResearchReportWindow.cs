@@ -619,17 +619,7 @@ namespace SkinDevApp.Views
         private FrameworkElement MarkedAreasNotes()
         {
             var sp = new StackPanel();
-            sp.Children.Add(T("How to read the marked areas", 10.5, true, Navy, 6));
-
-            var key = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-            for (int ci = 0; ci < 3; ci++)
-            {
-                var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 18, 0) };
-                item.Children.Add(new Border { Width = 14, Height = 10, BorderBrush = C(SkinDevApp.Imaging.ClassPalette.Hex[ci]), BorderThickness = new Thickness(2), Margin = new Thickness(0, 2, 6, 0) });
-                item.Children.Add(T(SkinDevApp.V6.V6Conditions.Names[ci], 9, false, TextInk, 0));
-                key.Children.Add(item);
-            }
-            sp.Children.Add(key);
+            sp.Children.Add(T("How to read the marked areas", 13, true, Navy, 10));
 
             string[][] notes =
             {
@@ -646,14 +636,14 @@ namespace SkinDevApp.Views
             for (int i = 0; i < 3; i++)
             {
                 var col = new StackPanel();
-                col.Children.Add(T(notes[i][0], 9, true, Navy, 2));
-                col.Children.Add(T(notes[i][1], 8.5, false, TextInk, 0));
+                col.Children.Add(T(notes[i][0], 11, true, Navy, 4));
+                col.Children.Add(T(notes[i][1], 10, false, TextInk, 0));
                 Grid.SetColumn(col, i * 2);
                 g.Children.Add(col);
             }
             sp.Children.Add(g);
-            var band = Panel(sp, PanelBg, null, 12);
-            band.Margin = new Thickness(0, 4, 0, 0);
+            var band = Panel(sp, PanelBg, null, 16);
+            band.Margin = new Thickness(0, 6, 0, 0);
             return band;
         }
 
@@ -936,6 +926,22 @@ namespace SkinDevApp.Views
             return sp;
         }
 
+        /// <summary>Side-by-side fields with relative widths (a long signature line and a short date line); value == null leaves the line blank for handwriting.</summary>
+        private static Grid FieldRowWeighted(double[] weights, params Tuple<string, string>[] fields)
+        {
+            var g = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            for (int i = 0; i < fields.Length; i++)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(weights[i], GridUnitType.Star) });
+                var cell = new StackPanel { Margin = new Thickness(i == 0 ? 0 : 18, 0, 0, 0) };
+                cell.Children.Add(FormLabel(fields[i].Item1));
+                cell.Children.Add(new Border { Height = 26, BorderBrush = C("#9CA3AF"), BorderThickness = new Thickness(0, 0, 0, 1), Child = fields[i].Item2 == null ? null : T(fields[i].Item2, 9, true, TextInk, 0) });
+                Grid.SetColumn(cell, i);
+                g.Children.Add(cell);
+            }
+            return g;
+        }
+
         /// <summary>Two or three side-by-side fields; value == null leaves the line blank for handwriting.</summary>
         private static Grid FieldRow(params Tuple<string, string>[] fields)
         {
@@ -1010,9 +1016,8 @@ namespace SkinDevApp.Views
             sp.Children.Add(Rule(4, 6));
             if (dermatologist)
             {
-                sp.Children.Add(FieldRow(
-                    Tuple.Create("Signature of dermatologist", (string)null),
-                    Tuple.Create("Printed name", (string)null),
+                sp.Children.Add(FieldRowWeighted(new[] { 3.0, 1.0 },
+                    Tuple.Create("Printed name and signature of dermatologist", (string)null),
                     Tuple.Create("Date", (string)null)));
                 sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 22, 0, 8));
             }
@@ -1030,10 +1035,6 @@ namespace SkinDevApp.Views
                 }
             }
 
-            sp.Children.Add(T("After completion, the research team enters these answers in the system (Researcher Verification window, tab \"" +
-                              (dermatologist ? "Dermatologist Review" : "Researcher Assessment") +
-                              "\"). Keep the signed sheet with the study records. Human assessments are saved separately and never overwrite the AI prediction.",
-                              7.5, false, Muted, 0));
             return sp;
         }
 

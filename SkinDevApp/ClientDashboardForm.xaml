@@ -272,8 +272,6 @@
                                     <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Image}" Foreground="#B9897A" Width="20" Height="20" Margin="0,0,10,0"/>
                                     <TextBlock Text="Image review" FontSize="18" FontWeight="SemiBold" Foreground="#2F3024"/>
                                 </DockPanel>
-                                <TextBlock Text="Check each image. Retake any view without repeating registration. Results are finalized when you accept."
-                                           FontSize="12" Foreground="#6F6F58" TextWrapping="Wrap" Margin="0,4,0,10"/>
                                 <StackPanel x:Name="ReviewList"/>
                                 <Button x:Name="AcceptBtn" Content="Accept views and view results  ›" Style="{StaticResource PrimaryButton}"
                                         Margin="0,10,0,0" Click="AcceptBtn_Click"/>

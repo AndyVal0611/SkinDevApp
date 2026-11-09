@@ -142,7 +142,7 @@ namespace SkinDevApp.Views
             {
                 var row = new DockPanel { Margin = new Thickness(0, 4, 0, 6) };
                 var badge = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Brush("#E7E8CF"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0),
-                    Child = new TextBlock { Text = (i + 1).ToString(), FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#5F6048"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+                    Child = new TextBlock { Text = (i + 1).ToString(), FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#5F6048"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
                 DockPanel.SetDock(badge, Dock.Left);
                 row.Children.Add(badge);
                 var t = new StackPanel();

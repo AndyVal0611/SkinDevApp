@@ -171,7 +171,7 @@ namespace SkinDevApp.Views
                 body.Children.Add(all);
             }
             return CardShell("WAITING FOR YOUR REVIEW", pending.Count == 0 ? "All caught up" : pending.Count + (pending.Count == 1 ? " scan" : " scans"),
-                             "Scans awaiting a dermatologist's review, with those marked for further review listed first.", body);
+                             "Scans waiting for review. Those marked for further review appear first.", body);
         }
 
         private UIElement RecentCard()
