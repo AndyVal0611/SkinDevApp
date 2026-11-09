@@ -76,13 +76,13 @@ namespace SkinDevApp.Views
 
             // bottom: what is happening now, and how far along start-up is
             var bottom = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 34), Width = TrackWidth };
-            var statusRow = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+            var statusRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14), HorizontalAlignment = HorizontalAlignment.Center };
             var spinner = Ui.Spinner(16, "#F7F5E9");
             spinner.Margin = new Thickness(0, 0, 10, 0);
             DockPanel.SetDock(spinner, Dock.Left);
             statusRow.Children.Add(spinner);
             _status = new TextBlock { Text = "Starting LUMYVUE", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush("#F7F5E9"), VerticalAlignment = VerticalAlignment.Center };
-            statusRow.Children.Add(_status);
+            // the step names are kept off the screen: the splash shows only the wordmark, its design and the progress bar
             bottom.Children.Add(statusRow);
 
             var track = new Grid { Height = 4, Width = TrackWidth };
@@ -93,14 +93,7 @@ namespace SkinDevApp.Views
             bottom.Children.Add(track);
 
             _detail = new TextBlock { Text = " ", FontSize = 12, Foreground = Ui.Brush("#CFCDB4"), Margin = new Thickness(0, 10, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
-            bottom.Children.Add(_detail);
             card.Children.Add(bottom);
-
-            card.Children.Add(new TextBlock
-            {
-                Text = "Research prototype  ·  a screening aid, not a diagnosis", FontSize = 11, Foreground = Ui.Brush("#B9B79E"),
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 12)
-            });
 
             // a soft shadow on its own layer behind the card
             var shadow = new Border
