@@ -52,7 +52,7 @@ namespace SkinDevApp.Views
             }
 
             FirstRunPanel.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
-            if (ForgotBtn != null) { ForgotBtn.Visibility = _firstRun ? Visibility.Collapsed : Visibility.Visible; ForgotNote.Visibility = ForgotBtn.Visibility; }
+            if (ForgotBtn != null) { ForgotBtn.Visibility = _firstRun ? Visibility.Collapsed : Visibility.Visible; }
             if (_firstRun)
             {
                 LoginHintTxt.Text = "No account exists yet. Create the first account now (password of at least " +
