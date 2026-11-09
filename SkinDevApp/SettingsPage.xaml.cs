@@ -54,11 +54,10 @@ namespace SkinDevApp
                 return;
             }
 
-            _tabs.Add(Tuple.Create("Camera", BuildCameraTab(), true));
-            _tabs.Add(Tuple.Create("Capture", BuildCaptureTab(), true));
-            _tabs.Add(Tuple.Create("Thermal printer", BuildPrinterTab(), false));      // saved with its own button: never mixed with the camera settings
+            _tabs.Add(Tuple.Create("Camera & capture", BuildScanTab(), true));
+            _tabs.Add(Tuple.Create("Receipt printer", BuildPrinterTab(), false));      // saved with its own button: never mixed with the camera settings
             _tabs.Add(Tuple.Create("Accounts", BuildAccountsTab(), false));
-            _tabs.Add(Tuple.Create("Change history", BuildHistoryTab(), false));
+            _tabs.Add(Tuple.Create("History", BuildHistoryTab(), false));
 
             Fill(ScanSettings.Load());
             ShowTab(0);
@@ -96,8 +95,8 @@ namespace SkinDevApp
 
             ContentHost.Content = _tabs[index].Item2;
             FooterBar.Visibility = _tabs[index].Item3 ? Visibility.Visible : Visibility.Collapsed;
-            if (_tabs[index].Item1 == "Change history") RefreshHistory();
-            if (_tabs[index].Item1 == "Thermal printer") RefreshPrinterStatus();
+            if (_tabs[index].Item1 == "History") RefreshHistory();
+            if (_tabs[index].Item1 == "Receipt printer") RefreshPrinterStatus();
         }
 
         // ------------------------------------------------------------------ rows --
@@ -132,10 +131,53 @@ namespace SkinDevApp
             return new Border
             {
                 Child = g,
-                Padding = new Thickness(0, 16, 0, 16),
+                Padding = new Thickness(0, 13, 0, 13),
                 BorderBrush = Ui.Brush("#EDE8DA"),
                 BorderThickness = new Thickness(0, 0, 0, 1)
             };
+        }
+
+        /// <summary>A heading with an optional one-line hint, then a card of rows.</summary>
+        private UIElement Section(string title, string hint, params UIElement[] rows)
+        {
+            var sp = new StackPanel { Margin = new Thickness(0, 0, 0, 6) };
+            if (!string.IsNullOrEmpty(title))
+            {
+                var head = new StackPanel { Margin = new Thickness(10, 6, 8, 8) };
+                head.Children.Add(Ui.Text(title, 16, true, Ui.Ink, new Thickness(0)));
+                if (!string.IsNullOrEmpty(hint)) head.Children.Add(Ui.Text(hint, 12, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+                sp.Children.Add(head);
+            }
+            sp.Children.Add(RowCard(rows));
+            return sp;
+        }
+
+        /// <summary>Rarely needed settings, hidden until asked for so the page stays short.</summary>
+        private UIElement Advanced(string title, string hint, UIElement body)
+        {
+            var arrow = Ui.Text("\u25B8", 14, true, Ui.Muted, new Thickness(0, 0, 10, 0));
+            var name = Ui.Text(title, 14, true, Ui.Ink, new Thickness(0));
+            var line = new StackPanel { Orientation = Orientation.Horizontal };
+            line.Children.Add(arrow);
+            line.Children.Add(name);
+            if (!string.IsNullOrEmpty(hint)) line.Children.Add(Ui.Text("   " + hint, 12, false, Ui.Muted, new Thickness(0)));
+            var toggle = new Border
+            {
+                Child = line, Padding = new Thickness(18, 14, 18, 14), Margin = new Thickness(8, 4, 8, 10),
+                Background = System.Windows.Media.Brushes.White, BorderBrush = Ui.Brush("#E8E2D3"), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(14), Cursor = System.Windows.Input.Cursors.Hand
+            };
+            var host = new ContentControl { Content = body, Visibility = Visibility.Collapsed };
+            toggle.MouseLeftButtonUp += (s, e) =>
+            {
+                bool open = host.Visibility != Visibility.Visible;
+                host.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+                arrow.Text = open ? "\u25BE" : "\u25B8";
+            };
+            var sp = new StackPanel();
+            sp.Children.Add(toggle);
+            sp.Children.Add(host);
+            return sp;
         }
 
         private UIElement NumRow(string key, string title, string description, double width = 130)
@@ -159,9 +201,9 @@ namespace SkinDevApp
             return new Border { Padding = new Thickness(0, 14, 0, 12), Child = Ui.Text(text, 11.5, false, Ui.Muted, new Thickness(0)) };
         }
 
-        // ------------------------------------------------------------ camera tab --
+        // ------------------------------------------------------- camera & capture --
 
-        private UIElement BuildCameraTab()
+        private UIElement BuildScanTab()
         {
             _camera = new ComboBox { Style = (Style)FindResource("Combo"), Height = 38, Width = 340 };
             var names = new List<string> { AutoCamera };
@@ -174,39 +216,35 @@ namespace SkinDevApp
             _camera.ItemsSource = names;
             _label["camera.name"] = "Camera";
 
-            return RowCard(new[]
-            {
-                Row("Camera", "The Logitech BRIO is chosen automatically when it is connected. Change this only if the study uses another camera.", _camera),
-                BoolRow("camera.max_resolution", "Sharpest picture", "Use the sharpest picture the camera can give (for example Full HD). Turn this off to use the size below."),
-                NumRow("camera.width", "Picture width (pixels)", "Used only when the sharpest picture is turned off. The closest supported camera mode is used. Default 640."),
-                NumRow("camera.height", "Picture height (pixels)", "Used only when the sharpest picture is turned off. Default 480."),
-                Note("Frame rate and exposure follow the camera driver, which keeps every image consistent."),
-                NumRow("preview.zoom_min", "Smallest zoom of the live picture", "1 shows the whole picture. Values below 1 let it be shrunk on the screen. Zooming only changes what is shown, never the image that is taken. Default 1."),
-                NumRow("preview.zoom_max", "Largest zoom of the live picture", "How far the picture can be enlarged by pinching with two fingers or using the + button. Default 4."),
-                BoolRow("preview.zoom_buttons", "Show the zoom buttons", "Show + and − buttons on the live picture. Pinching with two fingers always works."),
-                BoolRow("touch.always_keyboard", "Always show the on-screen keyboard", "Open the on-screen keyboard whenever a text box is selected, also with a mouse. " +
-                        "Turn this on if the keyboard does not open when a field is tapped (some touchscreens are reported to Windows as a mouse). Off by default.")
-            });
-        }
+            var page = new StackPanel();
+            page.Children.Add(Section("Camera", null,
+                Row("Camera", "Chosen automatically when the Logitech BRIO is connected.", _camera),
+                BoolRow("camera.max_resolution", "Sharpest picture", "Use the best quality the camera offers.")));
+            page.Children.Add(Section("Taking images", null,
+                BoolRow("capture.auto", "Automatic capture", "Take each image once the face is steady. The manual button always works."),
+                BoolRow("capture.review_before_finish", "Review before the results", "Check each image, and retake it if needed, before the results appear.")));
+            page.Children.Add(Section("Touch screen", null,
+                BoolRow("preview.zoom_buttons", "Zoom buttons", "Show + and \u2212 on the live picture. Pinching always works."),
+                BoolRow("touch.always_keyboard", "Always show the on-screen keyboard", "Turn on if the keyboard does not open when a field is tapped.")));
 
-        // ----------------------------------------------------------- capture tab --
-
-        private UIElement BuildCaptureTab()
-        {
-            return RowCard(new[]
-            {
-                BoolRow("capture.auto", "Automatic capture", "Take each image automatically once the face is steady. The manual button always stays available."),
-                BoolRow("capture.review_before_finish", "Review images before the results", "Show each image so it can be accepted or retaken before the results appear."),
-                NumRow("capture.stable_frames", "Steady frames needed", "How many steady readings in a row are needed before an image is taken. Default 8."),
-                NumRow("capture.hold_ms", "Hold-still time (milliseconds)", "How long the face must stay still before capture. Default 1200."),
-                NumRow("capture.cooldown_s", "Pause between images (seconds)", "Prevents duplicate images. Default 4."),
-                NumRow("capture.min_sharpness", "Minimum sharpness", "An image must be at least this sharp to be accepted. Default 25."),
-                NumRow("capture.min_brightness", "Minimum brightness", "Average brightness from 0 (black) to 255 (white). Default 45."),
-                NumRow("capture.max_brightness", "Maximum brightness", "Average brightness from 0 (black) to 255 (white). Default 215."),
-                NumRow("pose.front_max_yaw", "Front view: largest head turn", "How far the head may turn and still count as facing the camera. Default 0.12."),
-                NumRow("pose.side_min_yaw", "Side views: smallest head turn", "How far the head must turn for a left or right image. Default 0.20."),
-                Note("Image analysis, heatmap and lesion-marking settings are fixed for this study and cannot be changed here.")
-            });
+            page.Children.Add(Advanced("Advanced", "Fine-tuning. The defaults work well; change only if you need to.",
+                RowCard(new[]
+                {
+                    NumRow("camera.width", "Picture width (pixels)", "Used when Sharpest picture is off. Default 640."),
+                    NumRow("camera.height", "Picture height (pixels)", "Used when Sharpest picture is off. Default 480."),
+                    NumRow("preview.zoom_min", "Smallest zoom", "1 shows the whole picture. Default 1."),
+                    NumRow("preview.zoom_max", "Largest zoom", "How far the live picture can be enlarged. Default 4."),
+                    NumRow("capture.stable_frames", "Steady readings needed", "In a row, before an image is taken. Default 8."),
+                    NumRow("capture.hold_ms", "Hold-still time (ms)", "How long the face must stay still. Default 1200."),
+                    NumRow("capture.cooldown_s", "Pause between images (s)", "Prevents duplicates. Default 4."),
+                    NumRow("capture.min_sharpness", "Minimum sharpness", "Blurrier images are rejected. Default 25."),
+                    NumRow("capture.min_brightness", "Minimum brightness", "From 0 (black) to 255 (white). Default 45."),
+                    NumRow("capture.max_brightness", "Maximum brightness", "From 0 (black) to 255 (white). Default 215."),
+                    NumRow("pose.front_max_yaw", "Front view: largest head turn", "Default 0.12."),
+                    NumRow("pose.side_min_yaw", "Side views: smallest head turn", "Default 0.20."),
+                    Note("Image analysis and lesion marking are fixed for this study and cannot be changed here.")
+                })));
+            return page;
         }
 
         // ----------------------------------------------------------- printer tab --
@@ -273,36 +311,41 @@ namespace SkinDevApp
             foreach (Button b in new[] { check, _pTestBtn, layout }) { b.Margin = new Thickness(0, 0, 8, 8); testButtons.Children.Add(b); }
             tests.Children.Add(_pStatus);
             tests.Children.Add(testButtons);
-            tests.Children.Add(Ui.Text("The tests use the values on this page, even before they are saved.", 11, false, Ui.Muted, new Thickness(0)));
+            tests.Children.Add(Ui.Text("Tests use the values on this page, even before saving.", 11, false, Ui.Muted, new Thickness(0)));
 
             Button save = Ui.Btn("Save printer settings", (s, e) => SavePrinter(), "PrimaryButton", 230);
             Button defaults = Ui.Btn("Restore printer defaults", (s, e) => { FillPrinter(new PrinterSettings()); PrinterMessage("The default printer values are shown. Press Save printer settings to apply them.", true); }, "SecondaryButton", 240);
             defaults.Margin = new Thickness(10, 0, 0, 0);
-            var saveRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 16, 0, 4) };
+            var saveRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
             saveRow.Children.Add(save);
             saveRow.Children.Add(defaults);
 
             FillPrinter(PrinterSettings.Load());
-            return RowCard(new UIElement[]
-            {
-                Row("Receipt printer", "Print patient receipts on the QR701 thermal printer built into LUMYVUE. When off, receipts can still be previewed.", _pEnabled),
-                Row("Simulation mode", "For testing without the printer: receipts are saved as files and NOTHING is printed. Every screen says so while it is on.", _pSim),
-                Row("Connection status", "What LUMYVUE can check. The QR701 cannot report paper or power, so these are never shown as \"ready\".", tests),
-                Row("COM port", "The serial port of the USB-to-TTL adapter the printer is wired to. Connect the printer's TTL pins only through such an adapter: never to an RS-232 port.", portRow),
-                Row("Baud rate", "Must match the printer. Not confirmed for the QR701: hold the printer's feed button while switching it on to print its self-test page, which shows the baud rate.", _pBaud),
-                Row("Serial format", "Usually 8 data bits, no parity, 1 stop bit (8N1). Change only if the self-test page says otherwise.", serial),
-                Row("Flow control", "TTL printers usually have no flow-control wire: keep None unless the printer's documentation says otherwise.", _pFlow),
-                Row("Characters per line", "32 fits the 48 mm print width in the standard font. The Test print ruler shows whether every line fits. From 24 to 48.", _pCols),
-                Row("Bold and large text", "Uses the ESC E and GS ! commands. Turn on only after the Test print shows its style test correctly; otherwise receipts print as plain text.", _pStyles),
-                Row("Reset the printer before each receipt", "Sends ESC @ first, so a half-finished earlier job cannot change the layout.", _pReset),
-                Row("Paper feed after a receipt (lines)", "Blank lines so the receipt clears the tear bar (the QR701 has no cutter). From 0 to 12. Default 4.", _pFeed),
-                Row("Pause after each line (ms)", "Gives the printer time to print, because a TTL link has no flow control. Increase it if lines go missing. From 0 to 500. Default 20.", _pDelay),
-                Row("Final receipt by default", "Once the dermatologist has completed the review, offer the final receipt first.", _pFinal),
-                Row("Show the four AI scores", "Print the four similarity scores under the AI classification (they fit the 48 mm width).", _pScores),
-                Row("Show the dermatologist's assessment", "Print the dermatologist's assessment on final receipts. The notes are never printed.", _pAssess),
-                Note("Troubleshooting: garbled characters usually mean the baud rate or serial format does not match the printer. Nothing at all: check the 5 to 9 V power supply, the paper roll (shiny side towards the print head), and that TX of the adapter goes to RX of the printer with a shared ground. Lines missing or cut off: increase the pause after each line, or lower the characters per line."),
-                new Border { Child = new StackPanel { Children = { saveRow, _pMsg } }, Padding = new Thickness(0, 0, 0, 12) }
-            });
+            var page = new StackPanel();
+            page.Children.Add(Section("Receipt printer", null,
+                Row("Print receipts", "Print patient receipts on the thermal printer. When off, receipts can still be previewed.", _pEnabled),
+                Row("Test mode", "Nothing is printed; receipts are saved as files instead.", _pSim),
+                Row("Port", "The serial port the printer is connected to.", portRow),
+                Row("Connection", "Check the connection and print a test page.", tests)));
+            page.Children.Add(Section("On the receipt", null,
+                Row("Final receipt first", "After the dermatologist's review, offer the final receipt first.", _pFinal),
+                Row("AI scores", "Print the four scores under the classification.", _pScores),
+                Row("Dermatologist's assessment", "Print it on final receipts. Notes are never printed.", _pAssess)));
+            page.Children.Add(new Border { Child = new StackPanel { Children = { saveRow, _pMsg } }, Margin = new Thickness(8, 0, 8, 14) });
+            page.Children.Add(Advanced("Advanced", "Printer connection and layout. Change only if printing looks wrong.",
+                RowCard(new UIElement[]
+                {
+                    Row("Baud rate", "Must match the printer. Hold its feed button while switching it on to print a page that shows it.", _pBaud),
+                    Row("Serial format", "Usually 8 data bits, no parity, 1 stop bit.", serial),
+                    Row("Flow control", "Keep None unless the printer's documentation says otherwise.", _pFlow),
+                    Row("Characters per line", "From 24 to 48. 32 fits the paper width.", _pCols),
+                    Row("Bold and large text", "Turn on only after the test page shows its style test correctly.", _pStyles),
+                    Row("Reset before each receipt", "Prevents an earlier job from changing the layout.", _pReset),
+                    Row("Paper feed after a receipt", "Blank lines, from 0 to 12. Default 4.", _pFeed),
+                    Row("Pause after each line (ms)", "Increase if lines go missing. From 0 to 500. Default 20.", _pDelay),
+                    Note("Garbled characters usually mean the baud rate or serial format does not match. Nothing printed: check the power, the paper roll (shiny side towards the print head) and the wiring. Missing lines: increase the pause after each line.")
+                })));
+            return page;
         }
 
         private void FillPorts(string keep)
@@ -464,7 +507,7 @@ namespace SkinDevApp
                 var host = new StackPanel();
                 host.Children.Add(_acctHost);
                 host.Children.Add(addBtn);
-                rows.Add(Row("Accounts", "Everyone listed here can sign in. Create an account for a dermatologist or another administrator who will use the prototype.", host));
+                rows.Add(Row("Accounts", "Everyone listed here can sign in.", host));
             }
             rows.Add(Row("Change my password", "You are signed in as " + (string.IsNullOrEmpty(AppSession.UserId) ? "(no account)" : AppSession.UserId) + ".", change));
             rows.Add(new Border { Child = _acctMsg });
@@ -535,7 +578,7 @@ namespace SkinDevApp
             _historyHost = new StackPanel();
             return RowCard(new UIElement[]
             {
-                Row("Recent changes", "Every change to the camera, capture and printer settings is recorded here with the date, time and person.", _historyHost)
+                Row("Recent changes", "Who changed which setting, and when.", _historyHost)
             });
         }
 

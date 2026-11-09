@@ -64,11 +64,11 @@ namespace SkinDevApp.Printing
         public static PrinterStatus Status(PrinterSettings s)
         {
             if (!s.Enabled)
-                return new PrinterStatus { CanSend = false, Level = 2, Headline = "Turned off", Detail = "Receipts can be previewed. Turn the printer on in Settings > Thermal printer to print." };
+                return new PrinterStatus { CanSend = false, Level = 2, Headline = "Turned off", Detail = "Receipts can be previewed. Turn the printer on in Settings > Receipt printer to print." };
             if (s.Simulation)
                 return new PrinterStatus { CanSend = true, Level = 1, Headline = "Simulation mode: nothing is printed", Detail = "Receipts are saved as files for testing. Turn simulation off in Settings to print on the QR701." };
             if (string.IsNullOrWhiteSpace(s.PortName))
-                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No COM port chosen", Detail = "Choose the printer's serial port in Settings > Thermal printer." };
+                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No COM port chosen", Detail = "Choose the printer's serial port in Settings > Receipt printer." };
             if (!PortNames().Contains(s.PortName, StringComparer.OrdinalIgnoreCase))
                 return new PrinterStatus { CanSend = false, Level = 2, Headline = s.PortName + " not found", Detail = "The serial adapter may be unplugged, or Windows gave it another COM number. Check the cable, then choose the port in Settings." };
             return new PrinterStatus
