@@ -26,14 +26,14 @@
                 </Border>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="A. Agreement to take part in the research" Style="{StaticResource H2}"/>
+                        <TextBlock Text="A. Agreement to use LUMYVUE" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Body}" Margin="0,0,0,10"
-                                   Text="LUMYVUE is a research prototype that captures images of the face and uses a computer program to analyze skin images. It does not provide a diagnosis and does not replace professional medical evaluation. Participation is voluntary, and you may stop at any time without any consequences."/>
+                                   Text="LUMYVUE is an AI-assisted facial skin health monitoring system. It captures images of the face and analyzes them using artificial intelligence. It does not provide a diagnosis and does not replace professional medical evaluation. Giving consent is voluntary, and you may stop at any time without any consequences."/>
                         <CheckBox x:Name="UnderstoodChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I have read (or had read to me) and understood the research information, and my questions were answered. *"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I have read (or had read to me) and understood the information above, and my questions were answered. *"/>
                         </CheckBox>
                         <CheckBox x:Name="VoluntaryChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I understand that my participation is voluntary and that I may withdraw at any time. *"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I understand that giving consent is voluntary and that I may withdraw it at any time. *"/>
                         </CheckBox>
                     </StackPanel>
                 </Border>
@@ -42,16 +42,16 @@
                     <StackPanel>
                         <TextBlock Text="B. Agreement to capture images of the face" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Body}" Margin="0,0,0,10"
-                                   Text="Three images (front, left side and right side) will be taken with the study camera. The images are saved under your Patient ID, not your name."/>
+                                   Text="Three images (front, left side and right side) will be taken with the LUMYVUE camera. The images are saved under your Patient ID, not your name."/>
                         <CheckBox x:Name="CaptureChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for images of my face to be taken. *"/>
                         </CheckBox>
                         <CheckBox x:Name="ProcessingChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be analyzed by the LUMYVUE research system. *"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be analyzed by the LUMYVUE system. *"/>
                         </CheckBox>
                         <Separator Margin="0,10"/>
                         <CheckBox x:Name="FutureUseChk" Margin="0,4">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="Optional: I agree that my images may be used to improve the system in the future. (This is not required to take part.)"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="Optional: I agree that my images may be used to improve the system in the future. (This is not required.)"/>
                         </CheckBox>
                     </StackPanel>
                 </Border>

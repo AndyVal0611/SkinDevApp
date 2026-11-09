@@ -203,7 +203,7 @@ namespace SkinDevApp.V6
         private static UIElement TechnicalDetails(V6SessionSummary s)
         {
             var sp = new StackPanel { Margin = new Thickness(4, 6, 0, 0) };
-            sp.Children.Add(Ui.Text("Calibrated model probability for each condition, compared with its decision limit. For researchers; the clinical reading above already accounts for these numbers.",
+            sp.Children.Add(Ui.Text("Calibrated model probability for each condition, compared with its decision limit. The clinical reading above already accounts for these numbers.",
                                     11, false, Ui.Muted, new Thickness(0, 0, 0, 6)));
             foreach (V6ViewSummary v in s.Views)
             {
@@ -215,7 +215,7 @@ namespace SkinDevApp.V6
             }
             return new Expander
             {
-                Header = new TextBlock { Text = "Technical details (for researchers)", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Muted },
+                Header = new TextBlock { Text = "Technical details", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Muted },
                 IsExpanded = false, Margin = new Thickness(0, 8, 0, 0), Content = sp
             };
         }

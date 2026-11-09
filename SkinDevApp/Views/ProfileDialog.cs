@@ -190,7 +190,7 @@ namespace SkinDevApp.Views
         private static ProfileDialog BuildCreate()
         {
             var d = Build(new AccountProfile(), "Create an account",
-                "For a dermatologist or another administrator who will use this prototype. Enter the account details and the person's personal and professional details. Fields marked * are required.");
+                "For a dermatologist or another administrator who will use LUMYVUE. Enter the account details and the person's personal and professional details. Fields marked * are required.");
 
             var types = new WrapPanel();
             var derm = new RadioButton { Content = "Dermatologist (reviews scans)", GroupName = "new-acct-type", IsChecked = true, Margin = new Thickness(0, 6, 18, 6), FontSize = 14 };

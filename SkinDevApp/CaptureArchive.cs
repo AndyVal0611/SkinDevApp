@@ -91,9 +91,9 @@ namespace SkinDevApp.Scanning
         {
             var loc = new LocalizationSection
             {
-                Note = "Candidate lesion locations from a separate research detector (YOLOv8) trained on public box-annotated datasets. " +
+                Note = "Candidate lesion locations from a separate lesion detector (YOLOv8) trained on public box-annotated datasets. " +
                        "Not lesion segmentation, not a diagnosis, not a lesion count: it misses lesions and can draw wrong boxes. " +
-                       "Eczema is a pilot class. It does not change Grad-CAM++ or the class scores."
+                       "Eczema detection is still limited. It does not change Grad-CAM++ or the class scores."
             };
 
             if (det == null)

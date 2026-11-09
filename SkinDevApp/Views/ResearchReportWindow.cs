@@ -275,7 +275,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(T("Skin screening  ·  generated " + DateTime.Now.ToString("MMM d, yyyy · h:mm tt", System.Globalization.CultureInfo.InvariantCulture), 9, false, Muted, 8));
             if (_d.Participant != null && _d.Participant.Status == "Withdrawn")
             {
-                sp.Children.Add(Panel(T("This patient has withdrawn from the study. Do not include this scan in any analysis.", 9, true, WarnInk, 0), WarnBg, WarnLine, 7));
+                sp.Children.Add(Panel(T("This patient is marked as withdrawn. Do not include this scan in any analysis.", 9, true, WarnInk, 0), WarnBg, WarnLine, 7));
                 sp.Children.Add(new Border { Height = 8 });
             }
 
@@ -427,7 +427,7 @@ namespace SkinDevApp.Views
                     sp.Children.Add(Panel(w, WarnBg, WarnLine, 8));
                 }
                 else sp.Children.Add(T("Views consistent: every captured angle has the same primary class; no review flags were raised.", 8.5, false, TextInk, 2));
-                sp.Children.Add(T("Fusion method: quality-weighted pooling of per-view scores. Heuristic; its validation is limited without paired multi-view labelled data.", 7.5, false, Muted, 2));
+                sp.Children.Add(T("Fusion method: quality-weighted pooling of the per-view scores. It has not yet been clinically validated.", 7.5, false, Muted, 2));
             }
             else if (_f.ReviewRecommended)
             {
@@ -442,7 +442,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(Heading("Human assessment"));
             sp.Children.Add(Table(new[]
             {
-                Ui.KV("Dermatologist validation", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + Fmt.When(dv.ValidationDate)),
+                Ui.KV("Dermatologist review", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + Fmt.When(dv.ValidationDate)),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending)
             }, 150));
 
@@ -574,7 +574,7 @@ namespace SkinDevApp.Views
         {
             var sp = new StackPanel();
             sp.Children.Add(T("Candidate Lesion Localization", 17, true, Navy, 0));
-            sp.Children.Add(T("Boxes proposed by a separate research detector on the same frames the classifier and Grad-CAM++ analyzed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
+            sp.Children.Add(T("Boxes proposed by a separate lesion detector on the same frames the classifier and Grad-CAM++ analyzed. Acne red, hyperpigmentation blue, eczema orange.", 8.5, false, Muted, 6));
 
             var cells = new List<FrameworkElement>();
             if (_d.Session.ScanMode == "Single") cells.Add(LocalizationCell(_d.Views.FirstOrDefault(), "Single"));
@@ -968,7 +968,7 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
-            sp.Children.Add(T(dermatologist ? "Dermatologist Review" : "Researcher Reference Assessment", 17, true, Navy, 0));
+            sp.Children.Add(T(dermatologist ? "Dermatologist Review" : "Reference Assessment", 17, true, Navy, 0));
             sp.Children.Add(T("Printed form — to be completed by hand and signed", 8.5, false, Muted, 6));
 
             sp.Children.Add(Table(new[]
@@ -980,35 +980,35 @@ namespace SkinDevApp.Views
             }, 130, 9));
             sp.Children.Add(Rule(4, 6));
             sp.Children.Add(T(dermatologist
-                ? "A separate validation layer. It never overwrites the AI prediction."
-                : "Select the reference label(s) you assign to this scan. More than one label may be selected if the protocol allows it.",
+                ? "This review is recorded separately and never replaces the AI result."
+                : "Select the reference label or labels you assign to this scan. More than one label may be selected if permitted.",
                 8, false, Muted, 8));
 
             if (dermatologist)
             {
-                sp.Children.Add(FieldRow(Tuple.Create("Validator ID *", (string)null),
-                                         Tuple.Create("Validator Name (where permitted by protocol)", (string)null)));
-                sp.Children.Add(FieldRow(Tuple.Create("Professional Role", "Dermatologist"),
-                                         Tuple.Create("Registration no. (optional)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Reviewer ID *", (string)null),
+                                         Tuple.Create("Reviewer name (where permitted)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Professional role", "Dermatologist"),
+                                         Tuple.Create("Registration number (optional)", (string)null)));
             }
 
-            sp.Children.Add(FormLabel((dermatologist ? "Dermatologist reference assessment" : "Reference assessment") + " *"));
+            sp.Children.Add(FormLabel((dermatologist ? "Dermatologist assessment" : "Reference assessment") + " *"));
             sp.Children.Add(Boxes(FormLabels));
 
-            sp.Children.Add(FormLabel("Agreement with AI *"));
+            sp.Children.Add(FormLabel("Agreement with the AI result *"));
             sp.Children.Add(Boxes(FormAgreement));
 
-            sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Researcher notes", dermatologist ? 8 : 5));
+            sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Notes", dermatologist ? 8 : 5));
 
             if (!dermatologist)
             {
-                sp.Children.Add(FormLabel("Per-view Comments (if any)"));
+                sp.Children.Add(FormLabel("Comments for each view (if any)"));
                 sp.Children.Add(FieldRow(Tuple.Create("Front", (string)null), Tuple.Create("Left", (string)null), Tuple.Create("Right", (string)null)));
-                sp.Children.Add(FieldRow(Tuple.Create("Researcher ID *", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Reviewer ID *", (string)null)));
             }
             else
             {
-                sp.Children.Add(FormLabel("Validation status *"));
+                sp.Children.Add(FormLabel("Review status *"));
                 sp.Children.Add(Boxes(new[] { "Completed", "Pending" }));
             }
 
@@ -1024,7 +1024,7 @@ namespace SkinDevApp.Views
             else
             {
                 // every member of the research team signs
-                sp.Children.Add(T("Signed by the research team (all members)", 8.5, true, Navy, 0));
+                sp.Children.Add(T("Signed by the review team (all members)", 8.5, true, Navy, 0));
                 foreach (string name in ResearchTeamMembers)
                 {
                     sp.Children.Add(FieldRow(

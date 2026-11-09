@@ -204,7 +204,7 @@ namespace SkinDevApp.Views
                 _lines = ReceiptService.PrintLines(_r, _ps, _copy, _superseded);
 
                 if (_superseded)
-                    _notes.Children.Add(Ui.Callout("Earlier version", "A newer receipt exists for this scan. Reprinting this version needs a researcher and is marked on the paper.", 1));
+                    _notes.Children.Add(Ui.Callout("Earlier version", "A newer receipt exists for this scan. Reprinting this version needs an administrator and is marked on the paper.", 1));
                 if (_copy)
                     _notes.Children.Add(Ui.Callout("Already sent to the printer", "Printing again makes a copy, marked \"COPY\" on the paper.", 1));
                 ReceiptState st = _d != null ? ReceiptService.State(_d) : null;
@@ -329,16 +329,16 @@ namespace SkinDevApp.Views
             ReceiptState st = ReceiptService.State(_d);
             if (st.Restricted)
             {
-                if (!AppSession.IsResearcher) { Show(st.RestrictionReason + " Only a signed-in researcher can print this receipt.", 2); return; }
+                if (!AppSession.IsResearcher) { Show(st.RestrictionReason + " Only a signed-in administrator can print this receipt.", 2); return; }
                 if (LumyDialog.Show(st.RestrictionReason + "\n\nPrint this receipt anyway? Your user name is recorded with the print.", "LUMYVUE receipt",
                         MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 { RecordStopped("Restricted record: printing not authorized"); return; }
-                why.Add("Restricted record printed with researcher authorization (" + AppSession.ActorId + ")");
+                why.Add("Restricted record printed with administrator authorization (" + AppSession.ActorId + ")");
             }
             if (_superseded)
             {
-                if (!AppSession.IsResearcher) { Show("This is an earlier receipt version. Only a signed-in researcher can reprint it.", 2); return; }
-                why.Add("Earlier version reprinted by researcher " + AppSession.ActorId);
+                if (!AppSession.IsResearcher) { Show("This is an earlier receipt version. Only a signed-in administrator can reprint it.", 2); return; }
+                why.Add("Earlier version reprinted by administrator " + AppSession.ActorId);
             }
 
             // a repeat within a minute is almost always a double tap: ask first

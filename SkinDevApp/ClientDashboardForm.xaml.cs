@@ -160,7 +160,7 @@ namespace SkinDevApp.Views
                     ? "No patient is selected. A live scan is filed under a Patient ID, so please register or select a patient first. (An uploaded image can still be analyzed; it is saved as a scan without a patient.)"
                     : "No patient is selected. Register or select a patient from the Dashboard first.";
             else if (IsWithdrawn(_participantId))
-                problem = _participantId + " has withdrawn from the study. Image capture is blocked.";
+                problem = _participantId + " is marked as withdrawn. Image capture is blocked.";
             else if (!Workflow.HasScanConsent(_participantId))
                 problem = "Required consent has not been recorded for " + _participantId + ". Image capture is blocked until consent is given.";
 

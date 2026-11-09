@@ -78,7 +78,7 @@ namespace SkinDevApp.Views
             buttons.Children.Add(SmallBtn("Back up now", (s, e) => Backup()));
             DockPanel.SetDock(buttons, Dock.Right);
             head.Children.Add(buttons);
-            head.Children.Add(Ui.Text("Study records", 16, true, Ui.Ink, new Thickness(0, 4, 0, 0)));
+            head.Children.Add(Ui.Text("Records overview", 16, true, Ui.Ink, new Thickness(0, 4, 0, 0)));
             _summary.Children.Add(head);
             try
             {
@@ -287,7 +287,7 @@ namespace SkinDevApp.Views
                 d.Children.Add(Action("Start a new scan for this patient", (s, e) => Workflow.ContinueToScan(pid)));
                 bool withdrawn = Str(row, "Status") == "Withdrawn";
                 var reason = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Margin = new Thickness(0, 4, 0, 0) };
-                d.Children.Add(Ui.Text(withdrawn ? "Re-activate this patient" : "Withdraw this patient from the study", 12.5, true, Ui.Ink, new Thickness(0, 16, 0, 0)));
+                d.Children.Add(Ui.Text(withdrawn ? "Reactivate this patient" : "Mark this patient as withdrawn", 12.5, true, Ui.Ink, new Thickness(0, 16, 0, 0)));
                 d.Children.Add(Ui.Text(withdrawn ? "Their scans are counted again in the statistics." : "Their records are kept but left out of every statistic. A reason is required.", 11, false, Ui.Muted, new Thickness(0)));
                 d.Children.Add(reason);
                 d.Children.Add(Action(withdrawn ? "Mark as active" : "Mark as withdrawn", (s, e) =>

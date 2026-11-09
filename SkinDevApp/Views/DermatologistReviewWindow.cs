@@ -28,7 +28,7 @@ namespace SkinDevApp.Views
 
         public const string Disclaimer =
             "LUMYVUE provides AI-generated classifications and visual evidence based on the condition categories included in its trained models. " +
-            "These outputs are intended to assist research and review and do not constitute a medical diagnosis. " +
+            "These outputs are intended to assist clinical review and do not constitute a medical diagnosis. " +
             "Clinical interpretation and diagnosis remain the responsibility of a qualified healthcare professional.";
 
         private readonly string _sessionId;

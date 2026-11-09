@@ -46,7 +46,7 @@ namespace SkinDevApp.Views
         public static bool RequireResearcher(string what)
         {
             if (AppSession.IsResearcher) return true;
-            LumyDialog.Show(what + " is available to signed-in researchers / administrators only.",
+            LumyDialog.Show(what + " is available to signed-in administrators only.",
                 "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }

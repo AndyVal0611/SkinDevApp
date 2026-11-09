@@ -36,7 +36,7 @@ namespace SkinDevApp.Data
             }
         }
 
-        public static string RoleTitle => IsResearcher ? "Researcher / Admin" : "Operator";
+        public static string RoleTitle => IsResearcher ? "Administrator" : "Operator";
 
         /// <summary>Recorded in the audit log and as OperatorID on new rows.</summary>
         public static string ActorId =>

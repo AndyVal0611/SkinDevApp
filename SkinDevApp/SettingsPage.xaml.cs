@@ -242,7 +242,7 @@ namespace SkinDevApp
                     NumRow("capture.max_brightness", "Maximum brightness", "From 0 (black) to 255 (white). Default 215."),
                     NumRow("pose.front_max_yaw", "Front view: largest head turn", "Default 0.12."),
                     NumRow("pose.side_min_yaw", "Side views: smallest head turn", "Default 0.20."),
-                    Note("Image analysis and lesion marking are fixed for this study and cannot be changed here.")
+                    Note("Image analysis and lesion marking are fixed and cannot be changed here.")
                 })));
             return page;
         }

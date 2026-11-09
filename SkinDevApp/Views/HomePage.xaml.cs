@@ -334,7 +334,7 @@ namespace SkinDevApp.Views
 
             if (p.Status == "Withdrawn")
             {
-                LumyDialog.Show(p.ParticipantID + " has withdrawn from the study. No new scans or consent can be recorded for this participant.",
+                LumyDialog.Show(p.ParticipantID + " is marked as withdrawn. No new scans or consent can be recorded for this patient.",
                     "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }

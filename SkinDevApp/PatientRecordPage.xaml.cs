@@ -271,7 +271,7 @@ namespace SkinDevApp
             actions.Children.Add(recConsent);
             sp.Children.Add(actions);
             if (p.Status == "Withdrawn")
-                sp.Children.Add(Ui.Text("This patient has withdrawn. Their data is left out of the Research Dashboard, and no new scans or consent can be recorded.",
+                sp.Children.Add(Ui.Text("This patient is marked as withdrawn. Their data is left out of the dashboard statistics, and no new scans or consent can be recorded.",
                     11, true, Ui.Bad, new Thickness(0, 8, 0, 0)));
             return Ui.Card(sp);
         }

@@ -115,7 +115,7 @@ namespace SkinDevApp.Views
                 tech.AppendLine();
             }
             sp.Children.Add(g);
-            sp.Children.Add(Ui.Text("The box threshold is fixed for this study. Boxes below it are not drawn.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            sp.Children.Add(Ui.Text("The box threshold is fixed. Boxes below it are not drawn.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
 
             foreach (string problem in LesionEngine.LoadProblems) tech.AppendLine("Could not load: " + problem);
             if (!LesionEngine.IsAvailable && LesionEngine.LoadErrorMessage != null) tech.AppendLine("Problem: " + LesionEngine.LoadErrorMessage);

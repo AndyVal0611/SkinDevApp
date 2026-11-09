@@ -191,7 +191,7 @@ namespace SkinDevApp.Tests
             Assert.Equal(40, d.LowConfidencePercent);
             Assert.Equal(60, d.AgreementPercent);
             Assert.Equal(10, d.CloseMarginPoints);
-            Assert.Contains("not been validated against dermatologist-annotated data", InterpretationSettings.ProvisionalNote);
+            Assert.Contains("not yet been validated against dermatologist-annotated data", InterpretationSettings.ProvisionalNote);
 
             var custom = InterpretationSettings.From(k => k == InterpretationSettings.KeyLowConfidence ? "50" : null);
             Assert.Equal(50, custom.LowConfidencePercent);

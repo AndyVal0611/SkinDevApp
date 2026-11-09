@@ -152,7 +152,7 @@ namespace SkinDevApp.Views
                             : mode == "Combined" ? "The predicted class's Grad-CAM++ overlay with the candidate lesion boxes on top. The two outputs stay independent."
                             : mode == "Grad-CAM++" ? (_v6 != null ? "Which image areas influenced the V5 classifier's score for the chosen condition. Kept from V5 for comparison; it explains the V5 classifier, not the V6 assessment, and the maps for different conditions look alike."
                                                                   : "Which image areas influenced the classifier's score for the predicted class (attribution, not a lesion map).")
-                            : mode == "Localization" ? "Candidate lesion locations from a separate research detector."
+                            : mode == "Localization" ? "Candidate lesion locations from a separate lesion detector."
                             : "The exact frame that was analyzed."
                 };
                 string m = mode;
@@ -298,7 +298,7 @@ namespace SkinDevApp.Views
 
             var icons = new Dictionary<string, string>
             {
-                { "Compare images and marked areas", "Icon.Image" }, { "Add researcher notes", "Icon.Notes" },
+                { "Compare images and marked areas", "Icon.Image" }, { "Add notes", "Icon.Notes" },
                 { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
                 { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" },
                 { "Detailed A4 report", "Icon.Report" }

@@ -468,7 +468,7 @@
                         </StackPanel>
 
                         <!-- Researcher view -->
-                        <CheckBox x:Name="ResearcherChk" Content="Researcher view" FontSize="13" Foreground="#2F3024"
+                        <CheckBox x:Name="ResearcherChk" Content="Detailed view" FontSize="13" Foreground="#2F3024"
                                   Margin="0,0,0,8" Checked="ResearcherChk_Changed" Unchecked="ResearcherChk_Changed"/>
 
                         <Border x:Name="ResearcherPanel" Visibility="Collapsed" Style="{StaticResource Panel}" Margin="0,0,0,14">

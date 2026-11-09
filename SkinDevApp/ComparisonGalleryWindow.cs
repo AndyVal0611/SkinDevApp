@@ -115,7 +115,7 @@ namespace SkinDevApp.Views
             _model = GalleryModel.Load(folder);
             _openFolder = _model.SessionFolder ?? folder;
 
-            Title = "LUMYVUE - Comparison Gallery (Researcher)";
+            Title = "LUMYVUE - Comparison Gallery";
             Width = 1380;
             Height = 900;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;

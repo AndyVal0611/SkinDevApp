@@ -33,8 +33,8 @@ namespace SkinDevApp
             if (p.Status == "Withdrawn")
             {
                 ParticipantTxt.Text += "  ·  WITHDRAWN";
-                PreviousConsentTxt.Text = "This patient has withdrawn from the study. Consent cannot be recorded and no images can be captured. " +
-                                          "A researcher can change the record status in Patient records (Edit) if the withdrawal was entered by mistake.";
+                PreviousConsentTxt.Text = "This patient is marked as withdrawn. Consent cannot be recorded and no images can be captured. " +
+                                          "An administrator can change the record status in Patient records (Edit) if the withdrawal was entered by mistake.";
                 AgreeBtn.IsEnabled = false;
                 foreach (CheckBox box in new[] { UnderstoodChk, VoluntaryChk, CaptureChk, ProcessingChk, FutureUseChk }) box.IsEnabled = false;
                 HintTxt.Text = "Consent cannot be recorded for a withdrawn patient.";

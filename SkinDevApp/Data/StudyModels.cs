@@ -17,12 +17,12 @@ namespace SkinDevApp.Data
     public static class StudyText
     {
         public const string PrototypeNotice =
-            "LUMYVUE is a research prototype intended to assist with automated skin-image classification. " +
+            "LUMYVUE is an AI-assisted facial skin health monitoring system. " +
             "It does not replace professional medical evaluation and does not provide a diagnosis.";
 
         public const string ScoresNote =
-            "Model Class Scores are the four-class softmax output of the deployed classifier. " +
-            "They are not independent disease probabilities.";
+            "Class scores are the four-class output of the deployed classifier. " +
+            "They are not independent probabilities of disease.";
 
         public const string AttributionNote =
             "Grad-CAM++ maps show model attribution (which image areas influenced each class score). " +

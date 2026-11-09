@@ -95,8 +95,8 @@ namespace SkinDevApp.Views
 
             // ---------------------------------------------------------------- limitations
             var lim = new StackPanel();
-            lim.Children.Add(Sub("1. Research prototype"));
-            lim.Children.Add(Para("LUMYVUE is a research prototype exploring the use of artificial intelligence in facial skin health monitoring. It supports qualified healthcare professionals and does not replace their knowledge, judgment or decision-making."));
+            lim.Children.Add(Sub("1. Intended use"));
+            lim.Children.Add(Para("LUMYVUE is an AI-assisted tool for facial skin health monitoring. It supports qualified healthcare professionals and does not replace their knowledge, judgment or decision-making. Its interpretation thresholds are provisional and have not yet been fully validated."));
             lim.Children.Add(Sub("2. Not a medical diagnosis"));
             lim.Children.Add(Para("LUMYVUE does not diagnose conditions, prescribe medication, recommend treatment or replace an in-person consultation with a dermatologist. " +
                                   "All findings are preliminary screening information and must be evaluated by a qualified healthcare professional."));
@@ -142,7 +142,7 @@ namespace SkinDevApp.Views
                 Foreground = Brushes.White
             });
             sp.Children.Add(new TextBlock { Text = "AI skin health monitoring system", FontSize = 14, Foreground = Ui.Brush("#E8CCC2"), Margin = new Thickness(2, 0, 0, 0) });
-            sp.Children.Add(new TextBlock { Text = "Research prototype", FontSize = 12, Foreground = Ui.Brush("#DCD4C1"), Margin = new Thickness(2, 8, 0, 0) });
+            sp.Children.Add(new TextBlock { Text = "Supporting dermatological assessment", FontSize = 12, Foreground = Ui.Brush("#DCD4C1"), Margin = new Thickness(2, 8, 0, 0) });
 
             // the skin-tone ribbon from the login screen
             var ribbon = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 14, 0, 0) };

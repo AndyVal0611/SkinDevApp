@@ -44,7 +44,7 @@ namespace SkinDevApp.Views
         public double CloseMarginPoints { get; set; } = 10;
 
         public const string ProvisionalNote =
-            "Interpretation cut-offs are provisional research parameters and have not been validated against dermatologist-annotated data.";
+            "Interpretation thresholds are provisional and have not yet been validated against dermatologist-annotated data.";
 
         public static InterpretationSettings Default => new InterpretationSettings();
 

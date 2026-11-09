@@ -212,7 +212,7 @@ namespace SkinDevApp.Views
             if (p.Status == "Withdrawn")
             {
                 _summary.Foreground = Ui.Bad;
-                _summary.Text = head + "This patient has withdrawn from the study. New scans cannot be recorded.";
+                _summary.Text = head + "This patient is marked as withdrawn. New scans cannot be recorded.";
                 return;                                            // Continue stays disabled
             }
 

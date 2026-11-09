@@ -98,7 +98,7 @@ namespace SkinDevApp.Printing
 
             if (d.Participant != null)
             {
-                if (d.Participant.Status == "Withdrawn") { st.Restricted = true; st.RestrictionReason = "This patient has withdrawn from the study."; }
+                if (d.Participant.Status == "Withdrawn") { st.Restricted = true; st.RestrictionReason = "This patient is marked as withdrawn."; }
                 else
                 {
                     Consent consent = null;
@@ -229,7 +229,7 @@ namespace SkinDevApp.Printing
                 b.Text("This receipt is not a medical diagnosis. Please follow the advice of your healthcare professional.");
             }
             b.Rule();
-            b.Center("LUMYVUE research prototype");
+            b.Center("LUMYVUE skin health monitoring");
             b.Center("Thank you for participating.");
             draft.Body = b.Lines;
             return draft;
