@@ -583,41 +583,6 @@ namespace SkinDevApp
             RecordPanel.Children.Add(Ui.Card(sp));
         }
 
-        private void ShowUnlinked()
-        {
-            RecordPanel.Children.Clear();
-            var sp = new StackPanel();
-            List<ScanSessionRow> rows = StudyRepository.UnlinkedSessions();
-            sp.Children.Add(Ui.Text("Scans without a patient (" + rows.Count + ")", 16, true));
-            sp.Children.Add(Ui.Text("These scans are not filed under any patient yet. This happens to scans saved before Patient IDs existed, or scans taken without choosing a patient. " +
-                                    "Double-click a scan to view it. To file it, select it, type the Patient ID below and press Assign to patient.", 11.5, false, Ui.Muted));
-            DataGrid g = SessionGrid(rows, r => Nav.Go(new ResultsPage(r.ScanSessionID)));
-            g.Columns.Insert(1, new DataGridTextColumn { Header = "Name used at the scan", Binding = new Binding("LegacyPatientLabel"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
-            sp.Children.Add(g);
-
-            var link = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
-            var idBox = new TextBox { Style = (Style)FindResource("Field"), Width = 160 };
-            Button linkBtn = Ui.Btn("Assign to patient", (o, e) =>
-            {
-                var r = g.SelectedItem as ScanSessionRow;
-                string pid = StudyRepository.NormaliseParticipantId(idBox.Text);
-                if (r == null || StudyRepository.GetParticipant(pid) == null)
-                {
-                    LumyDialog.Show("Select a scan and enter an existing PatientID.", "LUMYVUE Records");
-                    return;
-                }
-                if (LumyDialog.Show("File scan " + r.DisplayId + " under " + pid + "? This is recorded in the audit log.", "LUMYVUE Records",
-                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                StudyRepository.LinkSessionToParticipant(r.ScanSessionID, pid);
-                ShowUnlinked();
-            }, "SmallButton");
-            link.Children.Add(Ui.Text("Patient ID: ", 12, true, Ui.Ink, new Thickness(0, 8, 6, 0)));
-            link.Children.Add(idBox);
-            link.Children.Add(linkBtn);
-            sp.Children.Add(link);
-            RecordPanel.Children.Add(Ui.Card(sp));
-        }
-
         private DataGrid SessionGrid(List<ScanSessionRow> rows, Action<ScanSessionRow> open)
         {
             var g = new DataGrid { Style = (Style)FindResource("Grid"), MaxHeight = 520, Margin = new Thickness(0, 6, 0, 0) };
@@ -635,7 +600,6 @@ namespace SkinDevApp
         }
 
         private void PendingBtn_Click(object sender, RoutedEventArgs e) { if (_ready) ShowPending(); }
-        private void UnlinkedBtn_Click(object sender, RoutedEventArgs e) { if (_ready) ShowUnlinked(); }
         private void RegisterBtn_Click(object sender, RoutedEventArgs e) => Nav.Go(new RegistrationPage());
 
         private async void ImportBtn_Click(object sender, RoutedEventArgs e)
@@ -648,9 +612,9 @@ namespace SkinDevApp
                 int failed = 0;
                 int n = await Task.Run(() => SessionImporter.ImportArchive(out failed));
                 LumyDialog.Show((n == 1 ? "1 saved scan was" : n + " saved scans were") + " added" + (failed > 0 ? ", and " + failed + (failed == 1 ? " folder" : " folders") + " could not be read" : "") +
-                                ".\n\nScans that already belong to a registered patient were filed under that patient. The others are listed under \"Scans without a patient\".",
+                                ".\n\nScans that belong to a registered patient were filed under that patient.",
                                 "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Information);
-                if (_p != null) LoadParticipant(_p.ParticipantID); else ShowUnlinked();
+                if (_p != null) LoadParticipant(_p.ParticipantID);
             }
             catch (Exception ex)
             {
