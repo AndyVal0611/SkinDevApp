@@ -232,7 +232,7 @@ namespace SkinDevApp.Views
             t.Children.Add(Ui.Text(all ? "All models are ready for scanning" : "Some models need attention", 17, true, all ? Ui.Good : Ui.Bad, new Thickness(0)));
             t.Children.Add(chips);
             row.Children.Add(t);
-            return Ui.Card(row, new Thickness(0, 0, 0, 12));
+            return Ui.Card(row, new Thickness(8, 0, 8, 12));
         }
 
         private async System.Threading.Tasks.Task Render()

@@ -80,6 +80,7 @@ namespace SkinDevApp
                 var w = s as Window;
                 if (w == null) return;
                 w.UseLayoutRounding = true;
+                System.Windows.Documents.Typography.SetNumeralStyle(w, FontNumeralStyle.Lining);      // IDs and dates in the serif headings read as 0001, not old-style figures
                 w.SnapsToDevicePixels = true;
                 TextOptions.SetTextRenderingMode(w, TextRenderingMode.ClearType);
                 TextOptions.SetTextFormattingMode(w, TextFormattingMode.Ideal);

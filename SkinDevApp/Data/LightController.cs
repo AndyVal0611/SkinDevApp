@@ -34,6 +34,12 @@ namespace SkinDevApp.Data
         /// <summary>Time given to the ring light to reach its brightness after the controller accepted the command.</summary>
         public const int RingStabilizationMs = 400;
 
+        /// <summary>
+        /// Master switch of the lighting feature (ESP32 over USB serial). OFF for now: no menu item, no panel on the scan screen, no serial port is opened,
+        /// nothing is sent at start-up, capture or shutdown. Set to true (and rebuild) to bring it all back; the code and the firmware stay as they are.
+        /// </summary>
+        public static bool Enabled { get; } = false;
+
         private static ESP32Controller C => ESP32Controller.Instance;
         private static bool _initialised, _softChecked;
 
@@ -112,6 +118,7 @@ namespace SkinDevApp.Data
         /// <summary>Called once when LUMYVUE starts: starts the background connection to the controller. Never blocks and never fails.</summary>
         public static void StartupSync()
         {
+            if (!Enabled) return;
             Init();
             C.StartMonitor();
         }
@@ -119,6 +126,7 @@ namespace SkinDevApp.Data
         /// <summary>LUMYVUE is shutting down the device: both lights off, then the port is closed. Waits at most timeoutMs, so a missing controller cannot stall the shutdown.</summary>
         public static void ShutdownLights(int timeoutMs = 1500)
         {
+            if (!Enabled) return;
             C.ShutdownLights(timeoutMs);
         }
 
@@ -127,6 +135,7 @@ namespace SkinDevApp.Data
         /// <summary>Connects if necessary and reads the controller's state. Null when it is not connected.</summary>
         public static async Task<LightState> GetAsync()
         {
+            if (!Enabled) return null;
             Init();
             if (!C.IsConnected) await C.ConnectAsync().ConfigureAwait(false);
             if (!C.IsConnected) return null;
@@ -137,6 +146,7 @@ namespace SkinDevApp.Data
         /// <summary>Changes only what is given. Brightness values are percent (0-100). Returns the state reported afterwards, or null if not connected.</summary>
         public static async Task<LightState> SetAsync(bool? on = null, int? brightness = null, int? temperature = null, bool? cob = null, int? cobBrightness = null)
         {
+            if (!Enabled) return null;
             Init();
             if (!C.IsConnected) await C.ConnectAsync().ConfigureAwait(false);
             if (!C.IsConnected) return null;
@@ -174,6 +184,7 @@ namespace SkinDevApp.Data
         /// <summary>LUMYVUE is closing normally: the ring light goes off (the soft lights stay on) and the port is closed.</summary>
         public static void CloseForExit()
         {
+            if (!Enabled) return;
             try { if (_ringOn && C.IsConnected) C.CaptureEndAsync().Wait(800); } catch { }
             C.Dispose();
         }
@@ -188,7 +199,7 @@ namespace SkinDevApp.Data
         /// </summary>
         public static async Task<bool> RingOnAsync()
         {
-            if (!AutoDuringScan) return true;
+            if (!Enabled || !AutoDuringScan) return true;               // lighting off: capture goes on without it
             Init();
             if (!C.IsConnected) return true;                                   // no controller: capture goes on without it
             Esp32Response r = await C.CaptureStartAsync().ConfigureAwait(false);

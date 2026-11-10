@@ -123,7 +123,7 @@ namespace SkinDevApp.Views
             BuildStatusPanel();
             InitTouch();
             InitCameraBox();
-            AddLightPanel();
+            if (SkinDevApp.Data.LightController.Enabled) AddLightPanel();
 
             ResetKioskState();
             CheckGate();
