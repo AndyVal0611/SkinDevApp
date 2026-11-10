@@ -138,7 +138,7 @@ namespace SkinDevApp.Views
                     Ui.KV("Scan", _d != null ? _d.Session.DisplayId : _r.ScanSessionID),
                     Ui.KV("Patient", _r.ParticipantID ?? "Not linked"),
                     Ui.KV("Generated", Fmt.When(_r.GeneratedAt)),
-                    Ui.KV("Review status", _r.ReviewStatus == "Completed" ? "Completed by dermatologist" : "Dermatologist review pending")
+                    Ui.KV("Review status", _r.ReviewStatus == "Completed" ? "Completed" : "Needs your review")
                 }, 104, 12));
             else
                 info.Children.Add(Ui.Text("Sample content to check the layout and width on the paper. It is not saved and contains no patient data.", 12, false, Ui.Ink, new Thickness(0, 8, 0, 0)));

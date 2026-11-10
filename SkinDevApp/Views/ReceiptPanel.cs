@@ -78,10 +78,10 @@ namespace SkinDevApp.Views
             var lines = new List<Tuple<string, int>>();
             if (!st.Saved) lines.Add(Tuple.Create(st.NotSavedReason + " Printing is turned off for this scan.", 2));
             else if (st.ReviewCompleted)
-                lines.Add(Tuple.Create("The dermatologist review was completed on " + Fmt.Date(st.Review.ValidationDate) + ". " +
+                lines.Add(Tuple.Create("Your review was completed on " + Fmt.Date(st.Review.ValidationDate) + ". " +
                                        (ps.FinalByDefault ? "The final receipt is recommended." : "The final receipt is available."), 0));
             else
-                lines.Add(Tuple.Create("The dermatologist review is pending. A preliminary receipt can be printed now. The final receipt will be available after the review.", 1));
+                lines.Add(Tuple.Create("Your review is pending. A preliminary receipt can be printed now. The final receipt will be available after your review.", 1));
 
             if (st.Restricted) lines.Add(Tuple.Create(st.RestrictionReason + " Printing requires an administrator's authorization.", 2));
 
@@ -127,7 +127,7 @@ namespace SkinDevApp.Views
                 buttons.Children.Add(b);
             }
             sp.Children.Add(buttons);
-            sp.Children.Add(Ui.Text("Receipts show the saved AI result and, once the review is complete, the dermatologist's assessment. Printing a receipt never changes the scan or its results.",
+            sp.Children.Add(Ui.Text("Receipts show the saved AI result and, once your review is complete, your assessment. Printing a receipt never changes the scan or its results.",
                 10.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return Ui.Card(sp);
         }

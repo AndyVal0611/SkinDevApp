@@ -21,7 +21,7 @@ namespace SkinDevApp.Views
         // stored vocabulary (kept compatible with the existing dermatologist records and dashboards)
         private static readonly string[] AgreementShown = { "Agree", "Partially agree", "Disagree", "Unable to determine" };
         private static readonly string[] AgreementStored = { "Agree", "Partially agree", "Disagree", "Uncertain" };
-        private static readonly string[] ReferenceShown = { "Acne", "Eczema", "Hyperpigmentation", "Normal Skin", "Other / Different finding", "Unable to assess" };
+        private static readonly string[] ReferenceShown = { "Acne", "Eczema", "Hyperpigmentation", "Normal skin", "Other / different finding", "Unable to assess" };
         private static readonly string[] ReferenceStored = { "Acne", "Eczema", "Hyperpigmentation", "Normal", "Other / uncertain", "Unable to assess" };
         private static readonly string[] LocalizationOptions = { "Relevant", "Partially relevant", "Not relevant", "No localization available", "Unable to assess" };
         private static readonly string[] GradCamOptions = { "Useful", "Partially useful", "Not useful", "Not interpretable", "Not available" };
@@ -40,7 +40,7 @@ namespace SkinDevApp.Views
         private StackPanel _viewerHost;
 
         // assessment form
-        private static readonly string[] StatusShown = { "Verified - review completed", "Requires further review", "Save as draft (not yet verified)" };
+        private static readonly string[] StatusShown = { "Verified: review completed", "Requires further review", "Save as draft (not yet verified)" };
         private static readonly string[] StatusStored = { ReviewStatus.ValidationCompleted, ReviewStatus.ValidationFurtherReview, ReviewStatus.ValidationDraft };
         private ComboBox _status;
         private TextBox _notes, _id, _name, _cred;
@@ -49,7 +49,7 @@ namespace SkinDevApp.Views
         public DermatologistReviewWindow(string scanSessionId)
         {
             _sessionId = scanSessionId;
-            Title = "LUMYVUE · Dermatologist review";
+            Title = "LUMYVUE · Your review";
             Width = 1180;
             Height = 900;
             MinWidth = 900;
@@ -75,8 +75,8 @@ namespace SkinDevApp.Views
                 return;
             }
 
-            root.Children.Add(Ui.WindowBand("Dermatologist review",
-                "Scan " + _d.Session.DisplayId + "  ·  The computer's reading of this scan, for your review."));
+            root.Children.Add(Ui.WindowBand("Your review",
+                "Scan " + _d.Session.DisplayId + "  ·  The AI reading of this scan, for you to review."));
 
             root.Children.Add(IdentityCard());
             root.Children.Add(SummaryCard());
@@ -337,7 +337,7 @@ namespace SkinDevApp.Views
         private UIElement AssessmentCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Dermatologist review", 17, true));
+            sp.Children.Add(Ui.Text("Your review", 17, true));
             sp.Children.Add(Ui.Text("For each condition the AI detected, choose whether you confirm it. Nothing is filled in for you, and saving never changes the AI result.", 12, false, Ui.Muted));
 
             sp.Children.Add(ConditionVerification());
@@ -361,7 +361,7 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(Label("Outcome of this review *"));
             _status = Combo(StatusShown); _status.SelectedIndex = 1; sp.Children.Add(_status);
-            sp.Children.Add(Ui.Text("Completed needs a Confirmed or Not Confirmed answer for every condition. It moves the scan to the verified records.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            sp.Children.Add(Ui.Text("Completed needs a Confirmed or Not confirmed answer for every condition. It moves the scan to the verified records.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
 
             Button save = Ui.Btn("Save assessment", (o, e) => Save(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
@@ -450,9 +450,9 @@ namespace SkinDevApp.Views
         private void Save()
         {
             string status = _status.SelectedIndex < 0 ? ReviewStatus.ValidationDraft : StatusStored[_status.SelectedIndex];
-            if (string.IsNullOrWhiteSpace(_id.Text)) { LumyDialog.Show("Please enter your reviewer ID.", "LUMYVUE Dermatologist Review"); return; }
+            if (string.IsNullOrWhiteSpace(_id.Text)) { LumyDialog.Show("Please enter your reviewer ID.", "LUMYVUE · Your review"); return; }
             if (status == ReviewStatus.ValidationCompleted && _condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment))
-            { LumyDialog.Show("A review can be marked completed only when every condition is Confirmed or Not Confirmed. Answer each condition, or choose \"Requires further review\" or \"Save as draft\".", "LUMYVUE Dermatologist Review"); return; }
+            { LumyDialog.Show("A review can be marked completed only when every condition is Confirmed or Not confirmed. Answer each condition, or choose \"Requires further review\" or \"Save as draft\".", "LUMYVUE · Your review"); return; }
 
             try
             {
@@ -472,13 +472,13 @@ namespace SkinDevApp.Views
                     ConditionReviews = _condRows.Select(r => new ConditionReview { Condition = r.Item1, Status = (string)r.Item2.SelectedItem, Observation = NullIfEmpty(r.Item3.Text) }).ToList()
                 }, _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList());
 
-                LumyDialog.Show("Assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE Dermatologist Review",
+                LumyDialog.Show("Assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE · Your review",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
             }
             catch (Exception ex)
             {
-                LumyDialog.Show("Could not save the assessment: " + ex.Message, "LUMYVUE Dermatologist Review", MessageBoxButton.OK, MessageBoxImage.Error);
+                LumyDialog.Show("Could not save the assessment: " + ex.Message, "LUMYVUE · Your review", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -499,7 +499,7 @@ namespace SkinDevApp.Views
         private UIElement HistoryCard()
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Previous dermatologist assessments for this scan", 14, true));
+            sp.Children.Add(Ui.Text("Previous assessments for this scan", 14, true));
             if (_d.Validations.Count == 0) sp.Children.Add(Ui.Text("None yet.", 12.5, false, Ui.Muted));
             foreach (DermatologistValidation v in _d.Validations.Take(3))
             {

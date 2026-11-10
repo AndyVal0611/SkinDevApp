@@ -136,7 +136,7 @@ namespace SkinDevApp.Views
                 new[] { "Read the whole face", "A whole-face model (MobileNetV2) looks at the full image." },
                 new[] { "Look for spots", "Three lesion detectors (YOLOv8) mark areas that may show acne, hyperpigmentation or eczema." },
                 new[] { "Combine", "A trained fusion network combines both readings and evaluates each condition against its own threshold." },
-                new[] { "Report", "Each condition is reported as detected, needs review, or not detected, with its certainty and the facial regions marked. A dermatologist confirms every result." }
+                new[] { "Report", "Each condition is reported as detected, needs review, or not detected, with its certainty and the facial regions marked. Every result needs your review." }
             };
             for (int i = 0; i < steps.Length; i++)
             {
@@ -256,7 +256,7 @@ namespace SkinDevApp.Views
                 Ui.KV("Status", finalOk ? "Ready" : "Not ready — " + (SkinDevApp.V6.V6Service.LastError ?? "the model could not be loaded")),
                 Ui.KV("Conditions", "Acne, hyperpigmentation and eczema (more than one may be present). Normal skin is reported when none is detected."),
                 Ui.KV("Each result shows", "Detected, needs review, or not detected, with the certainty and the facial regions marked."),
-                Ui.KV("Reviewed by", "A dermatologist confirms every result.")
+                Ui.KV("Reviewed by", "You (the dermatologist), for every result")
             }, 130));
             var v6tech = new System.Collections.Generic.List<string>
             {

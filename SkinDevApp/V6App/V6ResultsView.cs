@@ -73,8 +73,8 @@ namespace SkinDevApp.V6
             string ink = CategoryInk(s.Category);
             var sp = new StackPanel();
             sp.Children.Add(new TextBlock { Text = s.CategoryLabel.ToUpperInvariant(), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), Margin = new Thickness(0, 0, 0, 2) });
-            sp.Children.Add(new TextBlock { Text = s.Title, FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) });
-            if (!string.IsNullOrEmpty(s.Explanation)) sp.Children.Add(Ui.Text(s.Explanation, 13, false, Ui.Ink, new Thickness(0)));
+            sp.Children.Add(new TextBlock { Text = ClinicianVoice.Of(s.Title), FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Ui.Brush(ink), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) });
+            if (!string.IsNullOrEmpty(s.Explanation)) sp.Children.Add(Ui.Text(ClinicianVoice.Of(s.Explanation), 13, false, Ui.Ink, new Thickness(0)));
             return new Border
             {
                 Background = Ui.Brush(CategoryBg(s.Category)), BorderBrush = Ui.Brush(CategoryLine(s.Category)), BorderThickness = new Thickness(1, 1, 1, 1),
@@ -227,7 +227,7 @@ namespace SkinDevApp.V6
             foreach (string n in s.Notes) sp.Children.Add(Ui.Text(n, 12, false, Ui.Muted, new Thickness(0, 0, 0, 2)));
             foreach (string p in s.Problems) sp.Children.Add(Ui.Text(p, 12, false, Ui.Bad, new Thickness(0, 0, 0, 2)));
             if (!string.IsNullOrEmpty(modelLabel)) sp.Children.Add(Ui.Text("Analyzed by: " + modelLabel, 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
-            sp.Children.Add(Ui.Text(Disclaimer, 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            sp.Children.Add(Ui.Text(ClinicianVoice.Of(Disclaimer), 11, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             return sp;
         }
 
@@ -396,7 +396,7 @@ namespace SkinDevApp.V6
             DermatologistValidation v = d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft);
             string status = ReviewStatus.Normalise(d.Session.ReviewStatus);
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Text("Dermatologist assessment · recorded separately by a person", 13, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
+            sp.Children.Add(Ui.Text("Your assessment · recorded separately from the AI result", 13, true, Ui.Ink, new Thickness(0, 0, 0, 4)));
             if (v == null)
                 sp.Children.Add(Ui.Text("Not yet reviewed. Everything above is the AI result.", 12.5, false, Ui.Muted, new Thickness(0)));
             else
@@ -464,7 +464,7 @@ namespace SkinDevApp.V6
             if (c.MarkedAreas > 0)
                 sp.Children.Add(Ui.Text(c.MarkedAreas + (c.MarkedAreas == 1 ? " area marked on the image." : " areas marked on the image."), 11.5, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
             if (c.Category == ClinicalCategory.NeedsReview || c.Findings.Any(x => x.Status == ClinicalSummary.Possible || x.Status == ClinicalSummary.Inconclusive))
-                sp.Children.Add(Ui.Text("Dermatologist review is recommended for this image.", 11.5, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
+                sp.Children.Add(Ui.Text("Your review is recommended for this image.", 11.5, false, Ui.Brush("#8A5A00"), new Thickness(0, 2, 0, 0)));
             return sp;
         }
 

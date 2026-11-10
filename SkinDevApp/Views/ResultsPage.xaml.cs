@@ -299,7 +299,7 @@ namespace SkinDevApp.Views
             var icons = new Dictionary<string, string>
             {
                 { "Compare images and marked areas", "Icon.Image" }, { "Add notes", "Icon.Notes" },
-                { "Dermatologist review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
+                { "Your review", "Icon.Clipboard" }, { "Create report", "Icon.Report" }, { "Patient record", "Icon.User" },
                 { "New scan for this patient", "Icon.ScanFace" }, { "Back to home", "Icon.Home" },
                 { "Detailed A4 report", "Icon.Report" }
             };
@@ -323,7 +323,7 @@ namespace SkinDevApp.Views
             if (r)
             {
                 Group("REVIEW");
-                Add("Dermatologist review", (s, e) =>
+                Add("Your review", (s, e) =>
                 {
                     new DermatologistReviewWindow(_sessionId) { Owner = Application.Current.MainWindow }.ShowDialog();
                     Render();
@@ -366,9 +366,9 @@ namespace SkinDevApp.Views
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             human.Children.Add(Ui.InfoRows(new[]
             {
-                Ui.KV("Dermatologist", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft, not yet completed").ToLowerInvariant())
+                Ui.KV("Your review", dv == null ? "Not reviewed yet" : dv.DermatologistAssessment + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft, not yet completed").ToLowerInvariant())
             }, 110, 12.5));
-            human.Children.Add(Ui.Text("Reviews are saved separately and never change the AI result. The verification status follows the latest completed dermatologist review.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            human.Children.Add(Ui.Text("Reviews are saved separately and never change the AI result. The verification status follows the latest completed review.", 11, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             SideColumn.Children.Add(Ui.Card(human));
         }
 

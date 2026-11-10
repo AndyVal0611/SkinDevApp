@@ -206,7 +206,7 @@ namespace SkinDevApp
                 return Ui.Card(sp);
             }
 
-            string overall = string.IsNullOrEmpty(s.AITitle) ? "Pending" : s.AITitle;
+            string overall = string.IsNullOrEmpty(s.AITitle) ? "Pending" : SkinDevApp.Views.ClinicianVoice.Of(s.AITitle);
             sp.Children.Add(Ui.Cols(760,
                 Ui.InfoRows(new[] { Ui.KV("Scan", s.DisplayId), Ui.KV("Date and time", Fmt.When(s.StartedAt)) }, 100, 12.5),
                 Ui.InfoRows(new[] { Ui.KV("Result", overall), Ui.KV("Review status", s.ReviewStatus ?? ReviewStatus.Pending) }, 100, 12.5),
@@ -421,7 +421,7 @@ namespace SkinDevApp
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(buttons, Dock.Right);
             buttons.Children.Add(Ui.Btn("Results", (o, e) => Nav.Go(new ResultsPage(s.ScanSessionID)), "SmallButton"));
-            buttons.Children.Add(Ui.Btn("Dermatologist review", (o, e) =>
+            buttons.Children.Add(Ui.Btn("Your review", (o, e) =>
             {
                 new DermatologistReviewWindow(s.ScanSessionID) { Owner = Application.Current.MainWindow }.ShowDialog();
             }, "SmallButton"));
@@ -447,7 +447,7 @@ namespace SkinDevApp
                 Ui.KV("Overall result", overall),
                 Ui.KV("Images", single ? "1 (single image)" : s.ViewsCompleted + " of " + s.ViewsExpected + " analyzed"),
                 Ui.KV("Scan status", s.ScanStatus == "complete" ? "Complete" : s.ScanStatus == "incomplete" ? "Incomplete" : s.ScanStatus),
-                Ui.KV("Dermatologist review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
+                Ui.KV("Your review", dv == null ? "Not reviewed yet" : (dv.DermatologistAssessment ?? "—") + " — " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft").ToLowerInvariant())
             }, 160, 12.5));
 
             if (v6 != null)
@@ -573,7 +573,7 @@ namespace SkinDevApp
             RecordPanel.Children.Clear();
             var sp = new StackPanel();
             List<ScanSessionRow> rows = StudyRepository.PendingVerification();
-            sp.Children.Add(Ui.Text("Scans waiting for review (" + rows.Count + ")", 16, true));
+            sp.Children.Add(Ui.Text("Scans waiting for your review (" + rows.Count + ")", 16, true));
             sp.Children.Add(Ui.Text("Double-click a scan to open it for review.", 11.5, false, Ui.Muted));
             sp.Children.Add(SessionGrid(rows, r =>
             {
@@ -587,7 +587,7 @@ namespace SkinDevApp
         {
             var g = new DataGrid { Style = (Style)FindResource("Grid"), MaxHeight = 520, Margin = new Thickness(0, 6, 0, 0) };
             void Col(string header, string path, double w) =>
-                g.Columns.Add(new DataGridTextColumn { Header = header, Binding = new Binding(path), Width = w > 10 ? new DataGridLength(w + 26) : new DataGridLength(w, DataGridLengthUnitType.Star), MinWidth = w > 10 ? 60 : 150 });
+                g.Columns.Add(new DataGridTextColumn { Header = header, Binding = path == "AITitle" ? new Binding(path) { Converter = new SkinDevApp.Views.ClinicianVoiceConverter() } : new Binding(path), Width = w > 10 ? new DataGridLength(w + 26) : new DataGridLength(w, DataGridLengthUnitType.Star), MinWidth = w > 10 ? 60 : 150 });
             Col("Scan", "DisplayId", 112);
             Col("Patient", "ParticipantID", 85);
             Col("Date and time", "WhenText", 185);

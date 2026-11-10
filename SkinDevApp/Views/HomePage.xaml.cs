@@ -151,7 +151,7 @@ namespace SkinDevApp.Views
             row.Children.Add(right);
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 8, 6) };
             text.Children.Add(Ui.Text(Who(s), 13.5, true, Ui.Ink, new Thickness(0)));
-            string res = string.IsNullOrWhiteSpace(s.AITitle) ? "Result pending" : s.AITitle;
+            string res = string.IsNullOrWhiteSpace(s.AITitle) ? "Result pending" : ClinicianVoice.Of(s.AITitle);
             text.Children.Add(Ui.Text(res + "  ·  " + Fmt.When(s.StartedAt), 12, false, Ui.Muted, new Thickness(0, 1, 0, 0)));
             row.Children.Add(text);
             return new Border { BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = row };
@@ -171,7 +171,7 @@ namespace SkinDevApp.Views
                 body.Children.Add(all);
             }
             return CardShell("WAITING FOR YOUR REVIEW", pending.Count == 0 ? "All caught up" : pending.Count + (pending.Count == 1 ? " scan" : " scans"),
-                             "Scans waiting for review. Those marked for further review appear first.", body);
+                             "Scans waiting for your review. Those marked for further review appear first.", body);
         }
 
         private UIElement RecentCard()
@@ -238,7 +238,7 @@ namespace SkinDevApp.Views
                 Ui.KV("Contact", string.IsNullOrWhiteSpace(p.Contact) ? "Not provided" : p.Contact),
                 Ui.KV("Registered", Fmt.When(p.RegisteredAt)),
                 Ui.KV("Scans on record", scans.Count.ToString()),
-                Ui.KV("Latest scan", last == null ? "No scan yet" : (string.IsNullOrWhiteSpace(last.AITitle) ? "Result pending" : last.AITitle) + " · " + Fmt.When(last.StartedAt))
+                Ui.KV("Latest scan", last == null ? "No scan yet" : (string.IsNullOrWhiteSpace(last.AITitle) ? "Result pending" : ClinicianVoice.Of(last.AITitle)) + " · " + Fmt.When(last.StartedAt))
             }, 110, 12.5));
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
             row.Children.Add(Ui.Btn("Open record", (o, e) => Nav.Go(new PatientRecordPage(id)), "PrimaryButton"));
