@@ -93,6 +93,48 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- the floating Shut down button at the bottom of the menu: cream face with a soft shadow that deepens on hover and flattens when pressed -->
+        <Style x:Key="ShutdownBtn" TargetType="Button">
+            <Setter Property="Foreground" Value="#5B5C42"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="16" Padding="14,0" RenderTransformOrigin="0.5,0.5">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#FFFFFDF6" Offset="0"/>
+                                    <GradientStop Color="#FFEFEADC" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.Effect>
+                                <DropShadowEffect Color="#2F3024" BlurRadius="18" ShadowDepth="6" Direction="270" Opacity="0.38"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Effect">
+                                    <Setter.Value><DropShadowEffect Color="#2F3024" BlurRadius="24" ShadowDepth="8" Direction="270" Opacity="0.45"/></Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Bd" Property="RenderTransform">
+                                    <Setter.Value><TranslateTransform Y="-1"/></Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Effect">
+                                    <Setter.Value><DropShadowEffect Color="#2F3024" BlurRadius="8" ShadowDepth="2" Direction="270" Opacity="0.3"/></Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Bd" Property="RenderTransform">
+                                    <Setter.Value><TranslateTransform Y="3"/></Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="NavTile" TargetType="Button" BasedOn="{StaticResource BigAction}">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#3A3B2C"/>
@@ -116,6 +158,12 @@
                 <StackPanel DockPanel.Dock="Top" Margin="8,0,8,16">
                     <TextBlock Text="MENU" FontSize="11" FontWeight="SemiBold" Foreground="#DDDCC2"/>
                 </StackPanel>
+                <Button DockPanel.Dock="Bottom" Style="{StaticResource ShutdownBtn}" Margin="4,12,4,10" Click="ShutdownBtn_Click" ToolTip="Shut down the device">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Style="{StaticResource IconBox}" Tag="{StaticResource Icon.Power}" Width="19" Height="19" Margin="0,0,10,0"/>
+                        <TextBlock Text="Shut down" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <StackPanel x:Name="SideNav"/>
             </DockPanel>
         </Border>

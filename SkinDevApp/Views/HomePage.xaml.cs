@@ -261,7 +261,6 @@ namespace SkinDevApp.Views
             AddSide("Icon.Sliders", "Settings", () => Nav.Go(new SettingsPage()), r);
             AddSide("Icon.User", "My details", () => { if (ProfileDialog.EditCurrentUser(Application.Current.MainWindow)) { UpdateGreeting(); ShowCurrentParticipant(); } }, true);
             AddSide("Icon.Info", "About LUMYVUE", ShowAbout, true);
-            AddSide("Icon.Power", "Shut down", () => DeviceShutdown.Ask(), true);
         }
 
         private static int PendingCount()
@@ -288,6 +287,8 @@ namespace SkinDevApp.Views
             else b.Click += (s2, e2) => go();
             SideNav.Children.Add(b);
         }
+
+        private void ShutdownBtn_Click(object sender, RoutedEventArgs e) => DeviceShutdown.Ask();
 
         private static string PendingText()
         {
