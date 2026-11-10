@@ -55,6 +55,8 @@ namespace SkinDevApp.Hardware
     public interface IEsp32Transport : IDisposable
     {
         Stream Stream { get; }
+        /// <summary>False once the other end is gone (a read that returns nothing is not proof of that on a real COM port).</summary>
+        bool IsAlive { get; }
     }
 
     public sealed class ESP32Controller : IDisposable
@@ -80,6 +82,7 @@ namespace SkinDevApp.Hardware
         private int _missedPolls;
         private string _lastGoodPort;
         private bool _disposed;
+        private string _portProblem = "";
 
         /// <summary>The COM port chosen by hand ("" = find it automatically).</summary>
         public string PreferredPort { get; set; } = "";
@@ -158,13 +161,15 @@ namespace SkinDevApp.Hardware
                 candidates = candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (candidates.Count == 0) { SetError("No serial port was found. Connect the controller's USB cable."); return false; }
 
+                _portProblem = "";
                 foreach (string port in candidates)
                 {
                     if (await TryPortAsync(port).ConfigureAwait(false)) return true;
                 }
-                SetError(string.IsNullOrWhiteSpace(PreferredPort)
+                SetError((string.IsNullOrWhiteSpace(PreferredPort)
                     ? "No light controller answered on " + string.Join(", ", candidates) + "."
-                    : "The light controller did not answer on " + PreferredPort + ".");
+                    : "The light controller did not answer on " + PreferredPort + ".")
+                    + (string.IsNullOrEmpty(_portProblem) ? "" : " (" + _portProblem + ")"));
                 return false;
             }
             finally { _connectGate.Release(); }
@@ -197,7 +202,7 @@ namespace SkinDevApp.Hardware
             }
             catch (Exception ex)
             {
-                SetError(port + ": " + ex.Message);
+                _portProblem = port + ": " + ex.Message;
                 Close();
                 return false;
             }
@@ -247,13 +252,15 @@ namespace SkinDevApp.Hardware
 
         // ---------------------------------------------------------------- reading
 
+        // A COM port must be read with ordinary blocking reads on a thread of its own: Windows aborts an overlapped (async) serial read when the
+        // thread pool thread that started it is reused ("The I/O operation has been aborted..."). So: one dedicated background thread, no async I/O.
         private void StartReader(IEsp32Transport transport)
         {
             _readerCts?.Cancel();
             var cts = new CancellationTokenSource();
             _readerCts = cts;
             Stream stream = transport.Stream;
-            Task.Run(async () =>
+            var thread = new Thread(() =>
             {
                 var buffer = new byte[256];
                 var line = new StringBuilder();
@@ -261,12 +268,18 @@ namespace SkinDevApp.Hardware
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        int n = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+                        int n;
+                        try { n = stream.Read(buffer, 0, buffer.Length); }
+                        catch (TimeoutException) { continue; }                      // no data yet (the port has a short read time-out)
                         if (n <= 0)
                         {
-                            // end of the stream: the port was closed from the other side
-                            if (!cts.IsCancellationRequested && ReferenceEquals(_readerCts, cts)) Disconnect("The light controller was disconnected.");
-                            return;
+                            if (!transport.IsAlive)
+                            {
+                                if (!cts.IsCancellationRequested && ReferenceEquals(_readerCts, cts)) Disconnect("The light controller was disconnected.");
+                                return;
+                            }
+                            Thread.Sleep(15);
+                            continue;
                         }
                         for (int i = 0; i < n; i++)
                         {
@@ -279,13 +292,13 @@ namespace SkinDevApp.Hardware
                         }
                     }
                 }
-                catch (OperationCanceledException) { }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     // the cable was pulled or the port vanished
-                    if (!cts.IsCancellationRequested && ReferenceEquals(_readerCts, cts)) { Disconnect("The light controller was disconnected."); }
+                    if (!cts.IsCancellationRequested && ReferenceEquals(_readerCts, cts)) { _portProblem = ex.GetType().Name + ": " + ex.Message; Disconnect("The light controller was disconnected."); }
                 }
-            });
+            }) { IsBackground = true, Name = "LUMYVUE ESP32 reader" };
+            thread.Start();
         }
 
         private void OnLine(string line)
@@ -321,8 +334,8 @@ namespace SkinDevApp.Hardware
                 try
                 {
                     byte[] bytes = Encoding.ASCII.GetBytes(command + "\n");
-                    await t.Stream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
-                    await t.Stream.FlushAsync().ConfigureAwait(false);
+                    t.Stream.Write(bytes, 0, bytes.Length);                  // short synchronous write (the port has a 0.5 s write time-out)
+                    t.Stream.Flush();
                 }
                 catch (Exception ex)
                 {
@@ -429,6 +442,7 @@ namespace SkinDevApp.Hardware
         {
             private readonly SerialPort _port;
             public Stream Stream => _port.BaseStream;
+            public bool IsAlive { get { try { return _port.IsOpen; } catch { return false; } } }
 
             public SerialTransport(string name)
             {
@@ -438,7 +452,7 @@ namespace SkinDevApp.Hardware
                     DtrEnable = false,
                     RtsEnable = false,
                     Handshake = Handshake.None,
-                    ReadTimeout = SerialPort.InfiniteTimeout,
+                    ReadTimeout = 250,
                     WriteTimeout = 500,
                     Encoding = Encoding.ASCII
                 };

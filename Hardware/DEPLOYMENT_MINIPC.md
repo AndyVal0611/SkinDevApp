@@ -68,8 +68,14 @@ Also check: while LUMYVUE opens the COM port the soft-light fade must **not** re
 
 | Item | Status |
 |---|---|
-| Protocol and firmware behaviour (parsing, errors, fades, watchdog, saved settings) | **Compiled and tested on a PC** (MSVC with an Arduino stand-in): 49 checks pass. **Not** compiled for the ESP32 with the Arduino IDE |
-| LUMYVUE ↔ firmware logic (auto detect, connect, commands, acknowledgments, ring on/off, independent brightness, lost connection, reconnect, shutdown) | **Tested on a PC** against a simulated ESP32 running the real firmware logic: 23 checks pass |
+| Firmware compiles for the ESP32 | **Compiled** with the Arduino command-line tool (arduino-cli 1.5.1, esp32 core 3.3.12, board "ESP32 Dev Module"): no errors, 22 % of program space |
+| Firmware on a real board | **Uploaded and tested** on a real ESP32 (CH340 USB-serial, COM5 on the development laptop): `HELLO`, `PING`, `STATUS`, `SOFT`, `RINGLEVEL`, `CAPTURE_START/END` and both error answers returned exactly as in `PROTOCOL.md`; the board did **not** restart when the port was opened (uptime kept counting) |
+| LUMYVUE's own code on the real board | **Tested** on the development laptop: it found COM5 by itself in 25 ms, read `STATUS`, lit and switched off the ring (`ring=100` during capture, `0` after) and set the soft lights |
+| Protocol and firmware behaviour (parsing, errors, fades, watchdog, saved settings) | **Tested on a PC** (MSVC with an Arduino stand-in): 49 checks pass |
+| LUMYVUE and the firmware logic together (auto detect, acknowledgments, ring on/off, independent brightness, lost connection, reconnect, shutdown with and without a controller) | **Tested on a PC** against a simulated ESP32 running the real firmware logic: 23 checks pass |
 | C# application | **Compiled** (MSBuild Release/Debug), 104 unit tests pass; the new screens were rendered and checked |
-| Capture hooks (ring on before each view, off after each, off on cancel/failure) | **Code inspection + compiled**; exercised only in part by the simulator tests. Not run with a real camera session |
-| Real ESP32, USB serial on Windows, real lights, DTR reset behaviour, USB power at boot, kiosk start-up, Windows shutdown with the lights | **Not tested on hardware.** Use sections 5–9 on the Mini PC |
+| What the lights actually do (brightness, the 4 s fade-in, no flicker) | **Not observed.** The commands were accepted, but nobody has looked at the lights or the wiring yet. Check sections 6 and 8 |
+| Capture hooks (ring on before each view, off after each, off on cancel/failure) | **Code inspection + compiled**, and the same commands were exercised on the real board; **not** run in a real camera session |
+| USB power at boot on the Mini PC, kiosk start-up, Windows shutdown with the lights, deployment to the Mini PC | **Not tested on hardware.** Use sections 5-9 on the Mini PC |
+
+Lessons from the first real-board test: Windows aborts asynchronous serial reads when the thread that started them is reused, so the controller reads the port on one dedicated thread with blocking reads and writes synchronously. A simulator cannot show this kind of problem, which is why the real-board run mattered.
