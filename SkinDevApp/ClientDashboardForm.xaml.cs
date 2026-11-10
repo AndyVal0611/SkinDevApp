@@ -109,11 +109,12 @@ namespace SkinDevApp.Views
             CaptureArchive.CameraMirrored = false;
             RegionAttribution.MirroredCamera = false;
 
-            Loaded += (s, e) => { _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
+            Loaded += (s, e) => { SkinDevApp.Data.LightController.AutoOn(); _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
             Unloaded += (s, e) =>
             {
                 if (_hostWindow != null) _hostWindow.Closing -= OnHostWindowClosing;
                 _hostWindow = null;
+                SkinDevApp.Data.LightController.AutoOff();
                 ResetKioskState();
             };
 

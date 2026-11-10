@@ -178,6 +178,8 @@
     <Compile Include="Views\ClinicianVoice.cs" />
     <Compile Include="Views\ReportPdf.cs" />
     <Compile Include="Views\ReportsPage.cs" />
+    <Compile Include="Views\LightingPage.cs" />
+    <Compile Include="Data\LightController.cs" />
     <None Include="Kiosk\Run-LumyvueKiosk.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
