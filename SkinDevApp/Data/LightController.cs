@@ -132,10 +132,43 @@ namespace SkinDevApp.Data
             catch { return null; }
         }
 
-        /// <summary>Scan screen opened: the ring light comes on (when the automatic setting is on). Never blocks and never fails.</summary>
-        public static void AutoOn() { if (AutoDuringScan) Task.Run(() => SetAsync(on: true)); }
+        private static bool _ringOn;
 
-        /// <summary>Scan screen left: the ring light goes off again.</summary>
-        public static void AutoOff() { if (AutoDuringScan) Task.Run(() => SetAsync(on: false)); }
+        /// <summary>Image capture starts (the camera is started): the ring light comes on, when the automatic setting is on. Never blocks and never fails.</summary>
+        public static void RingOn()
+        {
+            if (!AutoDuringScan) return;
+            _ringOn = true;
+            Task.Run(() => SetAsync(on: true));
+        }
+
+        /// <summary>Image capture ends (the camera is stopped): the ring light goes off again. Only if this app switched it on.</summary>
+        public static void RingOff()
+        {
+            if (!_ringOn) return;
+            _ringOn = false;
+            Task.Run(() => SetAsync(on: false));
+        }
+
+        /// <summary>
+        /// When the app starts (the Mini PC has just started): make sure the soft lights are on. The controller fades them in by itself as soon as it has power;
+        /// it needs a few seconds to join the WiFi, so this retries for about 100 seconds and then gives up quietly.
+        /// </summary>
+        public static void StartupSync()
+        {
+            Task.Run(async () =>
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    LightState s = await GetAsync().ConfigureAwait(false);
+                    if (s != null)
+                    {
+                        if (!s.CobOn) await SetAsync(cob: true).ConfigureAwait(false);
+                        return;
+                    }
+                    await Task.Delay(5000).ConfigureAwait(false);
+                }
+            });
+        }
     }
 }

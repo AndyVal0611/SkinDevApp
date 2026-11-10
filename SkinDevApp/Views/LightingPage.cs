@@ -56,7 +56,7 @@ namespace SkinDevApp.Views
             // ring light
             var ring = new StackPanel();
             ring.Children.Add(Ui.Text("Ring light", 17, true, Ui.Ink, new Thickness(0)));
-            ring.Children.Add(Ui.Text("The light around the camera. It comes on by itself when a scan starts.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            ring.Children.Add(Ui.Text("The main light around the camera. It comes on by itself when image capture starts.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             ring.Children.Add(_power);
             ring.Children.Add(Labelled("Brightness", _brightVal));
             ring.Children.Add(_bright);
@@ -81,8 +81,8 @@ namespace SkinDevApp.Views
 
             // COB lights
             var cobCard = new StackPanel();
-            cobCard.Children.Add(Ui.Text("COB lights", 17, true, Ui.Ink, new Thickness(0)));
-            cobCard.Children.Add(Ui.Text("The lights inside the housing.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            cobCard.Children.Add(Ui.Text("Soft lights", 17, true, Ui.Ink, new Thickness(0)));
+            cobCard.Children.Add(Ui.Text("The soft lights inside the housing. They fade in when the Mini PC starts.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
             cobCard.Children.Add(_cobPower);
             cobCard.Children.Add(Labelled("Brightness", _cobVal));
             cobCard.Children.Add(_cob);
@@ -90,7 +90,7 @@ namespace SkinDevApp.Views
 
             // automatic use and address
             var auto = new StackPanel();
-            var autoChk = new CheckBox { Content = "Turn the ring light on when a scan starts, and off when it ends", FontSize = 13, IsChecked = LightController.AutoDuringScan };
+            var autoChk = new CheckBox { Content = "Turn the ring light on when image capture starts, and off when it ends", FontSize = 13, IsChecked = LightController.AutoDuringScan };
             autoChk.Click += (s, e) => LightController.AutoDuringScan = autoChk.IsChecked == true;
             auto.Children.Add(autoChk);
             auto.Children.Add(Ui.Text("Light controller address", 12, false, Ui.Muted, new Thickness(0, 14, 0, 4)));
@@ -161,7 +161,7 @@ namespace SkinDevApp.Views
             _power.Style = (Style)FindResource(_on ? "PrimaryButton" : "SecondaryButton");
             _power.Content = _on ? "Ring light is on  ·  tap to turn off" : "Ring light is off  ·  tap to turn on";
             _cobPower.Style = (Style)FindResource(_cobOn ? "PrimaryButton" : "SecondaryButton");
-            _cobPower.Content = _cobOn ? "COB lights are on  ·  tap to turn off" : "COB lights are off  ·  tap to turn on";
+            _cobPower.Content = _cobOn ? "Soft lights are on  ·  tap to turn off" : "Soft lights are off  ·  tap to turn on";
             _brightVal.Text = (int)_bright.Value + "%";
             int t = (int)_temp.Value;
             _tempVal.Text = t < 34 ? "Warm" : (t > 66 ? "Cool" : "Neutral");

@@ -112,6 +112,7 @@ namespace SkinDevApp
                 catch (Exception ex) { return ex.Message; }
             });
             splash.Step("Initializing system", 0.26, dbProblem == null ? "Database ready" : "Database problem: " + dbProblem);
+            if (dbProblem == null) SkinDevApp.Data.LightController.StartupSync();       // soft lights on once the light controller is reachable
 
             // Safety net: re-index scans that are on disk (and belong to a registered participant) but missing from the database.
             _ = Task.Run(() => { try { Data.SessionImporter.RecoverLinkedSessions(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Recover] " + ex.Message); } })

@@ -109,12 +109,12 @@ namespace SkinDevApp.Views
             CaptureArchive.CameraMirrored = false;
             RegionAttribution.MirroredCamera = false;
 
-            Loaded += (s, e) => { SkinDevApp.Data.LightController.AutoOn(); _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
+            Loaded += (s, e) => { _hostWindow = System.Windows.Window.GetWindow(this); if (_hostWindow != null) _hostWindow.Closing += OnHostWindowClosing; };
             Unloaded += (s, e) =>
             {
                 if (_hostWindow != null) _hostWindow.Closing -= OnHostWindowClosing;
                 _hostWindow = null;
-                SkinDevApp.Data.LightController.AutoOff();
+                SkinDevApp.Data.LightController.RingOff();
                 ResetKioskState();
             };
 
@@ -123,6 +123,7 @@ namespace SkinDevApp.Views
             BuildStatusPanel();
             InitTouch();
             InitCameraBox();
+            AddLightPanel();
 
             ResetKioskState();
             CheckGate();
@@ -672,6 +673,18 @@ namespace SkinDevApp.Views
         // Reset / camera lifecycle
         // ============================================================================
 
+        /// <summary>Adds the Lighting panel (soft lights and ring light brightness) under the camera buttons.</summary>
+        private void AddLightPanel()
+        {
+            try
+            {
+                var buttons = StartCamBtn.Parent as System.Windows.Controls.Panel;       // the grid holding Start camera and Capture
+                var host = buttons == null ? null : buttons.Parent as System.Windows.Controls.Panel;
+                if (host != null) host.Children.Insert(host.Children.IndexOf(buttons) + 1, new SkinDevApp.Views.LightPanel());
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[LightPanel] " + ex.Message); }
+        }
+
         private void ResetKioskState()
         {
             StopCamera();
@@ -742,6 +755,7 @@ namespace SkinDevApp.Views
 
                 _camTried = 0;
                 OpenCamera(SelectedCameraIndex());
+                SkinDevApp.Data.LightController.RingOn();                // image capture begins: the main ring light comes on
 
                 PlaceholderPanel.Visibility = Visibility.Collapsed;
                 UploadedImageViewer.Visibility = Visibility.Visible;
@@ -884,6 +898,7 @@ namespace SkinDevApp.Views
         private void StopCamera()
         {
             _cameraLive = false;
+            SkinDevApp.Data.LightController.RingOff();                  // image capture ended: the main ring light goes off
 
             if (_session != null)
             {
