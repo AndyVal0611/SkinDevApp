@@ -110,7 +110,7 @@ namespace SkinDevApp.Tests
                 string text = string.Join("\n", w.Lines.Select(l => l.Text));
                 Assert.Contains(final ? "AI SCREENING RESULT (ORIGINAL)" : "AI SCREENING RESULT", text); Assert.Contains("CONDITION DETECTED", text);
                 Assert.Contains("Condition detected: Hyperpigmentation", text); Assert.Contains("Detected, high certainty", text); Assert.Contains("Not detected, high certainty", text);
-                Assert.Contains("Verification: Pending verification", text); Assert.Contains("Not a diagnosis", text);
+                Assert.Contains("Verification: Pending verification", text); Assert.Contains("This is not a diagnosis", text);
                 Assert.DoesNotContain("xperimental", text); Assert.DoesNotContain("Most resembles", text); Assert.DoesNotContain("similarity scores", text);
                 Assert.Equal(final, text.Contains("Shown exactly as the AI saved it"));
             }

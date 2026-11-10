@@ -47,16 +47,16 @@ namespace SkinDevApp.Printing
 
         /// <summary>
         /// The receipt printer has one fixed configuration (nothing is read from or saved in Settings):
-        /// the QR701 on 9600 baud, 8N1, no flow control, 32 characters per line, plain text, 4 lines of feed.
-        /// The serial port is the one the Windows serial adapter provides: when there is more than one, the highest-numbered
-        /// (most recently added) is used.
+        /// the QR701 on 9600 baud, 8N1, no flow control, 32 characters per line, bold and large headings, 4 lines of feed.
+        /// The serial port is the one the USB serial adapter provides (Bluetooth ports are ignored): when there is more than one,
+        /// the highest-numbered (most recently added) is used.
         /// </summary>
         public static PrinterSettings Load()
         {
-            var s = new PrinterSettings { Enabled = true, Simulation = false };
+            var s = new PrinterSettings { Enabled = true, Simulation = false, Styles = true };
             try
             {
-                string[] ports = ThermalPrinter.PortNames();
+                string[] ports = ThermalPrinter.PrinterPortNames();
                 if (ports.Length > 0) s.PortName = ports[ports.Length - 1];
             }
             catch (Exception ex)

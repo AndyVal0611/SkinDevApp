@@ -141,19 +141,20 @@ namespace SkinDevApp.Printing
         public void Left(string text, ReceiptStyle style = ReceiptStyle.Normal) => Lines.Add(new ReceiptLine(text, ReceiptAlign.Left, style));
         public void Heading(string text) => Lines.Add(new ReceiptLine(text, ReceiptAlign.Left, ReceiptStyle.Bold));
         public void Rule() => Lines.Add(new ReceiptLine(new string('-', Width)));
+        public void Double() => Lines.Add(new ReceiptLine(new string('=', Width)));
         public void Blank() => Lines.Add(new ReceiptLine(""));
 
         /// <summary>"Label:          value" on one line when it fits, otherwise the value goes on the next line, indented.</summary>
-        public void Pair(string label, string value)
+        public void Pair(string label, string value, ReceiptStyle style = ReceiptStyle.Normal)
         {
             label = ReceiptText.Ascii(label) + ":";
             value = ReceiptText.Ascii(value);
             if (label.Length + 1 + value.Length <= Width)
-                Lines.Add(new ReceiptLine(label + new string(' ', Width - label.Length - value.Length) + value));
+                Lines.Add(new ReceiptLine(label + new string(' ', Width - label.Length - value.Length) + value, ReceiptAlign.Left, style));
             else
             {
-                Lines.Add(new ReceiptLine(label));
-                Lines.Add(new ReceiptLine("  " + value));
+                Lines.Add(new ReceiptLine(label, ReceiptAlign.Left, style));
+                Lines.Add(new ReceiptLine("  " + value, ReceiptAlign.Left, style));
             }
         }
 

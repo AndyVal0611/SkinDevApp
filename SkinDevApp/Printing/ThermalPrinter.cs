@@ -24,6 +24,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 
 namespace SkinDevApp.Printing
 {
@@ -60,6 +61,30 @@ namespace SkinDevApp.Printing
             catch { return new string[0]; }
         }
 
+        /// <summary>
+        /// The ports a printer can be on: the serial ports without the Bluetooth ones. A Bluetooth "Standard Serial over Bluetooth link"
+        /// port exists for every paired device and always fails with "the semaphore timeout period has expired", so it is never a printer.
+        /// </summary>
+        public static string[] PrinterPortNames()
+        {
+            string[] all = PortNames();
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DEVICEMAP\SERIALCOMM"))
+                {
+                    if (k == null) return all;
+                    var bluetooth = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (string name in k.GetValueNames())
+                    {
+                        string port = k.GetValue(name) as string;
+                        if (port != null && name.IndexOf("Bth", StringComparison.OrdinalIgnoreCase) >= 0) bluetooth.Add(port);
+                    }
+                    return all.Where(p => !bluetooth.Contains(p)).ToArray();
+                }
+            }
+            catch { return all; }
+        }
+
         /// <summary>Quick check without opening the port (safe to call while a screen is drawn).</summary>
         public static PrinterStatus Status(PrinterSettings s)
         {
@@ -68,7 +93,7 @@ namespace SkinDevApp.Printing
             if (s.Simulation)
                 return new PrinterStatus { CanSend = true, Level = 1, Headline = "Simulation mode: nothing is printed", Detail = "Receipts are saved as files for testing. Turn simulation off in Settings to print on the QR701." };
             if (string.IsNullOrWhiteSpace(s.PortName))
-                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No printer found", Detail = "Receipts can be previewed. Connect the printer's USB serial adapter to print." };
+                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No printer found", Detail = PortNames().Length > 0 ? "Only Bluetooth ports were found. Connect the printer's USB serial adapter to print; receipts can still be previewed." : "Connect the printer's USB serial adapter to print; receipts can still be previewed." };
             if (!PortNames().Contains(s.PortName, StringComparer.OrdinalIgnoreCase))
                 return new PrinterStatus { CanSend = false, Level = 2, Headline = s.PortName + " not found", Detail = "The serial adapter may be unplugged, or Windows gave it another COM number. Check the cable and reopen the receipt." };
             return new PrinterStatus
@@ -196,6 +221,8 @@ namespace SkinDevApp.Printing
             {
                 Handshake = (Handshake)Enum.Parse(typeof(Handshake), s.Handshake ?? "None", true),
                 Encoding = Encoding.ASCII,
+                DtrEnable = true,
+                RtsEnable = true,
                 WriteTimeout = 5000,
                 ReadTimeout = 500
             };
