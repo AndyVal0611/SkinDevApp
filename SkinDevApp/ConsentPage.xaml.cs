@@ -45,7 +45,7 @@ namespace SkinDevApp
             if (prev != null)
                 PreviousConsentTxt.Text = "Consent was previously recorded on " + SkinDevApp.Views.Fmt.When(prev.RecordedAt) + " (" + prev.Decision + ")" +
                     (prev.AllowsScanning ? "." : "; it does not allow scanning.") +
-                    " Please confirm it again for this visit. Items marked * are required, and nothing is pre-selected.";
+                    " Please confirm it again for this visit. Items marked with an asterisk (*) are required. No options are selected by default.";
         }
 
         private bool IsWithdrawnNow()
