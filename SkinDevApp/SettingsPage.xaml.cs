@@ -235,7 +235,6 @@ namespace SkinDevApp
                     NumRow("capture.stable_frames", "Steady readings needed", "In a row, before an image is taken. Default 8."),
                     NumRow("capture.hold_ms", "Hold-still time (ms)", "How long the face must stay still. Default 1200."),
                     NumRow("capture.cooldown_s", "Pause between images (s)", "Prevents duplicates. Default 4."),
-                    NumRow("capture.min_sharpness", "Minimum sharpness", "Blurrier images are rejected. Default 25."),
                     NumRow("capture.min_brightness", "Minimum brightness", "From 0 (black) to 255 (white). Default 45."),
                     NumRow("capture.max_brightness", "Maximum brightness", "From 0 (black) to 255 (white). Default 215."),
                     NumRow("pose.front_max_yaw", "Front view: largest head turn", "Default 0.12."),
@@ -415,7 +414,6 @@ namespace SkinDevApp
             _num["capture.stable_frames"].Text = s.StableFramesRequired.ToString(CultureInfo.InvariantCulture);
             _num["capture.hold_ms"].Text = s.HoldStillMs.ToString(CultureInfo.InvariantCulture);
             _num["capture.cooldown_s"].Text = F(s.CooldownSeconds);
-            _num["capture.min_sharpness"].Text = F(s.MinSharpness);
             _num["capture.min_brightness"].Text = F(s.MinBrightness);
             _num["capture.max_brightness"].Text = F(s.MaxBrightness);
             _num["pose.front_max_yaw"].Text = F(s.FrontMaxAbsYaw);
@@ -457,7 +455,6 @@ namespace SkinDevApp
             s.StableFramesRequired = I("capture.stable_frames", 1, 60);
             s.HoldStillMs = I("capture.hold_ms", 0, 10000);
             s.CooldownSeconds = D("capture.cooldown_s", 0.5, 30);
-            s.MinSharpness = D("capture.min_sharpness", 0, 1000);
             s.MinBrightness = D("capture.min_brightness", 0, 255);
             s.MaxBrightness = D("capture.max_brightness", 0, 255);
             s.FrontMaxAbsYaw = D("pose.front_max_yaw", 0.02, 0.5);

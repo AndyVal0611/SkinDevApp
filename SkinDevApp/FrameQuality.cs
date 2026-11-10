@@ -258,7 +258,7 @@ namespace SkinDevApp.Imaging
                     q.OverExposedFraction = Cv2.CountNonZero(over) / total;
                 }
 
-                q.SharpEnough = q.Sharpness >= MinSharpness;
+                q.SharpEnough = true;          // sharpness is not a capture requirement (the value is still measured for the record)
                 q.ExposureOk =
                     q.Brightness >= MinBrightness && q.Brightness <= MaxBrightness &&
                     q.UnderExposedFraction <= MaxUnderExposed &&

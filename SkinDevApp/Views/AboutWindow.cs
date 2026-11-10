@@ -40,7 +40,7 @@ namespace SkinDevApp.Views
             // ---------------------------------------------------------------- how it works
             page.Children.Add(Section("How LUMYVUE works", Steps(
                 new[] { "1", "Facial image capture", "The system captures three facial images in sequence: front, left side and right side. Proper positioning, sufficient lighting and clear facial visibility are important for usable images." },
-                new[] { "2", "AI-powered image analysis", "Before analysis, the system checks each image for sharpness, lighting and whether the face is visible. An image that is too poor to read is flagged for recapture. " +
+                new[] { "2", "AI-powered image analysis", "Before analysis, the system checks each image for lighting and whether the face is visible. An image that is too poor to read is flagged for recapture. " +
                              "The whole-face reading and the three lesion detectors are then combined to give a separate result for each condition, with its certainty and visual evidence." },
                 new[] { "3", "Dermatologist review and verification", "The dermatologist reviews the three images, inspects the marked areas and the findings for each condition, and records an independent assessment. " +
                              "AI-generated findings remain separate from the dermatologist's assessment." })));
@@ -108,7 +108,7 @@ namespace SkinDevApp.Views
                 new[] { "Hair", "keep hair away from the forehead, cheeks and other visible areas." },
                 new[] { "Position", "keep the face within the frame, at the recommended distance and position." },
                 new[] { "Steadiness", "avoid movement, and make sure the image is in focus." }));
-            lim.Children.Add(Note("A blurred, poorly lit or partly covered image can make the analysis unreliable. The system flags such images for recapture."));
+            lim.Children.Add(Note("A poorly lit or partly covered image can make the analysis unreliable. The system flags such images for recapture."));
             lim.Children.Add(Sub("4. Supported conditions and scope"));
             lim.Children.Add(Para("LUMYVUE is configured to analyze three categories: acne, hyperpigmentation and eczema. It does not identify other conditions and does not grade severity. " +
                                   "A result of no condition detected must not be read as confirmation of healthy skin."));

@@ -226,7 +226,6 @@ namespace SkinDevApp.Views
             if (rec != null && rec.Quality != null)
             {
                 var why = new List<string>();
-                if (rec.Quality.Sharpness < ScanSettings.Current.MinSharpness) why.Add("blurred");
                 if (rec.Quality.Brightness < ScanSettings.Current.MinBrightness) why.Add("too dark");
                 else if (rec.Quality.Brightness > ScanSettings.Current.MaxBrightness) why.Add("too bright");
                 if (!rec.Quality.FaceFound) why.Add("face not found");
@@ -294,10 +293,10 @@ namespace SkinDevApp.Views
         }
 
         private static readonly string[] StatusKeys =
-            { "Face position", "Pose / orientation", "Sharpness", "Brightness / exposure", "Motion", "Stability", "Camera" };
+            { "Face position", "Pose / orientation", "Brightness / exposure", "Motion", "Stability", "Camera" };
 
         private static readonly string[] StatusIcons =
-            { "Icon.Face", "Icon.Target", "Icon.Image", "Icon.Sun", "Icon.Move", "Icon.Pulse", "Icon.Camera" };
+            { "Icon.Face", "Icon.Target", "Icon.Sun", "Icon.Move", "Icon.Pulse", "Icon.Camera" };
 
         private void BuildStatusPanel()
         {
@@ -358,7 +357,6 @@ namespace SkinDevApp.Views
             }
             else SetStatusLine("Pose / orientation", true, "Any (single capture)");
 
-            SetStatusLine("Sharpness", q != null && q.SharpEnough, q == null ? "—" : (q.SharpEnough ? "Sharp" : "Blurry — hold still / refocus"));
             SetStatusLine("Brightness / exposure", q != null && q.ExposureOk, q == null ? "—" : (q.ExposureOk ? "OK" : "Check lighting"));
             SetStatusLine("Motion", g.Still, g.Still ? "Still" : "Moving");
             SetStatusLine("Stability", g.Stable && g.Consistent,
@@ -516,8 +514,7 @@ namespace SkinDevApp.Views
 
                 if (rec != null && rec.Quality != null)
                     info.Children.Add(Ui.Text(
-                        "Sharpness " + rec.Quality.Sharpness.ToString("0") + (rec.Quality.Sharpness >= ScanSettings.Current.MinSharpness ? " ✓" : " (low)") +
-                        "  ·  Brightness " + rec.Quality.Brightness.ToString("0") +
+                        "Brightness " + rec.Quality.Brightness.ToString("0") +
                         "  ·  Face " + (rec.Quality.FaceFound ? "found" : "not found") +
                         "  ·  Angle " + (rec.Session != null && rec.Session.PoseGateVerified ? "confirmed" : "not confirmed") +
                         "  ·  " + (rec.Trigger == "auto" ? "taken automatically" : "taken manually"),

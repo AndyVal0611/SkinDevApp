@@ -132,7 +132,7 @@ namespace SkinDevApp.Views
             sp.Children.Add(Ui.Text("Each image passes through the following steps, in this order.", 11.5, false, Ui.Muted, new Thickness(0, 0, 0, 8)));
             string[][] steps =
             {
-                new[] { "Check the image", "The face is located and centered, and the head angle is confirmed. Blurred or poorly lit images are flagged." },
+                new[] { "Check the image", "The face is located and centered, and the head angle is confirmed. Poorly lit images are flagged." },
                 new[] { "Read the whole face", "A whole-face model (MobileNetV2) looks at the full image." },
                 new[] { "Look for spots", "Three lesion detectors (YOLOv8) mark areas that may show acne, hyperpigmentation or eczema." },
                 new[] { "Combine", "A trained fusion network combines both readings and evaluates each condition against its own threshold." },
