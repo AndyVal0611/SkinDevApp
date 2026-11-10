@@ -28,6 +28,7 @@ namespace SkinDevApp.Views
         private readonly StackPanel _controls = new StackPanel();
         private readonly DispatcherTimer _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         private bool _loading, _on, _cobOn;
+        private TextBox _addrBox;
 
         public LightingPage()
         {
@@ -95,11 +96,11 @@ namespace SkinDevApp.Views
             auto.Children.Add(autoChk);
             auto.Children.Add(Ui.Text("Light controller address", 12, false, Ui.Muted, new Thickness(0, 14, 0, 4)));
             var addr = new DockPanel();
-            var addrBox = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Height = 40, Width = 260, Text = LightController.Host, HorizontalAlignment = HorizontalAlignment.Left };
-            Button save = Ui.Btn("Save", (s, e) => { LightController.Host = addrBox.Text; addrBox.Text = LightController.Host; Refresh(); }, "SmallButton");
+            _addrBox = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Height = 40, Width = 260, Text = LightController.Host, HorizontalAlignment = HorizontalAlignment.Left };
+            Button save = Ui.Btn("Save", (s, e) => { LightController.Host = _addrBox.Text; _addrBox.Text = LightController.Host; Refresh(); }, "SmallButton");
             save.Margin = new Thickness(8, 0, 0, 0);
             var addrRow = new StackPanel { Orientation = Orientation.Horizontal };
-            addrRow.Children.Add(addrBox);
+            addrRow.Children.Add(_addrBox);
             addrRow.Children.Add(save);
             auto.Children.Add(addrRow);
             auto.Children.Add(Ui.Text("Usually ringlight.local. If the controller cannot join the WiFi it starts its own hotspot \"RingLight\" (address 192.168.4.1).", 11.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
@@ -139,10 +140,17 @@ namespace SkinDevApp.Views
             LightState s = await LightController.GetAsync();
             if (s == null)
             {
+                _status.Text = "Searching the WiFi network for the light controller…";
+                _statusNote.Text = "This takes a few seconds.";
+                s = await LightController.FindOnNetworkAsync();
+                if (s != null && _addrBox != null) _addrBox.Text = LightController.Host;
+            }
+            if (s == null)
+            {
                 SetEnabled(false);
                 _status.Text = "Light controller not connected";
                 _status.Foreground = Ui.Bad;
-                _statusNote.Text = "Check that the controller is powered and on the same WiFi as this computer, then press Try again.";
+                _statusNote.Text = "Check that the controller is powered and on the same WiFi as this computer, then press Try again.  (" + LightController.LastReport + ")";
                 return;
             }
             _status.Text = "Connected to the light controller";

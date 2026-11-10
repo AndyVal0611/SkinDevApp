@@ -14,6 +14,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -93,22 +96,100 @@ namespace SkinDevApp.Data
 
         private static int Clamp(int v) => Math.Max(0, Math.Min(100, v));
 
+        /// <summary>What the last failed attempt tried and why it failed, in plain words (for the Lighting page).</summary>
+        public static string LastReport { get; private set; } = "";
+
         private static async Task<LightState> Call(string path)
         {
+            var report = new List<string>();
             foreach (string host in Hosts())
             {
                 try
                 {
                     string json = await Http.GetStringAsync("http://" + host + path).ConfigureAwait(false);
                     LightState s = Parse(json);
-                    if (s == null) continue;
+                    if (s == null) { report.Add(host + ": answered, but it is not the light controller"); continue; }
                     s.Host = host;
                     _working = host;
+                    LastReport = "";
                     return s;
                 }
-                catch { }
+                catch (Exception ex) { report.Add(host + ": " + Reason(ex)); }
             }
             _working = null;
+            LastReport = string.Join("  ·  ", report);
+            return null;
+        }
+
+        private static string Reason(Exception ex)
+        {
+            string m = (ex.InnerException != null ? ex.InnerException.Message : ex.Message) ?? "";
+            if (ex is TaskCanceledException || m.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0 && m.IndexOf("out", StringComparison.OrdinalIgnoreCase) >= 0) return "no answer (timed out)";
+            if (m.IndexOf("name could not be resolved", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("No such host", StringComparison.OrdinalIgnoreCase) >= 0) return "name not found";
+            if (m.IndexOf("refused", StringComparison.OrdinalIgnoreCase) >= 0) return "connection refused";
+            if (m.IndexOf("unreachable", StringComparison.OrdinalIgnoreCase) >= 0) return "network unreachable";
+            return m.Trim();
+        }
+
+        // ------------------------------------------------------------------ finding the controller on the WiFi
+
+        /// <summary>
+        /// Looks for the controller on this computer's own network by asking every address of the local network (the same /24) for /api/state.
+        /// This finds it when the name "ringlight.local" does not work. On success the address is saved and used from then on. Takes a few seconds.
+        /// </summary>
+        public static async Task<LightState> FindOnNetworkAsync()
+        {
+            var candidates = new List<string>();
+            try
+            {
+                foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                    foreach (UnicastIPAddressInformation ua in nic.GetIPProperties().UnicastAddresses)
+                    {
+                        if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                        byte[] b = ua.Address.GetAddressBytes();
+                        if (b[0] == 169 && b[1] == 254) continue;                       // no real network
+                        for (int i = 1; i <= 254; i++) if (i != b[3]) candidates.Add(b[0] + "." + b[1] + "." + b[2] + "." + i);
+                    }
+                }
+            }
+            catch { }
+            LightState s = await ProbeAsync(candidates.Distinct().ToList()).ConfigureAwait(false);
+            if (s != null) Host = s.Host;
+            return s;
+        }
+
+        /// <summary>Asks every candidate address (in parallel, short time-out) and returns the first one that answers like the controller.</summary>
+        internal static async Task<LightState> ProbeAsync(IList<string> hosts)
+        {
+            if (hosts.Count == 0) return null;
+            using (var probe = new HttpClient { Timeout = TimeSpan.FromMilliseconds(900) })
+            using (var gate = new SemaphoreSlim(64))
+            using (var cts = new CancellationTokenSource())
+            {
+                var tasks = hosts.Select(async h =>
+                {
+                    await gate.WaitAsync(cts.Token).ConfigureAwait(false);
+                    try
+                    {
+                        string json = await probe.GetStringAsync("http://" + h + "/api/state").ConfigureAwait(false);
+                        LightState s = Parse(json);
+                        if (s != null) s.Host = h;
+                        return s;
+                    }
+                    catch { return null; }
+                    finally { gate.Release(); }
+                }).ToList();
+                while (tasks.Count > 0)
+                {
+                    Task<LightState> done = await Task.WhenAny(tasks).ConfigureAwait(false);
+                    tasks.Remove(done);
+                    LightState s = null;
+                    try { s = done.Result; } catch { }
+                    if (s != null) { cts.Cancel(); _working = s.Host; return s; }
+                }
+            }
             return null;
         }
 
@@ -165,6 +246,11 @@ namespace SkinDevApp.Data
                     {
                         if (!s.CobOn) await SetAsync(cob: true).ConfigureAwait(false);
                         return;
+                    }
+                    if (i == 3)                                                       // the name did not work after ~15 s: look for it on the network
+                    {
+                        s = await FindOnNetworkAsync().ConfigureAwait(false);
+                        if (s != null) { if (!s.CobOn) await SetAsync(cob: true).ConfigureAwait(false); return; }
                     }
                     await Task.Delay(5000).ConfigureAwait(false);
                 }
