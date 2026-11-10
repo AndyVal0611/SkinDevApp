@@ -52,7 +52,7 @@ namespace SkinDevApp.Data
                        CASE s.ScanMode WHEN 'Single' THEN '1 photo' ELSE s.ViewsCompleted || ' of ' || s.ViewsExpected END AS ""Photos""
                 FROM ScanSessions s
                 WHERE (@q = '%%' OR s.SessionLabel LIKE @q OR s.ParticipantID LIKE @q OR s.ScanSessionID LIKE @q OR s.AITitle LIKE @q)
-                  AND (@rv = 'All' OR COALESCE(s.ReviewStatus,'Pending verification') = @rv OR (@rv = 'Unassigned scans' AND s.ParticipantID IS NULL))
+                  AND (@rv = 'All' OR COALESCE(s.ReviewStatus,'Pending verification') = @rv)
                   AND (@ai = 'All' OR COALESCE(s.AIResult,'Pending') = @ai)
                 ORDER BY s.StartedAt DESC;", "@q", Like(search), "@rv", review ?? "All", "@ai", aiResult ?? "All");
         }

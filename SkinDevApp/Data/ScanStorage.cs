@@ -198,7 +198,7 @@ namespace SkinDevApp.Data
             {
                 string dir = DataLocation.RecordsDir;
                 Directory.CreateDirectory(dir);
-                foreach (string n in ReviewStatus.All.Concat(new[] { UnassignedFolder })) Directory.CreateDirectory(Path.Combine(dir, n));
+                foreach (string n in ReviewStatus.All) Directory.CreateDirectory(Path.Combine(dir, n));
                 string p = Path.Combine(dir, "README.txt");
                 if (File.Exists(p)) return;
                 File.WriteAllText(p,
@@ -206,8 +206,7 @@ namespace SkinDevApp.Data
                     "Every scan has one folder: <status>\\<PatientID>\\<date>\\<scan folder>.\r\n\r\n" +
                     "  Pending verification     new scans, not yet reviewed by a dermatologist\r\n" +
                     "  Verified                 reviewed and completed by a dermatologist\r\n" +
-                    "  Requires further review  the dermatologist asked for further review\r\n" +
-                    "  Unassigned scans         scans not linked to a registered patient\r\n\r\n" +
+                    "  Requires further review  the dermatologist asked for further review\r\n\r\n" +
                     "A scan folder holds the images (original.png, analysed.png), the final AI result (v6_assessment.json, sealed with SHA-256),\r\n" +
                     "the evidence maps (v6_*.png), and the subfolders Receipts, Reports and Verification.\r\n" +
                     "LUMYVUE moves the folder itself when the verification status changes. Do not rename or move folders by hand:\r\n" +

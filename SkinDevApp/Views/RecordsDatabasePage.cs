@@ -4,7 +4,7 @@
 // "Records & database": the study database inside the application, for signed-in staff. No external database tool and no SQL.
 //   Patients              search, register, edit, open the record, start a scan, mark active / withdrawn
 //   Scans                 search and filter by verification status and AI outcome; see the AI result; set the verification status;
-//                         link an unassigned scan to a patient; open the results, the dermatologist review or the scan folder
+//                         open the results, the dermatologist review or the scan folder
 //   AI findings           every condition reading of every photograph (result, certainty, facial regions, origin)
 //   Verification records  every dermatologist and researcher review
 //   Activity log          the audit trail of every change
@@ -95,7 +95,6 @@ namespace SkinDevApp.Views
                 Stat("pending verification", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE COALESCE(ReviewStatus,'Pending verification')='Pending verification' AND ParticipantID IS NOT NULL;"), "#8A5A00");
                 Stat("verified", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ReviewStatus='Verified';"), "#3E6B3D");
                 Stat("require further review", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ReviewStatus='Requires further review';"), "#9B2F25");
-                Stat("unassigned scans", RecordsQueries.Count("SELECT COUNT(*) FROM ScanSessions WHERE ParticipantID IS NULL;"), "#5F5E5A");
                 Stat("images with an AI result", RecordsQueries.Count("SELECT COUNT(*) FROM AIAssessments;"), "#3A3B2C");
                 _summary.Children.Add(wrap);
             }
@@ -306,7 +305,7 @@ namespace SkinDevApp.Views
         {
             Action reload = null;
             TextBox q = Search("Scan, patient or AI summary", () => reload());
-            ComboBox rv = Filter(new[] { "All" }.Concat(ReviewStatus.All).Concat(new[] { "Unassigned scans" }), () => reload());
+            ComboBox rv = Filter(new[] { "All" }.Concat(ReviewStatus.All), () => reload());
             ComboBox ai = Filter(new[] { "All", "Condition detected", "Needs review", "No condition detected", "Retake image", "Analysis not completed", "Pending" }, () => reload());
             var bar = FilterBar(Labelled("Search", q), Labelled("Verification", rv), Labelled("AI result", ai));
             TabItem tab = Tab("Scans", "scans", bar, () => RecordsQueries.Scans(q.Text, (string)rv.SelectedItem, (string)ai.SelectedItem), (row, d) =>
@@ -341,20 +340,6 @@ namespace SkinDevApp.Views
                     LumyDialog.Show("Saved. The scan is now \"" + next + "\" and its files were moved to the matching folder.", "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information);
                     reload(); RenderSummary();
                 }, "GhostButton"));
-
-                if (string.IsNullOrEmpty(sd.Session.ParticipantID))
-                {
-                    d.Children.Add(Ui.Text("Link to a registered patient", 12.5, true, Ui.Ink, new Thickness(0, 16, 0, 2)));
-                    var pid = new TextBox { Style = (Style)Application.Current.FindResource("Field"), ToolTip = "Patient ID, e.g. PS-0004" };
-                    d.Children.Add(pid);
-                    d.Children.Add(Action("Link scan", (s, e) =>
-                    {
-                        string p = StudyRepository.NormaliseParticipantId(pid.Text);
-                        if (p == null || StudyRepository.GetParticipant(p) == null) { LumyDialog.Show("No registered patient has that ID.", "LUMYVUE Records"); return; }
-                        StudyRepository.LinkSessionToParticipant(id, p);
-                        reload(); RenderSummary();
-                    }, "GhostButton"));
-                }
             }, out reload);
             return tab;
         }
