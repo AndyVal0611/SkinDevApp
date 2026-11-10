@@ -159,30 +159,5 @@ namespace SkinDevApp.Data
             StudyRepository.Audit(kind == "auto" ? "Automatic database backup" : "Database backup", "Database", null, file);
             return file;
         }
-
-        /// <summary>Integrity and relationship check of the database file (PRAGMA integrity_check / foreign_key_check).</summary>
-        public static string HealthCheck()
-        {
-            using (var c = StudyDatabase.Open())
-            {
-                string integrity;
-                using (var cmd = new SQLiteCommand("PRAGMA integrity_check;", c)) integrity = Convert.ToString(cmd.ExecuteScalar());
-                int fk = 0;
-                using (var cmd = new SQLiteCommand("PRAGMA foreign_key_check;", c))
-                using (var r = cmd.ExecuteReader()) while (r.Read()) fk++;
-                int orphanViews = Count("SELECT COUNT(*) FROM CaptureViews v WHERE NOT EXISTS (SELECT 1 FROM ScanSessions s WHERE s.ScanSessionID=v.ScanSessionID);");
-                int noResult = Count("SELECT COUNT(*) FROM CaptureViews v WHERE NOT EXISTS (SELECT 1 FROM AIAssessments a WHERE a.CaptureID=v.CaptureID);");
-                int missingFolder = 0;
-                using (var cmd = new SQLiteCommand("SELECT SessionFolder FROM ScanSessions;", c))
-                using (var r = cmd.ExecuteReader())
-                    while (r.Read())
-                    {
-                        string f = r.IsDBNull(0) ? null : r.GetString(0);
-                        if (string.IsNullOrEmpty(f) || !Directory.Exists(DataLocation.Rebase(f))) missingFolder++;
-                    }
-                return "File integrity: " + integrity + " · broken links between tables: " + fk + " · photographs without a scan: " + orphanViews +
-                       " · photographs without an AI result: " + noResult + " · scans whose folder is missing on this PC: " + missingFolder;
-            }
-        }
     }
 }

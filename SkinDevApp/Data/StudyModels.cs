@@ -221,7 +221,6 @@ namespace SkinDevApp.Data
         public bool VoluntaryParticipation { get; set; }
         public bool ImageCaptureConsent { get; set; }
         public bool ImageProcessingConsent { get; set; }
-        public bool FutureModelUseConsent { get; set; }
         public string Decision { get; set; }                 // Agreed | Declined
         public string RecordedAt { get; set; }
         public string OperatorID { get; set; }

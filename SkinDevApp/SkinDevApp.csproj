@@ -176,6 +176,8 @@
     <Compile Include="Printing\UsbPrinter.cs" />
     <Compile Include="Views\DeviceShutdown.cs" />
     <Compile Include="Views\ClinicianVoice.cs" />
+    <Compile Include="Views\ReportPdf.cs" />
+    <Compile Include="Views\ReportsPage.cs" />
     <None Include="Kiosk\Run-LumyvueKiosk.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

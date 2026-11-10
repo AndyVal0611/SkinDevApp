@@ -22,12 +22,12 @@ namespace SkinDevApp.Views
         private sealed class Rule
         {
             public string Name, Category;
-            public bool CanEdit, CanDelete, CanAdd;
+            public bool CanEdit, CanAdd;
             public string[] Hidden = new string[0];
         }
 
-        private static Rule R(string name, string cat, bool edit = false, bool delete = false, bool add = false, params string[] hidden) =>
-            new Rule { Name = name, Category = cat, CanEdit = edit, CanDelete = delete, CanAdd = add, Hidden = hidden };
+        private static Rule R(string name, string cat, bool edit = false, bool add = false, params string[] hidden) =>
+            new Rule { Name = name, Category = cat, CanEdit = edit, CanAdd = add, Hidden = hidden };
 
         private const string CPatients = "Patients", CScans = "Scans and images", CAI = "AI results", CReviews = "Reviews", CSystem = "Accounts and system", CLogs = "Logs and receipts";
         private static readonly string[] CategoryOrder = { CPatients, CScans, CAI, CReviews, CSystem, CLogs };
@@ -52,10 +52,10 @@ namespace SkinDevApp.Views
             { "LocalizationRuns", R("Earlier localization runs", CAI) },
             { "ModelVersions", R("AI model versions", CAI) },
             { "FitzpatrickAssessments", R("Skin type assessments", CAI) },
-            { "DermatologistValidations", R("Dermatologist reviews", CReviews, edit: true, delete: true) },
-            { "DermatologistConditionReviews", R("Condition verdicts", CReviews, edit: true, delete: true) },
-            { "AssessmentLabels", R("Assessment labels", CReviews, edit: true, delete: true, add: true) },
-            { "ResearcherAccounts", R("Registered accounts", CSystem, false, false, false, "Salt", "Hash", "Iterations") },
+            { "DermatologistValidations", R("Dermatologist reviews", CReviews, edit: true) },
+            { "DermatologistConditionReviews", R("Condition verdicts", CReviews, edit: true) },
+            { "AssessmentLabels", R("Assessment labels", CReviews, edit: true, add: true) },
+            { "ResearcherAccounts", R("Registered accounts", CSystem, false, false, "Salt", "Hash", "Iterations") },
             { "SystemSettings", R("System settings", CSystem, edit: true, add: true) },
             { "AuditLog", R("Activity log", CLogs) },
             { "Receipts", R("Receipts", CLogs) },
@@ -99,9 +99,9 @@ namespace SkinDevApp.Views
                 SelectionMode = DataGridSelectionMode.Single, Margin = new Thickness(0, 4, 0, 0)
             };
             var details = new StackPanel();
-            var addBtn = Ui.Btn("Add", (o, e) => { }, "SmallButton"); var editBtn = Ui.Btn("Edit", (o, e) => { }, "SmallButton"); var delBtn = Ui.Btn("Delete", (o, e) => { }, "SmallButton");
+            var addBtn = Ui.Btn("Add", (o, e) => { }, "SmallButton"); var editBtn = Ui.Btn("Edit", (o, e) => { }, "SmallButton");
             var note = Ui.Text("", 11.5, false, Ui.Muted, new Thickness(0, 6, 0, 0));
-            foreach (Button b in new[] { addBtn, editBtn, delBtn }) { b.Margin = new Thickness(8, 0, 0, 0); b.IsEnabled = false; }
+            foreach (Button b in new[] { addBtn, editBtn }) { b.Margin = new Thickness(8, 0, 0, 0); b.IsEnabled = false; }
 
             Action reload = null;
             Action buildNav = null;
@@ -123,7 +123,7 @@ namespace SkinDevApp.Views
                 catch (Exception ex) { count.Text = "Could not read this table: " + ex.Message; }
                 details.Children.Clear();
                 addBtn.IsEnabled = st.Rule != null && st.Rule.CanAdd;
-                editBtn.IsEnabled = delBtn.IsEnabled = false;
+                editBtn.IsEnabled = false;
             };
 
             Action select = () =>
@@ -134,8 +134,8 @@ namespace SkinDevApp.Views
                 st.Rule = RuleFor(st.Table);
                 st.Cols = Columns(st.Table);
                 title.Text = st.Rule.Name;
-                info.Text = "Table \"" + st.Table + "\" · " + (st.Rule.CanEdit || st.Rule.CanDelete || st.Rule.CanAdd
-                    ? "You can " + string.Join(", ", new[] { st.Rule.CanAdd ? "add" : null, st.Rule.CanEdit ? "edit" : null, st.Rule.CanDelete ? "delete" : null }.Where(x => x != null)) + " records here (each change asks for confirmation)."
+                info.Text = "Table \"" + st.Table + "\" · " + (st.Rule.CanEdit || st.Rule.CanAdd
+                    ? "You can " + string.Join(", ", new[] { st.Rule.CanAdd ? "add" : null, st.Rule.CanEdit ? "edit" : null }.Where(x => x != null)) + " records here (each change asks for confirmation)."
                     : "view only: these records are protected.");
                 note.Text = st.Table == "ResearcherAccounts" ? "Passwords are never shown. Accounts are created and managed in Settings." : "";
                 search.Text = "";
@@ -176,20 +176,12 @@ namespace SkinDevApp.Views
             var searchBtn = Ui.Btn("Search", (o, e) => reload(), "SmallButton");
             var clearBtn = Ui.Btn("Clear", (o, e) => { search.Text = ""; reload(); }, "SmallButton"); clearBtn.Margin = new Thickness(8, 0, 0, 0);
             var refreshBtn = Ui.Btn("Refresh", (o, e) => { buildNav(); reload(); }, "SmallButton"); refreshBtn.Margin = new Thickness(8, 0, 0, 0);
-            var checkBtn = Ui.Btn("Check integrity", (o, e) =>
-            {
-                try { LumyDialog.Show(RecordsQueries.HealthCheck(), "LUMYVUE Database check", MessageBoxButton.OK, MessageBoxImage.Information); }
-                catch (Exception ex) { LumyDialog.Show("The check could not run: " + ex.Message, "LUMYVUE Database check", MessageBoxButton.OK, MessageBoxImage.Error); }
-            }, "SmallButton");
-            checkBtn.Margin = new Thickness(8, 0, 0, 0);
-
             grid.SelectionChanged += (o, e) =>
             {
                 details.Children.Clear();
                 var rv = grid.SelectedItem as DataRowView;
                 bool has = rv != null && st.Rule != null;
                 editBtn.IsEnabled = has && st.Rule.CanEdit;
-                delBtn.IsEnabled = has && st.Rule.CanDelete;
                 if (!has) return;
                 details.Children.Add(Ui.Text("Selected record", 13, true, Ui.Ink, new Thickness(0, 8, 0, 4)));
                 details.Children.Add(Ui.InfoRows(st.Cols.Where(c => !st.Rule.Hidden.Contains(c.Name, StringComparer.OrdinalIgnoreCase))
@@ -198,15 +190,14 @@ namespace SkinDevApp.Views
 
             addBtn.Click += (o, e) => { if (st.Table != null && WriteDialog(st, null)) { buildNav(); reload(); } };
             editBtn.Click += (o, e) => { var rv = grid.SelectedItem as DataRowView; if (rv != null && WriteDialog(st, rv.Row)) { buildNav(); reload(); } };
-            delBtn.Click += (o, e) => { var rv = grid.SelectedItem as DataRowView; if (rv != null && Delete(st, rv.Row)) { buildNav(); reload(); } };
 
             var bar = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
             var right = new StackPanel { Orientation = Orientation.Horizontal };
-            right.Children.Add(addBtn); right.Children.Add(editBtn); right.Children.Add(delBtn);
+            right.Children.Add(addBtn); right.Children.Add(editBtn);
             DockPanel.SetDock(right, Dock.Right);
             bar.Children.Add(right);
             var left = new StackPanel { Orientation = Orientation.Horizontal };
-            left.Children.Add(search); left.Children.Add(searchBtn); left.Children.Add(clearBtn); left.Children.Add(refreshBtn); left.Children.Add(checkBtn);
+            left.Children.Add(search); left.Children.Add(searchBtn); left.Children.Add(clearBtn); left.Children.Add(refreshBtn);
             bar.Children.Add(left);
 
             var main = new StackPanel { Margin = new Thickness(16, 0, 0, 0) };
@@ -312,29 +303,6 @@ namespace SkinDevApp.Views
 
         private static string KeyText(State st, DataRow row) =>
             string.Join(", ", st.Cols.Where(c => c.IsPk && row.Table.Columns.Contains(c.Name)).Select(c => c.Name + " = " + row[c.Name]));
-
-        private static bool Delete(State st, DataRow row)
-        {
-            var pks = st.Cols.Where(c => c.IsPk).ToList();
-            if (pks.Count == 0 || !st.Rule.CanDelete) return false;
-            if (!Confirm(st, "Delete this record from \"" + st.Rule.Name + "\"?\n" + KeyText(st, row))) return false;
-            try
-            {
-                using (var c = StudyDatabase.Open())
-                using (var tx = c.BeginTransaction())
-                {
-                    using (var cmd = new SQLiteCommand("DELETE FROM \"" + st.Table + "\" WHERE " + string.Join(" AND ", pks.Select((p, i) => "\"" + p.Name + "\" = @k" + i)) + ";", c, tx))
-                    {
-                        for (int i = 0; i < pks.Count; i++) cmd.Parameters.AddWithValue("@k" + i, row[pks[i].Name]);
-                        if (cmd.ExecuteNonQuery() != 1) { tx.Rollback(); LumyDialog.Show("Nothing was deleted.", "LUMYVUE Database"); return false; }
-                    }
-                    StudyRepository.Audit(c, tx, "Database record deleted", st.Table, KeyText(st, row), "from the All tables screen");
-                    tx.Commit();
-                }
-                return true;
-            }
-            catch (Exception ex) { LumyDialog.Show("The record could not be deleted: " + ex.Message, "LUMYVUE Database", MessageBoxButton.OK, MessageBoxImage.Error); return false; }
-        }
 
         private static object Typed(Col c, string text)
         {

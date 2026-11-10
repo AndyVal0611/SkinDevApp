@@ -258,8 +258,7 @@ namespace SkinDevApp
                 Ui.KV("Record status", p.Status),
                 Ui.KV("Consent", consent == null ? "Not recorded"
                     : (consent.Decision == "Agreed" ? "Given on " : "Declined on ") + Fmt.When(consent.RecordedAt) +
-                      (consent.AllowsScanning ? "" : " (scanning is not allowed)") +
-                      ". Use of the images for future model improvement: " + (consent.FutureModelUseConsent ? "agreed." : "not agreed."))
+                      (consent.AllowsScanning ? "" : " (scanning is not allowed)") + ".")
             });
             sp.Children.Add(Ui.InfoRows(rows, 130, 12.5));
 

@@ -386,14 +386,13 @@ namespace SkinDevApp.Data
                 long id;
                 using (var cmd = Cmd(c, @"INSERT INTO Consents
                     (ParticipantID, ResearchInfoUnderstood, VoluntaryParticipation, ImageCaptureConsent, ImageProcessingConsent,
-                     FutureModelUseConsent, Decision, RecordedAt, OperatorID)
-                    VALUES (@id,@a,@b,@c,@d,@e,@dec,@at,@op); SELECT last_insert_rowid();", tx,
+                     Decision, RecordedAt, OperatorID)
+                    VALUES (@id,@a,@b,@c,@d,@dec,@at,@op); SELECT last_insert_rowid();", tx,
                     "@id", k.ParticipantID, "@a", k.ResearchInfoUnderstood ? 1 : 0, "@b", k.VoluntaryParticipation ? 1 : 0,
-                    "@c", k.ImageCaptureConsent ? 1 : 0, "@d", k.ImageProcessingConsent ? 1 : 0, "@e", k.FutureModelUseConsent ? 1 : 0,
+                    "@c", k.ImageCaptureConsent ? 1 : 0, "@d", k.ImageProcessingConsent ? 1 : 0,
                     "@dec", k.Decision, "@at", k.RecordedAt, "@op", k.OperatorID))
                     id = Convert.ToInt64(cmd.ExecuteScalar());
-                Audit(c, tx, "Consent " + k.Decision, "Participant", k.ParticipantID,
-                      "future model use: " + (k.FutureModelUseConsent ? "yes" : "no"));
+                Audit(c, tx, "Consent " + k.Decision, "Participant", k.ParticipantID, k.Decision);
                 tx.Commit();
                 return id;
             }
@@ -414,7 +413,6 @@ namespace SkinDevApp.Data
                     VoluntaryParticipation = B(r, "VoluntaryParticipation"),
                     ImageCaptureConsent = B(r, "ImageCaptureConsent"),
                     ImageProcessingConsent = B(r, "ImageProcessingConsent"),
-                    FutureModelUseConsent = B(r, "FutureModelUseConsent"),
                     Decision = S(r, "Decision"),
                     RecordedAt = S(r, "RecordedAt"),
                     OperatorID = S(r, "OperatorID")
@@ -926,16 +924,6 @@ namespace SkinDevApp.Data
 
         public static int PendingDermatologistCount() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE s.ViewsCompleted > 0 AND " + ActiveSession + @"
             AND NOT EXISTS (SELECT 1 FROM DermatologistValidations d WHERE d.ScanSessionID=s.ScanSessionID AND d.ValidationStatus='Completed');");
-
-        /// <summary>
-        /// Scans of participants whose LATEST consent is "Agreed" with the optional future-model-use
-        /// permission ticked, and who have not withdrawn. Any future export of images for model
-        /// improvement must be limited to these.
-        /// </summary>
-        public static int SessionsWithFutureUseConsent() => Count(@"SELECT COUNT(*) FROM ScanSessions s WHERE " + ActiveSession + @"
-            AND s.ParticipantID IS NOT NULL
-            AND EXISTS (SELECT 1 FROM Consents k WHERE k.ParticipantID = s.ParticipantID AND k.Decision = 'Agreed' AND k.FutureModelUseConsent = 1
-                        AND k.ConsentID = (SELECT MAX(ConsentID) FROM Consents x WHERE x.ParticipantID = s.ParticipantID));");
 
         private static List<CountRow> Group(string sql)
         {

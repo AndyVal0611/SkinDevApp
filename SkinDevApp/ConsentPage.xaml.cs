@@ -36,7 +36,7 @@ namespace SkinDevApp
                 PreviousConsentTxt.Text = "This patient is marked as withdrawn. Consent cannot be recorded and no images can be captured. " +
                                           "An administrator can change the record status in Patient records (Edit) if the withdrawal was entered by mistake.";
                 AgreeBtn.IsEnabled = false;
-                foreach (CheckBox box in new[] { UnderstoodChk, VoluntaryChk, CaptureChk, ProcessingChk, FutureUseChk }) box.IsEnabled = false;
+                foreach (CheckBox box in new[] { UnderstoodChk, VoluntaryChk, CaptureChk, ProcessingChk }) box.IsEnabled = false;
                 HintTxt.Text = "Consent cannot be recorded for a withdrawn patient.";
                 return;
             }
@@ -72,7 +72,6 @@ namespace SkinDevApp
             VoluntaryParticipation = VoluntaryChk.IsChecked == true,
             ImageCaptureConsent = CaptureChk.IsChecked == true,
             ImageProcessingConsent = ProcessingChk.IsChecked == true,
-            FutureModelUseConsent = FutureUseChk.IsChecked == true,
             Decision = decision,
             OperatorID = AppSession.ActorId
         };

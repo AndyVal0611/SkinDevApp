@@ -256,6 +256,7 @@ namespace SkinDevApp.Views
             AddSide("Icon.Home", "Dashboard", null, true);
             AddSide("Icon.Users", "Patient records", () => Nav.Go(new PatientRecordPage()), r);
             AddSide("Icon.Clock", "Waiting for review", () => Nav.Go(new PatientRecordPage(pendingOnly: true)), r, PendingCount());
+            AddSide("Icon.Folder", "Reports", () => Nav.Go(new ReportsPage()), true);
             AddSide("Icon.Archive", "Records", () => { if (ReauthDialog.Confirm("Records")) Nav.Go(new RecordsDatabasePage()); }, r);
             AddSide("Icon.Layers", "Model information", () => Nav.Go(new ModelInfoPage()), r);
             AddSide("Icon.Sliders", "Settings", () => Nav.Go(new SettingsPage()), r);

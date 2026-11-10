@@ -62,6 +62,9 @@ namespace SkinDevApp.Data
         /// <summary>Every scan's files: Patient Records\&lt;verification status&gt;\&lt;PatientID&gt;\&lt;date&gt;\&lt;scan folder&gt; (see ScanStorage).</summary>
         public static string RecordsDir => Path.Combine(DataRoot, "Patient Records");
 
+        /// <summary>Every saved A4 report (PDF): the folder shown under Reports in the menu.</summary>
+        public static string ReportsDir => Path.Combine(DataRoot, "Reports");
+
         private static string FindSharedFolder()
         {
             try
@@ -118,7 +121,7 @@ namespace SkinDevApp.Data
 
     public static class StudyDatabase
     {
-        public const int SchemaVersion = 4;
+        public const int SchemaVersion = 5;
 
         public static string DbPath { get; } = DataLocation.DbFile;
 
@@ -176,6 +179,9 @@ namespace SkinDevApp.Data
                     Exec(c, tx, "INSERT OR IGNORE INTO SystemSettings(Key, Value, UpdatedAt, UpdatedBy) VALUES ('schema_version', '" +
                                 SchemaVersion + "', datetime('now','localtime'), 'system');");
                     Exec(c, tx, "UPDATE SystemSettings SET Value='" + SchemaVersion + "', UpdatedAt=datetime('now','localtime'), UpdatedBy='system' WHERE Key='schema_version' AND CAST(Value AS INTEGER) < " + SchemaVersion + ";");
+                    // Version 5: the optional "future model use" consent is no longer part of LUMYVUE; its column is removed
+                    // (a copy of the database is kept in Backups\ before the upgrade, see BackupBeforeUpgrade).
+                    DropColumnIfExists(c, tx, "Consents", "FutureModelUseConsent");
                     // Two tables are no longer used by LUMYVUE (the original prototype's report log and the researcher assessments).
                     // They are removed only when they hold no rows, so nothing recorded is ever lost.
                     DropIfEmpty(c, tx, "PatientLogs");
@@ -192,6 +198,15 @@ namespace SkinDevApp.Data
                 LastError = ex.Message;
                 System.Diagnostics.Debug.WriteLine("[StudyDatabase] " + ex);
             }
+        }
+
+        private static void DropColumnIfExists(SQLiteConnection c, SQLiteTransaction tx, string table, string column)
+        {
+            bool has = false;
+            using (var cmd = new SQLiteCommand("PRAGMA table_info(\"" + table + "\");", c, tx))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) if (string.Equals(r.GetString(1), column, StringComparison.OrdinalIgnoreCase)) has = true;
+            if (has) Exec(c, tx, "ALTER TABLE \"" + table + "\" DROP COLUMN \"" + column + "\";");
         }
 
         /// <summary>Drops an unused table, but only if it exists and has no rows.</summary>
@@ -438,7 +453,6 @@ CREATE TABLE IF NOT EXISTS Consents (
     VoluntaryParticipation INTEGER NOT NULL,
     ImageCaptureConsent    INTEGER NOT NULL,
     ImageProcessingConsent INTEGER NOT NULL,
-    FutureModelUseConsent  INTEGER NOT NULL,
     Decision               TEXT NOT NULL,
     RecordedAt             TEXT NOT NULL,
     OperatorID             TEXT

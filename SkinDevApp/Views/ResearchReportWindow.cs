@@ -106,7 +106,11 @@ namespace SkinDevApp.Views
             band.Margin = new Thickness(16, 16, 16, 0);
 
             var bar = new DockPanel { LastChildFill = false };
-            _pdfBtn = new Button { Style = (Style)Application.Current.FindResource("PrimaryButton"), Height = 50, Content = Ui.IconLabel("Icon.Report", "Save as PDF / Print", 18) };
+            var saveBtn = new Button { Style = (Style)Application.Current.FindResource("PrimaryButton"), Height = 50, Content = Ui.IconLabel("Icon.Folder", "Save to Reports", 18) };
+            saveBtn.Click += (s, e) => SaveToReportsFolder();
+            DockPanel.SetDock(saveBtn, Dock.Right);
+            bar.Children.Add(saveBtn);
+            _pdfBtn = new Button { Style = (Style)Application.Current.FindResource("SecondaryButton"), Height = 50, Margin = new Thickness(0, 0, 10, 0), Content = Ui.IconLabel("Icon.Report", "Print or save as…", 18) };
             _pdfBtn.Click += (s, e) => Export();
             DockPanel.SetDock(_pdfBtn, Dock.Right);
             bar.Children.Add(_pdfBtn);
@@ -117,7 +121,7 @@ namespace SkinDevApp.Views
             var hint = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             hint.Children.Add(Ui.Icon("Icon.Info", 16, Ui.Muted));
             ((FrameworkElement)hint.Children[0]).Margin = new Thickness(0, 0, 8, 0);
-            hint.Children.Add(Ui.Text("Choose \"Microsoft Print to PDF\" to save a PDF file.", 12, false, Ui.Muted, new Thickness(0)));
+            hint.Children.Add(Ui.Text("\"Save to Reports\" keeps a PDF in the Reports folder (menu > Reports), ready to copy to a USB drive.", 12, false, Ui.Muted, new Thickness(0)));
             bar.Children.Add(hint);
             var barCard = new Border { Style = (Style)Application.Current.FindResource("Card"), Padding = new Thickness(18, 12, 12, 12), Margin = new Thickness(16, 0, 16, 16), Child = bar };
 
@@ -1060,6 +1064,23 @@ namespace SkinDevApp.Views
                 doc.Pages.Add(content);
             }
             return doc;
+        }
+
+        /// <summary>Saves the A4 report as a PDF in the Reports folder (no dialog).</summary>
+        private void SaveToReportsFolder()
+        {
+            try
+            {
+                System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+                string path = ReportPdf.Save(BuildPages(), PageW, PageH, _d.Session.DisplayId);
+                StudyRepository.Audit("Report saved", "ScanSession", _d.Session.ScanSessionID, System.IO.Path.GetFileName(path));
+                Toast.Show("Report saved to the Reports folder");
+            }
+            catch (Exception ex)
+            {
+                LumyDialog.Show("The report could not be saved: " + ex.Message, "LUMYVUE Report", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally { System.Windows.Input.Mouse.OverrideCursor = null; }
         }
 
         private void Export()

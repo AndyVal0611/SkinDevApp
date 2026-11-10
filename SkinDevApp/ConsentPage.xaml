@@ -49,10 +49,6 @@
                         <CheckBox x:Name="ProcessingChk" Margin="0,4" Checked="Check_Changed" Unchecked="Check_Changed">
                             <TextBlock TextWrapping="Wrap" FontSize="13" Text="I give permission for these images to be analyzed by the LUMYVUE system. *"/>
                         </CheckBox>
-                        <Separator Margin="0,10"/>
-                        <CheckBox x:Name="FutureUseChk" Margin="0,4">
-                            <TextBlock TextWrapping="Wrap" FontSize="13" Text="Optional: I agree that my images may be used to improve the system in the future. (This is not required.)"/>
-                        </CheckBox>
                     </StackPanel>
                 </Border>
 

@@ -115,12 +115,6 @@ namespace SkinDevApp.Views
             catch (Exception ex) { LumyDialog.Show("The backup could not be made: " + ex.Message, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
-        private void Check()
-        {
-            try { LumyDialog.Show(RecordsQueries.HealthCheck(), "LUMYVUE Database check", MessageBoxButton.OK, MessageBoxImage.Information); }
-            catch (Exception ex) { LumyDialog.Show("The check could not run: " + ex.Message, "LUMYVUE Database check", MessageBoxButton.OK, MessageBoxImage.Error); }
-        }
-
         private static void OpenFolder(string folder)
         {
             try
