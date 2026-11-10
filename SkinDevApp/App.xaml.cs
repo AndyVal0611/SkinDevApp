@@ -28,10 +28,34 @@ namespace SkinDevApp
             catch { return false; }
         }
 
+        /// <summary>True when LUMYVUE was started with --kiosk (by the Windows start-up task on the Mini PC): full screen, one instance.</summary>
+        public static bool KioskMode { get; private set; }
+        private static System.Threading.Mutex _kioskMutex;
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
             ApplyBodyFont();
+
+            KioskMode = e.Args != null && e.Args.Any(a => string.Equals(a, "--kiosk", StringComparison.OrdinalIgnoreCase));
+            if (KioskMode)
+            {
+                bool first;
+                _kioskMutex = new System.Threading.Mutex(true, @"Local\LUMYVUE_Kiosk", out first);
+                if (!first) { Shutdown(0); return; }                                    // already open: never two copies on the same database
+
+                // after an unexpected error the start-up task starts LUMYVUE again: leave with a non-zero exit code
+                DispatcherUnhandledException += (s, ex) =>
+                {
+                    DeviceShutdown.LogCrash(ex.Exception);
+                    ex.Handled = true;
+                    Environment.Exit(1);
+                };
+                AppDomain.CurrentDomain.UnhandledException += (s, ex) => { DeviceShutdown.LogCrash(ex.ExceptionObject as Exception); Environment.Exit(1); };
+            }
+
+            // Windows is shutting down or restarting: let the last scan finish saving (never blocks the shutdown for long)
+            SessionEnding += (s, ex) => { try { SkinDevApp.Data.SaveQueue.WaitAll(TimeSpan.FromSeconds(8)); } catch { } };
 
             // "SkinDevApp.exe --diagnose <image>": headless, read-only replay of the classifier and detectors (see CnnDiagnostics.cs)
             if (SkinDevApp.AI.CnnDiagnostics.TryRunFromArgs(e.Args)) { Shutdown(0); return; }

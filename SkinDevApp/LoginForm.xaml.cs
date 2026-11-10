@@ -128,5 +128,7 @@ namespace SkinDevApp.Views
                 Nav.Home();
             }
         }
+
+        private void ShutdownBtn_Click(object sender, RoutedEventArgs e) => DeviceShutdown.Ask();
     }
 }

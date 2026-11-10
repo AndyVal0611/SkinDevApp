@@ -261,6 +261,7 @@ namespace SkinDevApp.Views
             AddSide("Icon.Sliders", "Settings", () => Nav.Go(new SettingsPage()), r);
             AddSide("Icon.User", "My details", () => { if (ProfileDialog.EditCurrentUser(Application.Current.MainWindow)) { UpdateGreeting(); ShowCurrentParticipant(); } }, true);
             AddSide("Icon.Info", "About LUMYVUE", ShowAbout, true);
+            AddSide("Icon.Power", "Shut down", () => DeviceShutdown.Ask(), true);
         }
 
         private static int PendingCount()

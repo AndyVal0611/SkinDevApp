@@ -16,6 +16,14 @@ namespace SkinDevApp
         private const double DesignWidth = 1600, DesignHeight = 900, MaxScale = 1.3;
 
         private bool _closeAnimated;
+        private bool _shutDownDevice;       // set by "Shut down": after the normal closing steps the Windows shutdown is started
+
+        /// <summary>Closes LUMYVUE the normal way (saving the last scan first) and then shuts the device down.</summary>
+        internal void BeginDeviceShutdown()
+        {
+            _shutDownDevice = true;
+            Close();
+        }
 
         public MainWindow()
         {
@@ -23,6 +31,14 @@ namespace SkinDevApp
 
             // LUMYVUE runs full screen on its monitor (landscape or portrait); the layouts adapt to the real resolution and Windows scaling
             WindowState = WindowState.Maximized;
+
+            // kiosk mode (started with --kiosk by the Windows start-up task): no title bar, over the whole screen including the taskbar
+            if (App.KioskMode)
+            {
+                WindowStyle = WindowStyle.None;
+                ResizeMode = ResizeMode.NoResize;
+                Topmost = true;
+            }
 
             // the interface grows with the screen, so text and touch targets keep a comfortable size on a large 1080p monitor
             SizeChanged += (s, e) => ApplyUiScale();
@@ -127,7 +143,7 @@ namespace SkinDevApp
             if (SaveQueue.Pending > 0)
             {
                 // show the closing screen before waiting, so the person sees that the last scan is being saved
-                ShowExitLayer("Saving the last scan…");
+                ShowExitLayer(_shutDownDevice ? "Saving the last scan before shutting down…" : "Saving the last scan…");
                 ExitLayer.BeginAnimation(OpacityProperty, null);
                 ExitLayer.Opacity = 1;
                 Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
@@ -138,23 +154,50 @@ namespace SkinDevApp
                 finally { Mouse.OverrideCursor = null; }
 
                 if (!done && LumyDialog.Show(
-                        "A scan is still being saved to the database. Closing now may leave it out until the next start " +
-                        "(its images are safe on disk and are re-indexed automatically).\n\nClose anyway?",
+                        "A scan is still being saved to the database. " + (_shutDownDevice ? "Shutting down" : "Closing") + " now may leave it out until the next start " +
+                        "(its images are safe on disk and are re-indexed automatically).\n\n" + (_shutDownDevice ? "Shut down anyway?" : "Close anyway?"),
                         "LUMYVUE", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 {
                     e.Cancel = true;
+                    _shutDownDevice = false;
                     ExitLayer.Visibility = Visibility.Collapsed;
                     ExitLayer.Opacity = 0;
                     return;
                 }
             }
 
+            // a receipt that is being sent to the printer is allowed to finish
+            if (SkinDevApp.Printing.ThermalPrinter.IsBusy)
+            {
+                var until = DateTime.UtcNow.AddSeconds(10);
+                while (SkinDevApp.Printing.ThermalPrinter.IsBusy && DateTime.UtcNow < until) System.Threading.Thread.Sleep(100);
+            }
+
             // a short, calm goodbye: the LUMYVUE screen fades in, then the window closes
             e.Cancel = true;
             _closeAnimated = true;
-            ShowExitLayer("Closing LUMYVUE");
+            ShowExitLayer(_shutDownDevice ? "Shutting down the device" : "Closing LUMYVUE");
             var hold = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(520) };
-            hold.Tick += (s, a) => { hold.Stop(); Close(); };
+            hold.Tick += (s, a) =>
+            {
+                hold.Stop();
+                if (_shutDownDevice)
+                {
+                    string problem = DeviceShutdown.Start();
+                    if (problem != null)
+                    {
+                        // the shutdown could not be started: LUMYVUE stays open and nothing is lost
+                        _shutDownDevice = false;
+                        _closeAnimated = false;
+                        ExitLayer.BeginAnimation(OpacityProperty, null);
+                        ExitLayer.Visibility = Visibility.Collapsed;
+                        ExitLayer.Opacity = 0;
+                        LumyDialog.Show("The device could not be shut down.\n\n" + problem + "\n\nLUMYVUE is still open. You can shut down Windows from the Start menu.", "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+                Close();
+            };
             hold.Start();
         }
     }

@@ -174,6 +174,19 @@
     <Compile Include="Printing\EscPos.cs" />
     <Compile Include="Printing\PrinterSettings.cs" />
     <Compile Include="Printing\UsbPrinter.cs" />
+    <Compile Include="Views\DeviceShutdown.cs" />
+    <None Include="Kiosk\Run-LumyvueKiosk.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Kiosk\Install-LumyvueKiosk.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Kiosk\Uninstall-LumyvueKiosk.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Kiosk\README.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <Compile Include="Printing\ReceiptContent.cs" />
     <Compile Include="Printing\ReceiptService.cs" />
     <Compile Include="Printing\ThermalPrinter.cs" />

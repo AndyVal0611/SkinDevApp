@@ -32,6 +32,7 @@
     <Geometry x:Key="Icon.Chart">M4,20 H20 M7,16.5 V11 M12,16.5 V6 M17,16.5 V13</Geometry>
     <Geometry x:Key="Icon.Clock">M12,3 A9,9 0 1 0 12,21 A9,9 0 1 0 12,3 Z M12,7.5 V12 L15,14</Geometry>
     <Geometry x:Key="Icon.Sliders">M4,6 H14 M18,6 H20 M16,4 V8 M4,12 H8 M12,12 H20 M10,10 V14 M4,18 H14 M18,18 H20 M16,16 V20</Geometry>
+    <Geometry x:Key="Icon.Power">M12,3 V11.5 M6.6,6.4 A8,8 0 1 0 17.4,6.4</Geometry>
     <Geometry x:Key="Icon.Info">M12,3 A9,9 0 1 0 12,21 A9,9 0 1 0 12,3 Z M12,11 V16.5 M12,7.6 V7.8</Geometry>
     <Geometry x:Key="Icon.Check">M5,12.5 L10,17.5 L19,7</Geometry>
     <Geometry x:Key="Icon.CheckCircle">M12,3 A9,9 0 1 0 12,21 A9,9 0 1 0 12,3 Z M8,12.3 L10.8,15 L16,9.3</Geometry>

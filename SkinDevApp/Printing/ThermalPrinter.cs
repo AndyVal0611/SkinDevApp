@@ -51,6 +51,7 @@ namespace SkinDevApp.Printing
     public static class ThermalPrinter
     {
         private static int _busy;                           // one job at a time, across all windows
+        public static bool IsBusy => Thread.VolatileRead(ref _busy) != 0;
 
         public static string SimulationFolder => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE", "ReceiptSimulation");
