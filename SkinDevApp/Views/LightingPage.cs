@@ -1,34 +1,43 @@
 // ============================================================================
 // LightingPage.cs  -  namespace SkinDevApp.Views
 //
-// "Lighting": the controls of the ring light and the COB lights, the same ones as the controller's own web page (ringlight.ino):
-// power, brightness, warm / cool colour, and the COB lights. Changes are sent to the controller over WiFi a moment after the slider stops.
+// "Lighting": the connection to the ESP32 light controller (USB, COM port) and the controls of the soft lights and the ring light.
+// Brightness changes are sent a moment after the slider stops. The ring light normally comes on only while images are captured; the
+// "Test ring light" button lights it by hand for a short check and it switches itself off again after one minute or when this page closes.
+// The percentages are the controller's settings: LUMYVUE cannot measure the real brightness of the lights.
 // ============================================================================
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using SkinDevApp.Data;
+using SkinDevApp.Hardware;
 
 namespace SkinDevApp.Views
 {
     public sealed class LightingPage : Page
     {
+        private const string AutoItem = "Automatic (find the controller)";
+
         private readonly TextBlock _status = Ui.Text("Looking for the light controller…", 13, true, Ui.Ink, new Thickness(0));
         private readonly TextBlock _statusNote = Ui.Text("", 12, false, Ui.Muted, new Thickness(0, 4, 0, 0));
-        private readonly Button _power = new Button { Height = 56, Margin = new Thickness(0, 12, 0, 0) };
-        private readonly Slider _bright = new Slider { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10 };
+        private readonly ComboBox _ports = new ComboBox { Style = (Style)Application.Current.FindResource("Combo"), Height = 40, Width = 300, HorizontalAlignment = HorizontalAlignment.Left };
+        private readonly Button _ringTest = new Button { Height = 52, Margin = new Thickness(0, 12, 0, 0) };
+        private readonly Slider _ring = new Slider { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10 };
         private readonly Slider _temp = new Slider { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10 };
-        private readonly Button _cobPower = new Button { Height = 56, Margin = new Thickness(0, 12, 0, 0) };
-        private readonly Slider _cob = new Slider { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10 };
-        private readonly TextBlock _brightVal = Ui.Text("", 12.5, true, Ui.Ink, new Thickness(0));
+        private readonly Button _softPower = new Button { Height = 52, Margin = new Thickness(0, 12, 0, 0) };
+        private readonly Slider _soft = new Slider { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10 };
+        private readonly TextBlock _ringVal = Ui.Text("", 12.5, true, Ui.Ink, new Thickness(0));
         private readonly TextBlock _tempVal = Ui.Text("", 12.5, true, Ui.Ink, new Thickness(0));
-        private readonly TextBlock _cobVal = Ui.Text("", 12.5, true, Ui.Ink, new Thickness(0));
-        private readonly StackPanel _controls = new StackPanel();
+        private readonly TextBlock _softVal = Ui.Text("", 12.5, true, Ui.Ink, new Thickness(0));
+        private readonly TextBlock _ringState = Ui.Text("", 12.5, true, Ui.Muted, new Thickness(0));
+        private readonly TextBlock _softState = Ui.Text("", 12.5, true, Ui.Muted, new Thickness(0));
         private readonly DispatcherTimer _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
-        private bool _loading, _on, _cobOn;
-        private TextBox _addrBox;
+        private readonly DispatcherTimer _testOff = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+        private bool _loading, _ringLit, _softLit, _ringChanged, _tempChanged, _softChanged;
 
         public LightingPage()
         {
@@ -43,31 +52,50 @@ namespace SkinDevApp.Views
             root.Children.Add(scroll);
             Content = root;
 
-            // connection
-            var conn = new DockPanel();
-            Button retry = Ui.Btn("Try again", (s, e) => Refresh(), "SmallButton");
+            // ---- connection
+            var conn = new StackPanel();
+            var top = new DockPanel();
+            Button retry = Ui.Btn("Try again", (s, e) => Reconnect(), "SmallButton");
             DockPanel.SetDock(retry, Dock.Right);
-            conn.Children.Add(retry);
-            var connText = new StackPanel();
-            connText.Children.Add(_status);
-            connText.Children.Add(_statusNote);
-            conn.Children.Add(connText);
+            top.Children.Add(retry);
+            var text = new StackPanel();
+            text.Children.Add(_status);
+            text.Children.Add(_statusNote);
+            top.Children.Add(text);
+            conn.Children.Add(top);
+            conn.Children.Add(Ui.Text("Controller port (USB)", 12, false, Ui.Muted, new Thickness(0, 14, 0, 4)));
+            var portRow = new StackPanel { Orientation = Orientation.Horizontal };
+            portRow.Children.Add(_ports);
+            Button refreshPorts = Ui.Btn("Refresh list", (s, e) => FillPorts(), "SmallButton");
+            refreshPorts.Margin = new Thickness(8, 0, 0, 0);
+            portRow.Children.Add(refreshPorts);
+            conn.Children.Add(portRow);
+            conn.Children.Add(Ui.Text("Automatic is best: LUMYVUE asks every USB serial port until the light controller answers. Choose a port only if that fails.", 11.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
             body.Children.Add(Ui.Card(conn, new Thickness(0, 0, 0, 12)));
 
-            // ring light
+            // ---- soft lights
+            var softCard = new StackPanel();
+            softCard.Children.Add(Ui.Text("Soft lights", 17, true, Ui.Ink, new Thickness(0)));
+            softCard.Children.Add(Ui.Text("The soft lights inside the housing. They fade in by themselves when the Mini PC starts and stay on during the scan.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            softCard.Children.Add(_softPower);
+            softCard.Children.Add(Labelled("Brightness", _softVal, _softState));
+            softCard.Children.Add(_soft);
+            body.Children.Add(Ui.Card(softCard, new Thickness(0, 0, 0, 12)));
+
+            // ---- ring light
             var ring = new StackPanel();
             ring.Children.Add(Ui.Text("Ring light", 17, true, Ui.Ink, new Thickness(0)));
-            ring.Children.Add(Ui.Text("The main light around the camera. It comes on by itself when image capture starts.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
-            ring.Children.Add(_power);
-            ring.Children.Add(Labelled("Brightness", _brightVal));
-            ring.Children.Add(_bright);
-            ring.Children.Add(Labelled("Color", _tempVal));
+            ring.Children.Add(Ui.Text("The main light around the camera. It comes on by itself when image capture starts and goes off when each capture ends.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
+            ring.Children.Add(_ringTest);
+            ring.Children.Add(Labelled("Brightness", _ringVal, _ringState));
+            ring.Children.Add(_ring);
+            ring.Children.Add(Labelled("Color", _tempVal, null));
             ring.Children.Add(_temp);
             var ends = new DockPanel();
-            ends.Children.Add(Ui.Text("Warm", 11.5, false, Ui.Muted, new Thickness(0)));
             var cool = Ui.Text("Cool", 11.5, false, Ui.Muted, new Thickness(0));
             DockPanel.SetDock(cool, Dock.Right);
-            ends.Children.Insert(0, cool);
+            ends.Children.Add(cool);
+            ends.Children.Add(Ui.Text("Warm", 11.5, false, Ui.Muted, new Thickness(0)));
             ring.Children.Add(ends);
             var presets = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             foreach (var p in new[] { Tuple.Create("Warm", 0), Tuple.Create("Neutral", 50), Tuple.Create("Cool", 100) })
@@ -80,85 +108,101 @@ namespace SkinDevApp.Views
             ring.Children.Add(presets);
             body.Children.Add(Ui.Card(ring, new Thickness(0, 0, 0, 12)));
 
-            // COB lights
-            var cobCard = new StackPanel();
-            cobCard.Children.Add(Ui.Text("Soft lights", 17, true, Ui.Ink, new Thickness(0)));
-            cobCard.Children.Add(Ui.Text("The soft lights inside the housing. They fade in when the Mini PC starts.", 12.5, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
-            cobCard.Children.Add(_cobPower);
-            cobCard.Children.Add(Labelled("Brightness", _cobVal));
-            cobCard.Children.Add(_cob);
-            body.Children.Add(Ui.Card(cobCard, new Thickness(0, 0, 0, 12)));
-
-            // automatic use and address
+            // ---- automatic use and notes
             var auto = new StackPanel();
-            var autoChk = new CheckBox { Content = "Turn the ring light on when image capture starts, and off when it ends", FontSize = 13, IsChecked = LightController.AutoDuringScan };
+            var autoChk = new CheckBox { Content = "Turn the ring light on when image capture starts, and off when each capture ends", FontSize = 13, IsChecked = LightController.AutoDuringScan };
             autoChk.Click += (s, e) => LightController.AutoDuringScan = autoChk.IsChecked == true;
             auto.Children.Add(autoChk);
-            auto.Children.Add(Ui.Text("Light controller address", 12, false, Ui.Muted, new Thickness(0, 14, 0, 4)));
-            var addr = new DockPanel();
-            _addrBox = new TextBox { Style = (Style)Application.Current.FindResource("Field"), Height = 40, Width = 260, Text = LightController.Host, HorizontalAlignment = HorizontalAlignment.Left };
-            Button save = Ui.Btn("Save", (s, e) => { LightController.Host = _addrBox.Text; _addrBox.Text = LightController.Host; Refresh(); }, "SmallButton");
-            save.Margin = new Thickness(8, 0, 0, 0);
-            var addrRow = new StackPanel { Orientation = Orientation.Horizontal };
-            addrRow.Children.Add(_addrBox);
-            addrRow.Children.Add(save);
-            auto.Children.Add(addrRow);
-            auto.Children.Add(Ui.Text("Usually ringlight.local. If the controller cannot join the WiFi it starts its own hotspot \"RingLight\" (address 192.168.4.1).", 11.5, false, Ui.Muted, new Thickness(0, 6, 0, 0)));
+            auto.Children.Add(Ui.Text("The percentages are the settings the controller accepted. LUMYVUE cannot measure the real brightness of the lights.", 11.5, false, Ui.Muted, new Thickness(0, 10, 0, 0)));
             body.Children.Add(Ui.Card(auto, new Thickness(0)));
 
-            _power.Click += (s, e) => { _on = !_on; ShowState(); Send(); };
-            _cobPower.Click += (s, e) => { _cobOn = !_cobOn; ShowState(); Send(); };
-            _bright.ValueChanged += (s, e) => { if (_loading) return; if (_bright.Value > 0) _on = true; ShowState(); Send(); };
-            _temp.ValueChanged += (s, e) => { if (_loading) return; ShowState(); Send(); };
-            _cob.ValueChanged += (s, e) => { if (_loading) return; if (_cob.Value > 0) _cobOn = true; ShowState(); Send(); };
+            // ---- behaviour
+            _ports.SelectionChanged += (s, e) =>
+            {
+                if (_loading || _ports.SelectedItem == null) return;
+                string pick = (string)_ports.SelectedItem;
+                LightController.PreferredPort = pick == AutoItem ? "" : pick;
+                Reconnect();
+            };
+            _softPower.Click += (s, e) => { _softLit = !_softLit; if (_softLit && _soft.Value < 1) _soft.Value = 100; _softChanged = true; ShowState(); Send(); };
+            _ringTest.Click += (s, e) => ToggleRingTest();
+            _ring.ValueChanged += (s, e) => { if (_loading) return; _ringChanged = true; ShowState(); Send(); };
+            _temp.ValueChanged += (s, e) => { if (_loading) return; _tempChanged = true; ShowState(); Send(); };
+            _soft.ValueChanged += (s, e) => { if (_loading) return; if (_soft.Value > 0) _softLit = true; _softChanged = true; ShowState(); Send(); };
             _debounce.Tick += (s, e) => { _debounce.Stop(); Push(); };
+            _testOff.Tick += (s, e) => { _testOff.Stop(); if (_ringLit) ToggleRingTest(); };
 
             SetEnabled(false);
-            Loaded += (s, e) => Refresh();
-            Unloaded += (s, e) => _debounce.Stop();
+            ShowState();
+            FillPorts();
+            Action changed = () => Dispatcher.BeginInvoke(new Action(() => { if (IsLoaded) Refresh(); }));
+            Loaded += (s, e) => { LightController.ConnectionChanged += changed; Refresh(); };
+            Unloaded += (s, e) =>
+            {
+                LightController.ConnectionChanged -= changed;
+                _debounce.Stop(); _testOff.Stop();
+                if (_ringLit) { _ringLit = false; var ignore = LightController.SetAsync(on: false); }     // a hand test never outlives the page
+            };
         }
 
-        private static UIElement Labelled(string label, TextBlock value)
+        private static UIElement Labelled(string label, TextBlock value, TextBlock state)
         {
             var d = new DockPanel { Margin = new Thickness(0, 16, 0, 2) };
             DockPanel.SetDock(value, Dock.Right);
             d.Children.Add(value);
+            if (state != null) { state.Margin = new Thickness(10, 0, 0, 0); DockPanel.SetDock(state, Dock.Left); }
             d.Children.Add(Ui.Text(label, 13, false, Ui.Muted, new Thickness(0)));
+            if (state != null) d.Children.Add(state);
             return d;
+        }
+
+        private void FillPorts()
+        {
+            _loading = true;
+            var items = new List<string> { AutoItem };
+            foreach (string p in ESP32Controller.AvailablePorts()) items.Add(p);
+            string keep = LightController.PreferredPort;
+            if (!string.IsNullOrEmpty(keep) && !items.Contains(keep, StringComparer.OrdinalIgnoreCase)) items.Add(keep);
+            _ports.ItemsSource = items;
+            _ports.SelectedItem = string.IsNullOrEmpty(keep) ? AutoItem : items.FirstOrDefault(i => string.Equals(i, keep, StringComparison.OrdinalIgnoreCase));
+            _loading = false;
         }
 
         private void SetEnabled(bool on)
         {
-            foreach (UIElement c in new UIElement[] { _power, _bright, _temp, _cobPower, _cob }) c.IsEnabled = on;
+            foreach (UIElement c in new UIElement[] { _ringTest, _ring, _temp, _softPower, _soft }) c.IsEnabled = on;
+        }
+
+        private async void Reconnect()
+        {
+            LightController.PreferredPort = LightController.PreferredPort;      // drops the link; the monitor opens it again
+            _status.Text = "Looking for the light controller…";
+            _status.Foreground = Ui.Ink;
+            _statusNote.Text = "";
+            await System.Threading.Tasks.Task.Delay(300);
+            Refresh();
         }
 
         private async void Refresh()
         {
-            _status.Text = "Looking for the light controller…";
-            _status.Foreground = Ui.Ink;
-            _statusNote.Text = "";
+            FillPorts();
             LightState s = await LightController.GetAsync();
-            if (s == null)
-            {
-                _status.Text = "Searching the WiFi network for the light controller…";
-                _statusNote.Text = "This takes a few seconds.";
-                s = await LightController.FindOnNetworkAsync();
-                if (s != null && _addrBox != null) _addrBox.Text = LightController.Host;
-            }
             if (s == null)
             {
                 SetEnabled(false);
                 _status.Text = "Light controller not connected";
                 _status.Foreground = Ui.Bad;
-                _statusNote.Text = "Check that the controller is powered and on the same WiFi as this computer, then press Try again.  (" + LightController.LastReport + ")";
+                var ports = ESP32Controller.AvailablePorts();
+                _statusNote.Text = !string.IsNullOrEmpty(LightController.LastError) ? LightController.LastError
+                                   : (ports.Count == 0 ? "No USB serial port was found. Check that the controller's USB cable is plugged in." : "Ports found: " + string.Join(", ", ports) + ".");
                 return;
             }
             _status.Text = "Connected to the light controller";
             _status.Foreground = Ui.Good;
-            _statusNote.Text = s.Host;
+            _statusNote.Text = s.Host + (string.IsNullOrEmpty(s.Firmware) ? "" : "  ·  firmware " + s.Firmware);
             _loading = true;
-            _on = s.On; _cobOn = s.CobOn;
-            _bright.Value = s.Brightness; _temp.Value = s.Temperature; _cob.Value = s.CobBrightness;
+            _ringLit = s.On; _softLit = s.CobOn;
+            _ring.Value = s.Brightness; _temp.Value = s.Temperature; _soft.Value = s.CobBrightness;
             _loading = false;
             SetEnabled(true);
             ShowState();
@@ -166,26 +210,44 @@ namespace SkinDevApp.Views
 
         private void ShowState()
         {
-            _power.Style = (Style)FindResource(_on ? "PrimaryButton" : "SecondaryButton");
-            _power.Content = _on ? "Ring light is on  ·  tap to turn off" : "Ring light is off  ·  tap to turn on";
-            _cobPower.Style = (Style)FindResource(_cobOn ? "PrimaryButton" : "SecondaryButton");
-            _cobPower.Content = _cobOn ? "Soft lights are on  ·  tap to turn off" : "Soft lights are off  ·  tap to turn on";
-            _brightVal.Text = (int)_bright.Value + "%";
+            _softPower.Style = (Style)FindResource(_softLit ? "PrimaryButton" : "SecondaryButton");
+            _softPower.Content = _softLit ? "Soft lights are on  ·  tap to turn off" : "Soft lights are off  ·  tap to turn on";
+            _ringTest.Style = (Style)FindResource(_ringLit ? "PrimaryButton" : "SecondaryButton");
+            _ringTest.Content = _ringLit ? "Ring light is on (test)  ·  tap to turn off" : "Test ring light  ·  tap to turn on for a check";
+            _softVal.Text = (int)_soft.Value + "%";
+            _ringVal.Text = (int)_ring.Value + "%";
             int t = (int)_temp.Value;
             _tempVal.Text = t < 34 ? "Warm" : (t > 66 ? "Cool" : "Neutral");
-            _cobVal.Text = (int)_cob.Value + "%";
+            _softState.Text = _softLit ? "ON" : "OFF";
+            _ringState.Text = _ringLit ? "ON" : "OFF";
+        }
+
+        private async void ToggleRingTest()
+        {
+            _ringLit = !_ringLit;
+            ShowState();
+            _testOff.Stop();
+            if (_ringLit) _testOff.Start();
+            LightState s = await LightController.SetAsync(on: _ringLit);
+            if (s == null) { _status.Text = "Lost connection to the light controller"; _status.Foreground = Ui.Bad; }
         }
 
         private void Send() { _debounce.Stop(); _debounce.Start(); }
 
         private async void Push()
         {
-            LightState s = await LightController.SetAsync(_on, (int)_bright.Value, (int)_temp.Value, _cobOn, (int)_cob.Value);
+            bool ring = _ringChanged, temp = _tempChanged, soft = _softChanged;
+            _ringChanged = _tempChanged = _softChanged = false;
+            LightState s = await LightController.SetAsync(
+                brightness: ring ? (int?)_ring.Value : null,
+                temperature: temp ? (int?)_temp.Value : null,
+                cob: soft ? (bool?)_softLit : null,
+                cobBrightness: soft ? (int?)_soft.Value : null);
             if (s == null)
             {
                 _status.Text = "Lost connection to the light controller";
                 _status.Foreground = Ui.Bad;
-                _statusNote.Text = "Press Try again.";
+                _statusNote.Text = "LUMYVUE reconnects by itself when the controller is back. Press Try again to hurry it up.";
             }
         }
     }

@@ -21,6 +21,7 @@ namespace SkinDevApp
         /// <summary>Closes LUMYVUE the normal way (saving the last scan first) and then shuts the device down.</summary>
         internal void BeginDeviceShutdown()
         {
+            DeviceShutdown.InProgress = true;
             _shutDownDevice = true;
             Close();
         }
@@ -160,6 +161,7 @@ namespace SkinDevApp
                 {
                     e.Cancel = true;
                     _shutDownDevice = false;
+                    DeviceShutdown.InProgress = false;
                     ExitLayer.Visibility = Visibility.Collapsed;
                     ExitLayer.Opacity = 0;
                     return;
@@ -183,11 +185,14 @@ namespace SkinDevApp
                 hold.Stop();
                 if (_shutDownDevice)
                 {
+                    SkinDevApp.Data.LightController.ShutdownLights(1500);        // both lights off and the port closed (waits at most 1.5 s, even without a controller)
                     string problem = DeviceShutdown.Start();
                     if (problem != null)
                     {
                         // the shutdown could not be started: LUMYVUE stays open and nothing is lost
                         _shutDownDevice = false;
+                        DeviceShutdown.InProgress = false;
+                        SkinDevApp.Data.LightController.StartupSync();           // the shutdown did not start: the light controller connects again
                         _closeAnimated = false;
                         ExitLayer.BeginAnimation(OpacityProperty, null);
                         ExitLayer.Visibility = Visibility.Collapsed;

@@ -724,8 +724,9 @@ namespace SkinDevApp.Views
             ResearcherMetricsTxt.Text = "";
         }
 
-        private void StartCamBtn_Click(object sender, RoutedEventArgs e)
+        private async void StartCamBtn_Click(object sender, RoutedEventArgs e)
         {
+            if (SkinDevApp.Views.DeviceShutdown.InProgress) return;     // the device is shutting down: no new capture
             if (!CheckGate()) return;
 
             try
@@ -754,8 +755,9 @@ namespace SkinDevApp.Views
                 _resultsFrozen = false;
 
                 _camTried = 0;
+                await SkinDevApp.Data.LightController.RingOnAsync();      // image capture begins: the ring light comes on and settles before the camera starts
+                if (!_cameraLive) { SkinDevApp.Data.LightController.RingOff(); return; }      // cancelled while waiting
                 OpenCamera(SelectedCameraIndex());
-                SkinDevApp.Data.LightController.RingOn();                // image capture begins: the main ring light comes on
 
                 PlaceholderPanel.Visibility = Visibility.Collapsed;
                 UploadedImageViewer.Visibility = Visibility.Visible;
@@ -1306,6 +1308,7 @@ namespace SkinDevApp.Views
             _lastResult?.Dispose();
             _lastResult = r;
             _resultsFrozen = true;
+            SkinDevApp.Data.LightController.RingOff();                 // this capture is done (or failed): the ring light goes off, the soft lights stay on
 
             GuideCanvas.Visibility = Visibility.Collapsed;
             GuideBanner.Visibility = Visibility.Collapsed;
@@ -1486,8 +1489,10 @@ namespace SkinDevApp.Views
                 : "\n✓ " + ScanViews.Title(doneView) + " captured. Next: " + ScanViews.Instruction(next);
 
             // Show this view's result for a moment, then move on to the next angle.
-            Task.Delay(2500).ContinueWith(_ =>
+            Task.Delay(2500).ContinueWith(async _ =>
             {
+                try { await SkinDevApp.Data.LightController.RingOnAsync(); }       // next angle: ring light on, command accepted, short settling time
+                catch { }
                 try
                 {
                     Dispatcher.BeginInvoke(new Action(() =>

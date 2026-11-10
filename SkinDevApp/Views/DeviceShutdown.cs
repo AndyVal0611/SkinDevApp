@@ -16,6 +16,9 @@ namespace SkinDevApp.Views
 {
     public static class DeviceShutdown
     {
+        /// <summary>True from the moment "Shut down" was confirmed: no new image capture may start.</summary>
+        public static bool InProgress { get; set; }
+
         /// <summary>Asks "Are you sure?" and, on Yes, closes LUMYVUE and shuts the device down.</summary>
         public static void Ask()
         {

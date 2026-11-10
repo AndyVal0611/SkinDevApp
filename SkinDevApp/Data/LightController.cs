@@ -1,58 +1,69 @@
 // ============================================================================
 // LightController.cs  -  namespace SkinDevApp.Data
 //
-// Talks to the ESP32 light controller (ringlight.ino) over WiFi. The controller serves a tiny web API:
-//   GET /api/state                                   -> {"on":true,"b":60,"t":50,"cob":true,"cb":100}
-//   GET /api/set?on=1&b=60&t=50&cob=1&cb=100         -> the same JSON after the change
-// (on = ring light on/off, b = ring brightness 0-100, t = colour temperature 0 warm - 100 cool, cob = COB lights on/off, cb = COB brightness)
-// It is found as http://ringlight.local, then (the controller's own hotspot) http://192.168.4.1. A different address can be set on the
-// Lighting page. Every call has a short time-out and never throws: when the controller is not reachable the result is null.
+// The lighting features of LUMYVUE (soft lights and ring light) as the rest of the application uses them. All hardware communication is in
+// SkinDevApp.Hardware.ESP32Controller (USB serial); this class only translates between the screens (percent, on/off) and that controller,
+// remembers the chosen COM port, and applies the lighting rules of the scan:
+//   * soft lights: on from power-up (the ESP32 fades them in by itself); the app only makes sure they are on once it is connected,
+//     without restarting a fade that is already running
+//   * ring light: off while idle; CAPTURE_START when image capture begins, CAPTURE_END when it ends, is cancelled or fails
 // ============================================================================
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net.Http;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Threading;
-using System.Text.Json;
 using System.Threading.Tasks;
+using SkinDevApp.Hardware;
 
 namespace SkinDevApp.Data
 {
+    /// <summary>What the controller last reported, in the units the screens use (percent). These are the controller's settings, not measured light.</summary>
     public sealed class LightState
     {
-        public bool On { get; set; }
-        public int Brightness { get; set; } = 60;
-        public int Temperature { get; set; } = 50;
-        public bool CobOn { get; set; }
-        public int CobBrightness { get; set; } = 100;
-        public string Host { get; set; }                  // where it answered
+        public bool On { get; set; }                      // ring light is lit
+        public int Brightness { get; set; } = 60;         // ring brightness 0-100 %
+        public int Temperature { get; set; } = 50;        // ring colour 0 warm - 100 cool
+        public bool CobOn { get; set; }                   // soft lights are lit
+        public int CobBrightness { get; set; } = 100;     // soft brightness 0-100 %
+        public string Host { get; set; }                  // the COM port it is connected on
+        public string Firmware { get; set; }
     }
 
     public static class LightController
     {
-        private const string KeyHost = "light.host", KeyAuto = "light.auto";
-        public const string DefaultHost = "ringlight.local";
+        private const string KeyPort = "light.port", KeyAuto = "light.auto";
+        /// <summary>Time given to the ring light to reach its brightness after the controller accepted the command.</summary>
+        public const int RingStabilizationMs = 400;
 
-        private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(1.5) };
-        private static string _working;
+        private static ESP32Controller C => ESP32Controller.Instance;
+        private static bool _initialised, _softChecked;
 
-        /// <summary>The address entered on the Lighting page (without http://); empty means the default.</summary>
-        public static string Host
+        // ---------------------------------------------------------------- settings
+
+        /// <summary>The COM port chosen by hand; empty means "find it automatically".</summary>
+        public static string PreferredPort
         {
-            get { return Read(KeyHost, DefaultHost); }
-            set { Write(KeyHost, string.IsNullOrWhiteSpace(value) ? DefaultHost : value.Trim()); _working = null; }
+            get { Init(); return C.PreferredPort ?? ""; }
+            set
+            {
+                Init();
+                C.PreferredPort = string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+                Write(KeyPort, C.PreferredPort);
+                C.Disconnect();                           // the monitor reconnects on the new port
+                _softChecked = false;
+            }
         }
 
-        /// <summary>Switch the ring light on when a scan starts and off when it ends (on by default).</summary>
+        /// <summary>Switch the ring light on when image capture starts and off when it ends (on by default).</summary>
         public static bool AutoDuringScan
         {
             get { return !string.Equals(Read(KeyAuto, "true"), "false", StringComparison.OrdinalIgnoreCase); }
             set { Write(KeyAuto, value ? "true" : "false"); }
         }
+
+        public static bool IsConnected => C.IsConnected;
+        public static string PortName => C.PortName;
+        public static string LastError => C.LastError;
+        public static event Action ConnectionChanged;
 
         private static string Read(string key, string def)
         {
@@ -60,7 +71,7 @@ namespace SkinDevApp.Data
             {
                 if (!StudyDatabase.IsReady) return def;
                 string v;
-                return StudyRepository.LoadSettings().TryGetValue(key, out v) && !string.IsNullOrWhiteSpace(v) ? v : def;
+                return StudyRepository.LoadSettings().TryGetValue(key, out v) && v != null ? v : def;
             }
             catch { return def; }
         }
@@ -70,191 +81,132 @@ namespace SkinDevApp.Data
             try { StudyRepository.SaveSettings(new Dictionary<string, string> { { key, value } }); } catch { }
         }
 
-        private static IEnumerable<string> Hosts()
+        private static void Init()
         {
-            var list = new List<string>();
-            if (!string.IsNullOrEmpty(_working)) list.Add(_working);
-            list.Add(Host);
-            list.Add(DefaultHost);
-            list.Add("192.168.4.1");
-            return list.Distinct(StringComparer.OrdinalIgnoreCase);
+            if (_initialised) return;
+            _initialised = true;
+            C.PreferredPort = Read(KeyPort, "");
+            C.StateChanged += OnControllerChanged;
         }
 
-        public static Task<LightState> GetAsync() => Call("/api/state");
-
-        /// <summary>Changes only what is given; the rest keeps its value on the controller.</summary>
-        public static Task<LightState> SetAsync(bool? on = null, int? brightness = null, int? temperature = null, bool? cob = null, int? cobBrightness = null)
+        private static void OnControllerChanged()
         {
-            var q = new List<string>();
-            if (on.HasValue) q.Add("on=" + (on.Value ? 1 : 0));
-            if (brightness.HasValue) q.Add("b=" + Clamp(brightness.Value));
-            if (temperature.HasValue) q.Add("t=" + Clamp(temperature.Value));
-            if (cob.HasValue) q.Add("cob=" + (cob.Value ? 1 : 0));
-            if (cobBrightness.HasValue) q.Add("cb=" + Clamp(cobBrightness.Value));
-            return Call("/api/set?" + string.Join("&", q));
-        }
-
-        private static int Clamp(int v) => Math.Max(0, Math.Min(100, v));
-
-        /// <summary>What the last failed attempt tried and why it failed, in plain words (for the Lighting page).</summary>
-        public static string LastReport { get; private set; } = "";
-
-        private static async Task<LightState> Call(string path)
-        {
-            var report = new List<string>();
-            foreach (string host in Hosts())
+            try { ConnectionChanged?.Invoke(); } catch { }
+            // First time connected: make sure the soft lights are on. The controller fades them in by itself when it gets power, so nothing is sent
+            // while they are already on or fading (a fade in progress is never restarted); only if they are OFF (for example after a shutdown with
+            // the USB port still powered) are they switched on, and the controller then fades them in.
+            if (C.IsConnected && !_softChecked && C.LastStatus != null)
             {
-                try
+                _softChecked = true;
+                if (C.LastStatus.Soft == 0)
                 {
-                    string json = await Http.GetStringAsync("http://" + host + path).ConfigureAwait(false);
-                    LightState s = Parse(json);
-                    if (s == null) { report.Add(host + ": answered, but it is not the light controller"); continue; }
-                    s.Host = host;
-                    _working = host;
-                    LastReport = "";
-                    return s;
-                }
-                catch (Exception ex) { report.Add(host + ": " + Reason(ex)); }
-            }
-            _working = null;
-            LastReport = string.Join("  ·  ", report);
-            return null;
-        }
-
-        private static string Reason(Exception ex)
-        {
-            string m = (ex.InnerException != null ? ex.InnerException.Message : ex.Message) ?? "";
-            if (ex is TaskCanceledException || m.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0 && m.IndexOf("out", StringComparison.OrdinalIgnoreCase) >= 0) return "no answer (timed out)";
-            if (m.IndexOf("name could not be resolved", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("No such host", StringComparison.OrdinalIgnoreCase) >= 0) return "name not found";
-            if (m.IndexOf("refused", StringComparison.OrdinalIgnoreCase) >= 0) return "connection refused";
-            if (m.IndexOf("unreachable", StringComparison.OrdinalIgnoreCase) >= 0) return "network unreachable";
-            return m.Trim();
-        }
-
-        // ------------------------------------------------------------------ finding the controller on the WiFi
-
-        /// <summary>
-        /// Looks for the controller on this computer's own network by asking every address of the local network (the same /24) for /api/state.
-        /// This finds it when the name "ringlight.local" does not work. On success the address is saved and used from then on. Takes a few seconds.
-        /// </summary>
-        public static async Task<LightState> FindOnNetworkAsync()
-        {
-            var candidates = new List<string>();
-            try
-            {
-                foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (UnicastIPAddressInformation ua in nic.GetIPProperties().UnicastAddresses)
-                    {
-                        if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                        byte[] b = ua.Address.GetAddressBytes();
-                        if (b[0] == 169 && b[1] == 254) continue;                       // no real network
-                        for (int i = 1; i <= 254; i++) if (i != b[3]) candidates.Add(b[0] + "." + b[1] + "." + b[2] + "." + i);
-                    }
+                    int level = C.LastStatus.SoftLevel > 0 ? ESP32Controller.ToPercent(C.LastStatus.SoftLevel) : 100;
+                    Task.Run(() => C.SetSoftAsync(level));
                 }
             }
-            catch { }
-            LightState s = await ProbeAsync(candidates.Distinct().ToList()).ConfigureAwait(false);
-            if (s != null) Host = s.Host;
-            return s;
+            if (!C.IsConnected) _softChecked = false;
         }
 
-        /// <summary>Asks every candidate address (in parallel, short time-out) and returns the first one that answers like the controller.</summary>
-        internal static async Task<LightState> ProbeAsync(IList<string> hosts)
+        // ---------------------------------------------------------------- start-up and shutdown
+
+        /// <summary>Called once when LUMYVUE starts: starts the background connection to the controller. Never blocks and never fails.</summary>
+        public static void StartupSync()
         {
-            if (hosts.Count == 0) return null;
-            using (var probe = new HttpClient { Timeout = TimeSpan.FromMilliseconds(900) })
-            using (var gate = new SemaphoreSlim(64))
-            using (var cts = new CancellationTokenSource())
-            {
-                var tasks = hosts.Select(async h =>
-                {
-                    await gate.WaitAsync(cts.Token).ConfigureAwait(false);
-                    try
-                    {
-                        string json = await probe.GetStringAsync("http://" + h + "/api/state").ConfigureAwait(false);
-                        LightState s = Parse(json);
-                        if (s != null) s.Host = h;
-                        return s;
-                    }
-                    catch { return null; }
-                    finally { gate.Release(); }
-                }).ToList();
-                while (tasks.Count > 0)
-                {
-                    Task<LightState> done = await Task.WhenAny(tasks).ConfigureAwait(false);
-                    tasks.Remove(done);
-                    LightState s = null;
-                    try { s = done.Result; } catch { }
-                    if (s != null) { cts.Cancel(); _working = s.Host; return s; }
-                }
-            }
-            return null;
+            Init();
+            C.StartMonitor();
         }
 
-        internal static LightState Parse(string json)
+        /// <summary>LUMYVUE is shutting down the device: both lights off, then the port is closed. Waits at most timeoutMs, so a missing controller cannot stall the shutdown.</summary>
+        public static void ShutdownLights(int timeoutMs = 1500)
         {
-            try
-            {
-                using (JsonDocument d = JsonDocument.Parse(json))
-                {
-                    JsonElement r = d.RootElement;
-                    return new LightState
-                    {
-                        On = r.GetProperty("on").GetBoolean(),
-                        Brightness = r.GetProperty("b").GetInt32(),
-                        Temperature = r.GetProperty("t").GetInt32(),
-                        CobOn = r.GetProperty("cob").GetBoolean(),
-                        CobBrightness = r.GetProperty("cb").GetInt32()
-                    };
-                }
-            }
-            catch { return null; }
+            C.ShutdownLights(timeoutMs);
         }
+
+        // ---------------------------------------------------------------- reading and changing
+
+        /// <summary>Connects if necessary and reads the controller's state. Null when it is not connected.</summary>
+        public static async Task<LightState> GetAsync()
+        {
+            Init();
+            if (!C.IsConnected) await C.ConnectAsync().ConfigureAwait(false);
+            if (!C.IsConnected) return null;
+            Esp32Status s = await C.RefreshStatusAsync().ConfigureAwait(false);
+            return s == null ? null : ToState(s);
+        }
+
+        /// <summary>Changes only what is given. Brightness values are percent (0-100). Returns the state reported afterwards, or null if not connected.</summary>
+        public static async Task<LightState> SetAsync(bool? on = null, int? brightness = null, int? temperature = null, bool? cob = null, int? cobBrightness = null)
+        {
+            Init();
+            if (!C.IsConnected) await C.ConnectAsync().ConfigureAwait(false);
+            if (!C.IsConnected) return null;
+            if (brightness.HasValue) await C.SetRingLevelAsync(brightness.Value).ConfigureAwait(false);
+            if (temperature.HasValue) await C.SetTemperatureAsync(temperature.Value).ConfigureAwait(false);
+            if (cob.HasValue || cobBrightness.HasValue)
+            {
+                bool soft = cob ?? (cobBrightness.Value > 0);
+                int level = cobBrightness ?? (C.LastStatus != null ? ESP32Controller.ToPercent(C.LastStatus.SoftLevel) : 100);
+                await C.SetSoftAsync(soft ? Math.Max(1, level) : 0).ConfigureAwait(false);
+            }
+            if (on.HasValue)
+            {
+                if (on.Value) await C.CaptureStartAsync().ConfigureAwait(false);       // lights the ring at its remembered level
+                else await C.CaptureEndAsync().ConfigureAwait(false);
+            }
+            Esp32Status s = await C.RefreshStatusAsync().ConfigureAwait(false);
+            return s == null ? null : ToState(s);
+        }
+
+        private static LightState ToState(Esp32Status s)
+        {
+            return new LightState
+            {
+                On = s.RingOn,
+                Brightness = ESP32Controller.ToPercent(s.RingLevel),
+                Temperature = ESP32Controller.ToPercent(s.Temp),
+                CobOn = s.SoftOn,
+                CobBrightness = ESP32Controller.ToPercent(s.SoftOn ? s.Soft : s.SoftLevel),
+                Host = C.PortName,
+                Firmware = s.Firmware
+            };
+        }
+
+        /// <summary>LUMYVUE is closing normally: the ring light goes off (the soft lights stay on) and the port is closed.</summary>
+        public static void CloseForExit()
+        {
+            try { if (_ringOn && C.IsConnected) C.CaptureEndAsync().Wait(800); } catch { }
+            C.Dispose();
+        }
+
+        // ---------------------------------------------------------------- the ring light during image capture
 
         private static bool _ringOn;
 
-        /// <summary>Image capture starts (the camera is started): the ring light comes on, when the automatic setting is on. Never blocks and never fails.</summary>
-        public static void RingOn()
+        /// <summary>
+        /// Image capture is about to begin: lights the ring and waits until the controller has ACCEPTED the command, then gives the light a moment to settle.
+        /// True when the ring is lit (or lighting is switched off / not connected, so capture is never blocked by a missing controller).
+        /// </summary>
+        public static async Task<bool> RingOnAsync()
         {
-            if (!AutoDuringScan) return;
+            if (!AutoDuringScan) return true;
+            Init();
+            if (!C.IsConnected) return true;                                   // no controller: capture goes on without it
+            Esp32Response r = await C.CaptureStartAsync().ConfigureAwait(false);
+            if (!r.Ok) return false;
             _ringOn = true;
-            Task.Run(() => SetAsync(on: true));
+            await Task.Delay(RingStabilizationMs).ConfigureAwait(false);
+            return true;
         }
 
-        /// <summary>Image capture ends (the camera is stopped): the ring light goes off again. Only if this app switched it on.</summary>
+        /// <summary>Fire-and-forget version of RingOnAsync.</summary>
+        public static void RingOn() { Task.Run(() => RingOnAsync()); }
+
+        /// <summary>Image capture ended, was cancelled or failed: the ring light goes off (the soft lights stay on). Only if this app lit it.</summary>
         public static void RingOff()
         {
             if (!_ringOn) return;
             _ringOn = false;
-            Task.Run(() => SetAsync(on: false));
-        }
-
-        /// <summary>
-        /// When the app starts (the Mini PC has just started): make sure the soft lights are on. The controller fades them in by itself as soon as it has power;
-        /// it needs a few seconds to join the WiFi, so this retries for about 100 seconds and then gives up quietly.
-        /// </summary>
-        public static void StartupSync()
-        {
-            Task.Run(async () =>
-            {
-                for (int i = 0; i < 20; i++)
-                {
-                    LightState s = await GetAsync().ConfigureAwait(false);
-                    if (s != null)
-                    {
-                        if (!s.CobOn) await SetAsync(cob: true).ConfigureAwait(false);
-                        return;
-                    }
-                    if (i == 3)                                                       // the name did not work after ~15 s: look for it on the network
-                    {
-                        s = await FindOnNetworkAsync().ConfigureAwait(false);
-                        if (s != null) { if (!s.CobOn) await SetAsync(cob: true).ConfigureAwait(false); return; }
-                    }
-                    await Task.Delay(5000).ConfigureAwait(false);
-                }
-            });
+            Task.Run(() => C.CaptureEndAsync());
         }
     }
 }

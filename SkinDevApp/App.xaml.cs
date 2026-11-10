@@ -32,6 +32,12 @@ namespace SkinDevApp
         public static bool KioskMode { get; private set; }
         private static System.Threading.Mutex _kioskMutex;
 
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try { SkinDevApp.Data.LightController.CloseForExit(); } catch { }        // ring light off, serial port closed
+            base.OnExit(e);
+        }
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -55,7 +61,7 @@ namespace SkinDevApp
             }
 
             // Windows is shutting down or restarting: let the last scan finish saving (never blocks the shutdown for long)
-            SessionEnding += (s, ex) => { try { SkinDevApp.Data.SaveQueue.WaitAll(TimeSpan.FromSeconds(8)); } catch { } };
+            SessionEnding += (s, ex) => { try { SkinDevApp.Data.SaveQueue.WaitAll(TimeSpan.FromSeconds(8)); } catch { } try { SkinDevApp.Data.LightController.ShutdownLights(1200); } catch { } };
 
             // "SkinDevApp.exe --diagnose <image>": headless, read-only replay of the classifier and detectors (see CnnDiagnostics.cs)
             if (SkinDevApp.AI.CnnDiagnostics.TryRunFromArgs(e.Args)) { Shutdown(0); return; }

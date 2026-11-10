@@ -181,6 +181,7 @@
     <Compile Include="Views\LightingPage.cs" />
     <Compile Include="Views\LightPanel.cs" />
     <Compile Include="Data\LightController.cs" />
+    <Compile Include="Hardware\ESP32Controller.cs" />
     <None Include="Kiosk\Run-LumyvueKiosk.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
