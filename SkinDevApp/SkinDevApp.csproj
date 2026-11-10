@@ -173,6 +173,7 @@
     <Compile Include="Data\ReceiptRepository.cs" />
     <Compile Include="Printing\EscPos.cs" />
     <Compile Include="Printing\PrinterSettings.cs" />
+    <Compile Include="Printing\UsbPrinter.cs" />
     <Compile Include="Printing\ReceiptContent.cs" />
     <Compile Include="Printing\ReceiptService.cs" />
     <Compile Include="Printing\ThermalPrinter.cs" />

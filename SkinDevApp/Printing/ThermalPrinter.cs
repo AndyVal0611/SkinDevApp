@@ -92,8 +92,14 @@ namespace SkinDevApp.Printing
                 return new PrinterStatus { CanSend = false, Level = 2, Headline = "Turned off", Detail = "Receipts can be previewed." };
             if (s.Simulation)
                 return new PrinterStatus { CanSend = true, Level = 1, Headline = "Simulation mode: nothing is printed", Detail = "Receipts are saved as files for testing. Turn simulation off in Settings to print on the QR701." };
+            if (!string.IsNullOrEmpty(s.UsbPath))
+                return new PrinterStatus
+                {
+                    CanSend = true, Level = 0, Headline = "QR701 connected by USB",
+                    Detail = "The printer cannot report paper or power, so please check that it is switched on and has paper."
+                };
             if (string.IsNullOrWhiteSpace(s.PortName))
-                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No printer found", Detail = PortNames().Length > 0 ? "Only Bluetooth ports were found. Connect the printer's USB serial adapter to print; receipts can still be previewed." : "Connect the printer's USB serial adapter to print; receipts can still be previewed." };
+                return new PrinterStatus { CanSend = false, Level = 2, Headline = "No printer found", Detail = "Connect the printer's USB cable and switch the printer on. Receipts can still be previewed." };
             if (!PortNames().Contains(s.PortName, StringComparer.OrdinalIgnoreCase))
                 return new PrinterStatus { CanSend = false, Level = 2, Headline = s.PortName + " not found", Detail = "The serial adapter may be unplugged, or Windows gave it another COM number. Check the cable and reopen the receipt." };
             return new PrinterStatus
@@ -109,7 +115,12 @@ namespace SkinDevApp.Printing
             return Task.Run(() =>
             {
                 if (s.Simulation) return "Simulation mode is on: no port is used and nothing is printed.";
-                if (string.IsNullOrWhiteSpace(s.PortName)) return "Choose a COM port first.";
+                if (!string.IsNullOrEmpty(s.UsbPath))
+                {
+                    try { using (UsbPrinter.Open(s.UsbPath)) { } return "The USB printer opened and closed correctly."; }
+                    catch (Exception ex) { return ex.Message; }
+                }
+                if (string.IsNullOrWhiteSpace(s.PortName)) return "No printer was found.";
                 try
                 {
                     using (SerialPort port = Open(s)) { }
@@ -140,7 +151,28 @@ namespace SkinDevApp.Printing
                 {
                     if (s.Simulation) return Simulate(chunks, s, progress, cancel, result);
                     if (!s.Enabled) { result.Outcome = SendOutcome.Failed; result.Error = "The printer is turned off."; return result; }
-                    if (string.IsNullOrWhiteSpace(s.PortName)) { result.Outcome = SendOutcome.Failed; result.Error = "No printer was found. Connect the printer's USB serial adapter."; return result; }
+                    if (!string.IsNullOrEmpty(s.UsbPath))
+                    {
+                        using (var usb = UsbPrinter.Open(s.UsbPath))
+                        {
+                            foreach (byte[] chunk in chunks)
+                            {
+                                if (cancel.IsCancellationRequested)
+                                {
+                                    result.Outcome = SendOutcome.Cancelled;
+                                    result.Error = result.BytesSent == 0 ? "Cancelled before anything was sent." : "Cancelled part-way: part of the receipt may have printed.";
+                                    return result;
+                                }
+                                UsbPrinter.Write(usb, chunk);
+                                result.BytesSent += chunk.Length;
+                                progress?.Report(total == 0 ? 1 : (double)result.BytesSent / total);
+                                Thread.Sleep(5);
+                            }
+                        }
+                        result.Outcome = SendOutcome.SentToPrinter;
+                        return result;
+                    }
+                    if (string.IsNullOrWhiteSpace(s.PortName)) { result.Outcome = SendOutcome.Failed; result.Error = "No printer was found. Connect the printer's USB cable and switch it on."; return result; }
 
                     using (SerialPort port = Open(s))
                     {
@@ -241,6 +273,7 @@ namespace SkinDevApp.Printing
                 return "The printer did not accept the data in time. Check the printer's power, paper and the flow-control setting.";
             if (ex is ArgumentOutOfRangeException || ex is ArgumentException)
                 return "These serial settings are not supported by " + port + " (" + s.BaudRate + " baud, " + s.DataBits + " data bits, parity " + s.Parity + ", stop bits " + s.StopBits + ").";
+            if (!string.IsNullOrEmpty(s.UsbPath) && ex is IOException) return ex.Message;
             if (ex is FileNotFoundException || ex is IOException)
                 return "Communication with " + port + " failed: the serial adapter may be unplugged, the COM number may have changed, or the printer lost power. (" + ex.Message.Trim() + ")";
             if (ex is InvalidOperationException)

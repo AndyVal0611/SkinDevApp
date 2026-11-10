@@ -21,7 +21,8 @@ namespace SkinDevApp.Printing
     {
         public bool Enabled { get; set; } = false;
         public bool Simulation { get; set; } = false;           // write the receipt to a file instead of a printer (clearly labelled; nothing is printed)
-        public string PortName { get; set; } = "";              // e.g. COM3 (the USB-to-TTL serial adapter)
+        public string PortName { get; set; } = "";              // "USB" for the printer's own USB cable, or a COM port (USB-to-TTL serial adapter)
+        public string UsbPath { get; set; } = "";               // the device path of the USB receipt printer, found automatically
         public int BaudRate { get; set; } = 9600;
         public int DataBits { get; set; } = 8;
         public string Parity { get; set; } = "None";            // None | Even | Odd
@@ -41,6 +42,7 @@ namespace SkinDevApp.Printing
         /// <summary>Short, non-personal description stored with every print attempt.</summary>
         public string PrinterId =>
             Simulation ? "Simulation (no printer)"
+                       : !string.IsNullOrEmpty(UsbPath) ? "QR701 USB"
                        : "QR701 " + (string.IsNullOrEmpty(PortName) ? "(no port)" : PortName) + " " + BaudRate.ToString(CultureInfo.InvariantCulture) + " " +
                          DataBits.ToString(CultureInfo.InvariantCulture) + (Parity ?? "N").Substring(0, 1) + (StopBits == "Two" ? "2" : "1") +
                          (Handshake == "None" ? "" : " " + Handshake);
@@ -56,6 +58,8 @@ namespace SkinDevApp.Printing
             var s = new PrinterSettings { Enabled = true, Simulation = false, Styles = true };
             try
             {
+                string usb = UsbPrinter.FindPath();                  // the printer's own USB cable first
+                if (!string.IsNullOrEmpty(usb)) { s.UsbPath = usb; s.PortName = "USB"; return s; }
                 string[] ports = ThermalPrinter.PrinterPortNames();
                 if (ports.Length > 0) s.PortName = ports[ports.Length - 1];
             }
