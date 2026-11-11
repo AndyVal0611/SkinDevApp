@@ -63,7 +63,7 @@ namespace SkinDevApp.Views
         {
             try
             {
-                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE");
+                string dir = DataLocation.LogsDir;
                 Directory.CreateDirectory(dir);
                 File.AppendAllText(Path.Combine(dir, "crash.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + (ex == null ? "unknown error" : ex.ToString()) + Environment.NewLine + Environment.NewLine);
             }

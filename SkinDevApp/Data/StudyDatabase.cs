@@ -32,38 +32,93 @@ using System.IO;
 namespace SkinDevApp.Data
 {
     /// <summary>
-    /// Where the study database and captured images live. By default they stay on this PC. To share one
-    /// database between several PCs, point every PC at the same synced folder (OneDrive, Google Drive,
-    /// Dropbox, a network share) with either:
-    ///   - the environment variable LUMYVUE_DATA_DIR, or
-    ///   - a text file %LOCALAPPDATA%\LUMYVUE\data_folder.txt whose first line is the folder path.
-    /// The database file and the Captures folder are then read and written inside that folder.
+    /// Where LUMYVUE keeps its data. EVERYTHING lives outside the application folder, in one permanent place:
+    ///
+    ///   C:\ProgramData\LUMYVUE\
+    ///       Database\lumyvue_db.sqlite     accounts, patients, scans, results, receipts, settings, audit log
+    ///       Patient Records\               every scan's files (images, results), see ScanStorage
+    ///       Captures\                      older capture folders
+    ///       Reports\                       saved A4 reports (PDF)
+    ///       Backups\                       database backups (SQLite online backup)
+    ///       Logs\                          database.log (migration, restore) and crash.log
+    ///
+    /// The folder is created by the application when it is missing and is shared by every Windows account of the PC. Replacing, moving or
+    /// rebuilding the application folder never touches it. Two environment variables exist for testing and special set-ups:
+    ///   - LUMYVUE_ROOT_DIR  uses another folder instead of C:\ProgramData\LUMYVUE (same layout), and
+    ///   - LUMYVUE_DATA_DIR  (or %LOCALAPPDATA%\LUMYVUE\data_folder.txt) the older "shared folder" mode: one flat folder, usable from
+    ///                       several PCs through a synced folder.
     /// </summary>
     public static class DataLocation
     {
-        private static readonly string LocalDb =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumyvue_db.sqlite");
+        /// <summary>Where older versions kept the database: next to the exe. Used only as a migration source (see DataMigration), never as the live database.</summary>
+        public static string LegacyDbFile { get; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumyvue_db.sqlite");
 
-        private static readonly string LocalCaptures = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE", "Captures");
+        /// <summary>Where older versions kept the scan files (%LOCALAPPDATA%\LUMYVUE). Migration source only.</summary>
+        public static string LegacyUserRoot { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE");
 
         /// <summary>The shared data folder, or null when this PC keeps its own data.</summary>
         public static string SharedFolder { get; } = FindSharedFolder();
 
         public static bool IsShared => SharedFolder != null;
 
+        /// <summary>The permanent data folder of this installation.</summary>
+        public static string DataRoot { get; } = SharedFolder ?? ResolveRoot();
+
+        public static string DatabaseDir { get; } = SharedFolder ?? Path.Combine(DataRoot, "Database");
+
         public static string DbFile { get; } = ResolveDb();
 
-        public static string CapturesDir => SharedFolder != null ? Path.Combine(SharedFolder, "Captures") : LocalCaptures;
-
-        /// <summary>The data folder of this installation: the shared folder, or %LOCALAPPDATA%\LUMYVUE.</summary>
-        public static string DataRoot => SharedFolder ?? Path.GetDirectoryName(LocalCaptures);
+        public static string CapturesDir => Path.Combine(DataRoot, "Captures");
 
         /// <summary>Every scan's files: Patient Records\&lt;verification status&gt;\&lt;PatientID&gt;\&lt;date&gt;\&lt;scan folder&gt; (see ScanStorage).</summary>
         public static string RecordsDir => Path.Combine(DataRoot, "Patient Records");
 
         /// <summary>Every saved A4 report (PDF): the folder shown under Reports in the menu.</summary>
         public static string ReportsDir => Path.Combine(DataRoot, "Reports");
+
+        public static string BackupsDir => Path.Combine(DataRoot, "Backups");
+
+        public static string LogsDir => Path.Combine(DataRoot, "Logs");
+
+        private static string ResolveRoot()
+        {
+            string p = Environment.GetEnvironmentVariable("LUMYVUE_ROOT_DIR");
+            if (!string.IsNullOrWhiteSpace(p)) return p.Trim().Trim('"');
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "LUMYVUE");
+        }
+
+        /// <summary>
+        /// Creates the permanent folders when they are missing and lets every Windows account of this PC use them. THROWS when that is not possible,
+        /// so the application reports the problem instead of quietly starting with an empty database somewhere else.
+        /// </summary>
+        public static void EnsureFolders()
+        {
+            bool newRoot = !Directory.Exists(DataRoot);
+            Directory.CreateDirectory(DataRoot);
+            Directory.CreateDirectory(DatabaseDir);
+            Directory.CreateDirectory(BackupsDir);
+            Directory.CreateDirectory(LogsDir);
+            Directory.CreateDirectory(ReportsDir);
+            if (newRoot && !IsShared)
+            {
+                try
+                {
+                    var di = new DirectoryInfo(DataRoot);
+                    var sec = di.GetAccessControl();
+                    sec.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                        new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinUsersSid, null),
+                        System.Security.AccessControl.FileSystemRights.Modify,
+                        System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                        System.Security.AccessControl.PropagationFlags.None, System.Security.AccessControl.AccessControlType.Allow));
+                    di.SetAccessControl(sec);
+                }
+                catch { /* the account that created the folder can still use it; other accounts may need the permission added by an administrator */ }
+            }
+            // a real write test: a folder that exists but cannot be written to must be reported now
+            string probe = Path.Combine(DatabaseDir, ".write_test_" + Guid.NewGuid().ToString("N"));
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+        }
 
         private static string FindSharedFolder()
         {
@@ -72,8 +127,7 @@ namespace SkinDevApp.Data
                 string p = Environment.GetEnvironmentVariable("LUMYVUE_DATA_DIR");
                 if (string.IsNullOrWhiteSpace(p))
                 {
-                    string cfg = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMYVUE", "data_folder.txt");
+                    string cfg = Path.Combine(LegacyUserRoot, "data_folder.txt");
                     if (File.Exists(cfg))
                         foreach (string line in File.ReadAllLines(cfg))
                             if (!string.IsNullOrWhiteSpace(line)) { p = line; break; }
@@ -88,20 +142,20 @@ namespace SkinDevApp.Data
 
         private static string ResolveDb()
         {
-            if (SharedFolder == null) return LocalDb;
+            if (SharedFolder == null) return Path.Combine(DatabaseDir, "lumyvue_db.sqlite");
             string shared = Path.Combine(SharedFolder, "lumyvue_db.sqlite");
             try
             {
-                // First PC to join: bring its existing local data (accounts, scans) into the shared folder.
-                if (!File.Exists(shared) && File.Exists(LocalDb)) File.Copy(LocalDb, shared);
+                // First PC to join a shared folder: bring its existing data (accounts, scans) into the shared folder.
+                if (!File.Exists(shared) && File.Exists(LegacyDbFile)) File.Copy(LegacyDbFile, shared);
             }
             catch { }
             return shared;
         }
 
         /// <summary>
-        /// Records store absolute paths. If a saved path does not exist on this PC (another PC wrote it),
-        /// re-point it at this PC's Captures folder.
+        /// Records store absolute paths. If a saved path does not exist on this PC (another PC wrote it, or the data was moved),
+        /// re-point it at this PC's Patient Records / Captures folder.
         /// </summary>
         public static string Rebase(string path)
         {
@@ -143,7 +197,16 @@ namespace SkinDevApp.Data
         {
             try
             {
-                if (!File.Exists(DbPath)) SQLiteConnection.CreateFile(DbPath);
+                DataLocation.EnsureFolders();                              // creates the permanent folders (throws when they cannot be used)
+                if (!File.Exists(DbPath))
+                {
+                    DataMigration.EnsureDatabase();                        // brings an older installation's data over (throws if that is not safe)
+                    if (!File.Exists(DbPath))                              // nothing to migrate: this is a first installation
+                    {
+                        SQLiteConnection.CreateFile(DbPath);
+                        DataMigration.Log("New database created at " + DbPath);
+                    }
+                }
                 else BackupBeforeUpgrade();
 
                 using (var c = Open())
@@ -236,10 +299,15 @@ namespace SkinDevApp.Data
             }
             catch { stored = 0; }                                     // no settings table yet: an old or empty database
             if (stored >= SchemaVersion) return;
-            string dir = Path.Combine(Path.GetDirectoryName(DbPath), "Backups");
+            string dir = DataLocation.BackupsDir;
             Directory.CreateDirectory(dir);
             string copy = Path.Combine(dir, "lumyvue_db_before_v" + SchemaVersion + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".sqlite");
-            File.Copy(DbPath, copy, false);
+            using (var src = Open())
+            using (var dst = new SQLiteConnection("Data Source=" + copy + ";Version=3;"))
+            {
+                dst.Open();
+                src.BackupDatabase(dst, "main", "main", -1, null, 0);      // consistent copy, never a plain file copy of a database in use
+            }
             LastBackup = copy;
         }
 

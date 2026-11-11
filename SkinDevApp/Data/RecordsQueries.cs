@@ -122,7 +122,7 @@ namespace SkinDevApp.Data
         /// <summary>Once a day, the first time the application starts: a copy of the database in Backups\; the newest 14 automatic copies are kept. Returns the file made, or null if today's exists.</summary>
         public static string AutoBackup()
         {
-            string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
+            string dir = DataLocation.BackupsDir;
             Directory.CreateDirectory(dir);
             string today = "lumyvue_db_auto_" + DateTime.Now.ToString("yyyyMMdd");
             if (Directory.GetFiles(dir, today + "*.sqlite").Length > 0) return null;
@@ -136,7 +136,7 @@ namespace SkinDevApp.Data
         /// <summary>The newest backup file name and time, or null.</summary>
         public static string LastBackupText()
         {
-            string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
+            string dir = DataLocation.BackupsDir;
             if (!Directory.Exists(dir)) return null;
             var files = new DirectoryInfo(dir).GetFiles("lumyvue_db_*.sqlite");
             if (files.Length == 0) return null;
@@ -147,7 +147,7 @@ namespace SkinDevApp.Data
         /// <summary>A consistent copy of the whole database (SQLite online backup) in Backups\. Returns the file written.</summary>
         public static string BackupNow(string kind = "manual")
         {
-            string dir = Path.Combine(Path.GetDirectoryName(StudyDatabase.DbPath), "Backups");
+            string dir = DataLocation.BackupsDir;
             Directory.CreateDirectory(dir);
             string file = Path.Combine(dir, "lumyvue_db_" + (kind == "auto" ? "auto_" : "") + DateTime.Now.ToString(kind == "auto" ? "yyyyMMdd_HHmmss" : "yyyyMMdd_HHmmss") + ".sqlite");
             using (var src = StudyDatabase.Open())

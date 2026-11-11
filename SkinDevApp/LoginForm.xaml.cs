@@ -44,6 +44,16 @@ namespace SkinDevApp.Views
         {
             if (EnterPortalBtn == null || FirstRunPanel == null) return;
 
+            // the database is not usable: never offer to create the first account (that would start an empty installation beside the real data)
+            if (!StudyDatabase.IsReady)
+            {
+                _firstRun = false;
+                FirstRunPanel.Visibility = Visibility.Collapsed;
+                EnterPortalBtn.IsEnabled = false;
+                LoginHintTxt.Text = "The database could not be opened, so signing in is not possible. " + (StudyDatabase.LastError ?? "") + " Nothing was changed. Please report this message.";
+                return;
+            }
+
             try { _firstRun = !AuthService.HasAccounts(); }
             catch (Exception ex)
             {

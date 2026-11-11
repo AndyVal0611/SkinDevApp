@@ -66,6 +66,9 @@ namespace SkinDevApp
             // "SkinDevApp.exe --diagnose <image>": headless, read-only replay of the classifier and detectors (see CnnDiagnostics.cs)
             if (SkinDevApp.AI.CnnDiagnostics.TryRunFromArgs(e.Args)) { Shutdown(0); return; }
 
+            // "SkinDevApp.exe --restore-db <backup> [--confirm]": internal restore of a database backup (see DatabaseRestore); no window
+            if (SkinDevApp.Data.DatabaseRestore.TryRunFromArgs(e.Args)) { Shutdown(0); return; }
+
             SkinDevApp.Views.ScanInterpreter.Settings = SkinDevApp.Views.InterpretationSettings.From(k => System.Configuration.ConfigurationManager.AppSettings[k]);
 
             SkinDevApp.V6.V6FeatureFlag.VariantProvider = () => System.Configuration.ConfigurationManager.AppSettings["V6Variant"] ?? Environment.GetEnvironmentVariable(SkinDevApp.V6.V6FeatureFlag.VariantEnvironmentVariable);
@@ -156,6 +159,11 @@ namespace SkinDevApp
             await splash.FinishAsync();
             splash.Close();
             main.Activate();
+
+            // the database could not be opened or migrated safely: say so plainly. LUMYVUE did NOT create a new empty database and did not change any data.
+            if (dbProblem != null)
+                LumyDialog.Show("LUMYVUE could not open its database.\n\n" + dbProblem + "\n\nNothing was changed and no new database was created. Please keep this message and report it.\n\nData folder: " + SkinDevApp.Data.DataLocation.DataRoot,
+                                "LUMYVUE database", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
