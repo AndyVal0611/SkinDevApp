@@ -111,7 +111,12 @@ namespace SkinDevApp.Views
 
         private void Backup()
         {
-            try { string f = RecordsQueries.BackupNow(); LumyDialog.Show("A full copy of the database was saved (" + DateTime.Now.ToString("d MMM yyyy, h:mm tt", System.Globalization.CultureInfo.InvariantCulture) + ").", "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information); }
+            try
+            {
+                string f = RecordsQueries.BackupNow();
+                string copy = SkinDevApp.Data.DataMirror.Run();
+                LumyDialog.Show("A full copy of the database was saved (" + DateTime.Now.ToString("d MMM yyyy, h:mm tt", System.Globalization.CultureInfo.InvariantCulture) + ").\n\n" + copy, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
             catch (Exception ex) { LumyDialog.Show("The backup could not be made: " + ex.Message, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 

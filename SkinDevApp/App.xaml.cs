@@ -32,9 +32,12 @@ namespace SkinDevApp
         public static bool KioskMode { get; private set; }
         private static System.Threading.Mutex _kioskMutex;
 
+        private static System.Threading.Timer _mirrorTimer;
+
         protected override void OnExit(ExitEventArgs e)
         {
             try { SkinDevApp.Data.LightController.CloseForExit(); } catch { }        // ring light off, serial port closed
+            try { _mirrorTimer?.Dispose(); SkinDevApp.Data.DataMirror.Run(); } catch { }   // last plain copy of everything gathered
             base.OnExit(e);
         }
 
@@ -59,6 +62,9 @@ namespace SkinDevApp
                 };
                 AppDomain.CurrentDomain.UnhandledException += (s, ex) => { DeviceShutdown.LogCrash(ex.ExceptionObject as Exception); Environment.Exit(1); };
             }
+
+            // plain copy of the gathered data (scans, reports, receipts, database) every 10 minutes; first one comes with the start-up maintenance
+            _mirrorTimer = new System.Threading.Timer(_ => { try { SkinDevApp.Data.DataMirror.Run(); } catch { } }, null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
 
             // Windows is shutting down or restarting: let the last scan finish saving (never blocks the shutdown for long)
             SessionEnding += (s, ex) => { try { SkinDevApp.Data.SaveQueue.WaitAll(TimeSpan.FromSeconds(8)); } catch { } try { SkinDevApp.Data.LightController.ShutdownLights(1200); } catch { } };

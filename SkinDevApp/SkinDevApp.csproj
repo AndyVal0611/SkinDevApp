@@ -182,6 +182,7 @@
     <Compile Include="Views\LightPanel.cs" />
     <Compile Include="Data\LightController.cs" />
     <Compile Include="Data\DataMigration.cs" />
+    <Compile Include="Data\DataMirror.cs" />
     <Compile Include="Hardware\ESP32Controller.cs" />
     <None Include="Kiosk\Run-LumyvueKiosk.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

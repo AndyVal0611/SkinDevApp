@@ -35,6 +35,7 @@ namespace SkinDevApp.V6
             {
                 if (!StudyDatabase.IsReady) { Report("Database not available"); return; }
                 try { RecordsQueries.AutoBackup(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[AutoBackup] " + ex.Message); }
+                try { DataMirror.Run(); } catch { }                                   // plain copy in Documents\LUMYVUE Data
                 Report("Checking stored AI results");
                 foreach (string id in AllSessions())
                     try { AIResultStore.SyncSession(id); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[Sync] " + id + ": " + ex.Message); }
