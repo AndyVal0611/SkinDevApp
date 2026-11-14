@@ -107,7 +107,7 @@ namespace SkinDevApp.V6
                 top.Children.Add(pill);
                 top.Children.Add(Ui.Text(f.Condition, 13, true, idx >= 0 ? Ui.Brush(ClassPalette.Hex[idx]) : Ui.Ink, new Thickness(0, 2, 8, 0)));
                 item.Children.Add(top);
-                string detail = "Confidence " + ClinicalSummary.ConfidenceText(f) + " · " + (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Certainty + " certainty" + (f.ByDetector ? " · found by the lesion detector" : "") : "Review needed") +
+                string detail = (f.Status == ClinicalSummary.Detected || f.Status == ClinicalSummary.NotDetected ? f.Status : "Review needed") +
                                 (f.Regions.Count > 0 ? " · " + string.Join("; ", f.Regions) : "");
                 item.Children.Add(Ui.Text(detail, 12, false, Ui.Muted, new Thickness(0, 2, 0, 0)));
                 sp.Children.Add(item);
