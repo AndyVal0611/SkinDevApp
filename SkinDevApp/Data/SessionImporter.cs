@@ -253,11 +253,19 @@ namespace SkinDevApp.Data
             if (string.IsNullOrEmpty(head.ParticipantID))
                 return "UNASSIGNED-" + head.ScanSessionID.Replace("single-", "").Substring(0, 8).ToUpperInvariant();
 
+            int count, highest = 0;
             using (var cmd = StudyRepository.Cmd(c, "SELECT COUNT(*) FROM ScanSessions WHERE ParticipantID=@p;", tx, "@p", head.ParticipantID))
-            {
-                int n = Convert.ToInt32(cmd.ExecuteScalar()) + 1;
-                return head.ParticipantID + "-S" + n.ToString("00", CultureInfo.InvariantCulture);
-            }
+                count = Convert.ToInt32(cmd.ExecuteScalar());
+            // the highest number already used, so a number freed by a deleted scan is never given to a new one
+            using (var cmd = StudyRepository.Cmd(c, "SELECT SessionLabel FROM ScanSessions WHERE ParticipantID=@p;", tx, "@p", head.ParticipantID))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read())
+                {
+                    string l = StudyRepository.S(r, "SessionLabel"); int at = l == null ? -1 : l.LastIndexOf("-S", StringComparison.Ordinal), v;
+                    if (at >= 0 && int.TryParse(l.Substring(at + 2), NumberStyles.None, CultureInfo.InvariantCulture, out v) && v > highest) highest = v;
+                }
+            int n = Math.Max(count, highest) + 1;
+            return head.ParticipantID + "-S" + n.ToString("00", CultureInfo.InvariantCulture);
         }
 
         private static long EnsureModel(SQLiteConnection c, SQLiteTransaction tx, ModelSection m)

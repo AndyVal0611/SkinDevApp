@@ -533,6 +533,58 @@ namespace SkinDevApp.Data
             return list;
         }
 
+        /// <summary>
+        /// Deletes a scan (and everything stored for it) from the database. Nothing is recorded about the deletion. For safety a verified database
+        /// backup is made first, and the scan's image folder is not erased but moved to Backups\Deleted scans.
+        /// </summary>
+        public static bool DeleteScan(string scanSessionId)
+        {
+            if (string.IsNullOrWhiteSpace(scanSessionId)) return false;
+            string folder, participant, label;
+            using (var c0 = StudyDatabase.Open())
+            using (var q = Cmd(c0, "SELECT SessionFolder, ParticipantID, SessionLabel FROM ScanSessions WHERE ScanSessionID=@s;", null, "@s", scanSessionId))
+            using (var r = q.ExecuteReader())
+            {
+                if (!r.Read()) return false;
+                folder = S(r, "SessionFolder"); participant = S(r, "ParticipantID"); label = S(r, "SessionLabel");
+            }
+
+            RecordsQueries.BackupNow();
+            const string caps = "(SELECT CaptureID FROM CaptureViews WHERE ScanSessionID=@s)";
+            using (var c = StudyDatabase.Open())
+            using (var tx = c.BeginTransaction())
+            {
+                void Del(string sql) { using (var cmd = Cmd(c, sql, tx, "@s", scanSessionId)) cmd.ExecuteNonQuery(); }
+                foreach (string t in new[] { "AIFindings", "AIMarkedAreas", "AttributionMaps", "LesionDetections", "LocalizationRuns", "AnalysisImages", "ClassScores", "AnalysisResults", "AIAssessments" })
+                    Del("DELETE FROM " + t + " WHERE CaptureID IN " + caps + ";");
+                Del("DELETE FROM CaptureViews WHERE ScanSessionID=@s;");
+                Del("DELETE FROM AssessmentLabels WHERE OwnerID IN (SELECT ValidationID FROM DermatologistValidations WHERE ScanSessionID=@s);");
+                Del("DELETE FROM DermatologistConditionReviews WHERE ScanSessionID=@s;");
+                Del("DELETE FROM DermatologistValidations WHERE ScanSessionID=@s;");
+                Del("DELETE FROM FitzpatrickAssessments WHERE ScanSessionID=@s;");
+                Del("DELETE FROM ReceiptPrintAttempts WHERE ReceiptID IN (SELECT ReceiptID FROM Receipts WHERE ScanSessionID=@s);");
+                Del("DELETE FROM Receipts WHERE ScanSessionID=@s;");
+                Del("DELETE FROM ScanSessions WHERE ScanSessionID=@s;");
+                tx.Commit();
+            }
+
+            // the images are kept out of the patient's record but not erased
+            try
+            {
+                string src = !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder) ? folder : DataLocation.Rebase(folder);
+                if (!string.IsNullOrEmpty(src) && System.IO.Directory.Exists(src))
+                {
+                    string root = System.IO.Path.Combine(DataLocation.BackupsDir, "Deleted scans");
+                    System.IO.Directory.CreateDirectory(root);
+                    string name = (label ?? scanSessionId) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    string dest = System.IO.Path.Combine(root, string.Concat(name.Split(System.IO.Path.GetInvalidFileNameChars())));
+                    System.IO.Directory.Move(src, dest);
+                }
+            }
+            catch (Exception ex) { DataMigration.Log("Deleted scan " + scanSessionId + ": its image folder could not be moved: " + ex.Message); }
+            return true;
+        }
+
         public static List<ScanSessionRow> UnlinkedSessions()
         {
             var list = new List<ScanSessionRow>();

@@ -339,9 +339,22 @@ namespace SkinDevApp.Views
                     LumyDialog.Show("Saved. The scan is now \"" + next + "\" and its files were moved to the matching folder.", "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Information);
                     reload(); RenderSummary();
                 }, "GhostButton"));
+
+                d.Children.Add(Action("Delete this scan", (s, e) =>
+                {
+                    if (!ConfirmDelete(sd.Session.DisplayId, sd.Session.ParticipantID)) return;
+                    try { StudyRepository.DeleteScan(id); }
+                    catch (Exception ex) { LumyDialog.Show("The scan could not be deleted: " + ex.Message, "LUMYVUE Records", MessageBoxButton.OK, MessageBoxImage.Error); return; }
+                    reload(); RenderSummary();
+                }, "GhostButton"));
             }, out reload);
             return tab;
         }
+
+        /// <summary>Asks before a scan is deleted (shared by Records and the patient page).</summary>
+        internal static bool ConfirmDelete(string scanName, string patient) =>
+            LumyDialog.Show("Delete scan " + scanName + (string.IsNullOrEmpty(patient) ? "" : " of " + patient) + "?\n\nThe scan and its results are removed from the patient's record and cannot be brought back from the app. " +
+                            "A backup of the database is made first, and its images are moved to the Backups\\Deleted scans folder.", "LUMYVUE Records", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
         // ------------------------------------------------------------------ findings, reviews, audit
 

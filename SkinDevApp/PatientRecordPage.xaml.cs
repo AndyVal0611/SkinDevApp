@@ -410,6 +410,26 @@ namespace SkinDevApp
             _detailHost.Children.Add(DetailCard(d));
             _detailHost.Children.Add(ReceiptPanel.Card(d, () => ShowDetail(row)));
             _detailHost.Children.Add(EvidenceCard(d));
+            _detailHost.Children.Add(DeleteScanCard(d));
+        }
+
+        /// <summary>Deletes this scan from the patient's record (after a confirmation).</summary>
+        private Border DeleteScanCard(SessionDetail d)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Ui.Text("Delete this scan", 15, true));
+            sp.Children.Add(Ui.Text("Removes this scan and its results from the patient's record. It cannot be brought back from the app.", 11.5, false, Ui.Muted));
+            Button del = Ui.Btn("Delete scan", (o, e) =>
+            {
+                if (!SkinDevApp.Views.RecordsDatabasePage.ConfirmDelete(d.Session.DisplayId, d.Session.ParticipantID)) return;
+                try { StudyRepository.DeleteScan(d.Session.ScanSessionID); }
+                catch (Exception ex) { LumyDialog.Show("The scan could not be deleted: " + ex.Message, "LUMYVUE", MessageBoxButton.OK, MessageBoxImage.Error); return; }
+                if (_p != null) LoadParticipant(_p.ParticipantID);
+            }, "GhostButton");
+            del.HorizontalAlignment = HorizontalAlignment.Left;
+            del.Margin = new Thickness(0, 10, 0, 0);
+            sp.Children.Add(del);
+            return Ui.Card(sp);
         }
 
         internal static Border DetailCard(SessionDetail d)
