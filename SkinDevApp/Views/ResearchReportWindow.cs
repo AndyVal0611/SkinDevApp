@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // ResearchReportWindow.cs  -  namespace SkinDevApp.Views
 //
 // "PrecisionSkin Research Analysis Report" for one saved scan session. Built only
@@ -444,11 +444,21 @@ namespace SkinDevApp.Views
             DermatologistValidation dv = _d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault();
             SkinProfile skin = string.IsNullOrEmpty(s.ParticipantID) ? null : StudyRepository.GetSkinProfile(s.ParticipantID);
             sp.Children.Add(Heading("Human assessment"));
-            sp.Children.Add(Table(new[]
+            var humanRows = new List<KeyValuePair<string, string>>
             {
                 Ui.KV("Dermatologist review", dv == null ? "Pending" : (dv.DermatologistAssessment ?? "—") + " · " + (ReviewStatus.FromValidation(dv.ValidationStatus) ?? "draft") + " · " + dv.DermatologistID + " · " + Fmt.When(dv.ValidationDate)),
                 Ui.KV("Verification status", s.ReviewStatus ?? ReviewStatus.Pending)
-            }, 150));
+            };
+            if (dv != null)
+            {
+                // what the dermatologist recorded in the review window: who, each condition's verdict, and the notes (read from the saved review)
+                string who = string.Join(" · ", new[] { dv.ValidatorName, string.IsNullOrWhiteSpace(dv.CredentialReference) ? null : "Reg. no. " + dv.CredentialReference }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                if (who.Length > 0) humanRows.Add(Ui.KV("Reviewed by", who));
+                foreach (var cr in StudyRepository.LatestConditionReviews(s.ScanSessionID))
+                    humanRows.Add(Ui.KV(cr.Key, (cr.Value.Status ?? "—") + (string.IsNullOrWhiteSpace(cr.Value.Observation) ? "" : " — " + cr.Value.Observation)));
+                if (!string.IsNullOrWhiteSpace(dv.Notes)) humanRows.Add(Ui.KV("Dermatologist notes", dv.Notes));
+            }
+            sp.Children.Add(Table(humanRows, 150));
 
             // disclaimer + full hash
             sp.Children.Add(new Border { Height = 8 });
@@ -908,12 +918,13 @@ namespace SkinDevApp.Views
         private static TextBlock FormLabel(string text) => T(text, 8.5, true, Navy, 3);
 
         /// <summary>Wrapping row of "box + option" entries.</summary>
-        private static WrapPanel Boxes(IEnumerable<string> options)
+        private static WrapPanel Boxes(IEnumerable<string> options, ISet<string> ticked = null)
         {
             var w = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
             foreach (string o in options)
             {
-                var t = T("☐  " + o, 9, false, TextInk, 0);
+                bool on = ticked != null && ticked.Contains(o);
+                var t = T((on ? "☑  " : "☐  ") + o, 9, on, on ? Navy : TextInk, 0);
                 t.Margin = new Thickness(0, 0, 18, 4);
                 w.Children.Add(t);
             }
@@ -972,8 +983,11 @@ namespace SkinDevApp.Views
         {
             ScanSessionRow s = _d.Session;
             var sp = new StackPanel();
+            // the dermatologist form shows what was saved in the review window; with no saved review it stays a blank form
+            DermatologistValidation dv = dermatologist ? (_d.Validations.FirstOrDefault(x => x.ValidationStatus != ReviewStatus.ValidationDraft) ?? _d.Validations.FirstOrDefault()) : null;
             sp.Children.Add(T(dermatologist ? "Dermatologist Review" : "Reference Assessment", 17, true, Navy, 0));
-            sp.Children.Add(T("Printed form — to be completed by hand and signed", 8.5, false, Muted, 6));
+            sp.Children.Add(T(dv != null ? "Recorded in LUMYVUE by the reviewing dermatologist · " + Fmt.When(dv.ValidationDate)
+                                         : dermatologist ? "Printed form — to be completed by hand" : "Printed form — to be completed by hand and signed", 8.5, false, Muted, 6));
 
             sp.Children.Add(Table(new[]
             {
@@ -990,19 +1004,45 @@ namespace SkinDevApp.Views
 
             if (dermatologist)
             {
-                sp.Children.Add(FieldRow(Tuple.Create("Reviewer ID *", (string)null),
-                                         Tuple.Create("Reviewer name (where permitted)", (string)null)));
+                sp.Children.Add(FieldRow(Tuple.Create("Reviewer ID *", dv == null ? null : dv.DermatologistID),
+                                         Tuple.Create("Reviewer name (where permitted)", dv == null ? null : dv.ValidatorName)));
                 sp.Children.Add(FieldRow(Tuple.Create("Professional role", "Dermatologist"),
-                                         Tuple.Create("Registration number (optional)", (string)null)));
+                                         Tuple.Create("Registration number (optional)", dv == null ? null : dv.CredentialReference)));
+            }
+
+            // ticks come only from the saved answers: a condition is ticked when it was Confirmed; "Normal" when every condition was Not Confirmed;
+            // "Other / uncertain" when any condition still needs further assessment
+            ISet<string> labelTicks = null, agreeTicks = null;
+            if (dv != null)
+            {
+                var verdicts = StudyRepository.LatestConditionReviews(_d.Session.ScanSessionID);
+                // the dermatologist's own ticked labels (saved in the review window); reviews saved before that question existed fall back to the condition verdicts
+                labelTicks = new HashSet<string>((dv.DermatologistAssessment ?? "").Split(',').Select(x => x.Trim()).Where(x => FormLabels.Contains(x, StringComparer.OrdinalIgnoreCase)), StringComparer.OrdinalIgnoreCase);
+                if (labelTicks.Count == 0)
+                {
+                    labelTicks = new HashSet<string>(verdicts.Where(kv => kv.Value.Status == ConditionReview.Confirmed).Select(kv => kv.Key), StringComparer.OrdinalIgnoreCase);
+                    if (verdicts.Count > 0 && verdicts.All(kv => kv.Value.Status == ConditionReview.NotConfirmed)) labelTicks.Add("Normal");
+                    if (verdicts.Any(kv => kv.Value.Status == ConditionReview.FurtherAssessment || kv.Value.Status == ConditionReview.Pending)) labelTicks.Add("Other / uncertain");
+                }
+                agreeTicks = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { string.IsNullOrWhiteSpace(dv.AgreementWithAI) ? "Uncertain" : dv.AgreementWithAI };
             }
 
             sp.Children.Add(FormLabel((dermatologist ? "Dermatologist assessment" : "Reference assessment") + " *"));
-            sp.Children.Add(Boxes(FormLabels));
+            sp.Children.Add(Boxes(FormLabels, labelTicks));
 
             sp.Children.Add(FormLabel("Agreement with the AI result *"));
-            sp.Children.Add(Boxes(FormAgreement));
+            sp.Children.Add(Boxes(FormAgreement, agreeTicks));
 
-            sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Notes", dermatologist ? 8 : 5));
+            if (dv != null && !string.IsNullOrWhiteSpace(dv.Notes))
+            {
+                var notes = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
+                notes.Children.Add(FormLabel("Dermatologist notes"));
+                var nt = T(dv.Notes, 9, false, TextInk, 0); nt.TextWrapping = TextWrapping.Wrap; nt.Margin = new Thickness(0, 2, 0, 6);
+                notes.Children.Add(nt);
+                notes.Children.Add(new Border { Height = 1, Background = C("#9CA3AF") });
+                sp.Children.Add(notes);
+            }
+            else sp.Children.Add(WriteArea(dermatologist ? "Dermatologist notes" : "Notes", dermatologist ? (dv != null ? 2 : 8) : 5));
 
             if (!dermatologist)
             {
@@ -1013,20 +1053,14 @@ namespace SkinDevApp.Views
             else
             {
                 sp.Children.Add(FormLabel("Review status *"));
-                sp.Children.Add(Boxes(new[] { "Completed", "Pending" }));
+                sp.Children.Add(Boxes(new[] { "Completed", "Pending" }, dv == null ? null :
+                    new HashSet<string> { string.Equals(dv.ValidationStatus, ReviewStatus.ValidationCompleted, StringComparison.OrdinalIgnoreCase) ? "Completed" : "Pending" }));
             }
 
-            // signature block
-            sp.Children.Add(Rule(4, 6));
-            if (dermatologist)
+            // signature block (research team only: the dermatologist form has no signature or date line)
+            if (!dermatologist)
             {
-                sp.Children.Add(FieldRowWeighted(new[] { 3.0, 1.0 },
-                    Tuple.Create("Printed name and signature of dermatologist", (string)null),
-                    Tuple.Create("Date", (string)null)));
-                sp.Children[sp.Children.Count - 1].SetValue(FrameworkElement.MarginProperty, new Thickness(0, 22, 0, 8));
-            }
-            else
-            {
+                sp.Children.Add(Rule(4, 6));
                 // every member of the research team signs
                 sp.Children.Add(T("Signed by the review team (all members)", 8.5, true, Navy, 0));
                 foreach (string name in ResearchTeamMembers)

@@ -13,6 +13,10 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/SkinDevApp;component/Themes/Lumyvue.Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <!-- Touchscreen: a finger drag scrolls every scrollable area (without a panning mode only the scroll bar worked) -->
+            <Style TargetType="ScrollViewer">
+                <Setter Property="PanningMode" Value="VerticalFirst"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

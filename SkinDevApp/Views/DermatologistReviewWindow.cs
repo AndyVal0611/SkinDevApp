@@ -44,6 +44,10 @@ namespace SkinDevApp.Views
         private static readonly string[] StatusStored = { ReviewStatus.ValidationCompleted, ReviewStatus.ValidationFurtherReview, ReviewStatus.ValidationDraft };
         private ComboBox _status;
         private TextBox _notes, _id, _name, _cred;
+        // the two questions of the printed review form, answered here so the A4 report can print them
+        private static readonly string[] AssessmentOptions = { "Acne", "Eczema", "Hyperpigmentation", "Normal", "Other / uncertain", "Unusable image" };
+        private readonly List<CheckBox> _assessBoxes = new List<CheckBox>();
+        private readonly List<RadioButton> _agreeRadios = new List<RadioButton>();
         private readonly List<Tuple<string, ComboBox, TextBox>> _condRows = new List<Tuple<string, ComboBox, TextBox>>();
 
         public DermatologistReviewWindow(string scanSessionId)
@@ -342,6 +346,27 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(ConditionVerification());
 
+            sp.Children.Add(Label("Dermatologist assessment *"));
+            sp.Children.Add(Ui.Text("Tick every label you assign to this scan.", 11, false, Ui.Muted));
+            var assessWrap = new WrapPanel { Margin = new Thickness(0, 2, 0, 6) };
+            _assessBoxes.Clear();
+            foreach (string o in AssessmentOptions)
+            {
+                var cb = new CheckBox { Content = o, FontSize = 13, Margin = new Thickness(0, 4, 18, 4), VerticalContentAlignment = VerticalAlignment.Center };
+                _assessBoxes.Add(cb); assessWrap.Children.Add(cb);
+            }
+            sp.Children.Add(assessWrap);
+
+            sp.Children.Add(Label("Agreement with the AI result *"));
+            var agreeWrap = new WrapPanel { Margin = new Thickness(0, 2, 0, 6) };
+            _agreeRadios.Clear();
+            for (int i = 0; i < AgreementStored.Length; i++)
+            {
+                var rb = new RadioButton { Content = AgreementStored[i], GroupName = "derm-agreement", FontSize = 13, Margin = new Thickness(0, 4, 18, 4), VerticalContentAlignment = VerticalAlignment.Center };
+                _agreeRadios.Add(rb); agreeWrap.Children.Add(rb);
+            }
+            sp.Children.Add(agreeWrap);
+
             sp.Children.Add(Label("Notes (optional)"));
             _notes = Field(true); _notes.MinHeight = 90; sp.Children.Add(_notes);
 
@@ -361,7 +386,7 @@ namespace SkinDevApp.Views
 
             sp.Children.Add(Label("Outcome of this review *"));
             _status = Combo(StatusShown); _status.SelectedIndex = 1; sp.Children.Add(_status);
-            sp.Children.Add(Ui.Text("Completed needs a Confirmed or Not confirmed answer for every condition. It moves the scan to the verified records.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
+            sp.Children.Add(Ui.Text("Completed needs a Confirmed or Not confirmed answer for every condition, a dermatologist assessment and an agreement answer. It moves the scan to the verified records.", 11, false, Ui.Muted, new Thickness(0, 4, 0, 0)));
 
             Button save = Ui.Btn("Save assessment", (o, e) => Save(), "PrimaryButton");
             save.Margin = new Thickness(0, 16, 0, 0);
@@ -454,10 +479,17 @@ namespace SkinDevApp.Views
             if (status == ReviewStatus.ValidationCompleted && _condRows.Any(r => (string)r.Item2.SelectedItem == ConditionReview.Pending || (string)r.Item2.SelectedItem == ConditionReview.FurtherAssessment))
             { LumyDialog.Show("A review can be marked completed only when every condition is Confirmed or Not confirmed. Answer each condition, or choose \"Requires further review\" or \"Save as draft\".", "LUMYVUE · Your review"); return; }
 
+            var pickedLabels = _assessBoxes.Where(b => b.IsChecked == true).Select(b => (string)b.Content).ToList();
+            RadioButton pickedAgree = _agreeRadios.FirstOrDefault(r => r.IsChecked == true);
+            if (status == ReviewStatus.ValidationCompleted && (pickedLabels.Count == 0 || pickedAgree == null))
+            { LumyDialog.Show("A review can be marked completed only when you have answered \"Dermatologist assessment\" and \"Agreement with the AI result\". Answer them, or choose \"Requires further review\" or \"Save as draft\".", "LUMYVUE · Your review"); return; }
+
             try
             {
                 string label;
                 string agreement = DeriveAgreement(out label);
+                if (pickedLabels.Count > 0) label = string.Join(", ", pickedLabels);          // the dermatologist's own answers replace the worked-out ones
+                if (pickedAgree != null) agreement = (string)pickedAgree.Content;
                 StudyRepository.SaveDermatologistValidation(new DermatologistValidation
                 {
                     ScanSessionID = _sessionId,
@@ -470,7 +502,7 @@ namespace SkinDevApp.Views
                     Notes = _notes.Text,
                     ValidationStatus = status,
                     ConditionReviews = _condRows.Select(r => new ConditionReview { Condition = r.Item1, Status = (string)r.Item2.SelectedItem, Observation = NullIfEmpty(r.Item3.Text) }).ToList()
-                }, _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList());
+                }, pickedLabels.Count > 0 ? pickedLabels : _condRows.Where(r => (string)r.Item2.SelectedItem == ConditionReview.Confirmed).Select(r => r.Item1).ToList());
 
                 LumyDialog.Show("Assessment saved. Scan status: " + (ReviewStatus.FromValidation(status) ?? "unchanged (draft)") + ". The AI result is unchanged.", "LUMYVUE · Your review",
                     MessageBoxButton.OK, MessageBoxImage.Information);
